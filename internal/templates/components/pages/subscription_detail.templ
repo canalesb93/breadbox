@@ -25,12 +25,13 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 	@components.CategoryPickerStyles()
 	<div x-data="seriesDetail" data-series-id={ p.Series.ShortID }>
 		@components.EntityHeader(components.EntityHeaderProps{
-			Title:    p.Series.Name,
-			Icon:     seriesTypeIcon(p.Series.Type),
-			IconTone: seriesStatusIconTone(p.Series.Status),
-			Badges:   seriesDetailBadges(p.Series),
-			Meta:     components.EntityHeaderMeta(p.Series.CadenceLabel, p.Series.MerchantKey),
-			Action:   seriesDetailActions(p.Series),
+			Title:            p.Series.Name,
+			TitlePrivateKind: "merchant",
+			Icon:             seriesTypeIcon(p.Series.Type),
+			IconTone:         seriesStatusIconTone(p.Series.Status),
+			Badges:           seriesDetailBadges(p.Series),
+			Meta:             components.EntityHeaderMeta(p.Series.CadenceLabel, p.Series.MerchantKey),
+			Action:           seriesDetailActions(p.Series),
 		})
 		@components.SeriesDetectionPanel(p.Detection)
 		<!-- Rule (edit) + Evidence (read) -->

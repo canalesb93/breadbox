@@ -68,15 +68,21 @@ const (
 )
 
 type EntityHeaderProps struct {
-	Title           string
-	TitleClass      string
-	Icon            string
-	IconTone        IconTone
-	IconComponent   templ.Component
-	Badges          templ.Component
-	Meta            templ.Component
-	Action          templ.Component
-	SecondaryAction templ.Component
+	Title      string
+	TitleClass string
+	// TitlePrivateKind marks the title as private user data for the
+	// client-side privacy mode — set it to the data-private kind
+	// ("account" | "institution" | "merchant") when the title is an account
+	// name, institution name, or merchant/series name. Empty = not private
+	// (the default; e.g. a rule name or sync-log title).
+	TitlePrivateKind string
+	Icon             string
+	IconTone         IconTone
+	IconComponent    templ.Component
+	Badges           templ.Component
+	Meta             templ.Component
+	Action           templ.Component
+	SecondaryAction  templ.Component
 }
 
 templ EntityHeader(p EntityHeaderProps) {
@@ -93,7 +99,12 @@ templ EntityHeader(p EntityHeaderProps) {
 			}
 			<div class="min-w-0 flex-1">
 				<div class="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
-					<h1 class={ "bb-page-title min-w-0 max-w-full", p.TitleClass }>{ p.Title }</h1>
+					<h1
+						class={ "bb-page-title min-w-0 max-w-full", p.TitleClass }
+						if p.TitlePrivateKind != "" {
+							data-private={ p.TitlePrivateKind }
+						}
+					>{ p.Title }</h1>
 					if p.Badges != nil {
 						<span class="hidden sm:contents">
 							@p.Badges

@@ -57,7 +57,11 @@ package components
 //	    Format: components.AmountFormatAbbreviated,
 //	    Class:  "text-2xl font-semibold",
 //	})
-
 templ Amount(p AmountProps) {
-	<span class={ amountClasses(p) }>{ AmountText(p) }</span>
+	<span
+		class={ amountClasses(p) }
+		if !p.Public {
+			data-private="amount"
+		}
+	>{ AmountText(p) }</span>
 }

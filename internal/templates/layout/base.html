@@ -38,6 +38,28 @@
       } catch (_) { /* best-effort */ }
     })();
   </script>
+  <script>
+    // Apply the persisted privacy mode before paint so sensitive values never
+    // flash before privacy.js rewrites (obfuscate) or blurs (hide) them.
+    //   'obfuscate'/'hide' — set data-privacy (CSS keys off it) AND add the
+    //     'privacy-pending' class, which blurs every [data-private] until
+    //     privacy.js's first pass runs and removes the class.
+    //   'real' / absent    — no-op.
+    // See static/js/admin/privacy.js + the privacy block in input.css.
+    (function () {
+      try {
+        var p = localStorage.getItem('bb-privacy');
+        if (p === 'obfuscate' || p === 'hide') {
+          document.documentElement.setAttribute('data-privacy', p);
+          document.documentElement.classList.add('privacy-pending');
+        }
+      } catch (_) { /* best-effort */ }
+    })();
+  </script>
+  <!-- Privacy engine: defines window.bbPrivacy and rewrites/restores
+       [data-private] nodes. Non-deferred so it exists before Alpine's
+       `privacy` store inits; its own pass waits for DOMContentLoaded. -->
+  <script src="/static/js/admin/privacy.js"></script>
   <!-- fetchpriority="high" hints that the app stylesheet is render-blocking and
        critical. Safari 17.2+ and Chrome 102+ honor it; older browsers ignore. -->
   <link rel="stylesheet" href="/static/css/styles.css" fetchpriority="high">
@@ -254,6 +276,32 @@
           var self = this;
           mq.addEventListener('change', function(e) { self.systemDark = e.matches; });
         },
+      });
+    });
+  </script>
+
+  <script>
+    // Alpine store: $store.privacy
+    //
+    // Reactive façade over window.bbPrivacy (static/js/admin/privacy.js), which
+    // owns the actual mode state + DOM rewriting. This store exists so the
+    // avatar-menu control can bind to `$store.privacy.mode` for active-segment
+    // highlighting; every mutation delegates to window.bbPrivacy so the engine
+    // stays the single source of truth. Three modes: 'real' / 'obfuscate' /
+    // 'hide'. Persisted per-browser (never server-stored — a privacy preference
+    // shouldn't leak across devices or members), mirroring $store.theme.
+    document.addEventListener('alpine:init', function() {
+      Alpine.store('privacy', {
+        mode: (window.bbPrivacy && window.bbPrivacy.mode) || 'real',
+        set: function(m) {
+          if (window.bbPrivacy) window.bbPrivacy.set(m);
+          this.mode = (window.bbPrivacy && window.bbPrivacy.mode) || m;
+        },
+        cycle: function() {
+          if (window.bbPrivacy) window.bbPrivacy.cycle();
+          this.mode = (window.bbPrivacy && window.bbPrivacy.mode) || this.mode;
+        },
+        get active() { return this.mode !== 'real'; },
       });
     });
   </script>
@@ -2857,6 +2905,19 @@
           group: 'Actions',
           scope: 'global',
           action: function() { if (Alpine.store('theme')) Alpine.store('theme').toggle(); }
+        });
+
+        // Cycle privacy mode: real → obfuscate → hide → real. Bound to
+        // 'shift+p' (a bare 'p' would collide with page-level single-key
+        // bindings); the dispatcher folds Shift into e.key and tries the
+        // 'shift+<key>' spec first, same path as the theme toggle above.
+        reg.register({
+          id: 'global.privacy.cycle',
+          keys: 'shift+p',
+          description: 'Cycle privacy (real → obfuscate → hide)',
+          group: 'Actions',
+          scope: 'global',
+          action: function() { if (Alpine.store('privacy')) Alpine.store('privacy').cycle(); }
         });
 
         Object.keys(goRoutes).forEach(function(k) {
