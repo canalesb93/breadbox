@@ -159,6 +159,20 @@ templ workflowReconfigureDrawer() {
 				@workflowAdvancedFields("reconfigure.maxTurns", "reconfigure.maxBudget")
 			</div>
 			@components.DrawerFooter() {
+				<!-- Destructive reset: removes the instantiated workflow and
+				     returns the card to its un-configured "Set up" state. Subtle
+				     ghost-error icon button so it reads as available-but-quiet,
+				     not a primary action. Confirms via bbConfirm before deleting. -->
+				<button
+					type="button"
+					class="btn btn-ghost btn-sm btn-square text-error/70 hover:text-error tooltip tooltip-top"
+					data-tip="Remove workflow"
+					@click="removeWorkflow()"
+					x-bind:disabled="reconfigure.loading"
+					aria-label="Remove workflow"
+				>
+					@components.LucideIcon("trash-2", "w-4 h-4")
+				</button>
 				<button
 					type="button"
 					class="btn btn-soft btn-sm gap-1.5 mr-auto"
@@ -378,7 +392,7 @@ templ workflowOneOffControls(preset WorkflowPresetCardProps, isAdmin bool) {
 			type="button"
 			class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
 			data-tip="Run now"
-			@click={ "runOneOff('" + preset.Slug + "')" }
+			@click={ "runOneOff('" + preset.Slug + "', '" + preset.Name + "')" }
 			x-bind:disabled={ "runningOneOff['" + preset.Slug + "']" }
 			aria-label={ "Run " + preset.Name + " now" }
 		>
@@ -431,26 +445,23 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 	<div>
 		<div class="text-sm font-medium mb-2">When should the workflow run?</div>
 		<div class="grid grid-cols-2 gap-2">
-			<label class="cursor-pointer">
-				<input type="radio" name="trigger_on_sync" value="false" x-model={ triggerVar } @change={ "describeCron(" + cronVar + ")" } class="peer sr-only"/>
-				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
-					<div class="flex items-center gap-2">
-						@components.LucideIcon("calendar-clock", "w-4 h-4 text-base-content/60")
-						<span class="text-sm font-medium">Custom schedule</span>
-					</div>
-					<div class="text-xs text-base-content/55 mt-1">On a recurring cron schedule</div>
-				</div>
-			</label>
-			<label class="cursor-pointer">
-				<input type="radio" name="trigger_on_sync" value="true" x-model={ triggerVar } class="peer sr-only"/>
-				<div class="rounded-xl border border-base-300 p-3 h-full transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
-					<div class="flex items-center gap-2">
-						@components.LucideIcon("refresh-cw", "w-4 h-4 text-base-content/60")
-						<span class="text-sm font-medium">After each sync</span>
-					</div>
-					<div class="text-xs text-base-content/55 mt-1">Right after new data lands</div>
-				</div>
-			</label>
+			@components.RadioCard(components.RadioCardProps{
+				Name:       "trigger_on_sync",
+				Value:      "false",
+				Icon:       "calendar-clock",
+				Title:      "Custom schedule",
+				Subtitle:   "On a recurring cron schedule",
+				ModelExpr:  triggerVar,
+				ChangeExpr: "describeCron(" + cronVar + ")",
+			})
+			@components.RadioCard(components.RadioCardProps{
+				Name:      "trigger_on_sync",
+				Value:     "true",
+				Icon:      "refresh-cw",
+				Title:     "After each sync",
+				Subtitle:  "Right after new data lands",
+				ModelExpr: triggerVar,
+			})
 		</div>
 		<div x-show={ triggerVar + " === 'false'" } x-cloak class="mt-3 space-y-2">
 			<div class="text-xs font-medium text-base-content/70">Schedule</div>
@@ -540,7 +551,7 @@ templ workflowAdvancedFields(turnsVar, budgetVar string) {
 				<div>
 					<div class="text-xs font-medium text-base-content/60 mb-1.5">Max turns</div>
 					<label class="input input-sm flex items-center gap-1.5 w-full">
-						<input type="number" name="max_turns" x-model={ turnsVar } min="0" max="100" step="1" class="grow tabular-nums" placeholder="10"/>
+						<input type="number" name="max_turns" x-model={ turnsVar } min="0" max="100" step="1" class="grow tabular-nums" placeholder="∞ unlimited"/>
 						<span class="text-[11px] text-base-content/35 font-medium">turns</span>
 					</label>
 				</div>
@@ -553,7 +564,7 @@ templ workflowAdvancedFields(turnsVar, budgetVar string) {
 					</label>
 				</div>
 			</div>
-			<p class="text-[11px] text-base-content/40 mt-2">A run stops at whichever limit it reaches first. Leave blank for the workflow's defaults.</p>
+			<p class="text-[11px] text-base-content/40 mt-2">Cost is the real ceiling — a run stops when it's done or hits the budget. Leave turns blank for unlimited (recommended); set a cap only as a backstop against runaway loops.</p>
 		</div>
 	</div>
 }
@@ -563,7 +574,8 @@ templ workflowAdvancedFields(turnsVar, budgetVar string) {
 // to the workflow default (10 turns / $1.00); an explicit 0 is preserved
 // (0 = no cap), so the ternaries test for empty/null rather than falsiness.
 func workflowAdvancedSummaryExpr(turnsVar, budgetVar string) string {
-	turns := "(" + turnsVar + " === '' || " + turnsVar + " == null ? '10' : " + turnsVar + ")"
+	// Blank/0 turns = unlimited (budget-bound) → render ∞ rather than a number.
+	turns := "(" + turnsVar + " === '' || " + turnsVar + " == null || Number(" + turnsVar + ") <= 0 ? '∞' : " + turnsVar + ")"
 	budget := "(" + budgetVar + " === '' || " + budgetVar + " == null ? '1.00' : Number(" + budgetVar + ").toFixed(2))"
 	return turns + " + ' turns · $' + " + budget
 }

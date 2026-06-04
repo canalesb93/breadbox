@@ -134,6 +134,7 @@ func groupWorkflowPresets(views []service.WorkflowPresetView, lastRuns map[strin
 			EstCostPerRunUSD: v.EstCostPerRunUSD,
 			Model:            model,
 			MaxTurns:         maxTurns,
+			MaxBudgetUSD:     v.MaxBudgetUSD,
 			OneOff:           v.OneOff,
 			Enabled:          v.Enabled,
 		}

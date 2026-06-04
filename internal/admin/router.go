@@ -521,6 +521,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/workflows/{slug}/run", RunAgentNowAdminHandler(a, svc))
 			r.Post("/workflows/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
+			// Abort an in-progress run mid-flight (run-detail "Cancel run" button).
+			// Editor-level, like run/enable/disable above.
+			r.Post("/workflows/runs/{shortId}/cancel", CancelWorkflowRunAdminHandler(a, svc))
+			r.Post("/agents/runs/{shortId}/cancel", CancelWorkflowRunAdminHandler(a, svc))
 			// Lightweight JSON status poll (short_id + status) for the gallery's
 			// one-off Run button spinner. Static "runs" segment never shadows
 			// the {slug}/* routes above.
@@ -539,6 +543,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// because a reconfigure re-authorizes recurring AI spend behavior.
 			r.With(RequireAdmin(sm)).Get("/workflows/{slug}/config", WorkflowConfigAdminHandler(svc))
 			r.With(RequireAdmin(sm)).Post("/workflows/{slug}/reconfigure", ReconfigureWorkflowAdminHandler(svc))
+			// Remove an instantiated workflow, resetting the preset card back to
+			// "Set up". Admin-only — deleting de-authorizes the recurring spend the
+			// enable gesture authorized, mirroring the enable/reconfigure guard.
+			r.With(RequireAdmin(sm)).Post("/workflows/{slug}/delete", DeleteWorkflowAdminHandler(svc))
 		})
 
 		// Admin-only API routes.

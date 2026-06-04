@@ -46,7 +46,31 @@ var defaultAgentSystemPrompt = func() string {
 }()
 
 // DefaultAgentMaxTurns is the per-run turn cap when a definition omits one.
-const DefaultAgentMaxTurns = 10
+// 0 means UNLIMITED — the per-run cost budget (max_budget_usd) and the run
+// timeout are the real ceilings. A turn cap that bites before the budget just
+// abandons a half-finished run with money still on the table (the next run
+// redoes the setup work), so we don't impose one by default; an operator can
+// still set an explicit 1-100 cap in Advanced as a belt-and-suspenders backstop.
+const DefaultAgentMaxTurns = 0
+
+// SidecarMaxTurnsCap is the positive turn value handed to the sidecar when a
+// definition's cap is "unlimited" (0). The Claude Agent SDK / sidecar schema
+// requires a positive integer, so unlimited is expressed as a ceiling high
+// enough that the budget + 30-minute run timeout always bind first. Resolved
+// via sidecarMaxTurns() at spec-assembly time only — the DB still stores 0.
+const SidecarMaxTurnsCap = 1000
+
+// sidecarMaxTurns maps a definition's stored cap to the value the sidecar runs
+// with: an explicit positive cap passes through; 0/unlimited becomes the high
+// SidecarMaxTurnsCap so the budget is the practical ceiling. This is also the
+// defense-in-depth guard against forwarding a non-positive max_turns to the
+// sidecar, which its z.number().int().positive() schema rejects.
+func sidecarMaxTurns(n int) int {
+	if n <= 0 {
+		return SidecarMaxTurnsCap
+	}
+	return n
+}
 
 // DefaultAgentMaxBudgetUSD mirrors the workflows migration default.
 // The column is NOT NULL, so we always send a value to sqlc.
@@ -79,7 +103,7 @@ type AgentDefinitionResponse struct {
 	TriggerOnSyncComplete bool `json:"trigger_on_sync_complete"`
 	// SourceTemplate is the workflow-preset slug this definition was
 	// instantiated from, or nil if it was hand-authored.
-	SourceTemplate *string          `json:"source_template,omitempty"`
+	SourceTemplate *string `json:"source_template,omitempty"`
 	// AvatarSeed is the per-workflow DiceBear seed for this definition's
 	// identicon. nil/empty means the avatar seeds on the slug instead (the
 	// historical default). Editable from the Workflows reconfigure drawer.
@@ -1250,17 +1274,6 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		maxBudget = *def.MaxBudgetUSD
 	}
 
-	// Clamp max_turns to a positive value. The sidecar's spec schema requires
-	// maxTurns > 0 (z.number().int().positive()); a definition holding 0 — e.g.
-	// a pre-fix row, or a max_turns:0 edit that slipped past validation — would
-	// otherwise forward maxTurns:0 and fail the run with spec_invalid before it
-	// even starts. Last line of defense before the sidecar; mirrors the
-	// create-path default so any non-positive value resolves to the default.
-	maxTurns := def.MaxTurns
-	if maxTurns <= 0 {
-		maxTurns = DefaultAgentMaxTurns
-	}
-
 	// SystemPrompt: caller-defined override wins; otherwise the breadbox
 	// baseline is injected. Without this fallback the SDK silently uses
 	// its built-in "Claude Code"-style persona, which is optimized for
@@ -1276,11 +1289,15 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		Prompt:            def.Prompt,
 		SystemPrompt:      systemPrompt,
 		Model:             def.Model,
-		MaxTurns:          maxTurns,
-		MaxBudgetUsd:      maxBudget,
-		ToolScope:         def.ToolScope,
-		AllowedTools:      allowedTools,
-		MCPServers:        mcpServers,
+		// sidecarMaxTurns clamps an unlimited (0) cap up to the positive value the
+		// sidecar schema requires (z.number().int().positive()); an explicit cap
+		// passes through. This is also the last line of defense against a stray
+		// max_turns:0 reaching the sidecar and failing the run with spec_invalid.
+		MaxTurns:     sidecarMaxTurns(def.MaxTurns),
+		MaxBudgetUsd: maxBudget,
+		ToolScope:    def.ToolScope,
+		AllowedTools: allowedTools,
+		MCPServers:   mcpServers,
 		Auth: agent.AuthConfig{
 			Mode:  authMode,
 			Token: token,

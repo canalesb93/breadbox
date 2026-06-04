@@ -35,6 +35,28 @@ func WorkflowConfigAdminHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// DeleteWorkflowAdminHandler handles POST /-/workflows/{slug}/delete. It removes
+// the instantiated workflow (its agent_definition), resetting the preset card
+// back to its un-configured "Set up" state. Run history is preserved (the FK is
+// SET NULL), and the scheduler hot-reloads off the definition-changed hook so
+// the cron entry is dropped immediately. Admin-only — deleting de-authorizes
+// the recurring AI spend the enable gesture authorized, mirroring that guard.
+// Returns JSON {ok:true} for the gallery's async fetch (no full-page redirect).
+func DeleteWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := chi.URLParam(r, "slug")
+		if err := svc.DeleteAgentDefinition(r.Context(), slug); err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Workflow not found")
+				return
+			}
+			writeError(w, http.StatusUnprocessableEntity, "WORKFLOW_DELETE_FAILED", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
 // ReconfigureWorkflowAdminHandler handles POST /-/workflows/{slug}/reconfigure.
 // It re-composes the configurable layers of an already-enabled workflow
 // (schedule, additional-instructions tail, chosen options) without touching

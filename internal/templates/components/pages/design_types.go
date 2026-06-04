@@ -227,6 +227,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionFormControls() },
 		},
 		{
+			Slug:        "radio-card",
+			Title:       "Radio card",
+			Description: "components.RadioCard — a radio styled as a selectable icon+title+subtitle tile. The \"pick one of a few, each worth a sentence\" control (roomier than a bare radio list, lighter than a wizard step). Powers the Workflows drawer trigger choice (Custom schedule vs After each sync). Hover lifts the surface, keyboard focus rings the card, the chosen tile flips to primary with a check; native or Alpine-bound.",
+			Group:       "forms",
+			Render:      func() templ.Component { return SectionRadioCard() },
+		},
+		{
 			Slug:        "filter-search-input",
 			Title:       "Filter search input",
 			Description: "Client-side filter input — daisy input + leading search icon + x-model binding for Alpine-driven row filtering. Use components.FilterSearchInput on /categories, /tags, and future inline-filter list pages.",

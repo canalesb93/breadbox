@@ -144,6 +144,27 @@ templ agentRunDetailHeader(p AgentRunDetailProps) {
 			</div>
 		</div>
 		<div class="bb-run-header__actions">
+			<!-- Cancel run — only while in_progress. status is reactive (the live
+			     poll updates it), so this hides itself the moment the run lands
+			     a terminal status. x-cloak avoids a flash on terminal runs. -->
+			<button
+				type="button"
+				class="btn btn-sm btn-error btn-soft gap-2"
+				x-show="status === 'in_progress'"
+				x-cloak
+				title="Stop this run now"
+				@click="cancelRun()"
+				:disabled="cancelling"
+			>
+				<span x-show="!cancelling" class="contents">
+					@components.LucideIcon("square", "w-4 h-4")
+					Cancel run
+				</span>
+				<span x-show="cancelling" x-cloak class="contents">
+					<span class="loading loading-spinner loading-xs"></span>
+					Cancelling…
+				</span>
+			</button>
 			if effectiveRunPrompt(p) != "" {
 				<button
 					type="button"
@@ -193,6 +214,8 @@ templ agentRunSummaryStatus(status string) {
 			<span class="badge badge-soft badge-error badge-sm">timeout</span>
 		case "skipped":
 			<span class="badge badge-ghost badge-sm">skipped</span>
+		case "cancelled":
+			<span class="badge badge-soft badge-warning badge-sm">cancelled</span>
 		case "in_progress":
 			<span class="inline-flex items-center gap-1.5 text-primary text-sm">
 				<span class="loading loading-spinner loading-xs"></span>

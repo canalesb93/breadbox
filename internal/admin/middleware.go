@@ -25,7 +25,11 @@ type NavBadges struct {
 	UnreadReports        int64
 	// SeriesCandidates is the count of recurring-series candidates awaiting a
 	// confirm/reject verdict. Displayed next to the Subscriptions nav link.
-	SeriesCandidates   int64
+	SeriesCandidates int64
+	// WorkflowFailures is the count of preset-instantiated workflows whose most
+	// recent run errored. Drives a red dot on the Workflows nav link so a failed
+	// automation is visible from any page (mirrors the /workflows card red dot).
+	WorkflowFailures   int64
 	ShowGettingStarted bool
 }
 
@@ -61,6 +65,12 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 				badges.SeriesCandidates = cand
 			} else {
 				logger.Debug("nav badges: count candidate series", "error", err)
+			}
+
+			if failed, err := queries.CountWorkflowsWithFailedLastRun(ctx); err == nil {
+				badges.WorkflowFailures = failed
+			} else {
+				logger.Debug("nav badges: count failed workflows", "error", err)
 			}
 
 			// Check if getting started guide should show in nav.

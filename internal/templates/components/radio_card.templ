@@ -1,0 +1,79 @@
+package components
+
+// RadioCard is a radio input styled as a selectable card — an icon + title +
+// optional subtitle in a bordered tile that lights up (primary border, soft
+// primary fill, primary icon, a check affordance) when chosen. It's the
+// "pick one of a few options, each worth a sentence" control: roomier and more
+// legible than a bare radio list, lighter than a wizard step. The Workflows
+// drawer uses a 2-up pair for the trigger choice (Custom schedule vs After each
+// sync); drop N of them into a grid for more.
+//
+// Binding is flexible so the same card works server-rendered or Alpine-driven:
+//   - Native: set Checked on the default card and share Name across the group;
+//     the browser owns selection and the CSS (peer-checked / has-checked)
+//     reacts live — no JS needed (this is how the sandbox renders them).
+//   - Alpine: pass ModelExpr (an x-model target) and, if needed, ChangeExpr
+//     (an @change handler). The same checked-state CSS reacts to the DOM state
+//     Alpine maintains.
+//
+// Interactions: hover lifts the border + surface; keyboard focus (the visually
+// hidden input is still tabbable) draws a focus-visible ring on the card; the
+// chosen card flips its border, fill, and icon to primary and reveals a check.
+type RadioCardProps struct {
+	// Name is the radio group's form field — shared across the cards in one
+	// choice. Required.
+	Name string
+	// Value is this card's submitted value. Required.
+	Value string
+	// Icon is an optional lucide name shown left of the title; it inherits the
+	// card's color so it tints primary when selected.
+	Icon string
+	// Title is the card's headline. Required.
+	Title string
+	// Subtitle is an optional one-line caption under the title.
+	Subtitle string
+	// ModelExpr is an Alpine x-model target (e.g. "reconfigure.triggerOnSync").
+	// Empty = native/server-rendered selection via Checked.
+	ModelExpr string
+	// ChangeExpr is an optional Alpine @change handler expression.
+	ChangeExpr string
+	// Checked server-renders this card as the default selection (used for the
+	// native path; with ModelExpr, Alpine drives the state instead).
+	Checked bool
+	// Class adds extra classes to the label wrapper (rare).
+	Class string
+}
+
+templ RadioCard(p RadioCardProps) {
+	<label class={ "group block h-full cursor-pointer", p.Class }>
+		<input
+			type="radio"
+			name={ p.Name }
+			value={ p.Value }
+			if p.ModelExpr != "" {
+				x-model={ p.ModelExpr }
+			}
+			if p.ChangeExpr != "" {
+				@change={ p.ChangeExpr }
+			}
+			if p.Checked {
+				checked
+			}
+			class="peer sr-only"
+		/>
+		<div class="flex h-full flex-col rounded-xl border border-base-300 bg-base-100 p-3 text-base-content/55 transition-all duration-150 hover:border-base-content/25 hover:bg-base-200/40 peer-focus-visible:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-primary peer-checked:hover:bg-primary/5">
+			<div class="flex items-center gap-2">
+				if p.Icon != "" {
+					@LucideIcon(p.Icon, "w-4 h-4 shrink-0")
+				}
+				<span class="text-sm font-medium text-base-content">{ p.Title }</span>
+				<span class="ml-auto inline-flex shrink-0 text-primary opacity-0 scale-90 transition-all duration-150 group-has-[:checked]:opacity-100 group-has-[:checked]:scale-100">
+					@LucideIcon("check", "w-4 h-4")
+				</span>
+			</div>
+			if p.Subtitle != "" {
+				<div class="mt-1 text-xs text-base-content/55">{ p.Subtitle }</div>
+			}
+		</div>
+	</label>
+}

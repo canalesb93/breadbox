@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"breadbox/internal/agent"
@@ -78,18 +79,55 @@ type Orchestrator struct {
 	// sched is the agent scheduler this orchestrator notifies on CRUD changes.
 	// Wired via AttachScheduler after construction (avoids a chicken-and-egg).
 	sched *AgentScheduler
+
+	// inFlight maps an in-progress run's short_id to its run-context CancelFunc,
+	// so CancelRun can abort a specific run mid-flight (the run-detail "Cancel
+	// run" button). Registered when the async run goroutine starts and removed
+	// when it exits. Only this process's runs appear here.
+	inFlightMu sync.Mutex
+	inFlight   map[string]context.CancelFunc
 }
 
 // NewOrchestrator constructs an Orchestrator.
 // maxConcurrent < 1 is clamped to 1.
 func NewOrchestrator(svc *Service, runner agent.Runner, maxConcurrent int, encKey []byte, logger *slog.Logger) *Orchestrator {
 	return &Orchestrator{
-		svc:    svc,
-		runner: runner,
-		sem:    agent.NewSemaphore(maxConcurrent),
-		encKey: encKey,
-		logger: logger,
+		svc:      svc,
+		runner:   runner,
+		sem:      agent.NewSemaphore(maxConcurrent),
+		encKey:   encKey,
+		logger:   logger,
+		inFlight: make(map[string]context.CancelFunc),
 	}
+}
+
+// registerInFlight records an in-progress run's CancelFunc so CancelRun can
+// abort it. unregisterInFlight removes it (deferred on goroutine exit).
+func (o *Orchestrator) registerInFlight(shortID string, cancel context.CancelFunc) {
+	o.inFlightMu.Lock()
+	o.inFlight[shortID] = cancel
+	o.inFlightMu.Unlock()
+}
+
+func (o *Orchestrator) unregisterInFlight(shortID string) {
+	o.inFlightMu.Lock()
+	delete(o.inFlight, shortID)
+	o.inFlightMu.Unlock()
+}
+
+// CancelRun aborts an in-progress run by cancelling its run context, which
+// SIGKILLs the sidecar process group (see internal/agent/sidecar.go). The run
+// goroutine then persists a terminal 'cancelled' status. Returns true if the
+// run was found in-flight in THIS process; false means it already finished (or
+// is unknown here), and the caller should treat that as a no-op / conflict.
+func (o *Orchestrator) CancelRun(shortID string) bool {
+	o.inFlightMu.Lock()
+	cancel, ok := o.inFlight[shortID]
+	o.inFlightMu.Unlock()
+	if ok {
+		cancel()
+	}
+	return ok
 }
 
 // AttachScheduler wires the scheduler so NotifyDefinitionChanged can trigger
@@ -289,6 +327,10 @@ func (o *Orchestrator) RunNowAsyncWith(ctx context.Context, def *AgentDefinition
 	go func() {
 		runCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
+		// Expose this run's cancel to CancelRun for the duration of the work, so
+		// the run-detail "Cancel run" button can abort it mid-flight.
+		o.registerInFlight(resp.ShortID, cancel)
+		defer o.unregisterInFlight(resp.ShortID)
 		defer o.sem.Release()
 		// Panic recovery — without this a panic from anywhere downstream
 		// (sidecar NDJSON parser, slog handler, DB driver) takes the whole
@@ -396,6 +438,18 @@ func (o *Orchestrator) prepareRun(ctx context.Context, def *AgentDefinitionRespo
 			return nil
 		}
 		result, runErr := o.runner.Run(runCtx, *spec, handler)
+
+		// Operator cancellation: CancelRun cancels runCtx (context.Canceled),
+		// which SIGKILLs the sidecar and surfaces here as a generic run error.
+		// Re-tag it as the terminal 'cancelled' status so the row reads as an
+		// intentional stop, not a failure. The 30-minute ceiling cancels with
+		// context.DeadlineExceeded instead, so this only catches operator (and
+		// shutdown) cancellation — timeout keeps its own status.
+		if errors.Is(runCtx.Err(), context.Canceled) {
+			result.Status = agent.StatusCancelled
+			result.Err = nil
+			runErr = nil
+		}
 
 		// Use a FRESH context for persist + hit-cap updates so a cancelled
 		// runCtx (timeout, server shutdown, or future caller passing a

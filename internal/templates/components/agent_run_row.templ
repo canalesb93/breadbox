@@ -240,6 +240,8 @@ func agentRunAvatarTone(status string) string {
 		return "bg-error/10"
 	case "in_progress":
 		return "bg-info/10"
+	case "cancelled":
+		return "bg-warning/10"
 	case "skipped":
 		return "bg-base-200"
 	default:
@@ -255,6 +257,8 @@ func agentRunAvatarIcon(status string) string {
 		return "x"
 	case "timeout":
 		return "clock-alert"
+	case "cancelled":
+		return "ban"
 	case "skipped":
 		return "circle-dashed"
 	default:
@@ -268,6 +272,8 @@ func agentRunAvatarIconColor(status string) string {
 		return "text-success"
 	case "error", "timeout":
 		return "text-error"
+	case "cancelled":
+		return "text-warning"
 	default:
 		return "text-base-content/50"
 	}

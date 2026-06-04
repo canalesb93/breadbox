@@ -1548,6 +1548,70 @@ func kbdGlyphRefs() []kbdGlyphRef {
 
 // ─── Keyboard shortcut badges ──────────────────────────────────────────
 
+templ SectionRadioCard() {
+	<div class="flex flex-col gap-6">
+		@designExample("Trigger selector (2-up)", "The Workflows drawer's \"When should the workflow run?\" choice. Native radios share a name, so selection + the lit state work with no JS — click a card, tab between them, and watch the border / fill / icon flip to primary and the check appear.") {
+			<div class="grid grid-cols-2 gap-2 max-w-md">
+				@components.RadioCard(components.RadioCardProps{
+					Name:     "demo-trigger",
+					Value:    "custom",
+					Icon:     "calendar-clock",
+					Title:    "Custom schedule",
+					Subtitle: "On a recurring cron schedule",
+					Checked:  true,
+				})
+				@components.RadioCard(components.RadioCardProps{
+					Name:     "demo-trigger",
+					Value:    "sync",
+					Icon:     "refresh-cw",
+					Title:    "After each sync",
+					Subtitle: "Right after new data lands",
+				})
+			</div>
+		}
+		@designExample("Title only", "Drop the subtitle for a denser choice where the title carries the whole meaning.") {
+			<div class="grid grid-cols-3 gap-2 max-w-md">
+				@components.RadioCard(components.RadioCardProps{
+					Name:    "demo-scope",
+					Value:   "read",
+					Icon:    "eye",
+					Title:   "Read only",
+					Checked: true,
+				})
+				@components.RadioCard(components.RadioCardProps{
+					Name:  "demo-scope",
+					Value: "write",
+					Icon:  "pencil",
+					Title: "Read & write",
+				})
+				@components.RadioCard(components.RadioCardProps{
+					Name:  "demo-scope",
+					Value: "admin",
+					Icon:  "shield",
+					Title: "Full access",
+				})
+			</div>
+		}
+		@designExample("No icon", "Icons are optional — a card works with just a title (+ subtitle). Equal heights hold across the row even when one card's subtitle wraps.") {
+			<div class="grid grid-cols-2 gap-2 max-w-md">
+				@components.RadioCard(components.RadioCardProps{
+					Name:     "demo-plain",
+					Value:    "concise",
+					Title:    "Concise",
+					Subtitle: "Headline findings only",
+					Checked:  true,
+				})
+				@components.RadioCard(components.RadioCardProps{
+					Name:     "demo-plain",
+					Value:    "detailed",
+					Title:    "Detailed",
+					Subtitle: "Full evidence trail for every flagged item",
+				})
+			</div>
+		}
+	</div>
+}
+
 templ SectionThemeControls() {
 	<div class="flex flex-col gap-6">
 		@designExample("ThemeToggle (compact)", "Cycling icon button used in the sidebar + design navbar. One click steps system → light → dark → system; the glyph (monitor / sun / moon) reflects the current preference, so \"system\" stays distinguishable. Backed by $store.theme — try it and watch the navbar toggle above stay in sync.") {
