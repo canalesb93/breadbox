@@ -280,7 +280,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "recurring-detail",
 			Title:       "Recurring detail panels",
-			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz), SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset), and SeriesFactStrip (read-only derived facts). The handler assembles the values; these are pure presentation.",
+			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz, with a no-amount variant), the standalone SeriesMatchWindow amount-axis viz, SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset, read-only and unlinkable variants), and SeriesFactStrip (read-only derived facts). Money values carry data-private so privacy mode obfuscates them. The handler assembles the values; these are pure presentation.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionRecurringDetail() },
 		},

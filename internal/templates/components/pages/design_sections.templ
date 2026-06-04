@@ -269,6 +269,28 @@ templ SectionRecurringDetail() {
 				},
 			})
 		}
+		@designExample("Detection panel — no amount yet", "When the detector hasn't pinned an expected amount, the panel drops the match-window viz and reads as a weaker (warning-tone) match. The merchant key + cadence still anchor the rule.") {
+			@components.SeriesDetectionPanel(components.SeriesDetectionProps{
+				StrengthLabel: "Likely match",
+				StrengthTone:  "warning",
+				MerchantKey:   "acme*gym",
+				HasAmount:     false,
+				CadencePhrase: "on an irregular cadence",
+			})
+		}
+		@designExample("Match window (SeriesMatchWindow)", "The amount-axis range viz on its own — tolerance band, expected marker, and (optionally) a hollow prior-price marker when the charge stepped up. Embedded inside the detection panel on the live page; shown here standalone with no prior price.") {
+			@components.SeriesMatchWindow(components.SeriesMatchWindowProps{
+				RangeText:    "$8.99 – $10.99",
+				AxisMinText:  "$7",
+				AxisMaxText:  "$13",
+				ExpectedText: "$9.99 expected",
+				InWindowText: "4 charges",
+				BandLeftPct:  "33.3",
+				BandWidthPct: "33.3",
+				ExpectedPct:  "50",
+				HasPrior:     false,
+			})
+		}
 		@designExample("Evidence timeline (SeriesEvidenceTimeline)", "The charges a series was detected from: projected next (dashed), matched (✓), and prior-price (·) markers on a continuous rail, with a price-change inset where the amount stepped.") {
 			@components.SeriesEvidenceTimeline(components.SeriesEvidenceProps{
 				Rows: []components.SeriesEvidenceRow{
@@ -281,10 +303,21 @@ templ SectionRecurringDetail() {
 				},
 			})
 		}
-		@designExample("Fact strip (SeriesFactStrip)", "Read-only derived facts pinned to the page foot — last charge, next renewal, last seen, detected-by. Hairline-divided, no icons.") {
+		@designExample("Evidence timeline — unlinkable (live)", "On the detail page the timeline opts into a hover-revealed unlink control on each linked (non-projected) row, wired to the page's unlinkCharge() Alpine action. Hover a matched/prior row to reveal it.") {
+			@components.SeriesEvidenceTimeline(components.SeriesEvidenceProps{
+				Unlinkable:    true,
+				SeriesShortID: "demo1234",
+				Rows: []components.SeriesEvidenceRow{
+					{ShortID: "tx000001", Date: "May 15, 2026", AmountText: "$15.99", State: "matched"},
+					{ShortID: "tx000002", Date: "Apr 15, 2026", AmountText: "$15.99", State: "matched"},
+					{ShortID: "tx000003", Date: "Mar 15, 2026", AmountText: "$15.99", State: "prior"},
+				},
+			})
+		}
+		@designExample("Fact strip (SeriesFactStrip)", "Read-only derived facts pinned to the page foot — last charge, next renewal, last seen, detected-by. Hairline-divided, no icons. The money facts carry Private: \"amount\" so privacy mode obfuscates them.") {
 			@components.SeriesFactStrip(components.SeriesFactStripProps{
 				Facts: []components.SeriesFact{
-					{Label: "Last charge", Value: "$15.99"},
+					{Label: "Last charge", Value: "$15.99", Private: "amount"},
 					{Label: "Next renewal", Value: "Jun 15, 2026"},
 					{Label: "Last seen", Value: "May 15, 2026"},
 					{Label: "Detected by", Value: "Auto-matched"},

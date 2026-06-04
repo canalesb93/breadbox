@@ -540,7 +540,7 @@ func assembleSeriesFacts(s service.SeriesResponse, row pages.SubscriptionRow) co
 		lastCharge = subscriptionMoney(s.LastAmount, deref(s.IsoCurrencyCode))
 	}
 	return components.SeriesFactStripProps{Facts: []components.SeriesFact{
-		{Label: "Last charge", Value: lastCharge},
+		{Label: "Last charge", Value: lastCharge, Private: "amount"},
 		{Label: "Next renewal", Value: dash(formatSubDate(s.NextExpectedDate, "Jan 2, 2006"))},
 		{Label: "Last seen", Value: dash(formatSubDate(s.LastSeenDate, "Jan 2, 2006"))},
 		{Label: "Detected by", Value: dash(row.SourceLabel)},
