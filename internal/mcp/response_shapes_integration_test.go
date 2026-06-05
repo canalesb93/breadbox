@@ -533,6 +533,35 @@ func TestQueryTransactionsFieldsAll(t *testing.T) {
 	)
 }
 
+// TestListTransactionRulesLeanDefault pins that the rule roster is lean by
+// default (summary projection — no conditions/actions trees) and that
+// fields=all restores the full definition.
+func TestListTransactionRulesLeanDefault(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Default (no fields) → summary projection.
+	res, _, err := f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{})
+	out := decodeToolResult[map[string]any](t, "list_transaction_rules", res, err)
+	requireKeys(t, "list_transaction_rules", out, "rules")
+	rules := asArray(t, "list_transaction_rules.rules", out["rules"])
+	if len(rules) == 0 {
+		t.Fatal("expected at least the seeded rule")
+	}
+	rule := asObject(t, "list_transaction_rules.rules[0]", rules[0])
+	requireKeys(t, "list_transaction_rules.rules[0]", rule, "id", "name", "enabled", "priority", "trigger", "hit_count")
+	requireAbsent(t, "list_transaction_rules.rules[0]", rule, "conditions", "actions", "created_at", "short_id")
+
+	// fields=all → full definition restored.
+	resAll, _, errAll := f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{Fields: "all"})
+	outAll := decodeToolResult[map[string]any](t, "list_transaction_rules(all)", resAll, errAll)
+	rulesAll := asArray(t, "list_transaction_rules(all).rules", outAll["rules"])
+	if len(rulesAll) == 0 {
+		t.Fatal("expected at least the seeded rule")
+	}
+	ruleAll := asObject(t, "list_transaction_rules(all).rules[0]", rulesAll[0])
+	requireKeys(t, "list_transaction_rules(all).rules[0]", ruleAll, "id", "name", "conditions", "actions", "created_at")
+}
+
 // TestPreviewRuleResponseShape pins `sample_matches` (not `sample`) + sample
 // row fields (transaction_id, not id).
 func TestPreviewRuleResponseShape(t *testing.T) {
@@ -1045,8 +1074,14 @@ func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
 			name:        "list_transaction_rules <-> breadbox://rules",
 			envelopeKey: "", // both surfaces return the same {rules, has_more, total} object
 			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
+				// list_transaction_rules is lean-by-default (summary projection,
+				// no conditions/actions trees). The resource has no fields knob
+				// and returns the full payload, so parity is asserted against
+				// the tool's full mode (fields=all) — that's the invariant that
+				// must hold: same service call, same full shape.
 				return f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{
-					Limit: rulesResourceLimit,
+					Limit:  rulesResourceLimit,
+					Fields: "all",
 				})
 			},
 			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {

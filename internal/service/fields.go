@@ -44,9 +44,18 @@ var fieldAliases = map[string][]string{
 	"timestamps": {"created_at", "updated_at", "datetime", "authorized_datetime"},
 }
 
-// ParseFields parses and validates the fields query parameter.
+// ParseFields parses and validates the transaction fields query parameter.
 // Returns nil if no field selection (return all fields).
 func ParseFields(raw string) (map[string]bool, error) {
+	return parseFieldsWith(raw, validFields, fieldAliases)
+}
+
+// parseFieldsWith is the generic field-selection parser shared by every
+// entity's Parse*Fields wrapper. valid is the set of selectable JSON field
+// names; aliases expand shorthand names to groups. It returns nil for an empty
+// selection (caller should return the full struct). id and short_id are always
+// included so a row is always identifiable.
+func parseFieldsWith(raw string, valid map[string]bool, aliases map[string][]string) (map[string]bool, error) {
 	if raw == "" {
 		return nil, nil
 	}
@@ -57,24 +66,24 @@ func ParseFields(raw string) (map[string]bool, error) {
 		if f == "" {
 			continue
 		}
-		if expanded, ok := fieldAliases[f]; ok {
+		if expanded, ok := aliases[f]; ok {
 			for _, ef := range expanded {
 				fields[ef] = true
 			}
 			continue
 		}
-		if !validFields[f] {
+		if !valid[f] {
 			unknown = append(unknown, f)
 			continue
 		}
 		fields[f] = true
 	}
 	if len(unknown) > 0 {
-		validList := make([]string, 0, len(validFields)+len(fieldAliases))
-		for k := range validFields {
+		validList := make([]string, 0, len(valid)+len(aliases))
+		for k := range valid {
 			validList = append(validList, k)
 		}
-		for k := range fieldAliases {
+		for k := range aliases {
 			validList = append(validList, k)
 		}
 		sort.Strings(validList)
