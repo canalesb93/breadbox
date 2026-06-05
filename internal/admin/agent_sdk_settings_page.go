@@ -77,19 +77,6 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			}
 		}
 
-		// Connector library — best-effort (display only).
-		connectors, _ := svc.ListConnectors(ctx)
-		connectorViews := make([]pages.AgentSDKConnector, 0, len(connectors))
-		for _, c := range connectors {
-			connectorViews = append(connectorViews, pages.AgentSDKConnector{
-				ShortID:    c.ShortID,
-				Name:       c.Name,
-				URL:        c.URL,
-				HeaderName: c.HeaderName,
-				HasSecret:  c.HasSecret,
-			})
-		}
-
 		props := pages.AgentSDKSettingsProps{
 			Form:                 form,
 			FieldErrors:          map[string]string{},
@@ -98,7 +85,6 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			Status:               buildAgentSDKStatus(status),
 			CSRFToken:            GetCSRFToken(r),
 			HouseholdSpend30dStr: formatHouseholdSpend(spend),
-			Connectors:           connectorViews,
 		}
 
 		data := BaseTemplateData(r, sm, "workflows-settings", "Workflows settings")

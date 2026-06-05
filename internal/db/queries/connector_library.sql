@@ -14,17 +14,19 @@ SELECT * FROM connector_library WHERE name = $1;
 SELECT * FROM connector_library WHERE name = ANY($1::text[]) ORDER BY name;
 
 -- name: CreateConnectorLibrary :one
-INSERT INTO connector_library (name, url, header_name, secret_ciphertext)
-VALUES ($1, $2, $3, $4)
+INSERT INTO connector_library (name, url, transport, note, header_names, header_values_ciphertext)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: UpdateConnectorLibrary :one
 UPDATE connector_library
-SET name              = $2,
-    url               = $3,
-    header_name       = $4,
-    secret_ciphertext = $5,
-    updated_at        = NOW()
+SET name                      = $2,
+    url                       = $3,
+    transport                 = $4,
+    note                      = $5,
+    header_names              = $6,
+    header_values_ciphertext  = $7,
+    updated_at                = NOW()
 WHERE id = $1
 RETURNING *;
 

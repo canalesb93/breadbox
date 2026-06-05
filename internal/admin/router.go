@@ -357,6 +357,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Workflow runtime settings — Claude Agent SDK auth, sidecar, and run
 		// ceilings. Admin-only because tokens are sensitive and runs cost.
 		r.Get("/settings/workflows", AgentSDKSettingsPageHandler(a, svc, sm, tr))
+			r.Get("/settings/connectors", ConnectorsSettingsPageHandler(a, svc, sm, tr))
 		// Back-compat: the tab used to live at /settings/agents.
 		r.Get("/settings/agents", redirectGET("/settings/workflows"))
 		r.Get("/agents-settings", redirectGET("/settings/mcp"))
@@ -654,10 +655,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/cleanup", AgentCleanupAdminHandler(a, svc))
 
 			// Connector library CRUD (admin-only — connector secrets are
-			// sensitive). Posts come from the Workflows settings page.
-			r.Post("/workflows/connectors", CreateConnectorAdminHandler(svc, sm))
-			r.Post("/workflows/connectors/{id}/update", UpdateConnectorAdminHandler(svc, sm))
-			r.Post("/workflows/connectors/{id}/delete", DeleteConnectorAdminHandler(svc, sm))
+			// sensitive). Posts come from the Connectors settings page.
+			r.Post("/connectors", CreateConnectorAdminHandler(svc, sm))
+			r.Post("/connectors/import", ImportConnectorsAdminHandler(svc, sm))
+			r.Post("/connectors/{id}/update", UpdateConnectorAdminHandler(svc, sm))
+			r.Post("/connectors/{id}/delete", DeleteConnectorAdminHandler(svc, sm))
 
 			// Notifications tab "Send test" button. Canonical home for the
 			// test-delivery endpoint now that the sink lives on its own page;

@@ -1280,9 +1280,9 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	// carries the enabled names; the library holds URL + encrypted secret,
 	// decrypted here where encKey is in hand. Names with no library row (e.g. a
 	// since-deleted connector) are skipped.
-	var connectorTools []string
+	var connectorTools, connectorNotes []string
 	if len(def.Connectors) > 0 {
-		servers, tools, cErr := s.resolveEnabledConnectorServers(ctx, def.Connectors, encKey)
+		servers, tools, notes, cErr := s.resolveEnabledConnectorServers(ctx, def.Connectors, encKey)
 		if cErr != nil {
 			return nil, fmt.Errorf("assemble connectors: %w", cErr)
 		}
@@ -1290,6 +1290,7 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 			mcpServers[name] = cfg
 		}
 		connectorTools = tools
+		connectorNotes = notes
 	}
 
 	// The TS sidecar runs with permissionMode: "dontAsk", which auto-denies
@@ -1328,6 +1329,11 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	systemPrompt := derefString(def.SystemPrompt)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = defaultAgentSystemPrompt
+	}
+	// Inject per-connector usage notes so the agent knows how/when to use each
+	// enabled connector (the note authored on the Connectors settings page).
+	if len(connectorNotes) > 0 {
+		systemPrompt += "\n\n## Available connectors\n\nYou can call these custom MCP connectors in addition to breadbox:\n\n" + strings.Join(connectorNotes, "\n")
 	}
 
 	spec := &agent.JobSpec{

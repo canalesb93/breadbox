@@ -15,37 +15,74 @@ import (
 var testEncKey = []byte("0123456789abcdef0123456789abcdef")
 
 func TestValidateConnectorFields(t *testing.T) {
-	if _, _, err := validateConnectorFields("gmail", "https://x/mcp"); err != nil {
-		t.Fatalf("valid connector rejected: %v", err)
+	if n, u, tr, err := validateConnectorFields("gmail", "https://x/mcp", ""); err != nil || n != "gmail" || u != "https://x/mcp" || tr != "http" {
+		t.Fatalf("valid connector: n=%q u=%q tr=%q err=%v", n, u, tr, err)
 	}
-	cases := map[string][2]string{
-		"bad name":      {"Gmail!", "https://x/mcp"},
-		"reserved name": {"breadbox", "https://x/mcp"},
-		"bad scheme":    {"gmail", "ftp://nope"},
-		"no host":       {"gmail", "https://"},
+	cases := map[string][3]string{
+		"bad name":      {"Gmail!", "https://x/mcp", "http"},
+		"reserved name": {"breadbox", "https://x/mcp", "http"},
+		"bad scheme":    {"gmail", "ftp://nope", "http"},
+		"no host":       {"gmail", "https://", "http"},
+		"bad transport": {"gmail", "https://x/mcp", "stdio"},
 	}
 	for name, in := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, _, err := validateConnectorFields(in[0], in[1]); !errors.Is(err, ErrInvalidParameter) {
+			if _, _, _, err := validateConnectorFields(in[0], in[1], in[2]); !errors.Is(err, ErrInvalidParameter) {
 				t.Fatalf("want ErrInvalidParameter, got %v", err)
 			}
 		})
 	}
 }
 
-func TestEncryptConnectorSecret(t *testing.T) {
-	if got, err := encryptConnectorSecret("", testEncKey); err != nil || got != "" {
-		t.Fatalf("empty plaintext: got %q err %v", got, err)
+func TestHeaderValuesEncryptRoundTrip(t *testing.T) {
+	if got, err := encryptHeaderValues(nil, testEncKey); err != nil || got != "" {
+		t.Fatalf("empty map: got %q err %v", got, err)
 	}
-	if _, err := encryptConnectorSecret("tok", nil); !errors.Is(err, ErrInvalidParameter) {
+	if _, err := encryptHeaderValues(map[string]string{"Authorization": "x"}, nil); !errors.Is(err, ErrInvalidParameter) {
 		t.Fatalf("want ErrInvalidParameter with no key, got %v", err)
 	}
-	ct, err := encryptConnectorSecret("Bearer xyz", testEncKey)
+	in := map[string]string{"Authorization": "Bearer xyz", "X-Api-Key": "abc"}
+	ct, err := encryptHeaderValues(in, testEncKey)
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}
 	if ct == "" || strings.Contains(ct, "Bearer xyz") {
-		t.Fatalf("ciphertext leaks plaintext or is empty: %q", ct)
+		t.Fatalf("ciphertext leaks plaintext or empty: %q", ct)
+	}
+	out, err := decryptHeaderValues(ct, testEncKey)
+	if err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	if out["Authorization"] != "Bearer xyz" || out["X-Api-Key"] != "abc" {
+		t.Fatalf("round-trip mismatch: %+v", out)
+	}
+}
+
+func TestNormalizeHeaders(t *testing.T) {
+	// Drops blank-name rows; carries forward blank values from existing.
+	existing := map[string]string{"Authorization": "Bearer old"}
+	in := []ConnectorHeaderInput{
+		{Name: "Authorization", Value: ""},      // carry forward
+		{Name: "X-Api-Key", Value: "new"},       // new value
+		{Name: "  ", Value: "ignored"},          // dropped (blank name)
+	}
+	names, values, err := normalizeHeaders(in, existing)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if len(names) != 2 || names[0] != "Authorization" || names[1] != "X-Api-Key" {
+		t.Fatalf("names: %v", names)
+	}
+	if values["Authorization"] != "Bearer old" || values["X-Api-Key"] != "new" {
+		t.Fatalf("values: %+v", values)
+	}
+	// Invalid header name rejected.
+	if _, _, err := normalizeHeaders([]ConnectorHeaderInput{{Name: "Bad Header", Value: "x"}}, nil); !errors.Is(err, ErrInvalidParameter) {
+		t.Fatalf("want ErrInvalidParameter for bad header name, got %v", err)
+	}
+	// Duplicate header name rejected.
+	if _, _, err := normalizeHeaders([]ConnectorHeaderInput{{Name: "A", Value: "1"}, {Name: "A", Value: "2"}}, nil); !errors.Is(err, ErrInvalidParameter) {
+		t.Fatalf("want ErrInvalidParameter for duplicate header, got %v", err)
 	}
 }
 
@@ -58,12 +95,10 @@ func TestEnabledConnectorNamesRoundTrip(t *testing.T) {
 	if len(names) != 2 || names[0] != "gmail" || names[1] != "calendar" {
 		t.Fatalf("dedup/trim failed: %v", names)
 	}
-	// Empty → "[]".
 	empty, _ := enabledConnectorNamesToBytes(nil)
 	if string(empty) != "[]" {
 		t.Fatalf("empty names should encode []: %s", empty)
 	}
-	// Invalid name rejected.
 	if _, err := enabledConnectorNamesToBytes([]string{"Bad Name"}); !errors.Is(err, ErrInvalidParameter) {
 		t.Fatalf("want ErrInvalidParameter for bad name, got %v", err)
 	}
