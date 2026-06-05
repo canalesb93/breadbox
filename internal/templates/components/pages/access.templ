@@ -8,10 +8,9 @@ import (
 
 // Access renders the combined API Keys + OAuth Clients tab. Each is a
 // borderless SettingsSection (.claude/rules/settings.md). Creating a key
-// or client is a one-click action: an inline bar carries an optional
-// label + a permission toggle (defaults to full access), so the bare
-// button still mints in one click. The plaintext is revealed inline. No
-// subpages.
+// or client is a one-click action: a split button mints full-access in one
+// click, or drops down to reveal "Create 'read-only' key/client". The
+// plaintext is revealed inline. No subpages.
 templ Access(p AccessProps) {
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
@@ -26,7 +25,6 @@ templ Access(p AccessProps) {
 // ---------------------------------------------------------------------
 // API Keys
 // ---------------------------------------------------------------------
-
 templ accessAPIKeysSection(p AccessProps) {
 	<div id="api-keys">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -36,11 +34,10 @@ templ accessAPIKeysSection(p AccessProps) {
 			Bare:    true,
 		}) {
 			@accessCreateBar(accessCreateBarProps{
-				Action:     "/settings/api-keys/new",
-				CSRFToken:  p.CSRFToken,
-				CreateText: "Create key",
-				NameHint:   "e.g. Claude MCP, Dashboard",
-				ScopeNote:  "Read-only keys can query data but can't trigger syncs, categorize, or use write MCP tools.",
+				Action:       "/settings/api-keys/new",
+				CSRFToken:    p.CSRFToken,
+				CreateText:   "Create key",
+				ReadOnlyText: "Create 'read-only' key",
 			})
 			if p.JustCreatedKey != nil {
 				@accessReveal(p.JustCreatedKey, "API key")
@@ -77,10 +74,14 @@ func accessKeysCaption(p AccessProps) string {
 }
 
 templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
-	<div class="bb-settings-row" x-data="{ confirming: false }">
+	<div
+		class="bb-settings-row"
+		x-data="{ confirming: false, editing: false, label: $el.dataset.label, origLabel: $el.dataset.label }"
+		data-label={ k.Name }
+	>
 		<div class="bb-settings-row__main">
 			<div class="bb-settings-row__label">
-				<span class="truncate">{ k.Name }</span>
+				<span class="truncate" x-text="label">{ k.Name }</span>
 				@accessScopeBadge(k.Scope)
 			</div>
 			<div class="bb-settings-row__caption flex items-center gap-x-2 gap-y-0.5 flex-wrap">
@@ -93,9 +94,76 @@ templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
 		</div>
 		if isAdmin {
 			<div class="bb-settings-row__control">
-				@accessRevokeControl(accessAPIKeyRevokeURL(k.ID), csrfToken, "API key "+k.Name)
+				@accessAPIKeyControl(k, csrfToken)
 			</div>
+			@accessEditLabelDialog(accessAPIKeyRenameURL(k.ID), csrfToken)
 		}
+	</div>
+}
+
+// accessAPIKeyControl renders the overflow menu + inline confirm for API key rows.
+// State (confirming, editing, label) is owned by the parent accessActiveKeyRow x-data.
+templ accessAPIKeyControl(k AccessKeyRow, csrfToken string) {
+	<div class="contents">
+		<div x-show="!confirming" class="contents">
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: "Actions for API key " + k.Name,
+				Size:      "xs",
+				Items: []components.OverflowMenuItem{
+					{
+						Label:   "Edit label",
+						Icon:    "pencil",
+						OnClick: "editing = true; document.activeElement.blur()",
+					},
+					{
+						Label:       "Revoke…",
+						Icon:        "trash-2",
+						OnClick:     "confirming = true; document.activeElement.blur()",
+						Destructive: true,
+					},
+				},
+			})
+		</div>
+		<form method="POST" action={ templ.SafeURL(accessAPIKeyRevokeURL(k.ID)) } x-show="confirming" x-cloak>
+			<input type="hidden" name="_csrf" value={ csrfToken }/>
+			<span class="flex items-center gap-1.5 justify-end">
+				<button type="submit" class="btn btn-error btn-xs btn-soft">Confirm</button>
+				<button type="button" class="btn btn-ghost btn-xs" @click="confirming = false">Cancel</button>
+			</span>
+		</form>
+	</div>
+}
+
+// accessEditLabelDialog renders the modal for renaming an API key.
+// It reads/writes the `label` and `origLabel` vars from the parent row's x-data.
+// Uses a DaisyUI div-based modal (not native <dialog>) so Alpine's :class
+// binding controls visibility without needing the native showModal() API.
+templ accessEditLabelDialog(renameURL, csrfToken string) {
+	<div class="modal" :class="{ 'modal-open': editing }" role="dialog" aria-modal="true">
+		<div class="modal-box max-w-xs p-5" @click.stop>
+			<h3 class="font-medium text-sm mb-3">Edit label</h3>
+			<form method="POST" action={ templ.SafeURL(renameURL) }>
+				<input type="hidden" name="_csrf" value={ csrfToken }/>
+				<input
+					type="text"
+					name="name"
+					x-model="label"
+					class="input input-sm w-full mb-4"
+					placeholder="API key"
+					required
+					x-effect="editing && $nextTick(() => $el.focus())"
+				/>
+				<div class="flex justify-end gap-2">
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm"
+						@click="editing = false; label = origLabel"
+					>Cancel</button>
+					<button type="submit" class="btn btn-primary btn-sm">Save</button>
+				</div>
+			</form>
+		</div>
+		<label class="modal-backdrop" @click="editing = false; label = origLabel"></label>
 	</div>
 }
 
@@ -117,7 +185,6 @@ templ accessRevokedKeyRow(k AccessKeyRow) {
 // ---------------------------------------------------------------------
 // OAuth Clients
 // ---------------------------------------------------------------------
-
 templ accessOAuthClientsSection(p AccessProps) {
 	<div id="oauth-clients">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -127,11 +194,10 @@ templ accessOAuthClientsSection(p AccessProps) {
 			Bare:    true,
 		}) {
 			@accessCreateBar(accessCreateBarProps{
-				Action:     "/settings/oauth-clients/new",
-				CSRFToken:  p.CSRFToken,
-				CreateText: "Create client",
-				NameHint:   "e.g. Claude Desktop",
-				ScopeNote:  "Scope applies to every connection authorized through this client.",
+				Action:       "/settings/oauth-clients/new",
+				CSRFToken:    p.CSRFToken,
+				CreateText:   "Create client",
+				ReadOnlyText: "Create 'read-only' client",
 			})
 			if p.JustCreatedClient != nil {
 				@accessReveal(p.JustCreatedClient, "OAuth client")
@@ -207,61 +273,43 @@ templ accessRevokedClientRow(c AccessClientRow) {
 // ---------------------------------------------------------------------
 
 type accessCreateBarProps struct {
-	Action     string // POST endpoint that mints + reveals the secret
-	CSRFToken  string
-	CreateText string // "Create key" / "Create client"
-	NameHint   string // placeholder for the optional label input
-	ScopeNote  string // one-line note shown when "Read only" is picked
+	Action       string // POST endpoint that mints + reveals the secret
+	CSRFToken    string
+	CreateText   string // "Create key" / "Create client"
+	ReadOnlyText string // dropdown label: "Create 'read-only' key" / "Create 'read-only' client"
 }
 
-// accessCreateBar is the one-click create affordance: one inline bar with
-// an optional label, a full-access/read-only permission toggle (daisy
-// join segmented control, defaults to full access), and the create
-// button. Leaving the label blank and hitting create still mints in one
-// click. The in-page swapper intercepts the POST so the reveal lands
-// inline without a navigation.
+// accessCreateBar is the one-click create affordance: a split button that
+// mints a full-access key in one click, or drops down to reveal a read-only
+// creation option. The in-page swapper intercepts the POST so the reveal
+// lands inline without a navigation.
 templ accessCreateBar(p accessCreateBarProps) {
-	<form
-		method="POST"
-		action={ templ.SafeURL(p.Action) }
-		x-data="{ scope: 'full_access' }"
-		class="flex flex-col gap-2 mb-5"
-	>
-		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-		<input type="hidden" name="scope" :value="scope"/>
-		<div class="flex flex-col sm:flex-row sm:items-end gap-3">
-			<label class="flex flex-col gap-1.5 flex-1 min-w-0">
-				<span class="text-xs font-medium text-base-content/60">
-					Label <span class="font-normal text-base-content/40">optional</span>
-				</span>
-				<input type="text" name="name" class="input input-sm w-full" placeholder={ p.NameHint } autocomplete="off"/>
-			</label>
-			<div class="flex flex-col gap-1.5">
-				<span class="text-xs font-medium text-base-content/60">Permission</span>
-				<div class="join w-full sm:w-auto" role="group" aria-label="Permission scope">
-					<button
-						type="button"
-						class="join-item btn btn-sm flex-1 sm:flex-none"
-						:class="{ 'btn-active': scope === 'full_access' }"
-						:aria-pressed="scope === 'full_access'"
-						@click="scope = 'full_access'"
-					>Full access</button>
-					<button
-						type="button"
-						class="join-item btn btn-sm flex-1 sm:flex-none"
-						:class="{ 'btn-active': scope === 'read_only' }"
-						:aria-pressed="scope === 'read_only'"
-						@click="scope = 'read_only'"
-					>Read only</button>
+	<div class="mb-5" x-data="{ scope: 'full_access' }">
+		<form method="POST" action={ templ.SafeURL(p.Action) } x-ref="form">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<input type="hidden" name="scope" :value="scope"/>
+			<div class="join">
+				<button type="submit" class="btn btn-primary btn-sm join-item gap-2">
+					@components.LucideIcon("plus", "w-4 h-4")
+					{ p.CreateText }
+				</button>
+				<div class="dropdown dropdown-end">
+					<button type="button" tabindex="0" class="btn btn-primary btn-sm join-item px-2">
+						@components.LucideIcon("chevron-down", "w-3.5 h-3.5")
+					</button>
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-56 p-1 mt-1">
+						<li>
+							<button
+								type="button"
+								class="text-sm"
+								@click="scope = 'read_only'; $nextTick(() => $refs.form.requestSubmit())"
+							>{ p.ReadOnlyText }</button>
+						</li>
+					</ul>
 				</div>
 			</div>
-			<button type="submit" class="btn btn-primary btn-sm gap-2 w-full sm:w-auto">
-				@components.LucideIcon("plus", "w-4 h-4")
-				{ p.CreateText }
-			</button>
-		</div>
-		<p class="text-xs text-base-content/45 leading-snug" x-show="scope === 'read_only'" x-cloak>{ p.ScopeNote }</p>
-	</form>
+		</form>
+	</div>
 }
 
 // accessReveal renders the one-time plaintext block shown right after a
@@ -341,7 +389,7 @@ templ accessScopeBadge(scope string) {
 }
 
 // accessRevokeControl is the inline two-step revoke affordance shared by
-// key + client rows.
+// client rows (API key rows use accessAPIKeyControl instead).
 templ accessRevokeControl(action, csrfToken, ariaLabel string) {
 	<div x-data="{ confirming: false }" class="contents">
 		<div x-show="!confirming" class="contents">

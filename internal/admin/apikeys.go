@@ -228,3 +228,24 @@ func APIKeyRevokePageHandler(svc *service.Service, sm *scs.SessionManager) http.
 		http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 	}
 }
+
+// APIKeyRenamePageHandler serves POST /settings/api-keys/{id}/rename.
+func APIKeyRenamePageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			name = "API key"
+		}
+		if err := svc.RenameAPIKey(r.Context(), id, name); err != nil {
+			SetFlash(r.Context(), sm, "error", "Failed to rename API key")
+			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
+			return
+		}
+		if r.Header.Get(settingsFragmentHeader) == "1" {
+			renderAccessTab(svc, sm, tr, w, r, nil, nil)
+			return
+		}
+		http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
+	}
+}

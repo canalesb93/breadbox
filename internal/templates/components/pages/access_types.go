@@ -64,6 +64,11 @@ func accessAPIKeyRevokeURL(id string) string {
 	return "/settings/api-keys/" + id + "/revoke"
 }
 
+// accessAPIKeyRenameURL returns the POST endpoint that renames the given API key.
+func accessAPIKeyRenameURL(id string) string {
+	return "/settings/api-keys/" + id + "/rename"
+}
+
 // accessOAuthClientRevokeURL returns the POST endpoint that revokes the
 // given OAuth client.
 func accessOAuthClientRevokeURL(id string) string {
