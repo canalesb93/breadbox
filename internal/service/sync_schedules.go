@@ -223,12 +223,14 @@ func (s *Service) DeleteSyncSchedule(ctx context.Context, idOrShort string) erro
 	return nil
 }
 
-// ScheduleRef is a lightweight (name, cron) pair used to describe the schedules
-// that apply to a connection — for rendering "next sync" / "syncs on" without
-// loading full schedule rows per connection.
+// ScheduleRef is a lightweight (name, cron, human) triple used to describe the
+// schedules that apply to a connection — for rendering "next sync" / "syncs on"
+// without loading full schedule rows per connection. Human is the English
+// cadence (e.g. "Every 15 minutes") so the UI can show name + readable schedule.
 type ScheduleRef struct {
-	Name string `json:"name"`
-	Cron string `json:"cron"`
+	Name  string `json:"name"`
+	Cron  string `json:"cron"`
+	Human string `json:"human"`
 }
 
 // SyncScheduleResolution loads the enabled schedules once and returns the
@@ -249,7 +251,8 @@ func (s *Service) SyncScheduleResolution(ctx context.Context) (all []ScheduleRef
 	byID := make(map[[16]byte]ScheduleRef, len(rows))
 	appliesAll := make(map[[16]byte]bool, len(rows))
 	for _, row := range rows {
-		ref := ScheduleRef{Name: row.Name, Cron: row.Cron}
+		_, human := s.DescribeCron(row.Cron)
+		ref := ScheduleRef{Name: row.Name, Cron: row.Cron, Human: human}
 		byID[row.ID.Bytes] = ref
 		appliesAll[row.ID.Bytes] = row.AppliesToAll
 		if row.AppliesToAll {

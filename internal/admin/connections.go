@@ -1451,7 +1451,13 @@ func computeNextSync(p syncScheduleParams, schedules []service.ScheduleRef, tzNa
 	names := make([]string, 0, len(schedules))
 	crons := make([]string, 0, len(schedules))
 	for _, s := range schedules {
-		names = append(names, s.Name)
+		// "Name — every 15 minutes": both the label and the readable cadence,
+		// so "Default schedule" alone never looks opaque.
+		label := s.Name
+		if s.Human != "" {
+			label += " — " + s.Human
+		}
+		names = append(names, label)
 		crons = append(crons, s.Cron)
 	}
 	info := NextSyncInfo{ScheduleNames: names}

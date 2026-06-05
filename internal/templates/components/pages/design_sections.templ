@@ -3,6 +3,7 @@ package pages
 import (
 	"time"
 
+	"breadbox/internal/cronspec"
 	"breadbox/internal/templates/components"
 )
 
@@ -474,6 +475,38 @@ templ SectionFormControls() {
 					<input type="radio" name="ds-radio-1" class="radio"/>
 					<span class="label-text">Weekly</span>
 				</label>
+			</div>
+		}
+	</div>
+}
+
+// ─── Cron field ────────────────────────────────────────────────────────
+templ SectionCronField() {
+	<div class="flex flex-col gap-6">
+		@designExample("Default (preset chips + custom + live preview)", "components.CronField — timezone-aware preset chips, a custom 5-field expression, and a live preview (English description + next runs in the instance timezone, fetched from /-/cron/preview). The active preset is derived from the cron value, so an unmatched expression shows Custom with the raw cron — never a wrong preset label.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:    "ds_cron_a",
+					Value:   "0 6,18 * * *",
+					Presets: cronspec.Presets,
+				})
+			</div>
+		}
+		@designExample("Custom expression (no matching preset)", "An expression with no catalog match opens on the Custom chip with the raw cron visible — the case that previously mis-rendered as 'Every 15 minutes'.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:    "ds_cron_b",
+					Value:   "0 */12 * * *",
+					Presets: cronspec.Presets,
+				})
+			</div>
+		}
+		@designExample("Empty (new schedule)", "No initial value — chips only, no preview until a cadence is chosen or typed.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:    "ds_cron_c",
+					Presets: cronspec.Presets,
+				})
 			</div>
 		}
 	</div>
