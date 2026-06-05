@@ -30,33 +30,15 @@ templ ScheduleForm(p ScheduleFormProps) {
 					required
 				/>
 			</div>
-			<!-- Cadence preset -->
+			<!-- Cadence — shared cron component (presets + custom + live preview) -->
 			<div class="space-y-1.5">
-				<label for="preset" class="bb-settings-row__label">Cadence</label>
-				<select id="preset" name="preset" class="bb-form-select select select-sm w-full bg-base-200" x-model="preset">
-					for _, preset := range p.Presets {
-						if preset.Key == p.PresetKey {
-							<option value={ preset.Key } selected>{ preset.Label }</option>
-						} else {
-							<option value={ preset.Key }>{ preset.Label }</option>
-						}
-					}
-				</select>
-			</div>
-			<!-- Custom cron (only when preset == custom) -->
-			<div class="space-y-1.5" x-show="preset === 'custom'" x-cloak>
-				<label for="cron" class="bb-settings-row__label">Custom cron expression</label>
-				<input
-					id="cron"
-					name="cron"
-					type="text"
-					value={ p.Cron }
-					placeholder="0 6,18 * * *"
-					class="bb-form-input input input-sm w-full font-mono"
-				/>
-				<p class="text-xs text-base-content/45 leading-snug">
-					Standard 5-field cron (minute hour day month weekday), evaluated in the server's local timezone.
-				</p>
+				<label class="bb-settings-row__label">Cadence</label>
+				@components.CronField(components.CronFieldProps{
+					Name:       "cron",
+					PresetName: "preset",
+					Value:      p.Cron,
+					Presets:    p.Presets,
+				})
 			</div>
 			<!-- Targets -->
 			<div class="space-y-2">
@@ -114,17 +96,13 @@ func scheduleFormTitle(p ScheduleFormProps) string {
 	return "New sync schedule"
 }
 
-// scheduleFormState is the inline Alpine x-data: tracks the selected preset
-// (to reveal the custom-cron field) and the applies-to-all flag (to dim the
-// connection picker). Short enough to stay inline per the UI rules.
+// scheduleFormState is the inline Alpine x-data: tracks the applies-to-all flag
+// (to dim the connection picker). The cron/preset state is owned by the nested
+// CronField component. Short enough to stay inline per the UI rules.
 func scheduleFormState(p ScheduleFormProps) string {
-	preset := p.PresetKey
-	if preset == "" {
-		preset = "twice_daily"
-	}
 	all := "false"
 	if p.AppliesToAll {
 		all = "true"
 	}
-	return "{ preset: '" + preset + "', all: " + all + " }"
+	return "{ all: " + all + " }"
 }
