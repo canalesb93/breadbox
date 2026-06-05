@@ -58,13 +58,16 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 			allRows = rows
 		}
 
-		// Lookup of household member display name by user short_id. Built
-		// from a single ListUsers call rather than the per-account N+1 the
-		// connections page does — accounts can be hundreds of rows.
+		// Lookup of household member display name and avatar version by user
+		// short_id. Built from a single ListUsers call rather than the
+		// per-account N+1 the connections page does — accounts can be hundreds
+		// of rows.
 		users, _ := a.Queries.ListUsers(ctx)
 		userNameByShort := make(map[string]string, len(users))
+		userAvatarVersionByShort := make(map[string]string, len(users))
 		for _, u := range users {
 			userNameByShort[u.ShortID] = u.Name
+			userAvatarVersionByShort[u.ShortID] = usersAvatarVersion(u.UpdatedAt)
 		}
 
 		// Build typed rows + running totals.
@@ -86,11 +89,11 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 
 		if useUser {
 			for _, r := range userRows {
-				appendRow(accountRowFromListByUser(r, userNameByShort))
+				appendRow(accountRowFromListByUser(r, userNameByShort, userAvatarVersionByShort))
 			}
 		} else {
 			for _, r := range allRows {
-				appendRow(accountRowFromListAll(r, userNameByShort))
+				appendRow(accountRowFromListAll(r, userNameByShort, userAvatarVersionByShort))
 			}
 		}
 
@@ -137,8 +140,9 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 			usersCopy := make([]db.User, len(users))
 			copy(usersCopy, users)
 			sort.Slice(usersCopy, func(i, j int) bool {
-				ci := accountsPerUser[pgconv.FormatUUID(usersCopy[i].ID)]
-				cj := accountsPerUser[pgconv.FormatUUID(usersCopy[j].ID)]
+				// rows use short_id as key — match here.
+				ci := accountsPerUser[usersCopy[i].ShortID]
+				cj := accountsPerUser[usersCopy[j].ShortID]
 				if ci != cj {
 					return ci > cj
 				}
@@ -150,9 +154,10 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 					first = u.Name[:1]
 				}
 				props.Users = append(props.Users, pages.AccountsListUserFilter{
-					ID:    pgconv.FormatUUID(u.ID),
-					Name:  u.Name,
-					First: first,
+					ID:            u.ShortID,
+					Name:          u.Name,
+					First:         first,
+					AvatarVersion: usersAvatarVersion(u.UpdatedAt),
 				})
 			}
 		}
@@ -164,7 +169,7 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 // accountRowFromListAll converts an editor/admin-scope ListAccountsRow into
 // the typed templ row. Sign on BalanceFloat is adjusted so liabilities render
 // as negatives in the table.
-func accountRowFromListAll(r db.ListAccountsRow, userNameByShort map[string]string) pages.AccountsListRow {
+func accountRowFromListAll(r db.ListAccountsRow, userNameByShort, avatarVersionByShort map[string]string) pages.AccountsListRow {
 	row := pages.AccountsListRow{
 		ID:                pgconv.FormatUUID(r.ID),
 		DisplayName:       accountListDisplayName(r.DisplayName, r.Name),
@@ -187,6 +192,7 @@ func accountRowFromListAll(r db.ListAccountsRow, userNameByShort map[string]stri
 		if name, ok := userNameByShort[r.UserShortID.String]; ok && name != "" {
 			row.OwnerName = name
 			row.OwnerFirst = name[:1]
+			row.OwnerAvatarVersion = avatarVersionByShort[r.UserShortID.String]
 		}
 	}
 	if v, ok := pgconv.NumericToFloat(r.BalanceCurrent); ok {
@@ -206,7 +212,7 @@ func accountRowFromListAll(r db.ListAccountsRow, userNameByShort map[string]stri
 // accountRowFromListByUser mirrors accountRowFromListAll for the
 // per-household-member query (which omits the optional connection_id check
 // since users only see accounts on their own connections).
-func accountRowFromListByUser(r db.ListAccountsByUserRow, userNameByShort map[string]string) pages.AccountsListRow {
+func accountRowFromListByUser(r db.ListAccountsByUserRow, userNameByShort, avatarVersionByShort map[string]string) pages.AccountsListRow {
 	row := pages.AccountsListRow{
 		ID:                pgconv.FormatUUID(r.ID),
 		DisplayName:       accountListDisplayName(r.DisplayName, r.Name),
@@ -227,6 +233,7 @@ func accountRowFromListByUser(r db.ListAccountsByUserRow, userNameByShort map[st
 		if name, ok := userNameByShort[r.UserShortID.String]; ok && name != "" {
 			row.OwnerName = name
 			row.OwnerFirst = name[:1]
+			row.OwnerAvatarVersion = avatarVersionByShort[r.UserShortID.String]
 		}
 	}
 	if v, ok := pgconv.NumericToFloat(r.BalanceCurrent); ok {
