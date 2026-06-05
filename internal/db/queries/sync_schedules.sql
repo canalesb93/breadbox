@@ -20,7 +20,7 @@ FROM sync_schedules s
 ORDER BY s.created_at ASC;
 
 -- name: ListEnabledSyncSchedules :many
-SELECT id, cron, applies_to_all FROM sync_schedules WHERE enabled = true;
+SELECT id, name, cron, applies_to_all FROM sync_schedules WHERE enabled = true;
 
 -- name: ListSyncScheduleConnectionPairs :many
 SELECT schedule_id, connection_id FROM sync_schedule_connections;

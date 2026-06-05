@@ -6,6 +6,7 @@ package cronspec
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/robfig/cron/v3"
 )
@@ -80,6 +81,42 @@ func ResolveCron(presetKey, customCron string) (expr string, preset string, err 
 		return "", "", err
 	}
 	return customCron, CustomKey, nil
+}
+
+// NextRun returns the earliest upcoming fire time across the given cron
+// expressions (strictly after `from`), and whether any valid expression was
+// found. Invalid expressions are skipped.
+func NextRun(exprs []string, from time.Time) (time.Time, bool) {
+	var earliest time.Time
+	found := false
+	for _, e := range exprs {
+		sc, err := cron.ParseStandard(e)
+		if err != nil {
+			continue
+		}
+		n := sc.Next(from)
+		if !found || n.Before(earliest) {
+			earliest = n
+			found = true
+		}
+	}
+	return earliest, found
+}
+
+// DuePassed reports whether any of the cron expressions has a fire time in the
+// half-open window (since, now] — i.e. a scheduled run was missed since `since`.
+// Used to render "due now" without re-deriving the scheduler's logic.
+func DuePassed(exprs []string, since, now time.Time) bool {
+	for _, e := range exprs {
+		sc, err := cron.ParseStandard(e)
+		if err != nil {
+			continue
+		}
+		if !sc.Next(since).After(now) {
+			return true
+		}
+	}
+	return false
 }
 
 // Humanize returns a friendly description for a stored (cron, presetKey) pair.

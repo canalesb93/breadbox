@@ -223,6 +223,53 @@ func (s *Service) DeleteSyncSchedule(ctx context.Context, idOrShort string) erro
 	return nil
 }
 
+// ScheduleRef is a lightweight (name, cron) pair used to describe the schedules
+// that apply to a connection — for rendering "next sync" / "syncs on" without
+// loading full schedule rows per connection.
+type ScheduleRef struct {
+	Name string `json:"name"`
+	Cron string `json:"cron"`
+}
+
+// SyncScheduleResolution loads the enabled schedules once and returns the
+// `applies_to_all` schedules plus a per-connection map (keyed by connection
+// UUID string) of explicitly-targeted schedules. A connection's effective
+// schedules are `all` + `perConn[uuid]` — mirroring the scheduler's resolver,
+// but name-carrying and for display. Cheap: two queries regardless of count.
+func (s *Service) SyncScheduleResolution(ctx context.Context) (all []ScheduleRef, perConn map[string][]ScheduleRef, err error) {
+	rows, err := s.Queries.ListEnabledSyncSchedules(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list enabled sync schedules: %w", err)
+	}
+	pairs, err := s.Queries.ListSyncScheduleConnectionPairs(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list sync schedule connection pairs: %w", err)
+	}
+
+	byID := make(map[[16]byte]ScheduleRef, len(rows))
+	appliesAll := make(map[[16]byte]bool, len(rows))
+	for _, row := range rows {
+		ref := ScheduleRef{Name: row.Name, Cron: row.Cron}
+		byID[row.ID.Bytes] = ref
+		appliesAll[row.ID.Bytes] = row.AppliesToAll
+		if row.AppliesToAll {
+			all = append(all, ref)
+		}
+	}
+
+	perConn = make(map[string][]ScheduleRef)
+	for _, p := range pairs {
+		if appliesAll[p.ScheduleID.Bytes] {
+			continue
+		}
+		if ref, ok := byID[p.ScheduleID.Bytes]; ok {
+			key := pgconv.FormatUUID(p.ConnectionID)
+			perConn[key] = append(perConn[key], ref)
+		}
+	}
+	return all, perConn, nil
+}
+
 // ListScheduleConnectionShortIDs returns the connection short IDs a schedule
 // targets, for pre-checking the edit form.
 func (s *Service) ListScheduleConnectionShortIDs(ctx context.Context, idOrShort string) ([]string, error) {
