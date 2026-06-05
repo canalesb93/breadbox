@@ -137,16 +137,20 @@ templ settingsSyncSection(p SettingsProps) {
 				}
 			}
 		}
+		<!-- Create + per-schedule edit drawers (slide-over from the right) -->
+		@ScheduleDrawer(p.NewScheduleForm)
+		for _, f := range p.EditScheduleForms {
+			@ScheduleDrawer(f)
+		}
 	</div>
 }
 
-// newScheduleButton is the section's primary action — links to the
-// dedicated schedule form page.
+// newScheduleButton is the section's primary action — opens the create drawer.
 templ newScheduleButton() {
-	<a href="/settings/sync/schedules/new" class="btn btn-primary btn-sm gap-2">
+	<button type="button" @click="$store.drawers.open('schedule-new')" class="btn btn-primary btn-sm gap-2">
 		@components.LucideIcon("plus", "w-4 h-4")
 		New schedule
-	</a>
+	</button>
 }
 
 // settingsScheduleRow renders one schedule: its name + human cadence and
@@ -168,9 +172,9 @@ templ settingsScheduleRow(p SettingsProps, sched service.SyncScheduleView) {
 					<input type="checkbox" name="enabled" class="toggle toggle-sm toggle-primary" aria-label="Enabled"/>
 				}
 			}
-			<a href={ scheduleEditURL(sched.ShortID) } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
+			<button type="button" @click={ "$store.drawers.open('schedule-" + sched.ShortID + "')" } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
 				@components.LucideIcon("pencil", "w-4 h-4")
-			</a>
+			</button>
 			<form method="POST" action={ scheduleDeleteURL(sched.ShortID) } onsubmit="return confirm('Delete this schedule?')">
 				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
 				<button type="submit" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Delete schedule">

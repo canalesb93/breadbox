@@ -25,6 +25,44 @@ func scheduleFormConnections(svc *service.Service, r *http.Request) []service.Co
 	return conns
 }
 
+// buildScheduleDrawerForms assembles the create form + one edit form per
+// schedule for the server-rendered drawers in Settings → Sync. Each carries the
+// connection list, selected targets, and presets so the nested CronField and
+// connection picker hydrate correctly.
+func buildScheduleDrawerForms(a *app.App, r *http.Request, schedules []service.SyncScheduleView) (pages.ScheduleFormProps, []pages.ScheduleFormProps) {
+	conns := scheduleFormConnections(a.Service, r)
+	newForm := pages.ScheduleFormProps{
+		CSRFToken:     GetCSRFToken(r),
+		Presets:       cronspec.Presets,
+		Connections:   conns,
+		SelectedConns: map[string]bool{},
+		Enabled:       true,
+		AppliesToAll:  true,
+	}
+	editForms := make([]pages.ScheduleFormProps, 0, len(schedules))
+	for _, sched := range schedules {
+		selected := map[string]bool{}
+		if ids, err := a.Service.ListScheduleConnectionShortIDs(r.Context(), sched.ShortID); err == nil {
+			for _, id := range ids {
+				selected[id] = true
+			}
+		}
+		editForms = append(editForms, pages.ScheduleFormProps{
+			CSRFToken:     GetCSRFToken(r),
+			IsEdit:        true,
+			ShortID:       sched.ShortID,
+			Name:          sched.Name,
+			Cron:          sched.Cron,
+			AppliesToAll:  sched.AppliesToAll,
+			Enabled:       sched.Enabled,
+			Presets:       cronspec.Presets,
+			Connections:   conns,
+			SelectedConns: selected,
+		})
+	}
+	return newForm, editForms
+}
+
 // ScheduleFormPageHandler serves GET /settings/sync/schedules/new and
 // /settings/sync/schedules/{shortID}/edit.
 func ScheduleFormPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
