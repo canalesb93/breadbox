@@ -24,7 +24,43 @@ document.addEventListener('alpine:init', function () {
         this.provider = root.dataset.provider || '';
         this.tellerAppId = root.dataset.tellerAppId || '';
         this.tellerEnv = root.dataset.tellerEnv || '';
+        if (this.provider === 'simplefin') {
+          // Token-paste reauth: no SDK to launch. Wait for the user to paste a
+          // fresh setup token and submit it.
+          this.showMessage('Paste a fresh SimpleFIN setup token to reconnect.');
+          return;
+        }
         this.startReauth();
+      },
+
+      // submitSimplefin claims a freshly pasted setup token and rotates the
+      // connection's stored credentials in place.
+      submitSimplefin: function () {
+        var self = this;
+        var ta = document.getElementById('simplefin-reauth-token');
+        var token = ta ? (ta.value || '').trim() : '';
+        if (!token) {
+          self.showError('Paste your new SimpleFIN setup token first.');
+          return;
+        }
+        self.showMessage('Claiming token and reconnecting…');
+        self.canRetry = false;
+        fetch('/-/connections/' + this.connId + '/reauth-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ public_token: token }),
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.status === 'active') {
+              window.location.href = '/connections/' + self.connId;
+            } else {
+              self.showError(data.error || 'Re-authentication failed.');
+            }
+          })
+          .catch(function () {
+            self.showError('Network error. Please try again.');
+          });
       },
 
       showError: function (msg) {

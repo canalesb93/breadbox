@@ -92,6 +92,10 @@ type AgentDefinitionResponse struct {
 	ScheduleCron    *string  `json:"schedule_cron,omitempty"`
 	ToolScope       string   `json:"tool_scope"`
 	AllowedTools    []string `json:"allowed_tools"`
+	// Connectors lists the library connector NAMES enabled on this workflow
+	// (mounted alongside the built-in breadbox MCP at run time). Definitions +
+	// secrets live in the global connector library, not here.
+	Connectors      []string `json:"connectors"`
 	Model           string   `json:"model"`
 	MaxTurns        int      `json:"max_turns"`
 	MaxBudgetUSD    *float64 `json:"max_budget_usd,omitempty"`
@@ -246,6 +250,9 @@ type CreateAgentDefinitionParams struct {
 	QuietHoursEnd         *string
 	TriggerOnSyncComplete bool    // fire after each successful sync completes
 	SourceTemplate        *string // preset slug this was instantiated from; nil = hand-authored
+	// Connectors lists library connector names to enable on this workflow.
+	// nil/empty = none.
+	Connectors []string
 }
 
 // UpdateAgentDefinitionParams uses pointer fields for PATCH semantics:
@@ -270,6 +277,9 @@ type UpdateAgentDefinitionParams struct {
 	// untouched; a non-empty value replaces it; an empty string clears it
 	// back to slug-seeded.
 	AvatarSeed *string
+	// Connectors replaces the enabled-connector-name set when non-nil; nil
+	// leaves it untouched.
+	Connectors *[]string
 }
 
 // RecentErroredAgentRun is one entry in the admin run-failed banner
@@ -481,6 +491,10 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 	if err := validateQuietHours(p.QuietHoursStart, p.QuietHoursEnd); err != nil {
 		return nil, err
 	}
+	connectorsJSON, err := enabledConnectorNamesToBytes(p.Connectors)
+	if err != nil {
+		return nil, err
+	}
 	row, err := s.Queries.CreateAgentDefinition(ctx, db.CreateAgentDefinitionParams{
 		Name:                  p.Name,
 		Slug:                  p.Slug,
@@ -497,6 +511,7 @@ func (s *Service) CreateAgentDefinition(ctx context.Context, p CreateAgentDefini
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(p.QuietHoursEnd),
 		TriggerOnSyncComplete: p.TriggerOnSyncComplete,
 		SourceTemplate:        pgconv.TextPtrIfNotEmpty(p.SourceTemplate),
+		Connectors:            connectorsJSON,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create agent definition: %w", err)
@@ -584,6 +599,16 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		merged.MaxTurns = DefaultAgentMaxTurns
 	}
 
+	// Connectors hold only enabled library-connector NAMES (no secrets), so a
+	// plain replace is safe. Omitting the field leaves the set untouched.
+	connectorsJSON := existing.Connectors
+	if p.Connectors != nil {
+		connectorsJSON, err = enabledConnectorNamesToBytes(*p.Connectors)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	row, err := s.Queries.UpdateAgentDefinition(ctx, db.UpdateAgentDefinitionParams{
 		ID:                    existing.ID,
 		Name:                  merged.Name,
@@ -601,6 +626,7 @@ func (s *Service) UpdateAgentDefinition(ctx context.Context, slugOrID string, p 
 		QuietHoursEnd:         pgconv.TextPtrIfNotEmpty(merged.QuietHoursEnd),
 		TriggerOnSyncComplete: merged.TriggerOnSyncComplete,
 		AvatarSeed:            pgconv.TextPtrIfNotEmpty(merged.AvatarSeed),
+		Connectors:            connectorsJSON,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update agent definition: %w", err)
@@ -1249,6 +1275,24 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 		},
 	}
 
+	// Merge the workflow's enabled connectors (Phase 1: HTTP MCP servers from
+	// the global library, e.g. a remote Gmail MCP for receipt lookups). def
+	// carries the enabled names; the library holds URL + encrypted secret,
+	// decrypted here where encKey is in hand. Names with no library row (e.g. a
+	// since-deleted connector) are skipped.
+	var connectorTools, connectorNotes []string
+	if len(def.Connectors) > 0 {
+		servers, tools, notes, cErr := s.resolveEnabledConnectorServers(ctx, def.Connectors, encKey)
+		if cErr != nil {
+			return nil, fmt.Errorf("assemble connectors: %w", cErr)
+		}
+		for name, cfg := range servers {
+			mcpServers[name] = cfg
+		}
+		connectorTools = tools
+		connectorNotes = notes
+	}
+
 	// The TS sidecar runs with permissionMode: "dontAsk", which auto-denies
 	// any tool call NOT in allowedTools. An empty allowedTools therefore
 	// disables every breadbox MCP tool — i.e. the whole point of the
@@ -1268,6 +1312,10 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	if !hasBreadbox {
 		allowedTools = append([]string{"mcp__breadbox"}, allowedTools...)
 	}
+	// Each custom connector "<name>" is mounted above; allow its whole tool
+	// surface via the "mcp__<name>" wildcard so the agent can actually call it.
+	// (The connector itself enforces its own scopes server-side.)
+	allowedTools = append(allowedTools, connectorTools...)
 
 	maxBudget := 1.0
 	if def.MaxBudgetUSD != nil {
@@ -1281,6 +1329,11 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 	systemPrompt := derefString(def.SystemPrompt)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = defaultAgentSystemPrompt
+	}
+	// Inject per-connector usage notes so the agent knows how/when to use each
+	// enabled connector (the note authored on the Connectors settings page).
+	if len(connectorNotes) > 0 {
+		systemPrompt += "\n\n## Available connectors\n\nYou can call these custom MCP connectors in addition to breadbox:\n\n" + strings.Join(connectorNotes, "\n")
 	}
 
 	spec := &agent.JobSpec{
@@ -1472,6 +1525,7 @@ func agentDefinitionFromRow(row db.Workflow, lastRun *AgentRunSummary) AgentDefi
 		ScheduleCron:          pgconv.TextPtr(row.ScheduleCron),
 		ToolScope:             row.ToolScope,
 		AllowedTools:          agentAllowedToolsFromBytes(row.AllowedTools),
+		Connectors:            enabledConnectorNamesFromBytes(row.Connectors),
 		Model:                 row.Model,
 		MaxTurns:              int(row.MaxTurns),
 		MaxBudgetUSD:          agentFloatFromNumeric(row.MaxBudgetUsd),

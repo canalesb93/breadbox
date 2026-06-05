@@ -154,6 +154,22 @@ func (s *Service) RevokeAPIKey(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *Service) RenameAPIKey(ctx context.Context, id, name string) error {
+	uid, err := pgconv.ParseUUID(id)
+	if err != nil {
+		return ErrNotFound
+	}
+	tag, err := s.Pool.Exec(ctx,
+		"UPDATE api_keys SET name = $2 WHERE id = $1 AND revoked_at IS NULL", uid, name)
+	if err != nil {
+		return fmt.Errorf("rename api key: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Service) ValidateAPIKey(ctx context.Context, key string) (*db.ApiKey, error) {
 	hash := sha256.Sum256([]byte(key))
 	keyHash := fmt.Sprintf("%x", hash)

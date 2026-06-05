@@ -71,6 +71,7 @@ func (f *fakeTellerProvider) HandleWebhook(context.Context, provider.WebhookPayl
 func (f *fakeTellerProvider) RemoveConnection(context.Context, provider.Connection) error {
 	panic("fakeTellerProvider.RemoveConnection not implemented")
 }
+func (f *fakeTellerProvider) ReconcilesPendingByPolling() bool { return false }
 
 // tellerSetupEnv is the per-test harness for the setup endpoint.
 type tellerSetupEnv struct {

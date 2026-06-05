@@ -51,7 +51,7 @@ templ Rules(p RulesProps) {
 				}
 				{ fmt.Sprintf("%d rule%s", p.Total, components.PluralS(p.Total)) }
 				if p.FiltersActive {
-					<span class="text-base-content/30"> match your filters</span>
+					<span class="text-base-content/30">match your filters</span>
 				}
 			</div>
 			if len(p.Rules) > 0 {

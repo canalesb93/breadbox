@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/app"
@@ -37,7 +38,7 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 		}
 
 		// Ensure entries exist for all providers even if they have no connections.
-		for _, p := range []string{"plaid", "teller", "csv"} {
+		for _, p := range []string{"plaid", "teller", "simplefin", "csv"} {
 			if _, ok := providerHealth[p]; !ok {
 				providerHealth[p] = &service.ProviderHealthSummary{Provider: p}
 			}
@@ -67,6 +68,9 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			TellerCertFromEnv:       a.Config.TellerCertPath != "",
 			TellerCertConfigured:    a.Config.TellerCertPath != "" || len(a.Config.TellerCertPEM) > 0,
 			TellerWebhookConfigured: a.Config.TellerWebhookSecret != "",
+
+			SimpleFINEnabled: a.Config.SimpleFINEnabled,
+			SimpleFINFromEnv: os.Getenv("SIMPLEFIN_ENABLED") != "",
 
 			HasEncryptionKey:    len(a.Config.EncryptionKey) > 0,
 			SyncIntervalMinutes: a.Config.SyncIntervalMinutes,
@@ -335,6 +339,43 @@ func readTellerCertFiles(r *http.Request) (certPEM, keyPEM []byte, err error) {
 	return certPEM, keyPEM, nil
 }
 
+// ProvidersSaveSimpleFINHandler serves POST /admin/settings/providers/simplefin.
+// SimpleFIN has no server-level credential, so this only toggles whether the
+// provider is offered at connect time.
+func ProvidersSaveSimpleFINHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		if os.Getenv("SIMPLEFIN_ENABLED") != "" {
+			FlashRedirect(w, r, sm, "error", "SimpleFIN is configured via environment variables and cannot be changed here.", "/settings/providers")
+			return
+		}
+
+		val := strings.ToLower(strings.TrimSpace(r.FormValue("simplefin_enabled")))
+		enabled := val == "on" || val == "true" || val == "1" || val == "yes"
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "simplefin_enabled",
+			Value: pgconv.Text(strconv.FormatBool(enabled)),
+		}); err != nil {
+			a.Logger.Error("save simplefin config", "error", err)
+			FlashRedirect(w, r, sm, "error", "Failed to save SimpleFIN setting.", "/settings/providers")
+			return
+		}
+
+		a.Config.SimpleFINEnabled = enabled
+		a.Config.ConfigSources["simplefin_enabled"] = "db"
+		if err := a.ReinitProvider("simplefin"); err != nil {
+			a.Logger.Error("reinit simplefin provider", "error", err)
+		}
+
+		msg := "SimpleFIN disabled."
+		if enabled {
+			msg = "SimpleFIN enabled. It's now available when adding a connection."
+		}
+		FlashRedirect(w, r, sm, "success", msg, "/settings/providers")
+	}
+}
+
 // ProvidersTestHandler serves POST /admin/api/test-provider/{provider}.
 func ProvidersTestHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -380,6 +421,15 @@ func ProvidersTestHandler(a *app.App) http.HandlerFunc {
 				return
 			}
 			writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: false, Message: "Teller certificate not configured"})
+
+		case "simplefin":
+			// SimpleFIN has no server-level credential to validate — each
+			// connection carries its own access token. Report the toggle state.
+			if a.Config.SimpleFINEnabled {
+				writeJSON(w, http.StatusOK, testResult{Provider: "simplefin", Success: true, Message: "Enabled — add a connection and paste a setup token"})
+				return
+			}
+			writeJSON(w, http.StatusOK, testResult{Provider: "simplefin", Success: false, Message: "SimpleFIN is disabled"})
 
 		default:
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Unknown provider: " + providerName})

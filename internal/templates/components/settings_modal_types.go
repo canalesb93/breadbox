@@ -16,6 +16,7 @@ const (
 	SettingsModalTabWorkflows     = "workflows"
 	SettingsModalTabNotifications = "notifications"
 	SettingsModalTabMCP           = "mcp"
+	SettingsModalTabConnectors    = "connectors"
 	SettingsModalTabAccess        = "api-keys"
 	SettingsModalTabBackups       = "backups"
 	SettingsModalTabDeveloper     = "developer"

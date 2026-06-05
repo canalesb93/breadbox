@@ -354,12 +354,16 @@ templ mcpConnectionDrawer() {
 							@click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
 						>
 							<template x-if="!copiedConfig">
-								<span class="flex items-center gap-1">@components.LucideIcon("copy", "w-4 h-4")
-Copy</span>
+								<span class="flex items-center gap-1">
+									@components.LucideIcon("copy", "w-4 h-4")
+									Copy
+								</span>
 							</template>
 							<template x-if="copiedConfig">
-								<span class="flex items-center gap-1 text-success">@components.LucideIcon("check", "w-4 h-4")
-Copied!</span>
+								<span class="flex items-center gap-1 text-success">
+									@components.LucideIcon("check", "w-4 h-4")
+									Copied!
+								</span>
 							</template>
 						</button>
 					</div>

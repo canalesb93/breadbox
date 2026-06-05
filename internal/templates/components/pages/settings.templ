@@ -91,7 +91,6 @@ templ SettingsHelp(p SettingsProps) {
 // ---------------------------------------------------------------------
 // General — Sync
 // ---------------------------------------------------------------------
-
 templ settingsSyncSection(p SettingsProps) {
 	<div id="sync">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -225,7 +224,6 @@ func settingsSyncCaption(p SettingsProps) string {
 // ---------------------------------------------------------------------
 // General — Avatars
 // ---------------------------------------------------------------------
-
 templ settingsAvatarsSection(p SettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "user-circle",
@@ -286,7 +284,6 @@ templ settingsAvatarPickerRow(p SettingsProps, actor, label, current string, see
 // ---------------------------------------------------------------------
 // System — Security
 // ---------------------------------------------------------------------
-
 templ settingsSecuritySection(p SettingsProps) {
 	<div id="security">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -334,7 +331,6 @@ func settingsEncryptionCaption(p SettingsProps) string {
 // ---------------------------------------------------------------------
 // System — Runtime
 // ---------------------------------------------------------------------
-
 templ settingsRuntimeSection(p SettingsProps) {
 	<div id="system">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -389,7 +385,6 @@ templ settingsRuntimeUpdateBadge(p SettingsProps) {
 // ---------------------------------------------------------------------
 // Help
 // ---------------------------------------------------------------------
-
 templ settingsResourcesSection(p SettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "life-buoy",

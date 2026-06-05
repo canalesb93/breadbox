@@ -97,9 +97,12 @@ templ agentRunsStats(s AgentRunsStatsProps) {
 // summary line shows the active filter chips so the operator can see
 // what's applied without expanding.
 templ agentRunsFilterBar(p AgentRunsListProps) {
-	<details class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl mt-4 mb-4" if agentRunsHasActiveFilter(p) {
-		open
-	}>
+	<details
+		class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl mt-4 mb-4"
+		if agentRunsHasActiveFilter(p) {
+			open
+		}
+	>
 		<summary class="collapse-title text-sm font-medium">
 			<div class="flex items-center gap-2 flex-wrap">
 				@components.LucideIcon("filter", "w-4 h-4 text-base-content/50")

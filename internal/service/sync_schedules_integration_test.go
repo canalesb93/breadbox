@@ -145,6 +145,48 @@ func TestSyncSchedules_ToggleAndDelete(t *testing.T) {
 	}
 }
 
+func TestSyncSchedules_AssignToManagedSchedule(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	c1 := testutil.MustCreateConnection(t, queries, user.ID, "sf_a")
+	c2 := testutil.MustCreateConnection(t, queries, user.ID, "sf_b")
+
+	const name = "SimpleFIN (daily)"
+	const cron = "0 6 * * *"
+
+	// First assignment creates the shared schedule and adds c1.
+	if err := svc.AssignConnectionToManagedSchedule(ctx, c1.ShortID, name, cron); err != nil {
+		t.Fatalf("assign c1: %v", err)
+	}
+	// Second connection reuses the SAME schedule (no duplicate created).
+	if err := svc.AssignConnectionToManagedSchedule(ctx, c2.ShortID, name, cron); err != nil {
+		t.Fatalf("assign c2: %v", err)
+	}
+	// Re-assigning c1 is idempotent.
+	if err := svc.AssignConnectionToManagedSchedule(ctx, c1.ShortID, name, cron); err != nil {
+		t.Fatalf("reassign c1: %v", err)
+	}
+
+	list, _ := svc.ListSyncSchedules(ctx)
+	managed := 0
+	for _, s := range list {
+		if s.Name == name {
+			managed++
+			if s.Cron != cron || s.AppliesToAll || !s.Enabled {
+				t.Errorf("unexpected managed schedule: %+v", s)
+			}
+			if s.ConnectionCount != 2 {
+				t.Errorf("expected 2 connections on managed schedule, got %d", s.ConnectionCount)
+			}
+		}
+	}
+	if managed != 1 {
+		t.Errorf("expected exactly 1 managed schedule named %q, got %d", name, managed)
+	}
+}
+
 func TestSyncSchedules_DeleteCascadesTargets(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()

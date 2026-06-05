@@ -14,6 +14,7 @@ import (
 
 type listSeriesInput struct {
 	Status string `json:"status,omitempty" jsonschema:"Optional status filter: active, candidate, paused, or cancelled."`
+	Fields string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Aliases: minimal (name,status,type,cadence), overview (identity + renewal prediction; the default — omits the verbose detection_signals blob). Default when omitted: overview. Pass fields=all for every field including detection_signals. Use get_series for a single series' full detail. id is always included."`
 }
 
 type getSeriesInput struct {
@@ -46,9 +47,33 @@ func (s *MCPServer) handleListSeries(_ context.Context, _ *mcpsdk.CallToolReques
 	if input.Status != "" {
 		status = &input.Status
 	}
+	// Lean-by-default: list_series returns the overview projection (identity +
+	// renewal prediction) unless the caller asks for more. The verbose
+	// detection_signals blob is excluded by default — fetch a single series'
+	// full detail via get_series, or pass fields=all here.
+	fieldsRaw := input.Fields
+	switch fieldsRaw {
+	case "":
+		fieldsRaw = service.DefaultSeriesFields
+	case "all":
+		fieldsRaw = "" // ParseSeriesFields("") → nil → full struct
+	}
+	fieldSet, err := service.ParseSeriesFields(fieldsRaw)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
 	series, err := s.svc.ListSeries(ctx, status)
 	if err != nil {
 		return errorResult(err), nil, nil
+	}
+
+	if fieldSet != nil {
+		projected := make([]map[string]any, len(series))
+		for i, sr := range series {
+			projected[i] = service.FilterSeriesFields(sr, fieldSet)
+		}
+		return jsonResult(map[string]any{"series": projected})
 	}
 	return jsonResult(map[string]any{"series": series})
 }

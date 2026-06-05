@@ -178,6 +178,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// plaintext inline (no /new form or /created subpage).
 		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
 		r.Post("/settings/api-keys/new", APIKeyCreatePageHandler(svc, sm, tr))
+		r.Post("/settings/api-keys/{id}/rename", APIKeyRenamePageHandler(svc, sm, tr))
 
 		r.Get("/settings/oauth-clients", redirectGET("/settings/api-keys"))
 		r.Post("/settings/oauth-clients/new", OAuthClientCreatePageHandler(svc, sm, tr))
@@ -357,6 +358,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Workflow runtime settings — Claude Agent SDK auth, sidecar, and run
 		// ceilings. Admin-only because tokens are sensitive and runs cost.
 		r.Get("/settings/workflows", AgentSDKSettingsPageHandler(a, svc, sm, tr))
+			r.Get("/settings/connectors", ConnectorsSettingsPageHandler(a, svc, sm, tr))
 		// Back-compat: the tab used to live at /settings/agents.
 		r.Get("/settings/agents", redirectGET("/settings/workflows"))
 		r.Get("/agents-settings", redirectGET("/settings/mcp"))
@@ -392,6 +394,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/providers", ProvidersGetHandler(a, svc, sm, tr))
 		r.Post("/settings/providers/plaid", ProvidersSavePlaidHandler(a, sm))
 		r.Post("/settings/providers/teller", ProvidersSaveTellerHandler(a, sm))
+		r.Post("/settings/providers/simplefin", ProvidersSaveSimpleFINHandler(a, sm))
 		r.Get("/providers", redirectGET("/settings/providers"))
 		r.Post("/providers/plaid", redirectPreserveMethod("/settings/providers/plaid"))
 		r.Post("/providers/teller", redirectPreserveMethod("/settings/providers/teller"))
@@ -660,6 +663,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/test", SmokeTestAgentAdminHandler(a, svc))
 			r.Post("/workflows/notify-test", NotifyTestAdminHandler(svc))
 			r.Post("/workflows/cleanup", AgentCleanupAdminHandler(a, svc))
+
+			// Connector library CRUD (admin-only — connector secrets are
+			// sensitive). Posts come from the Connectors settings page.
+			r.Post("/connectors", CreateConnectorAdminHandler(svc, sm))
+			r.Post("/connectors/import", ImportConnectorsAdminHandler(svc, sm))
+			r.Post("/connectors/{id}/update", UpdateConnectorAdminHandler(svc, sm))
+			r.Post("/connectors/{id}/delete", DeleteConnectorAdminHandler(svc, sm))
 
 			// Notifications tab "Send test" button. Canonical home for the
 			// test-delivery endpoint now that the sink lives on its own page;

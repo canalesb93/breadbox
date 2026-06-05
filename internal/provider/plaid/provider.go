@@ -38,3 +38,8 @@ func NewProvider(client *plaidgo.APIClient, encryptionKey []byte, webhookURL str
 func (p *PlaidProvider) HandleWebhook(ctx context.Context, payload provider.WebhookPayload) (provider.WebhookEvent, error) {
 	return p.handleWebhook(ctx, payload)
 }
+
+// ReconcilesPendingByPolling reports false: Plaid uses cursor-based sync and
+// links pending→posted via pending_transaction_id, so the engine must not
+// soft-delete pending rows that weren't re-returned.
+func (p *PlaidProvider) ReconcilesPendingByPolling() bool { return false }

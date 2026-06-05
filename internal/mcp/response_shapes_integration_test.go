@@ -461,8 +461,9 @@ func TestTransactionSummaryResponseShape(t *testing.T) {
 }
 
 // TestMerchantSummaryResponseShape pins {merchants, totals, filters} + row fields.
-// TestQueryTransactionsResponseShape pins category as an object (not a slug
-// string) and the wrapper envelope.
+// TestQueryTransactionsResponseShape pins the lean-by-default projection
+// (core,category), category as an object (not a slug string), the wrapper
+// envelope, and top-level currency hoisting when rows share one currency.
 func TestQueryTransactionsResponseShape(t *testing.T) {
 	f := seedFixtures(t)
 	res, _, err := f.svc.handleQueryTransactions(f.ctx, nil, queryTransactionsInput{
@@ -477,8 +478,14 @@ func TestQueryTransactionsResponseShape(t *testing.T) {
 		t.Fatal("expected at least one transaction")
 	}
 	txn := asObject(t, "query_transactions.transactions[0]", txns[0])
+	// Lean default = core,category. id is always included; fields outside the
+	// default projection (account_id, provider_merchant_name, timestamps,
+	// metadata) must be absent unless explicitly requested.
 	requireKeys(t, "query_transactions.transactions[0]", txn,
-		"id", "account_id", "amount", "date", "provider_name", "category",
+		"id", "amount", "date", "provider_name", "category",
+	)
+	requireAbsent(t, "query_transactions.transactions[0]", txn,
+		"account_id", "provider_merchant_name", "created_at", "updated_at", "metadata", "short_id",
 	)
 	switch v := txn["category"].(type) {
 	case map[string]any:
@@ -489,6 +496,70 @@ func TestQueryTransactionsResponseShape(t *testing.T) {
 	default:
 		t.Errorf("category must be object or null, got %T (%v)", v, v)
 	}
+	// Currency hoisting: the seeded rows are all USD, so iso_currency_code is
+	// emitted once at the top level and dropped from each row. (Written to
+	// tolerate the per-row fallback too, in case fixtures ever go multi-currency.)
+	if cur, hoisted := out["iso_currency_code"]; hoisted {
+		if s, _ := cur.(string); s == "" {
+			t.Errorf("top-level iso_currency_code must be a non-empty string, got %v", cur)
+		}
+		requireAbsent(t, "query_transactions.transactions[0]", txn, "iso_currency_code")
+	} else {
+		requireKeys(t, "query_transactions.transactions[0]", txn, "iso_currency_code")
+	}
+}
+
+// TestQueryTransactionsFieldsAll pins that fields=all restores the full
+// per-row struct (the pre-lean-default contract) and suppresses currency
+// hoisting — full fidelity is full fidelity.
+func TestQueryTransactionsFieldsAll(t *testing.T) {
+	f := seedFixtures(t)
+	res, _, err := f.svc.handleQueryTransactions(f.ctx, nil, queryTransactionsInput{
+		Limit:  10,
+		Fields: "all",
+	})
+	out := decodeToolResult[map[string]any](t, "query_transactions(all)", res, err)
+	requireKeys(t, "query_transactions(all)", out, "transactions", "has_more", "limit")
+	// fields=all means no projection map, so no top-level hoisting.
+	requireAbsent(t, "query_transactions(all)", out, "iso_currency_code")
+	txns := asArray(t, "query_transactions(all).transactions", out["transactions"])
+	if len(txns) == 0 {
+		t.Fatal("expected at least one transaction")
+	}
+	txn := asObject(t, "query_transactions(all).transactions[0]", txns[0])
+	requireKeys(t, "query_transactions(all).transactions[0]", txn,
+		"id", "account_id", "amount", "date", "provider_name",
+		"iso_currency_code", "provider_merchant_name", "category", "created_at", "metadata",
+	)
+}
+
+// TestListTransactionRulesLeanDefault pins that the rule roster is lean by
+// default (summary projection — no conditions/actions trees) and that
+// fields=all restores the full definition.
+func TestListTransactionRulesLeanDefault(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Default (no fields) → summary projection.
+	res, _, err := f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{})
+	out := decodeToolResult[map[string]any](t, "list_transaction_rules", res, err)
+	requireKeys(t, "list_transaction_rules", out, "rules")
+	rules := asArray(t, "list_transaction_rules.rules", out["rules"])
+	if len(rules) == 0 {
+		t.Fatal("expected at least the seeded rule")
+	}
+	rule := asObject(t, "list_transaction_rules.rules[0]", rules[0])
+	requireKeys(t, "list_transaction_rules.rules[0]", rule, "id", "name", "enabled", "priority", "trigger", "hit_count")
+	requireAbsent(t, "list_transaction_rules.rules[0]", rule, "conditions", "actions", "created_at", "short_id")
+
+	// fields=all → full definition restored.
+	resAll, _, errAll := f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{Fields: "all"})
+	outAll := decodeToolResult[map[string]any](t, "list_transaction_rules(all)", resAll, errAll)
+	rulesAll := asArray(t, "list_transaction_rules(all).rules", outAll["rules"])
+	if len(rulesAll) == 0 {
+		t.Fatal("expected at least the seeded rule")
+	}
+	ruleAll := asObject(t, "list_transaction_rules(all).rules[0]", rulesAll[0])
+	requireKeys(t, "list_transaction_rules(all).rules[0]", ruleAll, "id", "name", "conditions", "actions", "created_at")
 }
 
 // TestPreviewRuleResponseShape pins `sample_matches` (not `sample`) + sample
@@ -1003,8 +1074,14 @@ func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
 			name:        "list_transaction_rules <-> breadbox://rules",
 			envelopeKey: "", // both surfaces return the same {rules, has_more, total} object
 			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
+				// list_transaction_rules is lean-by-default (summary projection,
+				// no conditions/actions trees). The resource has no fields knob
+				// and returns the full payload, so parity is asserted against
+				// the tool's full mode (fields=all) — that's the invariant that
+				// must hold: same service call, same full shape.
 				return f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{
-					Limit: rulesResourceLimit,
+					Limit:  rulesResourceLimit,
+					Fields: "all",
 				})
 			},
 			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {

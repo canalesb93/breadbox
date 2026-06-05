@@ -270,6 +270,54 @@ func (s *Service) SyncScheduleResolution(ctx context.Context) (all []ScheduleRef
 	return all, perConn, nil
 }
 
+// AssignConnectionToManagedSchedule ensures a shared, named (non-applies-to-all)
+// schedule with the given cron exists and that the connection belongs to it.
+// Idempotent: re-running for the same connection is a no-op. Used to give
+// rate-limited providers (e.g. SimpleFIN) a conservative default cadence under
+// the schedule model instead of a per-connection interval override.
+func (s *Service) AssignConnectionToManagedSchedule(ctx context.Context, connID, name, cron string) error {
+	if err := cronspec.Validate(cron); err != nil {
+		return err
+	}
+	cid, err := s.resolveConnectionID(ctx, connID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := s.Queries.ListSyncSchedules(ctx)
+	if err != nil {
+		return fmt.Errorf("list sync schedules: %w", err)
+	}
+	var scheduleID pgtype.UUID
+	for _, r := range rows {
+		if r.Name == name {
+			scheduleID = r.ID
+			break
+		}
+	}
+	if !scheduleID.Valid {
+		created, err := s.Queries.CreateSyncSchedule(ctx, db.CreateSyncScheduleParams{
+			Name:         name,
+			Cron:         cron,
+			Preset:       pgconv.TextIfNotEmpty(cronspec.CustomKey),
+			AppliesToAll: false,
+			Enabled:      true,
+		})
+		if err != nil {
+			return fmt.Errorf("create managed schedule: %w", err)
+		}
+		scheduleID = created.ID
+	}
+
+	if err := s.Queries.AddScheduleConnection(ctx, db.AddScheduleConnectionParams{
+		ScheduleID:   scheduleID,
+		ConnectionID: cid,
+	}); err != nil {
+		return fmt.Errorf("add connection to managed schedule: %w", err)
+	}
+	return nil
+}
+
 // ListScheduleConnectionShortIDs returns the connection short IDs a schedule
 // targets, for pre-checking the edit form.
 func (s *Service) ListScheduleConnectionShortIDs(ctx context.Context, idOrShort string) ([]string, error) {

@@ -142,7 +142,8 @@ templ RuleForm(p RuleFormProps) {
 								<button type="button" class="px-2.5 py-0.5 text-xs font-medium rounded-md transition-colors" :class="form.logic === 'or' ? 'bg-base-100 shadow-sm text-base-content' : 'text-base-content/40 hover:text-base-content/60'" @click="form.logic = 'or'; syncToJson()">OR</button>
 							</div>
 							<button type="button" class="btn btn-ghost btn-xs gap-1.5" @click="addCondition()">
-								@components.LucideIcon("plus", "w-3.5 h-3.5") Add
+								@components.LucideIcon("plus", "w-3.5 h-3.5")
+								Add
 							</button>
 						</div>
 					</div>
@@ -156,7 +157,8 @@ templ RuleForm(p RuleFormProps) {
 							<p class="text-xs text-base-content/50">This rule will apply to every transaction. Use sparingly.</p>
 						</div>
 						<button type="button" class="btn btn-xs btn-outline" @click="addCondition()">
-							@components.LucideIcon("plus", "w-3 h-3") Add condition
+							@components.LucideIcon("plus", "w-3 h-3")
+							Add condition
 						</button>
 					</div>
 					<!-- Condition rows. Mobile: stacks as IF + Field on row 1, then
@@ -269,7 +271,8 @@ templ RuleForm(p RuleFormProps) {
 							<p class="text-xs text-base-content/40 mt-1">Add one or more. Only "Set category" is limited to a single action per rule.</p>
 						</div>
 						<button type="button" class="btn btn-ghost btn-xs gap-1.5 shrink-0" @click="addAction()" :disabled="!canAddAction()" :title="addActionTooltip()">
-							@components.LucideIcon("plus", "w-3.5 h-3.5") Add action
+							@components.LucideIcon("plus", "w-3.5 h-3.5")
+							Add action
 						</button>
 					</div>
 					<!-- Action row: stacks on mobile (Action select + remove button on row 1,

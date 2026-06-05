@@ -90,6 +90,13 @@ func Load() (*Config, error) {
 		cfg.ConfigSources["teller_env"] = "env"
 	}
 
+	// SimpleFIN opt-in. If the env var is present at all it wins over app_config
+	// (even when set to a falsey value), matching env-overrides-db precedence.
+	if raw := os.Getenv("SIMPLEFIN_ENABLED"); raw != "" {
+		cfg.SimpleFINEnabled = parseBool(raw)
+		cfg.ConfigSources["simplefin_enabled"] = "env"
+	}
+
 	// Connection pool tuning.
 	cfg.DBMaxConns = int32(getEnvInt("DB_MAX_CONNS", 25))
 	cfg.DBMinConns = int32(getEnvInt("DB_MIN_CONNS", 2))
@@ -247,6 +254,16 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		cfg.ConfigSources["webhook_url"] = "db"
 	} else {
 		cfg.ConfigSources["webhook_url"] = "default"
+	}
+
+	// SimpleFIN opt-in from app_config (unless already set from env).
+	if cfg.ConfigSources["simplefin_enabled"] != "env" {
+		if v, ok := appCfg["simplefin_enabled"]; ok {
+			cfg.SimpleFINEnabled = parseBool(v)
+			cfg.ConfigSources["simplefin_enabled"] = "db"
+		} else {
+			cfg.ConfigSources["simplefin_enabled"] = "default"
+		}
 	}
 
 	// Set defaults for any untracked config sources.

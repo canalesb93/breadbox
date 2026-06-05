@@ -36,6 +36,15 @@ document.addEventListener('alpine:init', function () {
             window.location.href = '/connections/import-csv';
             return;
           }
+          if (selectedProvider === 'simplefin') {
+            // Token-paste flow — no SDK, no /-/link-token round trip.
+            var sfName = document.getElementById('simplefin-member-name');
+            if (sfName) sfName.textContent = select.options[select.selectedIndex].text;
+            stepSelect.classList.add('hidden');
+            document.getElementById('step-simplefin').classList.remove('hidden');
+            setTimeout(function () { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
+            return;
+          }
           memberNameEl.textContent = select.options[select.selectedIndex].text;
           stepSelect.classList.add('hidden');
           stepLink.classList.remove('hidden');
@@ -194,6 +203,65 @@ document.addEventListener('alpine:init', function () {
         }
 
         retryBtn.addEventListener('click', startLink);
+
+        // SimpleFIN token-paste flow. The textarea + buttons only exist when
+        // the SimpleFIN provider is enabled, so guard on their presence.
+        var sfSubmit = document.getElementById('simplefin-submit');
+        if (sfSubmit) {
+          var sfStep = document.getElementById('step-simplefin');
+          var sfToken = document.getElementById('simplefin-token');
+          var sfStatus = document.getElementById('simplefin-status');
+          var sfBack = document.getElementById('simplefin-back');
+
+          sfBack.addEventListener('click', function (e) {
+            e.preventDefault();
+            sfStep.classList.add('hidden');
+            stepSelect.classList.remove('hidden');
+            sfStatus.textContent = '';
+            sfStatus.classList.remove('text-error');
+          });
+
+          sfSubmit.addEventListener('click', function (e) {
+            e.preventDefault();
+            var token = (sfToken.value || '').trim();
+            if (!token) {
+              sfStatus.textContent = 'Paste your SimpleFIN setup token first.';
+              sfStatus.classList.add('text-error');
+              return;
+            }
+            sfStatus.textContent = 'Claiming token and discovering accounts…';
+            sfStatus.classList.remove('text-error');
+            sfStatus.classList.add('text-base-content/50');
+            sfSubmit.disabled = true;
+
+            fetch('/-/exchange-token', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                public_token: token,
+                user_id: selectedUserId,
+                institution_id: 'simplefin',
+                institution_name: 'SimpleFIN',
+                provider: 'simplefin'
+              })
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+              if (data.connection_id) {
+                window.location.href = '/connections/' + data.connection_id;
+              } else {
+                sfStatus.textContent = data.error || 'Failed to connect. Check the token and try again.';
+                sfStatus.classList.add('text-error');
+                sfSubmit.disabled = false;
+              }
+            })
+            .catch(function () {
+              sfStatus.textContent = 'Network error. Please try again.';
+              sfStatus.classList.add('text-error');
+              sfSubmit.disabled = false;
+            });
+          });
+        }
       }
     };
   });

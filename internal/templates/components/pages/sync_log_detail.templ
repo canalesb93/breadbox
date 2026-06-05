@@ -136,22 +136,30 @@ templ SyncLogDetail(p SyncLogDetailProps) {
 						<div class="flex items-center gap-3 text-xs tabular-nums shrink-0">
 							if a.AddedCount != 0 {
 								<span class="text-success font-medium flex items-center gap-1">
-									@components.LucideIcon("plus", "w-3 h-3"){ strconv.FormatInt(int64(a.AddedCount), 10) }
+									@components.LucideIcon("plus", "w-3 h-3") {
+										strconv.FormatInt(int64(a.AddedCount), 10) 
+									}
 								</span>
 							}
 							if a.ModifiedCount != 0 {
 								<span class="text-info font-medium flex items-center gap-1">
-									@components.LucideIcon("pencil", "w-3 h-3"){ strconv.FormatInt(int64(a.ModifiedCount), 10) }
+									@components.LucideIcon("pencil", "w-3 h-3") {
+										strconv.FormatInt(int64(a.ModifiedCount), 10) 
+									}
 								</span>
 							}
 							if a.RemovedCount != 0 {
 								<span class="text-error font-medium flex items-center gap-1">
-									@components.LucideIcon("minus", "w-3 h-3"){ strconv.FormatInt(int64(a.RemovedCount), 10) }
+									@components.LucideIcon("minus", "w-3 h-3") {
+										strconv.FormatInt(int64(a.RemovedCount), 10) 
+									}
 								</span>
 							}
 							if a.UnchangedCount != 0 {
 								<span class="text-base-content/30 font-medium flex items-center gap-1" title="Unchanged">
-									@components.LucideIcon("equal", "w-3 h-3"){ strconv.FormatInt(int64(a.UnchangedCount), 10) }
+									@components.LucideIcon("equal", "w-3 h-3") {
+										strconv.FormatInt(int64(a.UnchangedCount), 10) 
+									}
 								</span>
 							}
 						</div>

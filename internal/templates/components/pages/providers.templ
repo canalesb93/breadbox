@@ -46,6 +46,14 @@ templ Providers(p ProvidersProps) {
 				Configured: p.TellerConfigured,
 				Health:     p.ProviderHealth["teller"],
 			})
+			@providerRow(providerRowData{
+				ID:         "simplefin",
+				Icon:       "key-round",
+				Name:       "SimpleFIN",
+				Desc:       "Paste a setup token — multi-bank, poll-only",
+				Configured: p.SimpleFINEnabled,
+				Health:     p.ProviderHealth["simplefin"],
+			})
 		}
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:    "upload",
@@ -66,8 +74,84 @@ templ Providers(p ProvidersProps) {
 		// (plus its scrim) shows.
 		@providersPlaidDrawer(p, p.ProviderHealth["plaid"])
 		@providersTellerDrawer(p, p.ProviderHealth["teller"])
+		@providersSimplefinDrawer(p, p.ProviderHealth["simplefin"])
 		@providersCSVDrawer(p.ProviderHealth["csv"])
 	</div>
+}
+
+// providersSimplefinDrawer holds the SimpleFIN opt-in. SimpleFIN has no
+// server-level credential — the access token is pasted per connection — so the
+// only setting is whether the provider is offered when adding a connection.
+templ providersSimplefinDrawer(p ProvidersProps, h *service.ProviderHealthSummary) {
+	@components.Drawer(components.DrawerProps{
+		ID:    "provider-simplefin",
+		Title: "SimpleFIN",
+		Size:  "md",
+	}) {
+		<div class="flex flex-col h-full">
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "key-round",
+				Title:    "SimpleFIN",
+				Subtitle: "Token-paste, poll-only bank aggregation",
+			})
+			if p.SimpleFINFromEnv {
+				<div class="flex-1 overflow-y-auto p-5 space-y-5">
+					@providerHealthBlock(h, p.SimpleFINEnabled)
+					<p class="text-sm text-base-content/70 leading-relaxed">
+						SimpleFIN is { simplefinEnabledWord(p.SimpleFINEnabled) } via the
+						<code class="font-mono text-xs">SIMPLEFIN_ENABLED</code> environment
+						variable and can't be changed here.
+					</p>
+				</div>
+				@providerDrawerCloseFooter(false)
+			} else {
+				<form
+					method="POST"
+					action="/settings/providers/simplefin"
+					autocomplete="off"
+					class="flex flex-col h-full"
+					x-data="providerCard"
+					data-provider="simplefin"
+					@submit="saving = true"
+				>
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+					<div class="flex-1 overflow-y-auto p-5 space-y-5">
+						<p class="text-sm text-base-content/70 leading-relaxed">
+							SimpleFIN connects to many banks through a one-time setup token you
+							paste when adding a connection — no app credentials to configure
+							here. Enable it to offer SimpleFIN on the connect screen.
+						</p>
+						@providerField(providerFieldProps{Label: "Offer SimpleFIN", For: "simplefin_enabled"}) {
+							<label class="flex items-center gap-3 cursor-pointer">
+								if p.SimpleFINEnabled {
+									<input type="checkbox" id="simplefin_enabled" name="simplefin_enabled" value="on" class="toggle toggle-primary" checked/>
+								} else {
+									<input type="checkbox" id="simplefin_enabled" name="simplefin_enabled" value="on" class="toggle toggle-primary"/>
+								}
+								<span class="text-sm text-base-content/70">Available when adding a connection</span>
+							</label>
+						}
+						<p class="text-xs text-base-content/45 leading-relaxed">
+							New SimpleFIN connections sync once a day to stay within the bridge's
+							request budget. Get a token from
+							<a href="https://bridge.simplefin.org/simplefin/create" target="_blank" rel="noopener" class="link link-primary">bridge.simplefin.org</a>
+							or your own SimpleFIN server.
+						</p>
+					</div>
+					@providerDrawerSaveFooter(p.SimpleFINEnabled)
+				</form>
+			}
+		</div>
+	}
+}
+
+// simplefinEnabledWord renders the env-managed state as a word for the
+// read-only SimpleFIN drawer copy.
+func simplefinEnabledWord(enabled bool) string {
+	if enabled {
+		return "enabled"
+	}
+	return "disabled"
 }
 
 // ---------------------------------------------------------------------
@@ -502,8 +586,10 @@ templ providerEnvNotice() {
 templ providerTestFooterButton() {
 	<div class="flex items-center gap-3 mr-auto min-w-0">
 		<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="testConnection()" :disabled="testing">
-			<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5")
-Test connection</span>
+			<span x-show="!testing" class="flex items-center gap-1.5">
+				@components.LucideIcon("plug", "w-3.5 h-3.5")
+				Test connection
+			</span>
 			<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing…</span>
 		</button>
 		<span x-show="testResult" x-cloak class="text-xs truncate" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>

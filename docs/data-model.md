@@ -270,7 +270,7 @@ UNIQUE (username)
 #### Enum Types (defined before the table)
 
 ```sql
-CREATE TYPE provider_type AS ENUM ('plaid', 'teller', 'csv');
+CREATE TYPE provider_type AS ENUM ('plaid', 'teller', 'simplefin', 'csv');
 
 CREATE TYPE connection_status AS ENUM (
     'active',           -- connection is healthy and syncing normally
@@ -1230,7 +1230,7 @@ DROP EXTENSION IF EXISTS "pgcrypto";
 
 ```sql
 -- +goose Up
-CREATE TYPE provider_type AS ENUM ('plaid', 'teller', 'csv');
+CREATE TYPE provider_type AS ENUM ('plaid', 'teller', 'simplefin', 'csv');
 
 CREATE TYPE connection_status AS ENUM (
     'active',

@@ -405,8 +405,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, syncLogS
 			logger.Debug("skipped transactions for excluded accounts", "skipped", skipped)
 		}
 
-		// Clean up stale pending transactions for Teller connections.
-		if string(conn.Provider) == "teller" {
+		// Clean up stale pending transactions for poll-based providers that
+		// re-return their full window each sync (Teller, SimpleFIN). Cursor/
+		// webhook providers (Plaid) manage pending→posted themselves.
+		if prov.ReconcilesPendingByPolling() {
 			staleCount := e.cleanStalePending(ctx, tx, connectionID, pendingAdded, previousCursor, logger)
 			removed += staleCount
 		}
@@ -1095,8 +1097,9 @@ func (e *Engine) updateBalances(ctx context.Context, q *db.Queries, prov provide
 }
 
 // cleanStalePending soft-deletes pending transactions that were not returned by
-// the Teller API during this sync window. This handles the case where a pending
-// transaction disappears without posting (e.g., holds that expire).
+// a poll-based provider during this sync window. This handles the case where a
+// pending transaction disappears without posting (e.g., holds that expire).
+// Only invoked for providers whose ReconcilesPendingByPolling() is true.
 func (e *Engine) cleanStalePending(ctx context.Context, tx pgx.Tx, connectionID pgtype.UUID, addedTxns []provider.Transaction, previousCursor string, logger *slog.Logger) int {
 	// Calculate date window.
 	toDate := time.Now()

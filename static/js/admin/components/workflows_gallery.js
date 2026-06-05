@@ -117,6 +117,7 @@ document.addEventListener('alpine:init', function () {
         maxBudget: '',
         additionalInstructions: '',
         options: [], // [{ key, label, help, selected, choices: [{value,label}] }]
+        connectors: [], // [{ name, url, enabled }] — library connectors + per-workflow enablement
       },
       // -------------------------------------------------------------------
 
@@ -501,6 +502,7 @@ document.addEventListener('alpine:init', function () {
         self.reconfigure.maxTurns = '';
         self.reconfigure.maxBudget = '';
         self.reconfigure.avatarSeed = '';
+        self.reconfigure.connectors = [];
         self.cronPreview = '';
         Alpine.store('drawers').open('wf-reconfigure');
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/config', {
@@ -522,6 +524,9 @@ document.addEventListener('alpine:init', function () {
             self.reconfigure.additionalInstructions = data.additional_instructions || '';
             self.reconfigure.avatarSeed = data.avatar_seed || '';
             self.reconfigure.options = Array.isArray(data.options) ? data.options : [];
+            self.reconfigure.connectors = (Array.isArray(data.connectors) ? data.connectors : []).map(function (c) {
+              return { name: c.name, url: c.url || '', enabled: !!c.enabled };
+            });
             if (self.reconfigure.triggerOnSync === 'false') self.describeCron(self.reconfigure.scheduleCron);
           })
           .catch(function (e) {
