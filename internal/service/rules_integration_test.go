@@ -1649,3 +1649,114 @@ func TestPreviewRuleForDetail_ExcludesAlreadyApplied(t *testing.T) {
 		t.Errorf("plain preview after apply: got %d, want 3 (should not filter)", plain.MatchCount)
 	}
 }
+
+// --- FindMatchingRules ---
+
+// findMatchRule looks up a matched rule by short_id in a result.
+func findMatchRule(rules []service.MatchingRule, shortID string) *service.MatchingRule {
+	for i := range rules {
+		if rules[i].ShortID == shortID {
+			return &rules[i]
+		}
+	}
+	return nil
+}
+
+func TestFindMatchingRules_ByTransaction(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+	user := testutil.MustCreateUser(t, queries, "User")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "QFC #123 SEATTLE", 4200, "2025-06-01")
+
+	// A rule that categorizes QFC → groceries.
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "QFC → groceries",
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "QFC"},
+		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat.Slug}},
+		Priority:   10,
+		Actor:      service.Actor{Type: "user", Name: "Test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+	// A rule that should NOT match this transaction.
+	if _, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Costco → groceries",
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "Costco"},
+		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat.Slug}},
+		Actor:      service.Actor{Type: "user", Name: "Test"},
+	}); err != nil {
+		t.Fatalf("CreateTransactionRule (costco): %v", err)
+	}
+
+	res, err := svc.FindMatchingRules(ctx, service.FindMatchingRulesParams{TransactionID: txn.ShortID})
+	if err != nil {
+		t.Fatalf("FindMatchingRules: %v", err)
+	}
+	if res.MatchedCount != 1 {
+		t.Fatalf("matched_count: got %d, want 1 (only QFC rule); rules=%+v", res.MatchedCount, res.Rules)
+	}
+	m := findMatchRule(res.Rules, rule.ShortID)
+	if m == nil {
+		t.Fatalf("QFC rule not in matches: %+v", res.Rules)
+	}
+	if m.SetsCategory == nil || *m.SetsCategory != cat.Slug {
+		t.Errorf("sets_category: got %v, want %q", m.SetsCategory, cat.Slug)
+	}
+	if m.MatchAll {
+		t.Errorf("match_all should be false for a conditioned rule")
+	}
+}
+
+func TestFindMatchingRules_BySyntheticMerchant(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Costco merchant → groceries",
+		Conditions: service.Condition{Field: "provider_merchant_name", Op: "contains", Value: "Costco"},
+		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat.Slug}},
+		Actor:      service.Actor{Type: "user", Name: "Test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	// Covered merchant → the rule is reported even though no transaction exists.
+	res, err := svc.FindMatchingRules(ctx, service.FindMatchingRulesParams{Merchant: "Costco Wholesale #42"})
+	if err != nil {
+		t.Fatalf("FindMatchingRules (covered): %v", err)
+	}
+	if findMatchRule(res.Rules, rule.ShortID) == nil {
+		t.Errorf("expected Costco rule to match merchant text; got %+v", res.Rules)
+	}
+
+	// Uncovered merchant → no matches.
+	none, err := svc.FindMatchingRules(ctx, service.FindMatchingRulesParams{Merchant: "Trader Joe's"})
+	if err != nil {
+		t.Fatalf("FindMatchingRules (uncovered): %v", err)
+	}
+	if none.MatchedCount != 0 {
+		t.Errorf("uncovered merchant: got %d matches, want 0: %+v", none.MatchedCount, none.Rules)
+	}
+}
+
+func TestFindMatchingRules_InputValidation(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// Neither provided.
+	if _, err := svc.FindMatchingRules(ctx, service.FindMatchingRulesParams{}); !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("empty params: got %v, want ErrInvalidParameter", err)
+	}
+	// Both provided.
+	if _, err := svc.FindMatchingRules(ctx, service.FindMatchingRulesParams{TransactionID: "abc", Merchant: "x"}); !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("both params: got %v, want ErrInvalidParameter", err)
+	}
+}

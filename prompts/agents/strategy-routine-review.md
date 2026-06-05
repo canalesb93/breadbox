@@ -17,7 +17,7 @@ STEP-BY-STEP:
    b. Apply the decision via update_transactions with operations like:
       {transaction_id, category_slug, tags_to_remove: [{slug: "needs-review", note: "<short rationale>"}], comment: "<optional narrative>"}
    c. When uncertain, skip — LEAVE the needs-review tag on the transaction. The tag stays, the transaction stays in the queue for next time. Do NOT silently remove the tag without a category decision.
-5. After reviewing, check if any new merchants appeared 2+ times (use merchant_summary if needed) — create rules for recurring patterns
+5. After reviewing, check if any new merchants appeared 2+ times (use merchant_summary if needed). For each candidate merchant, call find_matching_rules(merchant="<name>") FIRST. If it returns a rule that already sets the category, the merchant is covered — do NOT create another rule. Only draft a rule where coverage is missing, then preview_rule it before creating.
 6. Submit a brief report
 
 RULES IN ROUTINE MODE:
@@ -29,5 +29,5 @@ RULES IN ROUTINE MODE:
 ACCURACY OVER SPEED:
 - There are fewer items, so take time on each one
 - Prefer contains over exact match for merchant name rules
-- Check list_transaction_rules before creating to avoid duplicates
+- To avoid duplicates, use find_matching_rules(merchant=...) per candidate merchant — a targeted "is this already covered?" check. Do NOT dump the entire rule set with list_transaction_rules and scan it by hand; with hundreds of rules that wastes the run and still misses near-duplicates. find_matching_rules(transaction_id=...) is the equivalent check anchored to a specific row when you want every condition field evaluated.
 - Record your reasoning on non-obvious categorizations via the note on the tags_to_remove entry and/or the comment in the update_transactions compound op
