@@ -141,6 +141,7 @@ func popAPIKeyReveal(r *http.Request, sm *scs.SessionManager) *pages.AccessRevea
 		return nil
 	}
 	return &pages.AccessReveal{
+		ID:     sm.PopString(r.Context(), "created_api_key_id"),
 		Name:   sm.PopString(r.Context(), "created_api_key_name"),
 		Secret: secret,
 		Scope:  sm.PopString(r.Context(), "created_api_key_scope"),
@@ -199,7 +200,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			FlashRedirect(w, r, sm, "error", "Failed to create API key", "/settings/api-keys")
 			return
 		}
-		reveal := &pages.AccessReveal{Name: result.Name, Secret: result.PlaintextKey, Scope: scope}
+		reveal := &pages.AccessReveal{ID: result.ID, Name: result.Name, Secret: result.PlaintextKey, Scope: scope}
 		// JS path: the in-page swapper POSTs with the fragment header.
 		// Render the Access tab fragment directly with the reveal inline —
 		// no redirect, no one-shot flash to race against.
@@ -210,6 +211,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		// No-JS fallback: stash the reveal in a flash and 303 back so a
 		// form post doesn't re-submit on refresh.
 		sm.Put(r.Context(), "created_api_key", result.PlaintextKey)
+		sm.Put(r.Context(), "created_api_key_id", result.ID)
 		sm.Put(r.Context(), "created_api_key_name", result.Name)
 		sm.Put(r.Context(), "created_api_key_scope", scope)
 		http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
@@ -230,6 +232,14 @@ func APIKeyRevokePageHandler(svc *service.Service, sm *scs.SessionManager) http.
 }
 
 // APIKeyRenamePageHandler serves POST /settings/api-keys/{id}/rename.
+//
+// Three callers, three response shapes:
+//   - The reveal's inline Name field saves in the background with
+//     `X-Requested-With: fetch` so the one-shot secret stays on screen —
+//     we answer 204 (no body, no swap).
+//   - The overflow "Edit label" modal posts as a settings fragment — we
+//     re-render the Access tab so the renamed row repaints in place.
+//   - No-JS form post — 303 back to the tab.
 func APIKeyRenamePageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -237,7 +247,16 @@ func APIKeyRenamePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		if name == "" {
 			name = "API key"
 		}
-		if err := svc.RenameAPIKey(r.Context(), id, name); err != nil {
+		err := svc.RenameAPIKey(r.Context(), id, name)
+		if r.Header.Get("X-Requested-With") == "fetch" {
+			if err != nil {
+				http.Error(w, "rename failed", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to rename API key")
 			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 			return
