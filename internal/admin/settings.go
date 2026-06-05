@@ -65,6 +65,8 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		nextSyncTime = formatNextSync(a.Scheduler.NextRun())
 	}
 
+	syncSchedules, _ := a.Service.ListSyncSchedules(ctx)
+
 	props := pages.SettingsProps{
 		CSRFToken:            GetCSRFToken(r),
 		SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
@@ -78,6 +80,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
 		OnboardingDismissed:  onboardingDismissed,
 		NextSyncTime:         nextSyncTime,
+		SyncSchedules:        syncSchedules,
 		ConfigSources:        a.Config.ConfigSources,
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,

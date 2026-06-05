@@ -2,7 +2,10 @@
 
 package pages
 
-import "breadbox/internal/avatar"
+import (
+	"breadbox/internal/avatar"
+	"breadbox/internal/service"
+)
 
 // avatarPreviewExpr builds the Alpine `:src` expression for an
 // avatar-style preview tile. The seed is a fixed literal supplied by
@@ -47,6 +50,10 @@ type SettingsProps struct {
 	HasEncryptionKey     bool
 	OnboardingDismissed  bool
 	NextSyncTime         string
+	// SyncSchedules is the household's wall-clock sync schedules (the
+	// replacement for the single global interval). Rendered as a list in
+	// the General → Sync section.
+	SyncSchedules []service.SyncScheduleView
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
 

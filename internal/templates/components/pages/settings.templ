@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
 
@@ -95,30 +96,25 @@ templ settingsSyncSection(p SettingsProps) {
 	<div id="sync">
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:    "refresh-cw",
-			Title:   "Sync",
+			Title:   "Sync schedules",
 			Caption: settingsSyncCaption(p),
+			Right:   newScheduleButton(),
 		}) {
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Sync interval",
-				Caption: settingsNextSyncCaption(p),
-				For:     "sync_interval_minutes",
-			}) {
-				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
-					Action:    "/settings/sync",
-					CSRFToken: p.CSRFToken,
-					Label:     "Sync schedule saved",
-				}) {
-					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm bg-base-200">
-						@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
-						@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
-						@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
-						@syncIntervalOption(240, p.SyncIntervalMinutes, "Every 4 hours")
-						@syncIntervalOption(480, p.SyncIntervalMinutes, "Every 8 hours")
-						@syncIntervalOption(720, p.SyncIntervalMinutes, "Every 12 hours")
-						@syncIntervalOption(1440, p.SyncIntervalMinutes, "Every 24 hours")
-					</select>
+			if len(p.SyncSchedules) == 0 {
+				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+					<p class="text-sm text-base-content/55 leading-snug">
+						No sync schedules. Connections will not auto-sync until you add one.
+					</p>
 				}
 			}
+			for _, sched := range p.SyncSchedules {
+				@settingsScheduleRow(p, sched)
+			}
+		}
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:  "scroll",
+			Title: "Sync logs",
+		}) {
 			@components.SettingsRow(components.SettingsRowProps{
 				Label:   "Log retention",
 				Caption: fmt.Sprintf("%d logs stored · cleanup runs daily at 3:00 AM", p.SyncLogCount),
@@ -145,15 +141,85 @@ templ settingsSyncSection(p SettingsProps) {
 	</div>
 }
 
-func settingsSyncCaption(p SettingsProps) string {
-	return "Every " + components.FormatIntervalMinutes(p.SyncIntervalMinutes)
+// newScheduleButton is the section's primary action — links to the
+// dedicated schedule form page.
+templ newScheduleButton() {
+	<a href="/settings/sync/schedules/new" class="btn btn-primary btn-sm gap-2">
+		@components.LucideIcon("plus", "w-4 h-4")
+		New schedule
+	</a>
 }
 
-func settingsNextSyncCaption(p SettingsProps) string {
-	if p.NextSyncTime == "" {
-		return ""
+// settingsScheduleRow renders one schedule: its name + human cadence and
+// target on the left, an enabled toggle plus edit/delete actions on the right.
+templ settingsScheduleRow(p SettingsProps, sched service.SyncScheduleView) {
+	@components.SettingsRow(components.SettingsRowProps{
+		Label:   sched.Name,
+		Caption: scheduleRowCaption(sched),
+	}) {
+		<div class="flex items-center gap-2">
+			@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+				Action:    "/settings/sync/schedules/" + sched.ShortID + "/toggle",
+				CSRFToken: p.CSRFToken,
+				Label:     "Schedule updated",
+			}) {
+				if sched.Enabled {
+					<input type="checkbox" name="enabled" class="toggle toggle-sm toggle-primary" checked aria-label="Enabled"/>
+				} else {
+					<input type="checkbox" name="enabled" class="toggle toggle-sm toggle-primary" aria-label="Enabled"/>
+				}
+			}
+			<a href={ scheduleEditURL(sched.ShortID) } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
+				@components.LucideIcon("pencil", "w-4 h-4")
+			</a>
+			<form method="POST" action={ scheduleDeleteURL(sched.ShortID) } onsubmit="return confirm('Delete this schedule?')">
+				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Delete schedule">
+					@components.LucideIcon("trash-2", "w-4 h-4")
+				</button>
+			</form>
+		</div>
 	}
-	return "Next sync: " + p.NextSyncTime
+}
+
+// scheduleRowCaption combines the human cadence with the target summary and a
+// disabled marker.
+func scheduleRowCaption(sched service.SyncScheduleView) string {
+	caption := sched.CronHuman + " · " + scheduleTargetSummary(sched)
+	if !sched.Enabled {
+		caption += " · paused"
+	}
+	return caption
+}
+
+// scheduleTargetSummary describes which connections a schedule covers.
+func scheduleTargetSummary(sched service.SyncScheduleView) string {
+	if sched.AppliesToAll {
+		return "All connections"
+	}
+	switch sched.ConnectionCount {
+	case 0:
+		return "No connections"
+	case 1:
+		return "1 connection"
+	default:
+		return fmt.Sprintf("%d connections", sched.ConnectionCount)
+	}
+}
+
+func settingsSyncCaption(p SettingsProps) string {
+	n := len(p.SyncSchedules)
+	if n == 0 {
+		return "No schedules configured"
+	}
+	next := ""
+	if p.NextSyncTime != "" {
+		next = " · next sync " + p.NextSyncTime
+	}
+	if n == 1 {
+		return "1 schedule" + next
+	}
+	return fmt.Sprintf("%d schedules%s", n, next)
 }
 
 // ---------------------------------------------------------------------
@@ -384,14 +450,6 @@ templ settingsDeveloperSection() {
 // ---------------------------------------------------------------------
 // Helpers reused by handlers + by other settings tabs
 // ---------------------------------------------------------------------
-
-templ syncIntervalOption(value, current int, label string) {
-	if value == current {
-		<option value={ strconv.Itoa(value) } selected>{ label }</option>
-	} else {
-		<option value={ strconv.Itoa(value) }>{ label }</option>
-	}
-}
 
 templ retentionOption(value, current int, label string) {
 	if value == current {

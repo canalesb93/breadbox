@@ -425,6 +425,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
+
+		// Sync schedules — wall-clock cron schedules that replace the single
+		// global interval. List lives in Settings → Sync; create/edit is a
+		// standalone form page.
+		r.Get("/settings/sync/schedules/new", ScheduleFormPageHandler(a, svc, sm, tr))
+		r.Post("/settings/sync/schedules", ScheduleCreateHandler(a, svc, sm))
+		r.Get("/settings/sync/schedules/{shortID}/edit", ScheduleFormPageHandler(a, svc, sm, tr))
+		r.Post("/settings/sync/schedules/{shortID}", ScheduleUpdateHandler(a, svc, sm))
+		r.Post("/settings/sync/schedules/{shortID}/toggle", ScheduleToggleHandler(a, svc, sm))
+		r.Post("/settings/sync/schedules/{shortID}/delete", ScheduleDeleteHandler(a, svc, sm))
 		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
 	})
 
