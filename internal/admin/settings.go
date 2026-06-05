@@ -84,6 +84,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		SyncSchedules:        syncSchedules,
 		NewScheduleForm:      newScheduleForm,
 		EditScheduleForms:    editScheduleForms,
+		InstanceTimezone:     appconfig.String(ctx, a.Queries, appconfig.KeyInstanceTimezone, ""),
 		ConfigSources:        a.Config.ConfigSources,
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,
@@ -181,6 +182,30 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			SetFlash(ctx, sm, "success", fmt.Sprintf("Sync log retention set to %d days.", retentionDays))
 		}
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	}
+}
+
+// SettingsTimezonePostHandler serves POST /settings/timezone — sets the
+// instance IANA timezone all cron schedules (sync + workflows) are evaluated
+// in. Empty clears it (back to the server's local zone). Auto-save: 204 on ok.
+func SettingsTimezonePostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tz := strings.TrimSpace(r.FormValue("instance_timezone"))
+		if tz != "" {
+			if _, err := time.LoadLocation(tz); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+			Key:   appconfig.KeyInstanceTimezone,
+			Value: pgconv.Text(tz),
+		}); err != nil {
+			a.Logger.Error("save instance timezone", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

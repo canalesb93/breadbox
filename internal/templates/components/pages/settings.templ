@@ -99,6 +99,27 @@ templ settingsSyncSection(p SettingsProps) {
 			Caption: settingsSyncCaption(p),
 			Right:   newScheduleButton(),
 		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Timezone",
+				Caption: "Schedules are evaluated in this zone",
+				For:     "instance_timezone",
+			}) {
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/settings/timezone",
+					CSRFToken: p.CSRFToken,
+					Label:     "Timezone saved",
+				}) {
+					<select id="instance_timezone" name="instance_timezone" class="select select-sm bg-base-200">
+						@tzOption("", p.InstanceTimezone, "Server default")
+						for _, tz := range commonTimezones() {
+							@tzOption(tz, p.InstanceTimezone, tz)
+						}
+						if p.InstanceTimezone != "" && !isCommonTimezone(p.InstanceTimezone) {
+							@tzOption(p.InstanceTimezone, p.InstanceTimezone, p.InstanceTimezone)
+						}
+					</select>
+				}
+			}
 			if len(p.SyncSchedules) == 0 {
 				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
 					<p class="text-sm text-base-content/55 leading-snug">
@@ -449,6 +470,44 @@ templ settingsDeveloperSection() {
 // ---------------------------------------------------------------------
 // Helpers reused by handlers + by other settings tabs
 // ---------------------------------------------------------------------
+templ tzOption(value, current, label string) {
+	if value == current {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+// commonTimezones is a curated shortlist for the instance-timezone picker —
+// enough to cover most self-hosters without shipping the full IANA database in
+// a select. A configured zone outside this list is appended as its own option.
+func commonTimezones() []string {
+	return []string{
+		"UTC",
+		"America/Los_Angeles",
+		"America/Denver",
+		"America/Chicago",
+		"America/New_York",
+		"America/Sao_Paulo",
+		"Europe/London",
+		"Europe/Paris",
+		"Europe/Berlin",
+		"Europe/Madrid",
+		"Asia/Kolkata",
+		"Asia/Singapore",
+		"Asia/Tokyo",
+		"Australia/Sydney",
+	}
+}
+
+func isCommonTimezone(tz string) bool {
+	for _, t := range commonTimezones() {
+		if t == tz {
+			return true
+		}
+	}
+	return false
+}
 
 templ retentionOption(value, current int, label string) {
 	if value == current {
