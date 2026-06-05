@@ -26,11 +26,12 @@ type WorkflowPreset struct {
 	PromptBlocks []string
 
 	// Default run configuration applied when the preset is enabled.
-	ToolScope             string // "read_only" | "read_write"
-	Model                 string // empty = DefaultAgentModel
-	MaxTurns              int    // 0 = DefaultAgentMaxTurns
-	ScheduleCron          string // empty = no cron
-	TriggerOnSyncComplete bool   // fire after each successful sync
+	ToolScope             string  // "read_only" | "read_write"
+	Model                 string  // empty = DefaultAgentModel
+	MaxTurns              int     // 0 = DefaultAgentMaxTurns
+	MaxBudgetUSD          float64 // 0 = DefaultAgentMaxBudgetUSD
+	ScheduleCron          string  // empty = no cron
+	TriggerOnSyncComplete bool    // fire after each successful sync
 
 	// OneOff marks an on-demand workflow: it has no recurring trigger (no cron,
 	// no post-sync) and runs only when a human hits "Run now". The gallery
@@ -81,10 +82,10 @@ var applyModeOption = WorkflowPresetOption{
 	Help:    "How it handles categories it's confident about.",
 	Default: "auto",
 	Choices: []WorkflowPresetChoice{
-		{Value: "auto", Label: "Auto-apply categories", Directive: ""},
+		{Value: "auto", Label: "Auto-apply", Directive: ""},
 		{
 			Value:     "flag_only",
-			Label:     "Flag only — don't categorize",
+			Label:     "Flag only",
 			Directive: "APPLY MODE — FLAG ONLY: Do NOT set, change, or clear any transaction category, and do NOT call update_transactions to write a category. Your job in this mode is review-and-flag only: flag transactions that need a human's attention (and leave a brief comment explaining why), but leave all categorization decisions to the user.",
 		},
 	},
@@ -101,10 +102,10 @@ var ruleApplyModeOption = WorkflowPresetOption{
 	Help:    "Both create the rules — choose whether to also backfill existing transactions.",
 	Default: "create_apply",
 	Choices: []WorkflowPresetChoice{
-		{Value: "create_apply", Label: "Create rules & backfill history", Directive: ""},
+		{Value: "create_apply", Label: "Create & backfill", Directive: ""},
 		{
 			Value:     "create_only",
-			Label:     "Create rules only — skip backfill",
+			Label:     "Create only",
 			Directive: "RULE HANDLING — CREATE ONLY: Create the vetted rules as usual (dry-run each first), but do NOT call apply_rules — skip the backfill. Rules take effect on the next sync; leave existing transactions untouched. In your report, give each rule's dry-run match count and note that nothing was backfilled.",
 		},
 	},
@@ -120,15 +121,15 @@ var lookbackWindowOption = WorkflowPresetOption{
 	Help:    "How far back each run scans for anomalies.",
 	Default: "7",
 	Choices: []WorkflowPresetChoice{
-		{Value: "7", Label: "Last 7 days", Directive: ""},
+		{Value: "7", Label: "7 days", Directive: ""},
 		{
 			Value:     "30",
-			Label:     "Last 30 days",
+			Label:     "30 days",
 			Directive: "LOOKBACK WINDOW — 30 DAYS: Scan the last 30 days, not the default 7. Wherever a step says \"last 7 days\", read it as \"last 30 days\". Establish baselines from the period immediately preceding the window so a one-month scan still has something to compare against.",
 		},
 		{
 			Value:     "90",
-			Label:     "Last 90 days",
+			Label:     "90 days",
 			Directive: "LOOKBACK WINDOW — 90 DAYS: Scan the last 90 days, not the default 7. Wherever a step says \"last 7 days\", read it as \"last 90 days\". This is a wide, catch-up sweep — prioritize the highest-signal findings and don't re-flag items a prior run already surfaced.",
 		},
 	},
@@ -143,10 +144,10 @@ var reportVerbosityOption = WorkflowPresetOption{
 	Help:    "How much detail each report carries.",
 	Default: "concise",
 	Choices: []WorkflowPresetChoice{
-		{Value: "concise", Label: "Concise — headline findings", Directive: ""},
+		{Value: "concise", Label: "Concise", Directive: ""},
 		{
 			Value:     "detailed",
-			Label:     "Detailed — full evidence",
+			Label:     "Detailed",
 			Directive: "REPORT VERBOSITY — DETAILED: Write a thorough report. For every flagged item include the full evidence trail (amounts, dates, merchant, account, and the baseline you compared against) and a one-line rationale. Open with a short summary of what you scanned and the headline count, then the itemized findings. When nothing is flagged, still summarize what you checked and why the window is clean.",
 		},
 	},
@@ -201,9 +202,13 @@ var workflowPresets = []WorkflowPreset{
 			"strategy-rule-foundation",
 			"category-system",
 		},
-		ToolScope:        "read_write", // creates + applies rules (dry-run first)
-		Model:            "claude-sonnet-4-6",
-		OneOff:           true,
+		ToolScope: "read_write", // creates + applies rules (dry-run first)
+		Model:     "claude-sonnet-4-6",
+		OneOff:    true,
+		// Foundational one-off: a single deep pass over 1000+ transactions that
+		// drafts and applies rules. Turns stay unlimited (budget-bound) so a large
+		// history isn't cut off mid-pass; the generous budget is the real ceiling.
+		MaxBudgetUSD:     3.00,
 		EstCostPerRunUSD: 0.50, // analyzes 1000+ transactions on Sonnet + drafts rules
 		Options:          []WorkflowPresetOption{ruleApplyModeOption},
 	},
@@ -218,9 +223,13 @@ var workflowPresets = []WorkflowPreset{
 			"review-depth-efficient",
 			"category-system",
 		},
-		ToolScope:        "read_write", // categorizes + clears needs-review on resolved items
-		Model:            "claude-haiku-4-5",
-		OneOff:           true,
+		ToolScope: "read_write", // categorizes + clears needs-review on resolved items
+		Model:     "claude-haiku-4-5",
+		OneOff:    true,
+		// Batch one-off: clears a large backlog in one pass. Haiku keeps the
+		// per-turn cost low, and turns stay unlimited so a deep backlog isn't
+		// abandoned mid-pass — the forgiving budget is what bounds the run.
+		MaxBudgetUSD:     2.00,
 		EstCostPerRunUSD: 0.20, // hundreds–thousands of transactions on Haiku
 		Options:          []WorkflowPresetOption{applyModeOption},
 	},
@@ -265,9 +274,12 @@ var workflowPresets = []WorkflowPreset{
 			"review-depth-thorough",
 			"category-system",
 		},
-		ToolScope:        "read_write",
-		ScheduleCron:     "0 7 * * 1", // Mondays at 07:00 (canonical "Weekly" — drawer-selectable)
-		EstCostPerRunUSD: 0.08,        // thorough pass over an accumulated backlog
+		ToolScope:    "read_write",
+		ScheduleCron: "0 7 * * 1", // Mondays at 07:00 (canonical "Weekly" — drawer-selectable)
+		// Weekly deep-clean over an aged backlog — heavier than the per-sync
+		// reviewer, so it gets a moderately higher budget; turns stay unlimited.
+		MaxBudgetUSD:     1.50,
+		EstCostPerRunUSD: 0.08, // thorough pass over an accumulated backlog
 		Options:          []WorkflowPresetOption{applyModeOption},
 	},
 	{
@@ -463,6 +475,13 @@ func (s *Service) EnableWorkflowFromPreset(ctx context.Context, slug string, par
 		if m := strings.TrimSpace(*params.Model); m != "" {
 			create.Model = m
 		}
+	}
+	// Preset budget default (e.g. the forgiving caps on the foundational/batch
+	// one-offs). A non-zero preset budget seeds the instance; the form override
+	// below still wins when the operator sets one explicitly.
+	if preset.MaxBudgetUSD > 0 {
+		b := preset.MaxBudgetUSD
+		create.MaxBudgetUSD = &b
 	}
 	if params.MaxTurns != nil && *params.MaxTurns > 0 {
 		create.MaxTurns = *params.MaxTurns

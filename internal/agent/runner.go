@@ -10,6 +10,10 @@ const (
 	StatusError   = "error"
 	StatusTimeout = "timeout"
 	StatusSkipped = "skipped"
+	// StatusCancelled is an operator-initiated stop mid-run (the run-detail
+	// "Cancel run" button). Distinct from error (a failure) and timeout (the
+	// run ceiling) — the operator chose to abort, so it reads as intentional.
+	StatusCancelled = "cancelled"
 )
 
 // RunResult is the structured outcome of one agent run.

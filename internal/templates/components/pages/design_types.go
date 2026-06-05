@@ -227,6 +227,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionFormControls() },
 		},
 		{
+			Slug:        "radio-card",
+			Title:       "Radio card",
+			Description: "components.RadioCard — a radio styled as a selectable icon+title+subtitle tile. The \"pick one of a few, each worth a sentence\" control (roomier than a bare radio list, lighter than a wizard step). Powers the Workflows drawer trigger choice (Custom schedule vs After each sync). Hover lifts the surface, keyboard focus rings the card, the chosen tile flips to primary with a check; native or Alpine-bound.",
+			Group:       "forms",
+			Render:      func() templ.Component { return SectionRadioCard() },
+		},
+		{
 			Slug:        "filter-search-input",
 			Title:       "Filter search input",
 			Description: "Client-side filter input — daisy input + leading search icon + x-model binding for Alpine-driven row filtering. Use components.FilterSearchInput on /categories, /tags, and future inline-filter list pages.",
@@ -273,7 +280,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "recurring-detail",
 			Title:       "Recurring detail panels",
-			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz), SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset), and SeriesFactStrip (read-only derived facts). The handler assembles the values; these are pure presentation.",
+			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz, with a no-amount variant), the standalone SeriesMatchWindow amount-axis viz, SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset, read-only and unlinkable variants), and SeriesFactStrip (read-only derived facts). Money values carry data-private so privacy mode obfuscates them. The handler assembles the values; these are pure presentation.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionRecurringDetail() },
 		},

@@ -685,13 +685,13 @@ func TestRunOrSkip_HouseholdCeiling(t *testing.T) {
 	}
 }
 
-// TestAssembleJobSpec_ClampsNonPositiveMaxTurns is the defense-in-depth half
-// of the max_turns=0 fix: even if a definition somehow holds 0 (a pre-fix prod
-// row, a future code path that skips normalization), spec assembly must clamp
-// it to DefaultAgentMaxTurns rather than forward maxTurns:0 — which the
-// sidecar's z.number().int().positive() schema rejects with spec_invalid.
-// The def is hand-constructed because create/update now both normalize 0 away,
-// so this exercises the spec-assembly clamp in isolation.
+// TestAssembleJobSpec_ClampsNonPositiveMaxTurns is the defense-in-depth half of
+// the max_turns semantics: a non-positive cap means UNLIMITED (0 is now the
+// default — budget is the real ceiling), but the sidecar's
+// z.number().int().positive() schema rejects maxTurns<=0. Spec assembly must
+// therefore forward the high SidecarMaxTurnsCap (effectively unlimited) rather
+// than a literal 0/negative. The def is hand-constructed to exercise the
+// spec-assembly clamp in isolation.
 func TestAssembleJobSpec_ClampsNonPositiveMaxTurns(t *testing.T) {
 	svc, _, _ := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)
@@ -710,8 +710,8 @@ func TestAssembleJobSpec_ClampsNonPositiveMaxTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AssembleJobSpec: %v", err)
 	}
-	if spec.MaxTurns != service.DefaultAgentMaxTurns {
-		t.Errorf("spec.MaxTurns = %d, want %d (clamped from 0)", spec.MaxTurns, service.DefaultAgentMaxTurns)
+	if spec.MaxTurns != service.SidecarMaxTurnsCap {
+		t.Errorf("spec.MaxTurns = %d, want %d (unlimited cap, clamped from 0)", spec.MaxTurns, service.SidecarMaxTurnsCap)
 	}
 
 	// A negative value clamps too.
@@ -720,8 +720,8 @@ func TestAssembleJobSpec_ClampsNonPositiveMaxTurns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AssembleJobSpec (negative): %v", err)
 	}
-	if spec.MaxTurns != service.DefaultAgentMaxTurns {
-		t.Errorf("spec.MaxTurns = %d, want %d (clamped from -5)", spec.MaxTurns, service.DefaultAgentMaxTurns)
+	if spec.MaxTurns != service.SidecarMaxTurnsCap {
+		t.Errorf("spec.MaxTurns = %d, want %d (unlimited cap, clamped from -5)", spec.MaxTurns, service.SidecarMaxTurnsCap)
 	}
 
 	// A positive value is preserved.

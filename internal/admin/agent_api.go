@@ -265,6 +265,44 @@ func RunWorkflowPresetAdminHandler(a *app.App, svc *service.Service) http.Handle
 	}
 }
 
+// CancelWorkflowRunAdminHandler handles POST /-/workflows/runs/{shortId}/cancel.
+// It aborts an in-progress run by asking the orchestrator to cancel that run's
+// context — which SIGKILLs the sidecar process group (see internal/agent/
+// sidecar.go). The run goroutine then persists a terminal 'cancelled' status,
+// which the run-detail live poller picks up on its next refresh. Editor-level,
+// mirroring the run/enable/disable surface (managing an existing run, not
+// authorizing new recurring spend).
+func CancelWorkflowRunAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		shortID := chi.URLParam(r, "shortId")
+		orchestrator := a.AgentOrchestrator
+		if orchestrator == nil {
+			writeError(w, http.StatusServiceUnavailable, "AGENTS_DISABLED", "Agent orchestrator not configured")
+			return
+		}
+		run, err := svc.GetAgentRun(r.Context(), shortID)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Run not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load run")
+			return
+		}
+		if run.Status != "in_progress" {
+			writeError(w, http.StatusConflict, "INVALID_STATE", "Run is not in progress")
+			return
+		}
+		if !orchestrator.CancelRun(shortID) {
+			// Not in this process's in-flight set — it just finished, or is owned
+			// by another instance. Nothing to abort here.
+			writeError(w, http.StatusConflict, "NOT_CANCELLABLE", "Run is no longer cancellable")
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"status": "cancelling"})
+	}
+}
+
 // WorkflowRunStatusAdminHandler handles GET /-/workflows/runs/{shortId}/status —
 // a lightweight JSON status poll for the gallery's one-off Run button, which
 // keeps its spinner up for the whole run (not just the async dispatch). Returns

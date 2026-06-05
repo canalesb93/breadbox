@@ -577,18 +577,7 @@
                   title="Search">
             {{ lucide "search" "w-5 h-5" }}
           </button>
-          {{if .AdminUsername}}
-          <a href="/settings/account"
-             class="btn btn-square btn-ghost"
-             aria-label="My Account"
-             title="My Account">
-            {{if .SessionUserID}}
-            {{renderComponent "UserAvatar" (userAvatarProps .SessionUserID .SessionAvatarVersion .AdminUsername "lg")}}
-            {{else}}
-            {{ lucide "user-circle" "w-5 h-5" }}
-            {{end}}
-          </a>
-          {{end}}
+          {{if .AdminUsername}}{{renderComponent "TopbarUserMenu" .}}{{end}}
         </div>
       </div>
       {{/* Mobile location trail — the desktop topbar is hidden < lg, so the
@@ -834,7 +823,7 @@
               <span class="text-xs font-medium flex items-center gap-1">
                 {{ lucide "shield-check" "w-3.5 h-3.5 text-success" }} Redact financial data
               </span>
-              <span class="block text-xs text-base-content/50 leading-snug">Masks amounts, names, and other data in the screenshot and HTML before anything leaves this instance.</span>
+              <span class="block text-xs text-base-content/50 leading-snug">Obfuscates amounts and balances, and masks names and other data, in the screenshot and HTML before anything leaves this instance.</span>
             </span>
           </label>
           <p x-show="!redact" x-cloak class="text-xs text-warning flex items-start gap-1">
@@ -880,7 +869,8 @@
                 :disabled="!title.trim() || submitting || capturing"
                 class="btn btn-primary btn-sm gap-2">
           <span x-show="!submitting && !capturing" class="flex items-center gap-1.5">
-            {{ lucide "send" "w-3.5 h-3.5" }} File issue
+            {{ brand "github" "brand-onbtn w-3.5 h-3.5" }} File issue
+            {{ lucide "external-link" "w-3 h-3 opacity-70" }}
           </span>
           <span x-show="capturing && !submitting" x-cloak class="flex items-center gap-1.5">
             <span class="loading loading-spinner loading-xs"></span> Preparing…
@@ -2111,7 +2101,8 @@
         { id: 'sys-users', shortcutId: 'global.go.f', group: 'System', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/household', keywords: 'people family members' },
         { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'API Keys', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/settings/api-keys', keywords: 'tokens authentication api keys oauth connector claude access' },
         { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/settings/providers', keywords: 'plaid teller csv bank setup' },
-        { id: 'sys-logs', shortcutId: 'global.go.v', group: 'System', title: 'Logs', desc: 'Sync logs, webhook events, agent sessions', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events sessions activity' },
+        // Logs is hidden from quick-nav for now (route still live, reachable via feed deep links);
+        // restore this entry + the g-chord below to re-list it as a top-level page.
         { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/settings/backups', keywords: 'backup restore database dump export' },
         { id: 'sys-settings', shortcutId: 'global.go.s', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
         { id: 'sys-design', shortcutId: 'global.go.d', group: 'System', title: 'Design system', desc: 'DaisyUI + bb-* component sandbox', icon: 'palette', href: '/design', keywords: 'sandbox gallery components ui daisyui tailwind preview' },
@@ -2130,6 +2121,17 @@
         { id: 'act-theme-light', group: 'Quick Actions', title: 'Light theme', desc: 'Always use the light theme', icon: 'sun', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('light'); }, keywords: 'theme light mode appearance bright day color scheme set' },
         { id: 'act-theme-dark', group: 'Quick Actions', title: 'Dark theme', desc: 'Always use the dark theme', icon: 'moon', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('dark'); }, keywords: 'theme dark mode appearance night color scheme set' },
         { id: 'act-theme-system', group: 'Quick Actions', title: 'System theme', desc: 'Match your OS appearance', icon: 'monitor', action: function() { if (window.Alpine && Alpine.store('theme')) Alpine.store('theme').set('system'); }, keywords: 'theme system auto os appearance default color scheme automatic set' },
+        // Privacy actions (no href) — drive $store.privacy directly, mirroring
+        // the theme block above. `act-privacy` is the smart cycle
+        // (real → obfuscate → hide); its shortcutId links to the 'shift+p'
+        // binding in seedRegistry() so the palette row shows the same keycap
+        // hint as the help modal. The three explicit actions jump straight to a
+        // specific mode (the palette is the only place you can land directly on
+        // Hide without cycling).
+        { id: 'act-privacy', shortcutId: 'global.privacy.cycle', group: 'Quick Actions', title: 'Toggle privacy mode', desc: 'Cycle real → obfuscate → hide', icon: 'shield', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').cycle(); }, keywords: 'privacy obfuscate hide blur censor mask redact conceal sensitive screenshot demo screen share shoulder surf fake matrix hex' },
+        { id: 'act-privacy-real', group: 'Quick Actions', title: 'Show real data', desc: 'Turn privacy mode off', icon: 'eye', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').set('real'); }, keywords: 'privacy real show reveal unmask actual disable off normal clear' },
+        { id: 'act-privacy-obfuscate', group: 'Quick Actions', title: 'Obfuscate data', desc: 'Replace values with obvious fakes', icon: 'venetian-mask', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').set('obfuscate'); }, keywords: 'privacy obfuscate fake matrix hex scramble mask demo screenshot sensitive glitch' },
+        { id: 'act-privacy-hide', group: 'Quick Actions', title: 'Hide data', desc: 'Blur out sensitive values', icon: 'eye-off', action: function() { if (window.Alpine && Alpine.store('privacy')) Alpine.store('privacy').set('hide'); }, keywords: 'privacy hide blur censor redact conceal hidden sensitive screenshot' },
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
@@ -2768,8 +2770,7 @@
         r: { path: '/reviews',            label: 'Go to Reviews' },
         u: { path: '/rules',              label: 'Go to Rules' },
         a: { path: '/categories',         label: 'Go to Categories' },
-        v: { path: '/logs',               label: 'Go to Logs' },
-        l: { path: '/logs',               label: 'Go to Logs' },
+        // g+v / g+l → /logs disabled while Logs is hidden from top-level nav; restore with the sidebar link.
         b: { path: '/settings/backups',   label: 'Go to Backups' },
         s: { path: '/settings',           label: 'Go to Settings' },
         p: { path: '/settings/providers', label: 'Go to Providers' },

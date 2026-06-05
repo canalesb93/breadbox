@@ -13,6 +13,12 @@
 // one glitch function preserves each character class, so every kind is handled
 // uniformly today; the attribute keeps the door open for per-kind strategies.
 //
+// TRANSITIONS: switching to/from obfuscate runs a brief "decode" scramble —
+// each marked value flickers through random same-class glyphs and locks in
+// left-to-right (the matrix read). Only on-screen nodes animate (off-screen
+// ones snap), it respects prefers-reduced-motion, and a token cancels an
+// in-flight run so rapid toggles don't pile up. The hide blur eases via CSS.
+//
 // THREAT MODEL: presentation-only. Real values still exist in the DOM /
 // devtools / network — this defends against shoulder-surfing, screenshots, and
 // screen-shares, NOT against someone with browser access. Mirrors the
@@ -29,6 +35,9 @@
   var KEY = 'bb-privacy';
   var MODES = { real: 1, obfuscate: 1, hide: 1 };
   var DONE = 'data-bb-glitched'; // marks an element whose text we've replaced
+
+  var REDUCED = false;
+  try { REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
 
   function readMode() {
     try {
@@ -53,36 +62,120 @@
     return h >>> 0;
   }
 
-  var HEX = '0123456789abcdef';
+  var DIGITS = '0123456789';
+  var HEXL = 'abcdef';            // the occasional "matrix" hex letter
   var LOWER = 'abcdefghijklmnopqrstuvwxyz';
   var UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  // Glitch a string in place: digits → hex (the "matrix" read), letters →
-  // scrambled same-case letters, everything else (spaces, $ , . - · / etc.)
-  // verbatim. Length, grouping, currency symbols, and word boundaries survive,
-  // so layout and tabular-nums alignment hold.
+  // Glitch a string in place: digits stay MOSTLY numeric with the occasional
+  // hex letter (a-f) for the matrix read, letters → scrambled same-case
+  // letters, everything else (spaces, $ , . - · / etc.) verbatim. Length,
+  // grouping, currency symbols, and word boundaries survive, so layout and
+  // tabular-nums alignment hold.
+  //
+  // Numbers are kept reading as numbers: the first digit of the value is
+  // always numeric, two letters never land adjacent, and a letter only
+  // appears on a ~35% roll — so a glitched amount is always <50% letters
+  // and never collapses into "$ab,cd.ef". At least one hex letter (a-f) is
+  // guaranteed whenever there are eligible digit positions, so even short
+  // amounts like "$31" are visibly fake. Deterministic per value (no shimmer).
   function glitch(text) {
     if (!text) return text;
     var seed = hash32(text);
+    // Locate the first digit so a number always begins numeric.
+    var firstD = -1, lastD = -1;
+    for (var p = 0; p < text.length; p++) {
+      var cc = text.charCodeAt(p);
+      if (cc >= 48 && cc <= 57) { if (firstD < 0) firstD = p; lastD = p; }
+    }
     var out = '';
+    var prevLetter = false; // did the previous digit position become a letter?
+    var eligibleIdx = []; // output positions that could be hex but stayed numeric
+    var lastDOutIdx = -1; // output position of the last digit (fallback slot)
     for (var i = 0; i < text.length; i++) {
       var c = text.charCodeAt(i);
       // advance an LCG per position so adjacent same-class chars differ
       seed = (Math.imul(seed, 1664525) + 1013904223 + i) >>> 0;
-      if (c >= 48 && c <= 57) {            // 0-9
-        out += HEX[seed % 16];
+      if (c >= 48 && c <= 57) {            // 0-9 → stay mostly numeric
+        var canLetter = i !== firstD && !prevLetter;
+        if (canLetter && ((seed >>> 8) % 100) < 35) {
+          out += HEXL[(seed >>> 3) % 6];
+          prevLetter = true;
+        } else {
+          if (canLetter) eligibleIdx.push(out.length);
+          if (i === lastD) lastDOutIdx = out.length;
+          out += DIGITS[seed % 10];
+          prevLetter = false;
+        }
       } else if (c >= 97 && c <= 122) {    // a-z
         out += LOWER[seed % 26];
+        prevLetter = false;
       } else if (c >= 65 && c <= 90) {     // A-Z
         out += UPPER[seed % 26];
+        prevLetter = false;
       } else {
         out += text[i];                    // punctuation / whitespace verbatim
+        prevLetter = false;
+      }
+    }
+    // Guarantee at least one a-f hex char so the value is visibly fake data.
+    // If no hex letter landed via the probabilistic pass, force one at the
+    // most natural eligible position. Falls back to the last digit when there
+    // are no eligible middle positions (e.g. single/double digit amounts).
+    if (firstD >= 0) {
+      var hasHex = false;
+      for (var h = 0; h < out.length; h++) {
+        var hc = out.charCodeAt(h);
+        if (hc >= 97 && hc <= 102) { hasHex = true; break; }
+      }
+      if (!hasHex) {
+        var forced = hash32(text + '\x01');
+        var pick = eligibleIdx.length > 0
+          ? eligibleIdx[forced % eligibleIdx.length]
+          : lastDOutIdx;
+        if (pick >= 0) {
+          out = out.slice(0, pick) + HEXL[(forced >>> 4) % 6] + out.slice(pick + 1);
+        }
       }
     }
     return out;
   }
 
-  // ----- DOM application -----
+  // Is this char glyph an obfuscatable class (digit / letter)? Punctuation and
+  // whitespace are left alone, both by glitch() and the decode scramble.
+  function isGlyph(code) {
+    return (code >= 48 && code <= 57) || (code >= 97 && code <= 122) || (code >= 65 && code <= 90);
+  }
+
+  // A random same-class glyph for the decode flicker (non-deterministic — the
+  // flicker is meant to churn; only the locked, settled value is deterministic).
+  // Digits churn mostly through 0-9 (with the occasional hex letter) so the
+  // flicker matches the mostly-numeric settled value instead of going letter-heavy.
+  function randGlyph(code) {
+    if (code >= 48 && code <= 57) {
+      return Math.random() < 0.72 ? DIGITS[(Math.random() * 10) | 0] : HEXL[(Math.random() * 6) | 0];
+    }
+    if (code >= 97 && code <= 122) return LOWER[(Math.random() * 26) | 0];
+    return UPPER[(Math.random() * 26) | 0];
+  }
+
+  // Partially-decoded string at progress `prog` (0..1): glyph positions before
+  // the lock front show the final char; the rest flicker through random
+  // same-class glyphs. Punctuation/spaces are always the final char. `real` is
+  // used only for per-position character class (it shares length with target).
+  function scramble(real, target, prog) {
+    var len = target.length;
+    var locked = Math.floor(prog * len + 1e-6);
+    var out = '';
+    for (var i = 0; i < len; i++) {
+      if (i < locked) { out += target.charAt(i); continue; }
+      var code = (real.charCodeAt(i) || target.charCodeAt(i));
+      out += isGlyph(code) ? randGlyph(code) : target.charAt(i);
+    }
+    return out;
+  }
+
+  // ----- DOM application (instant) -----
 
   // Replace every non-whitespace text node under `el` with its glitch. Only
   // text nodes are touched, so child elements (category dots, icons, badges)
@@ -110,8 +203,9 @@
     el.removeAttribute(DONE);
   }
 
-  // Apply the current mode to all marked nodes under `root`. obfuscate rewrites
-  // text; real/hide restore the real text (hide blurs it via CSS).
+  // Apply the current mode to all marked nodes under `root`, instantly.
+  // obfuscate rewrites text; real/hide restore the real text (hide blurs it via
+  // CSS). Used on first paint and for dynamically-inserted nodes.
   function applyAll(root) {
     root = root || document.body;
     if (!root || !root.querySelectorAll) return;
@@ -119,6 +213,77 @@
     if (root.nodeType === 1 && root.matches && root.matches('[data-private]')) fn(root);
     var els = root.querySelectorAll('[data-private]');
     for (var i = 0; i < els.length; i++) fn(els[i]);
+  }
+
+  // ----- DOM application (animated decode) -----
+
+  var animToken = 0; // bumped on every transition so a stale rAF loop bails
+
+  // Animate the text transition between `from` and `to`. The decode scramble
+  // only runs when the underlying text actually changes between obfuscated and
+  // real (real↔obfuscate); transitions into/out of hide keep the text and let
+  // the CSS blur do the work, so we just snap the text and return. Off-screen
+  // marked elements snap instantly; only visible ones animate (bounds the
+  // per-frame DOM writes to what the user can actually see).
+  function animateTo(from, to) {
+    var obf = to === 'obfuscate';
+    var doScramble = obf || (to === 'real' && from === 'obfuscate');
+
+    var els = document.querySelectorAll('[data-private]');
+    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    var jobs = []; // [{nodes:[{node,real,target}], delay}]
+
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var nodes = [];
+      var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while ((n = walker.nextNode())) {
+        if (!n.nodeValue || !n.nodeValue.trim()) continue;
+        if (n.__bbReal == null) n.__bbReal = n.nodeValue;
+        nodes.push({ node: n, real: n.__bbReal, target: obf ? glitch(n.__bbReal) : n.__bbReal });
+      }
+      // Keep the DONE bookkeeping in lock-step with the instant path so a later
+      // applyAll() / observer pass doesn't re-touch these elements.
+      if (obf) el.setAttribute(DONE, '1'); else el.removeAttribute(DONE);
+      if (!nodes.length) continue;
+
+      var rect = el.getBoundingClientRect();
+      var visible = rect.bottom > -40 && rect.top < vh + 40 && rect.width > 0 && rect.height > 0;
+      if (!doScramble || !visible || REDUCED) {
+        for (var k = 0; k < nodes.length; k++) nodes[k].node.nodeValue = nodes[k].target;
+      } else {
+        jobs.push({ nodes: nodes, delay: Math.random() * 130 });
+      }
+    }
+
+    animToken++;
+    if (!jobs.length) return;
+    var myToken = animToken;
+    var DURATION = 320; // per-node decode window (after its stagger delay)
+    var start = null;
+
+    function tick(ts) {
+      if (myToken !== animToken) return; // superseded by a newer transition
+      if (start == null) start = ts;
+      var elapsed = ts - start;
+      var allDone = true;
+      for (var a = 0; a < jobs.length; a++) {
+        var job = jobs[a];
+        var p = (elapsed - job.delay) / DURATION;
+        if (p < 0) { allDone = false; continue; }
+        if (p >= 1) p = 1; else allDone = false;
+        var eased = 1 - Math.pow(1 - p, 3); // easeOutCubic — quick, soft settle
+        var ns = job.nodes;
+        for (var b = 0; b < ns.length; b++) {
+          var it = ns[b];
+          if (it.real === it.target) { it.node.nodeValue = it.target; continue; }
+          it.node.nodeValue = p >= 1 ? it.target : scramble(it.real, it.target, eased);
+        }
+      }
+      if (!allDone) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
   }
 
   // ----- observer: catch dynamically-inserted nodes (fetch+innerHTML swaps,
@@ -142,26 +307,56 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  // Bake the obfuscation glitch into a DETACHED / cloned subtree's
+  // [data-private] values, in place, without touching live page state,
+  // animations, the persisted mode, or the DONE/__bbReal bookkeeping the
+  // live path relies on. Walks `root` once and glitches any text node that
+  // has a [data-private] ancestor (so nested marks and the root itself are
+  // covered; the glitch of an already-glitched value is still obfuscated, so
+  // it stays safe no matter the caller's current mode). The dev-mode reporter
+  // uses this to redact financial values in a screenshot / HTML-snapshot clone.
+  function glitchTree(root) {
+    if (!root) return;
+    var doc = root.ownerDocument || document;
+    var walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (!node.nodeValue || !node.nodeValue.trim()) continue;
+      var p = node.parentElement;
+      if (p && p.closest && p.closest('[data-private]')) node.nodeValue = glitch(node.nodeValue);
+    }
+  }
+
   // ----- public API -----
 
-  function setMode(mode) {
+  function setMode(mode, animate) {
     if (!MODES[mode]) return;
+    var from = state;
+    if (mode === from) return;
     state = mode;
     try { localStorage.setItem(KEY, mode); } catch (_) {}
     var root = document.documentElement;
     if (mode === 'real') root.removeAttribute('data-privacy');
     else root.setAttribute('data-privacy', mode);
-    applyAll(document.body);
+    if (animate && !REDUCED) animateTo(from, mode);
+    else applyAll(document.body);
     root.classList.remove('privacy-pending');
   }
 
   window.bbPrivacy = {
     get mode() { return state; },
-    set: setMode,
+    // User-initiated changes (avatar menu, command palette, Shift+P) animate;
+    // pass animate=false for a silent set.
+    set: function (mode) { setMode(mode, true); },
     cycle: function () {
       var order = { real: 'obfuscate', obfuscate: 'hide', hide: 'real' };
-      setMode(order[state] || 'real');
+      setMode(order[state] || 'real', true);
     },
+    // Obfuscate a detached/cloned subtree's financial values in place. Does
+    // NOT change the live page or the persisted mode — see glitchTree above.
+    glitchTree: glitchTree,
   };
 
   // ----- init: run the first pass once the body exists, then reveal -----
@@ -169,8 +364,11 @@
     var root = document.documentElement;
     if (state === 'real') root.removeAttribute('data-privacy');
     else root.setAttribute('data-privacy', state);
-    applyAll(document.body);
+    applyAll(document.body);             // first paint is instant — no decode
     root.classList.remove('privacy-pending'); // reveal fakes / drop the gap blur
+    // Enable the CSS blur transition only AFTER the initial reveal, so the
+    // pre-paint blur→content swap on load stays instant (no fade-in flash).
+    requestAnimationFrame(function () { root.classList.add('privacy-anim'); });
     startObserver();
   }
 

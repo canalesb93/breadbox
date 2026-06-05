@@ -22,7 +22,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 			Title:                "Recurring",
 			Subtitle:             "Recurring charges Breadbox has detected — subscriptions, bills, and more — plus the candidates waiting on your call.",
 			SubtitleHideOnMobile: true,
-			SecondaryAction:      subscriptionsBetaBadge(),
+			TitleBadge:           subscriptionsBetaBadge(),
 			Action:               components.PageHeaderAction(templ.SafeURL("/recurring/new"), "plus", "New series"),
 		})
 		<!-- Stat row: Active · Monthly-equivalent · Due in 30 days · Needs review -->
@@ -35,18 +35,21 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 					Description: "tracked",
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:        "calendar",
-					Label:       "Monthly equivalent",
-					Value:       subTileMoney(p.MonthlyTotals),
-					Description: subTileMoneyExtra(p.MonthlyTotals),
-					Tone:        components.StatTonePrimary,
+					Icon:                   "calendar",
+					Label:                  "Monthly equivalent",
+					Value:                  subTileMoney(p.MonthlyTotals),
+					Description:            subTileMoneyExtra(p.MonthlyTotals),
+					Tone:                   components.StatTonePrimary,
+					ValuePrivateKind:       "amount",
+					DescriptionPrivateKind: "amount", // extra-currency totals are money too
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:        "clock",
-					Label:       "Due in 30 days",
-					Value:       subTileMoney(p.UpcomingTotals),
-					Description: subUpcomingDesc(p.UpcomingCount),
-					Tone:        components.StatToneInfo,
+					Icon:             "clock",
+					Label:            "Due in 30 days",
+					Value:            subTileMoney(p.UpcomingTotals),
+					Description:      subUpcomingDesc(p.UpcomingCount), // "N charges" — a count, stays visible
+					Tone:             components.StatToneInfo,
+					ValuePrivateKind: "amount",
 				})
 				@components.StatTile(components.StatTileProps{
 					Icon:        "inbox",
@@ -352,7 +355,7 @@ templ subscriptionsActiveRow(s SubscriptionRow) {
 
 // subscriptionsBetaBadge marks Recurring as a v1/beta feature.
 templ subscriptionsBetaBadge() {
-	<span class="badge badge-soft badge-info badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
+	<span class="badge badge-soft badge-warning badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
 }
 
 func intPtr(n int) *int { return &n }

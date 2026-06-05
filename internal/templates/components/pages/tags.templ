@@ -74,7 +74,7 @@ templ tagListRow(t TagRow) {
 		<div class="flex-1 min-w-0">
 			<code class="font-mono text-xs text-base-content/60 bg-base-200/50 px-1.5 py-0.5 rounded">{ t.Slug }</code>
 			if t.Description != "" {
-				<p class="text-xs text-base-content/50 mt-1 line-clamp-1">{ t.Description }</p>
+				<p data-user-content class="text-xs text-base-content/50 mt-1 line-clamp-1">{ t.Description }</p>
 			}
 		</div>
 		<!-- Transaction count (always visible; desktop gets the "txns" label) -->

@@ -13,9 +13,26 @@ package components
 // adding the `data-private="<kind>"` attribute to that element directly rather
 // than nesting another span — fewer nodes, same effect.
 //
-// See `docs/design-system.md` (privacy mode) and the catalog in
-// `.claude/rules/` for which fields count as private (scope: money + accounts &
-// merchants).
+// MARKING CONVENTIONS (dev-reporter redaction)
+//
+//   data-private="<kind>"  — financial / account data: rendered with a
+//                            shape-preserving "matrix" glitch in the reporter
+//                            screenshot so the layout is legible but values
+//                            are fake. Kinds: amount | merchant | account |
+//                            institution | mask.
+//
+//   data-user-content      — other user-generated text (agent names &
+//                            descriptions, rule names, tag names, free-text
+//                            notes). Dot-masked in reporter screenshots.
+//                            Add this attribute to any new user-entered field
+//                            that isn't already covered by data-private.
+//
+//   (no attribute)         — static UI text (labels, headings, system
+//                            category names, button copy). Left readable in
+//                            reporter screenshots so a reviewer can tell which
+//                            page/area the report is about.
+//
+// See `docs/design-system.md` (privacy mode) for the full spec.
 templ Private(kind, s string) {
 	<span data-private={ kind }>{ s }</span>
 }

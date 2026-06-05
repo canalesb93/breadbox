@@ -107,6 +107,25 @@ FROM ranked
 WHERE rn <= 5
 GROUP BY agent_definition_id;
 
+-- name: CountWorkflowsWithFailedLastRun :one
+-- Sidebar failure badge: how many preset-instantiated workflows have a most
+-- recent run that ended in error. Mirrors the per-card red dot on /workflows so
+-- the nav badge and the gallery agree. source_template IS NOT NULL scopes this
+-- to gallery workflows (excludes hand-authored agent definitions). Not gated on
+-- enabled — a paused-but-failing workflow still shows its dot on the card.
+WITH last_run AS (
+    SELECT DISTINCT ON (agent_definition_id)
+           agent_definition_id, status
+    FROM workflow_runs
+    WHERE agent_definition_id IS NOT NULL
+    ORDER BY agent_definition_id, started_at DESC
+)
+SELECT COUNT(*)::bigint
+FROM workflows w
+JOIN last_run lr ON lr.agent_definition_id = w.id
+WHERE w.source_template IS NOT NULL
+  AND lr.status = 'error';
+
 -- name: GetAgentCostStats30d :many
 -- Per-definition cost rollup over the last 30 days. Used by the admin
 -- list page to surface lifetime spend at a glance. Excludes skipped runs

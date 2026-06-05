@@ -41,6 +41,7 @@ document.addEventListener('alpine:init', function () {
       workflowSlug: '',
       csrfToken: '',
       rerunning: false,
+      cancelling: false,
       copiedPrompt: false,
 
       init: function () {
@@ -212,12 +213,13 @@ document.addEventListener('alpine:init', function () {
           }
           // Fire a toast on terminal transition so the operator notices
           // even if they scrolled away.
-          if (body.status === 'success' || body.status === 'error') {
+          if (body.status === 'success' || body.status === 'error' || body.status === 'cancelled') {
+            var doneMsg = 'Run completed.';
+            var doneType = 'success';
+            if (body.status === 'error') { doneMsg = 'Run failed.'; doneType = 'error'; }
+            else if (body.status === 'cancelled') { doneMsg = 'Run cancelled.'; doneType = 'warning'; }
             window.dispatchEvent(new CustomEvent('bb-toast', {
-              detail: {
-                message: 'Run ' + (body.status === 'success' ? 'completed' : 'failed') + '.',
-                type: body.status === 'success' ? 'success' : 'error',
-              },
+              detail: { message: doneMsg, type: doneType },
             }));
           }
         }
@@ -328,6 +330,63 @@ document.addEventListener('alpine:init', function () {
               detail: { message: err.message || 'Could not start the run.', type: 'error' },
             }));
             console.warn('[agent run rerun]', err);
+          });
+      },
+
+      // cancelRun aborts an in-progress run. Confirms first (work done so far is
+      // kept, the rest is abandoned), then POSTs to the cancel endpoint. The
+      // server SIGKILLs the sidecar and lands the row as 'cancelled'; the live
+      // poll picks that up and the button hides itself (x-show on status).
+      cancelRun: function () {
+        if (this.cancelling || this.status !== 'in_progress') return;
+        var self = this;
+        var go = function () { self._doCancel(); };
+        if (typeof window.bbConfirm !== 'function') {
+          if (window.confirm('Stop this run now? Work done so far is kept; the rest is abandoned.')) go();
+          return;
+        }
+        window.bbConfirm({
+          title: 'Cancel this run?',
+          message: 'Stop the run now. Anything it has already written is kept; the remaining work is abandoned. You can re-run it afterwards.',
+          confirmLabel: 'Cancel run',
+          variant: 'danger',
+        }).then(function (ok) { if (ok) go(); });
+      },
+
+      _doCancel: function () {
+        if (this.cancelling) return;
+        this.cancelling = true;
+        var self = this;
+        fetch('/-/workflows/runs/' + encodeURIComponent(this.shortId) + '/cancel', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json', 'X-CSRF-Token': this.csrfToken },
+        })
+          .then(function (res) {
+            return res.json().catch(function () { return null; }).then(function (body) {
+              return { ok: res.ok || res.status === 202, body: body };
+            });
+          })
+          .then(function (r) {
+            if (!r.ok) {
+              var msg = (r.body && r.body.error && r.body.error.message) || 'Could not cancel the run.';
+              throw new Error(msg);
+            }
+            window.dispatchEvent(new CustomEvent('bb-toast', {
+              detail: { message: 'Cancelling run…', type: 'info' },
+            }));
+            // Nudge a poll soon so the terminal status lands promptly instead of
+            // waiting a full cadence; the poller hides the button once it flips.
+            if (self.pollTimer) clearTimeout(self.pollTimer);
+            self.pollTimer = setTimeout(function () { self.poll(); }, 1200);
+          })
+          .catch(function (err) {
+            self.cancelling = false;
+            self.restorePageState();
+            window.dispatchEvent(new CustomEvent('bb-toast', {
+              detail: { message: err.message || 'Could not cancel the run.', type: 'error' },
+            }));
+            console.warn('[agent run cancel]', err);
           });
       },
     };

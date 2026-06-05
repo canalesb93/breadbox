@@ -237,23 +237,6 @@ func buildUsersProps(in usersListInput) pages.UsersProps {
 			row.LoginUsername = la.Username
 			row.LoginSetupPending = len(la.HashedPassword) == 0
 		}
-		for _, a := range eu.Accounts {
-			row.Accounts = append(row.Accounts, pages.UsersAccountRow{
-				ID:               a.ID,
-				Name:             a.Name,
-				Type:             a.Type,
-				SubtypeLabel:     a.Subtype,
-				HasSubtype:       a.Subtype != "",
-				Mask:             a.Mask,
-				HasMask:          a.Mask != "",
-				InstitutionName:  a.InstitutionName,
-				BalanceValue:     a.BalanceCurrent,
-				IsoCurrencyCode:  a.IsoCurrencyCode,
-				IsLiability:      a.IsLiability,
-				HasBalance:       a.HasBalance,
-				ConnectionStatus: a.ConnectionStatus,
-			})
-		}
 		props.EnrichedUsers = append(props.EnrichedUsers, row)
 	}
 
