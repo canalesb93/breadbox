@@ -73,14 +73,16 @@
   // grouping, currency symbols, and word boundaries survive, so layout and
   // tabular-nums alignment hold.
   //
-  // Numbers are kept reading as numbers: the first and last digit of the value
-  // are always numeric, two letters never land adjacent, and a letter only
-  // appears on a ~35% roll — so a glitched amount is always <50% letters and
-  // never collapses into "$ab,cd.ef". Deterministic per value (no shimmer).
+  // Numbers are kept reading as numbers: the first digit of the value is
+  // always numeric, two letters never land adjacent, and a letter only
+  // appears on a ~35% roll — so a glitched amount is always <50% letters
+  // and never collapses into "$ab,cd.ef". At least one hex letter (a-f) is
+  // guaranteed whenever there are eligible digit positions, so even short
+  // amounts like "$31" are visibly fake. Deterministic per value (no shimmer).
   function glitch(text) {
     if (!text) return text;
     var seed = hash32(text);
-    // Locate the first/last digit so a number always begins and ends numeric.
+    // Locate the first digit so a number always begins numeric.
     var firstD = -1, lastD = -1;
     for (var p = 0; p < text.length; p++) {
       var cc = text.charCodeAt(p);
@@ -88,16 +90,20 @@
     }
     var out = '';
     var prevLetter = false; // did the previous digit position become a letter?
+    var eligibleIdx = []; // output positions that could be hex but stayed numeric
+    var lastDOutIdx = -1; // output position of the last digit (fallback slot)
     for (var i = 0; i < text.length; i++) {
       var c = text.charCodeAt(i);
       // advance an LCG per position so adjacent same-class chars differ
       seed = (Math.imul(seed, 1664525) + 1013904223 + i) >>> 0;
       if (c >= 48 && c <= 57) {            // 0-9 → stay mostly numeric
-        var canLetter = i !== firstD && i !== lastD && !prevLetter;
+        var canLetter = i !== firstD && !prevLetter;
         if (canLetter && ((seed >>> 8) % 100) < 35) {
           out += HEXL[(seed >>> 3) % 6];
           prevLetter = true;
         } else {
+          if (canLetter) eligibleIdx.push(out.length);
+          if (i === lastD) lastDOutIdx = out.length;
           out += DIGITS[seed % 10];
           prevLetter = false;
         }
@@ -110,6 +116,26 @@
       } else {
         out += text[i];                    // punctuation / whitespace verbatim
         prevLetter = false;
+      }
+    }
+    // Guarantee at least one a-f hex char so the value is visibly fake data.
+    // If no hex letter landed via the probabilistic pass, force one at the
+    // most natural eligible position. Falls back to the last digit when there
+    // are no eligible middle positions (e.g. single/double digit amounts).
+    if (firstD >= 0) {
+      var hasHex = false;
+      for (var h = 0; h < out.length; h++) {
+        var hc = out.charCodeAt(h);
+        if (hc >= 97 && hc <= 102) { hasHex = true; break; }
+      }
+      if (!hasHex) {
+        var forced = hash32(text + '\x01');
+        var pick = eligibleIdx.length > 0
+          ? eligibleIdx[forced % eligibleIdx.length]
+          : lastDOutIdx;
+        if (pick >= 0) {
+          out = out.slice(0, pick) + HEXL[(forced >>> 4) % 6] + out.slice(pick + 1);
+        }
       }
     }
     return out;

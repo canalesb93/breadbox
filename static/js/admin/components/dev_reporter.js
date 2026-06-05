@@ -39,13 +39,23 @@
   var BB_EMAIL_RE = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g;
   function bbScrubPII(s) { return s.replace(BB_EMAIL_RE, '•••@•••'); }
 
-  // Walk every text node under root. Content text (not app chrome) is fully
-  // masked; chrome text (nav labels, buttons) stays readable but still has PII
-  // like emails scrubbed. When skipPrivate is true, text inside a
-  // [data-private] element is left alone here — those financial values are
-  // obfuscated separately with the privacy-mode glitch (legible, same-shape)
-  // rather than blanked to dots. skipPrivate is only set when the glitch pass
-  // actually ran, so a missing privacy engine safely falls back to dot-masking.
+  // Walk every text node under root and redact according to its marking:
+  //
+  //   [data-private]      — financial data already handled by bbGlitchPrivate
+  //                         (shape-preserving glitch); skipped here when
+  //                         skipPrivate=true.
+  //   [data-user-content] — opt-in marker for other user-generated text (notes,
+  //                         free-form descriptions, custom names); fully dot-
+  //                         masked here. Convention: add data-user-content to
+  //                         any user-entered text that isn't already covered by
+  //                         data-private (amounts, merchants, accounts, etc.).
+  //   chrome selectors    — nav/sidebar/topbar labels that stay readable but
+  //                         have email-style PII scrubbed.
+  //   everything else     — static UI text (labels, headings, system category
+  //                         names, button text); PII-scrubbed only, never blanked.
+  //
+  // skipPrivate is only set when the glitch pass actually ran; a missing
+  // privacy engine safely falls back to dot-masking the data-user-content nodes.
   function bbMaskTextNodes(root, skipPrivate) {
     var doc = root.ownerDocument || document;
     var walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -62,10 +72,18 @@
     var n, batch = [];
     while ((n = walker.nextNode())) batch.push(n);
     batch.forEach(function (node) {
-      if (bbClosestChrome(node.parentElement)) {
+      var p = node.parentElement;
+      if (bbClosestChrome(p)) {
+        // App chrome: scrub PII only (emails, seeds) — labels stay readable.
         node.nodeValue = bbScrubPII(node.nodeValue);
-      } else {
+      } else if (p && p.closest && p.closest('[data-user-content]')) {
+        // Explicitly opted-in user-generated text: full dot masking.
         node.nodeValue = bbMaskText(node.nodeValue);
+      } else {
+        // Static UI text (headings, system labels, category names, etc.):
+        // scrub PII only — never blank static strings that help a reviewer
+        // understand which page/area the report is about.
+        node.nodeValue = bbScrubPII(node.nodeValue);
       }
     });
   }
