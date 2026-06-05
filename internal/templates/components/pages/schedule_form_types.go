@@ -51,6 +51,15 @@ func (p ScheduleFormProps) FormAction() string {
 	return "/settings/sync/schedules"
 }
 
+// DrawerID is the $store.drawers key for this form's drawer: "schedule-new" for
+// create, "schedule-<shortID>" for edit. Buttons open the matching drawer.
+func (p ScheduleFormProps) DrawerID() string {
+	if p.IsEdit {
+		return "schedule-" + p.ShortID
+	}
+	return "schedule-new"
+}
+
 // connectionLabel renders a connection's display name for the target picker.
 func connectionLabel(c service.ConnectionResponse) string {
 	name := ""

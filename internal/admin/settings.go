@@ -66,6 +66,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	}
 
 	syncSchedules, _ := a.Service.ListSyncSchedules(ctx)
+	newScheduleForm, editScheduleForms := buildScheduleDrawerForms(a, r, syncSchedules)
 
 	props := pages.SettingsProps{
 		CSRFToken:            GetCSRFToken(r),
@@ -81,6 +82,8 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		OnboardingDismissed:  onboardingDismissed,
 		NextSyncTime:         nextSyncTime,
 		SyncSchedules:        syncSchedules,
+		NewScheduleForm:      newScheduleForm,
+		EditScheduleForms:    editScheduleForms,
 		ConfigSources:        a.Config.ConfigSources,
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,
