@@ -48,7 +48,7 @@ templ Providers(p ProvidersProps) {
 			})
 			@providerRow(providerRowData{
 				ID:         "simplefin",
-				Icon:       "key-round",
+				Brand:      "simplefin",
 				Name:       "SimpleFIN",
 				Desc:       "Paste a setup token — multi-bank, poll-only",
 				Configured: p.SimpleFINEnabled,
@@ -90,9 +90,9 @@ templ providersSimplefinDrawer(p ProvidersProps, h *service.ProviderHealthSummar
 	}) {
 		<div class="flex flex-col h-full">
 			@components.DrawerHeader(components.DrawerHeaderProps{
-				Icon:     "key-round",
-				Title:    "SimpleFIN",
-				Subtitle: "Token-paste, poll-only bank aggregation",
+				BrandIcon: "simplefin",
+				Title:     "SimpleFIN",
+				Subtitle:  "Token-paste, poll-only bank aggregation",
 			})
 			if p.SimpleFINFromEnv {
 				<div class="flex-1 overflow-y-auto p-5 space-y-5">

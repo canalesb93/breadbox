@@ -24,6 +24,28 @@ type ConnectionsProps struct {
 	// Account links tab
 	Links        []ConnectionsLinkRow
 	LinkAccounts []ConnectionsLinkAccount
+
+	// Connect-a-bank drawer (embedded on this page, opened from the
+	// "Connect Bank" button / empty state). Mirrors ConnectionNewProps so
+	// the shared connectWizard partial renders inside the drawer.
+	Users        []ConnectionNewUser
+	HasPlaid     bool
+	HasTeller    bool
+	HasSimpleFin bool
+	TellerEnv    string
+}
+
+// ConnectInProps adapts a ConnectionsProps into the ConnectionNewProps the
+// shared connectWizard partial expects.
+func (p ConnectionsProps) ConnectInProps() ConnectionNewProps {
+	return ConnectionNewProps{
+		Users:        p.Users,
+		CSRFToken:    p.CSRFToken,
+		HasPlaid:     p.HasPlaid,
+		HasTeller:    p.HasTeller,
+		HasSimpleFin: p.HasSimpleFin,
+		TellerEnv:    p.TellerEnv,
+	}
 }
 
 // ConnectionsProviderFilter is one chip in the provider filter strip.

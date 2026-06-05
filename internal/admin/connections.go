@@ -238,6 +238,11 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}
+		// Users + provider availability for the connect-a-bank drawer.
+		connectUsers, err := a.Queries.ListUsers(ctx)
+		if err != nil {
+			a.Logger.Error("list users for connect drawer", "error", err)
+		}
 		props := buildConnectionsProps(connectionsListInput{
 			Tab:              tab,
 			CSRFToken:        GetCSRFToken(r),
@@ -249,6 +254,11 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			TotalAssets:      totalAssets,
 			TotalLiabilities: totalLiabilities,
 			HasAnyBalance:    hasAnyBalance,
+			Users:            connectUsers,
+			HasPlaid:         a.Providers["plaid"] != nil,
+			HasTeller:        a.Providers["teller"] != nil,
+			HasSimpleFin:     a.Providers["simplefin"] != nil,
+			TellerEnv:        a.Config.TellerEnv,
 		})
 		tr.RenderWithTempl(w, r, data, pages.Connections(props))
 	}
@@ -302,6 +312,13 @@ type connectionsListInput struct {
 	TotalAssets      float64
 	TotalLiabilities float64
 	HasAnyBalance    bool
+
+	// Connect-a-bank drawer (shared connectWizard partial).
+	Users        []db.User
+	HasPlaid     bool
+	HasTeller    bool
+	HasSimpleFin bool
+	TellerEnv    string
 }
 
 // buildConnectionsProps converts the handler's inputs into the typed
@@ -314,9 +331,20 @@ func buildConnectionsProps(in connectionsListInput) pages.ConnectionsProps {
 		TotalAssets:      in.TotalAssets,
 		TotalLiabilities: in.TotalLiabilities,
 		HasAnyBalance:    in.HasAnyBalance,
+		HasPlaid:         in.HasPlaid,
+		HasTeller:        in.HasTeller,
+		HasSimpleFin:     in.HasSimpleFin,
+		TellerEnv:        in.TellerEnv,
 	}
 
 	props.Providers = in.Providers
+
+	for _, u := range in.Users {
+		props.Users = append(props.Users, pages.ConnectionNewUser{
+			ID:   pgconv.FormatUUID(u.ID),
+			Name: u.Name,
+		})
+	}
 
 	for _, c := range in.Connections {
 		row := pages.ConnectionsRow{
