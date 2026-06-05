@@ -105,7 +105,9 @@ templ AccountsList(p AccountsListProps) {
 		</template>
 	</div>
 	<script>
-		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
+		document.addEventListener("DOMContentLoaded", function () {
+			lucide.createIcons();
+		});
 	</script>
 }
 
@@ -115,7 +117,13 @@ templ accountsListUserFilterBtn(u AccountsListUserFilter) {
 		:class={ fmt.Sprintf("filterUser === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", u.ID) }
 		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
 	>
-		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ u.First }</span>
+		@components.UserAvatar(components.UserAvatarProps{
+			ID:         u.ID,
+			Name:       u.Name,
+			Version:    u.AvatarVersion,
+			Size:       components.UserAvatarSm,
+			Decorative: true,
+		})
 		{ u.Name }
 	</button>
 }
@@ -223,7 +231,13 @@ templ accountsListRow(a AccountsListRow, csrfToken string) {
 		<td class="hidden lg:table-cell text-sm text-base-content/70">
 			if a.OwnerName != "" {
 				<span class="inline-flex items-center gap-1.5">
-					<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ a.OwnerFirst }</span>
+					@components.UserAvatar(components.UserAvatarProps{
+						ID:         a.UserID,
+						Name:       a.OwnerName,
+						Version:    a.OwnerAvatarVersion,
+						Size:       components.UserAvatarSm,
+						Decorative: true,
+					})
 					{ a.OwnerName }
 				</span>
 			} else {
