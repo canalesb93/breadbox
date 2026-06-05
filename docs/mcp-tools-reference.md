@@ -357,6 +357,17 @@ Dry-run a condition tree against existing transactions. **Isolation semantics** 
 | `conditions` | object | Condition tree to test (same grammar as `create_transaction_rule`) |
 | `sample_size` | int | Max sample matches to return (default 10, max 50). `match_count` always reflects the full match set. |
 
+### find_matching_rules (Read)
+
+The **inverse of `preview_rule`**: evaluates the full active rule set against a single transaction (or a synthetic merchant context) and returns only the rules that match. Use it BEFORE creating a rule to answer "is this merchant already covered?" with one call — instead of listing every rule and scanning them by hand, which is slow and misses near-duplicates once you have hundreds of rules. Rules come back in priority-ASC (pipeline) order. Trigger is not filtered — a rule is reported whenever its *condition* matches.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `transaction_id` | string | A transaction id/short_id to evaluate every condition field (amount, category, tags, provider…) against the real row. Provide exactly one of `transaction_id` or `merchant`. |
+| `merchant` | string | Free-text merchant/name — builds a synthetic context with only the name fields set, so it matches name-based rules (`provider_merchant_name` / `provider_name`) but not amount/category/tag rules. Provide exactly one of `transaction_id` or `merchant`. |
+
+Response: `{ matched_count, rules: [{ short_id, name, sets_category, trigger, priority, hit_count, match_all }] }`. A rule with `sets_category` already handling the merchant means **don't** create a duplicate. `match_all=true` flags conditionless rules (e.g. the seeded `needs-review` tagger) that match everything — not merchant coverage.
+
 ### batch_create_rules (Write)
 
 Create multiple rules in one call. Ideal for composable pipelines — use `stage` (preferred) or raw `priority` on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` resolves to priority `0 / 10 / 50 / 100`; if both `stage` and `priority` are supplied on an item, `priority` wins. Returns per-item success + errors.
