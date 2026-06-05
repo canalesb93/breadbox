@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 
 	"breadbox/internal/service"
@@ -688,6 +689,29 @@ func parseConditions(m map[string]any) (service.Condition, error) {
 	return c, nil
 }
 
+// defaultMaxResponseBytes caps a single MCP tool response as a safety net
+// against pathological payloads (e.g. query_transactions with fields=all and
+// limit=500). Bytes are a proxy for tokens (~4 bytes/token), so ~100 KB ≈
+// 25K tokens — the same order as the cap GitHub's MCP server enforces. When a
+// response exceeds the cap the tool returns a RESPONSE_TOO_LARGE error telling
+// the caller to narrow the query, rather than dumping or silently truncating.
+const defaultMaxResponseBytes = 100_000
+
+// maxResponseBytes is the active response cap, resolved once at process start.
+// Override with BREADBOX_MCP_MAX_RESPONSE_BYTES (operator env knob, consistent
+// with Breadbox's env → app_config → default precedence); set it to 0 to
+// disable the cap entirely.
+var maxResponseBytes = resolveMaxResponseBytes()
+
+func resolveMaxResponseBytes() int {
+	if v := os.Getenv("BREADBOX_MCP_MAX_RESPONSE_BYTES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
+	}
+	return defaultMaxResponseBytes
+}
+
 func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -698,6 +722,17 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	// This reduces token usage by ~75% per ID without changing the schema agents see.
 	// Operates directly on JSON bytes to avoid unmarshal→remarshal overhead.
 	data = compactIDsBytes(data)
+
+	// Safety cap: refuse to emit a response larger than the configured byte
+	// ceiling. Better to return an actionable error than to blow the caller's
+	// context with a payload they didn't expect. Checked on the post-compaction
+	// wire bytes (what actually ships).
+	if maxResponseBytes > 0 && len(data) > maxResponseBytes {
+		return errorResultWithCode("RESPONSE_TOO_LARGE", fmt.Sprintf(
+			"response is %d bytes, over the %d-byte cap. Narrow the result: add filters, lower limit, paginate via next_cursor, or use the fields parameter to request fewer fields. Operators can raise or disable the cap via BREADBOX_MCP_MAX_RESPONSE_BYTES.",
+			len(data), maxResponseBytes,
+		)), nil, nil
+	}
 
 	// StructuredContent is the post-2025-06-18 spec slot for typed tool
 	// output. We populate it alongside the TextContent block so:
