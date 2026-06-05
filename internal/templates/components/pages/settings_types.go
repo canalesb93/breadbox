@@ -59,6 +59,9 @@ type SettingsProps struct {
 	// drawer), so the nested CronField hydrates with correct values.
 	NewScheduleForm   ScheduleFormProps
 	EditScheduleForms []ScheduleFormProps
+	// InstanceTimezone is the configured IANA zone cron is evaluated in
+	// (empty = server local). Surfaced as the Sync-section timezone picker.
+	InstanceTimezone string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
 

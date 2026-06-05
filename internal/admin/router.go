@@ -427,6 +427,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
 
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
+		r.Post("/settings/timezone", SettingsTimezonePostHandler(a, sm))
 
 		// Sync schedules — wall-clock cron schedules that replace the single
 		// global interval. List lives in Settings → Sync; create/edit is a
