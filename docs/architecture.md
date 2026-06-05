@@ -504,7 +504,7 @@ bank_connections
 ├── error_code              TEXT nullable
 ├── error_message           TEXT nullable
 ├── paused                  BOOLEAN DEFAULT FALSE
-├── sync_interval_override_minutes  INTEGER nullable
+├── sync_interval_override_minutes  INTEGER nullable  (deprecated — see sync_schedules)
 ├── new_accounts_available  BOOLEAN DEFAULT FALSE
 ├── consent_expiration_time TIMESTAMPTZ nullable
 ├── last_synced_at          TIMESTAMPTZ nullable

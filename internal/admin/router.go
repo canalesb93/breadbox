@@ -423,7 +423,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/developer", DeveloperSettingsHandler(a, svc, sm, tr))
 		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
 
-		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 
 		// Sync schedules — wall-clock cron schedules that replace the single
@@ -571,7 +570,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/connections/{id}/sync-status", SyncConnectionStatusHandler(a))
 			r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
 			r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
-			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
 			r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm, svc))
 			r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
 			r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))

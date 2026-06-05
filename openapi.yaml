@@ -1038,27 +1038,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Connection" }
-  /api/v1/connections/{id}/sync-interval:
-    parameters: [{ $ref: "#/components/parameters/IDPath" }]
-    post:
-      tags: [Connections]
-      summary: Update connection sync interval
-      description: "**Requires `full_access` scope.**"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [interval_seconds]
-              properties:
-                interval_seconds: { type: integer }
-      responses:
-        "200":
-          description: Updated connection.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Connection" }
   /api/v1/connections/{id}/reauth:
     parameters: [{ $ref: "#/components/parameters/IDPath" }]
     post:

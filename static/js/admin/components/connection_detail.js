@@ -13,9 +13,9 @@
 // - the header "remove" confirm-then-confirm UX (formerly inline x-data)
 //
 // Markup-side method names match the previous global-function names
-// (syncConnection, togglePause, removeConnection, updateSyncInterval,
-// updateDisplayName, toggleExcluded) so the inline handlers in the templ
-// component continue to read naturally as `@click="syncConnection"`.
+// (syncConnection, togglePause, removeConnection, updateDisplayName,
+// toggleExcluded) so the inline handlers in the templ component continue
+// to read naturally as `@click="syncConnection"`.
 document.addEventListener('alpine:init', function () {
   Alpine.data('connectionDetail', function () {
     var SYNC_POLL_INTERVAL_MS = 1500;
@@ -303,30 +303,6 @@ document.addEventListener('alpine:init', function () {
           .catch(function () {
             self.showToast('Network error. Please try again.');
             btn.disabled = false;
-          });
-      },
-
-      updateSyncInterval: function (val) {
-        var body = val === '' ? { minutes: null } : { minutes: parseInt(val, 10) };
-        var status = document.getElementById('interval-status');
-        status.textContent = 'Saving...';
-        fetch('/-/connections/' + this._connID + '/sync-interval', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        })
-          .then(function (res) {
-            if (res.ok) {
-              status.textContent = 'Saved';
-              setTimeout(function () { status.textContent = ''; }, 2000);
-            } else {
-              return res.json().then(function (data) {
-                status.textContent = data.error || 'Failed';
-              });
-            }
-          })
-          .catch(function () {
-            status.textContent = 'Network error';
           });
       },
 

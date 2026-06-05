@@ -304,40 +304,6 @@ func (s *Service) UpdateConnectionPaused(ctx context.Context, id string, paused 
 	return buildConnectionDetailResponse(conn), nil
 }
 
-// UpdateConnectionSyncInterval sets the per-connection sync interval
-// override in minutes. Pass nil to revert to the global default. Returns
-// ErrNotFound when the connection doesn't exist.
-func (s *Service) UpdateConnectionSyncInterval(ctx context.Context, id string, intervalMinutes *int, _ Actor) (*ConnectionDetailResponse, error) {
-	uid, err := s.resolveConnectionID(ctx, id)
-	if err != nil {
-		return nil, ErrNotFound
-	}
-
-	var interval pgtype.Int4
-	if intervalMinutes != nil && *intervalMinutes > 0 {
-		interval = pgtype.Int4{Int32: int32(*intervalMinutes), Valid: true}
-	}
-
-	if _, err := s.Queries.UpdateConnectionSyncInterval(ctx, db.UpdateConnectionSyncIntervalParams{
-		ID:                          uid,
-		SyncIntervalOverrideMinutes: interval,
-	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("update connection sync interval: %w", err)
-	}
-
-	conn, err := s.Queries.GetConnectionForAPI(ctx, uid)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("get connection: %w", err)
-	}
-	return buildConnectionDetailResponse(conn), nil
-}
-
 // ResolveConnectionUUID resolves a UUID-or-short_id input into a pgtype.UUID
 // without fetching the row. Returns ErrNotFound for an unknown short_id and a
 // wrapped parse error for an invalid UUID. Public so non-service callers

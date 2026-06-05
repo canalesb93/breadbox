@@ -119,10 +119,6 @@ UPDATE bank_connections SET consent_expiration_time = $2, status = 'pending_reau
 UPDATE bank_connections SET paused = $2, updated_at = NOW()
 WHERE id = $1 RETURNING *;
 
--- name: UpdateConnectionSyncInterval :one
-UPDATE bank_connections SET sync_interval_override_minutes = $2, updated_at = NOW()
-WHERE id = $1 RETURNING *;
-
 -- name: ListActiveUnpausedConnections :many
 SELECT * FROM bank_connections WHERE status = 'active' AND paused = false;
 

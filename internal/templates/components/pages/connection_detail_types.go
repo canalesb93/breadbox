@@ -10,25 +10,23 @@ type ConnectionDetailProps struct {
 	CSRFToken string
 
 	// Connection fields (flattened from db.GetBankConnectionRow)
-	Provider                         string
-	Status                           string
-	InstitutionName                  string
-	UserName                         string
-	UserNameValid                    bool
-	Paused                           bool
-	ConsecutiveFailures              int32
-	HasErrorCode                     bool
-	ErrorCode                        string
-	HasErrorMessage                  bool
-	ErrorMessage                     string
-	LastSyncedAtValid                bool
-	LastSyncedAtRelative             string
-	CreatedAtValid                   bool
-	CreatedAtFormatted               string
-	LastErrorAtValid                 bool
-	LastErrorAtRelative              string
-	SyncIntervalOverrideMinutesValid bool
-	SyncIntervalOverrideMinutesValue int32
+	Provider             string
+	Status               string
+	InstitutionName      string
+	UserName             string
+	UserNameValid        bool
+	Paused               bool
+	ConsecutiveFailures  int32
+	HasErrorCode         bool
+	ErrorCode            string
+	HasErrorMessage      bool
+	ErrorMessage         string
+	LastSyncedAtValid    bool
+	LastSyncedAtRelative string
+	CreatedAtValid       bool
+	CreatedAtFormatted   string
+	LastErrorAtValid     bool
+	LastErrorAtRelative  string
 
 	// Latest sync log status (for header badge — matches list page).
 	LastSyncStatus             string

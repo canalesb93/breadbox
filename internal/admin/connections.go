@@ -804,22 +804,20 @@ func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetail
 		ConnID:    in.ConnID,
 		CSRFToken: in.CSRFToken,
 		// Connection fields
-		Provider:                         string(in.Conn.Provider),
-		Status:                           string(in.Conn.Status),
-		InstitutionName:                  in.Conn.InstitutionName.String,
-		UserName:                         in.Conn.UserName.String,
-		UserNameValid:                    in.Conn.UserName.Valid,
-		Paused:                           in.Conn.Paused,
-		ConsecutiveFailures:              in.Conn.ConsecutiveFailures,
-		HasErrorCode:                     in.Conn.ErrorCode.Valid,
-		ErrorCode:                        in.Conn.ErrorCode.String,
-		HasErrorMessage:                  in.Conn.ErrorMessage.Valid,
-		ErrorMessage:                     in.Conn.ErrorMessage.String,
-		LastSyncedAtValid:                in.Conn.LastSyncedAt.Valid,
-		CreatedAtValid:                   in.Conn.CreatedAt.Valid,
-		LastErrorAtValid:                 in.Conn.LastErrorAt.Valid,
-		SyncIntervalOverrideMinutesValid: in.Conn.SyncIntervalOverrideMinutes.Valid,
-		SyncIntervalOverrideMinutesValue: in.Conn.SyncIntervalOverrideMinutes.Int32,
+		Provider:            string(in.Conn.Provider),
+		Status:              string(in.Conn.Status),
+		InstitutionName:     in.Conn.InstitutionName.String,
+		UserName:            in.Conn.UserName.String,
+		UserNameValid:       in.Conn.UserName.Valid,
+		Paused:              in.Conn.Paused,
+		ConsecutiveFailures: in.Conn.ConsecutiveFailures,
+		HasErrorCode:        in.Conn.ErrorCode.Valid,
+		ErrorCode:           in.Conn.ErrorCode.String,
+		HasErrorMessage:     in.Conn.ErrorMessage.Valid,
+		ErrorMessage:        in.Conn.ErrorMessage.String,
+		LastSyncedAtValid:   in.Conn.LastSyncedAt.Valid,
+		CreatedAtValid:      in.Conn.CreatedAt.Valid,
+		LastErrorAtValid:    in.Conn.LastErrorAt.Valid,
 
 		LastSyncStatus:             in.LastSyncStatus,
 		LastSyncErrorMessageValid:  in.LastSyncErrorMessage.Valid,
@@ -1303,40 +1301,6 @@ func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.Hand
 		})
 		if err != nil {
 			a.Logger.Error("update connection paused", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
-			return
-		}
-
-		writeJSON(w, http.StatusOK, conn)
-	}
-}
-
-// UpdateConnectionSyncIntervalHandler serves POST /admin/api/connections/{id}/sync-interval.
-func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
-		if !ok {
-			return
-		}
-
-		var req struct {
-			Minutes *int32 `json:"minutes"`
-		}
-		if !decodeJSON(w, r, &req) {
-			return
-		}
-
-		var interval pgtype.Int4
-		if req.Minutes != nil {
-			interval = pgconv.Int4(*req.Minutes)
-		}
-
-		conn, err := a.Queries.UpdateConnectionSyncInterval(r.Context(), db.UpdateConnectionSyncIntervalParams{
-			ID:                          connID,
-			SyncIntervalOverrideMinutes: interval,
-		})
-		if err != nil {
-			a.Logger.Error("update connection sync interval", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
 			return
 		}
