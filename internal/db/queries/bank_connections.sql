@@ -69,6 +69,11 @@ UPDATE bank_connections
 SET sync_cursor = $2, last_synced_at = NOW(), updated_at = NOW()
 WHERE id = $1;
 
+-- name: UpdateBankConnectionCredentials :exec
+UPDATE bank_connections
+SET encrypted_credentials = $2, status = 'active', error_code = NULL, error_message = NULL, updated_at = NOW()
+WHERE id = $1;
+
 -- name: DeleteBankConnection :exec
 UPDATE bank_connections
 SET status = 'disconnected', encrypted_credentials = NULL, updated_at = NOW()

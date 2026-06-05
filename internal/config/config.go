@@ -41,6 +41,12 @@ type Config struct {
 	TellerEnv           string // "sandbox" | "production"
 	TellerWebhookSecret string
 
+	// SimpleFIN — opt-in toggle (env SIMPLEFIN_ENABLED overrides app_config).
+	// SimpleFIN has no server-level credential: the access token is per
+	// connection (pasted at connect time), so the only global config is whether
+	// the provider is offered as a connect option at all.
+	SimpleFINEnabled bool
+
 	// From app_config table only
 	SyncIntervalMinutes int
 	WebhookURL          string

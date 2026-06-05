@@ -23,7 +23,7 @@ templ ConnectionNew(p ConnectionNewProps) {
 			<p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
 		</div>
 	</div>
-	if !p.HasPlaid && !p.HasTeller {
+	if !p.HasPlaid && !p.HasTeller && !p.HasSimpleFin {
 		<!-- No providers configured -->
 		<div class="bb-card p-8 max-w-lg">
 			<div class="flex flex-col items-center text-center">
@@ -33,7 +33,8 @@ templ ConnectionNew(p ConnectionNewProps) {
 				<h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
 				<p class="text-sm text-base-content/50 mb-6">You need to configure at least one bank provider before creating connections.</p>
 				<a href="/settings/providers" class="btn btn-primary btn-sm">
-					@components.LucideIcon("settings", "w-4 h-4") Configure Providers
+					@components.LucideIcon("settings", "w-4 h-4")
+					Configure Providers
 				</a>
 			</div>
 		</div>
@@ -80,6 +81,22 @@ templ ConnectionNew(p ConnectionNewProps) {
 										</div>
 									</label>
 								}
+								if p.HasSimpleFin {
+									<label class="relative cursor-pointer">
+										if !p.HasPlaid && !p.HasTeller {
+											<input type="radio" name="provider" value="simplefin" class="peer sr-only" checked/>
+										} else {
+											<input type="radio" name="provider" value="simplefin" class="peer sr-only"/>
+										}
+										<div
+											class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
+                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
+										>
+											@components.LucideIcon("key-round", "w-6 h-6 text-base-content opacity-60")
+											<span class="text-sm font-medium">SimpleFIN</span>
+										</div>
+									</label>
+								}
 								<label class="relative cursor-pointer">
 									<input type="radio" name="provider" value="csv" class="peer sr-only"/>
 									<div
@@ -121,15 +138,52 @@ templ ConnectionNew(p ConnectionNewProps) {
 						<p id="link-status" class="text-sm text-base-content/50 mb-6">Opening bank connection dialog...</p>
 						<div class="flex items-center gap-3">
 							<button id="retry-btn" class="btn btn-primary btn-sm hidden">
-								@components.LucideIcon("refresh-cw", "w-4 h-4") Retry
+								@components.LucideIcon("refresh-cw", "w-4 h-4")
+								Retry
 							</button>
 							<button id="back-btn" class="btn btn-ghost btn-sm">
-								@components.LucideIcon("arrow-left", "w-4 h-4") Back
+								@components.LucideIcon("arrow-left", "w-4 h-4")
+								Back
 							</button>
 						</div>
 					</div>
 				</div>
 			</div>
+			if p.HasSimpleFin {
+				<div id="step-simplefin" class="hidden">
+					<div class="bb-card p-8 max-w-lg">
+						<div class="flex items-center gap-3 mb-6">
+							@components.IconTile("primary", "key-round")
+							<div>
+								<h2 class="text-base font-semibold">Connect SimpleFIN</h2>
+								<p class="text-xs text-base-content/45">Connecting for: <span id="simplefin-member-name" class="font-medium text-base-content"></span></p>
+							</div>
+						</div>
+						<div class="flex flex-col gap-4">
+							<p class="text-sm text-base-content/60">
+								Paste the one-time setup token from your SimpleFIN bridge. Don't have one yet?
+								<a href="https://bridge.simplefin.org/simplefin/create" target="_blank" rel="noopener" class="link link-primary">Get a token</a>
+								— or use your own server's <code class="text-xs">/create</code> page if self-hosted.
+							</p>
+							<fieldset class="fieldset">
+								<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="simplefin-token">Setup token</label>
+								<textarea id="simplefin-token" rows="4" class="textarea w-full font-mono text-xs" placeholder="Paste your SimpleFIN setup token…"></textarea>
+							</fieldset>
+							<p id="simplefin-status" class="text-sm text-base-content/50 min-h-5"></p>
+							<div class="flex items-center gap-3">
+								<button id="simplefin-submit" class="btn btn-primary btn-sm">
+									@components.LucideIcon("link", "w-4 h-4")
+									Connect
+								</button>
+								<button id="simplefin-back" class="btn btn-ghost btn-sm">
+									@components.LucideIcon("arrow-left", "w-4 h-4")
+									Back
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			}
 		</div>
 	}
 }

@@ -392,6 +392,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/providers", ProvidersGetHandler(a, svc, sm, tr))
 		r.Post("/settings/providers/plaid", ProvidersSavePlaidHandler(a, sm))
 		r.Post("/settings/providers/teller", ProvidersSaveTellerHandler(a, sm))
+		r.Post("/settings/providers/simplefin", ProvidersSaveSimpleFINHandler(a, sm))
 		r.Get("/providers", redirectGET("/settings/providers"))
 		r.Post("/providers/plaid", redirectPreserveMethod("/settings/providers/plaid"))
 		r.Post("/providers/teller", redirectPreserveMethod("/settings/providers/teller"))

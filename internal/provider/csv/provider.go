@@ -48,3 +48,7 @@ func (p *CSVProvider) CreateReauthSession(ctx context.Context, conn provider.Con
 func (p *CSVProvider) RemoveConnection(ctx context.Context, conn provider.Connection) error {
 	return nil
 }
+
+// ReconcilesPendingByPolling reports false: CSV is import-only and never
+// re-polls, so the engine must not soft-delete pending rows.
+func (p *CSVProvider) ReconcilesPendingByPolling() bool { return false }

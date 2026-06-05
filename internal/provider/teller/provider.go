@@ -33,3 +33,8 @@ func NewProvider(client *Client, appID, env, webhookSecret string, encryptionKey
 	}
 }
 
+// ReconcilesPendingByPolling reports that Teller re-returns its full
+// transaction window on every sync (date-range polling), so the sync engine
+// should soft-delete pending rows no longer present in the window.
+func (p *TellerProvider) ReconcilesPendingByPolling() bool { return true }
+
