@@ -26,7 +26,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 	<script src="/static/js/admin/components/connection_detail.js"></script>
 	<div class="max-w-full overflow-x-hidden" x-data="connectionDetail" data-conn-id={ p.ConnID }>
 		if p.Status == "error" || p.Status == "pending_reauth" {
-			<div role="alert" class="alert alert-error rounded-xl mb-6">
+			<div role="alert" class="alert alert-warning alert-soft items-start rounded-xl mb-6">
 				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">This connection needs re-authentication</p>
@@ -36,7 +36,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 						<p class="text-xs opacity-80 mt-0.5 truncate">{ p.ErrorMessage }</p>
 					}
 				</div>
-				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-error shrink-0">Re-authenticate</a>
+				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-warning shrink-0">Re-authenticate</a>
 			</div>
 		}
 		if p.ConsecutiveFailures >= 3 && !(p.Status == "error" || p.Status == "pending_reauth") {
@@ -177,9 +177,6 @@ templ connDetailMeta(p ConnectionDetailProps) {
 // to the "one primary + one secondary" PageHeader rule — collapsing to
 // an OverflowMenu is tracked as follow-up work for connection_detail.
 templ connDetailActions(p ConnectionDetailProps) {
-	if p.Status == "error" || p.Status == "pending_reauth" {
-		<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline">Re-authenticate</a>
-	}
 	if p.Provider == "csv" {
 		<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline">
 			@components.LucideIcon("upload", "w-3.5 h-3.5")
