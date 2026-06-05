@@ -577,18 +577,7 @@
                   title="Search">
             {{ lucide "search" "w-5 h-5" }}
           </button>
-          {{if .AdminUsername}}
-          <a href="/settings/account"
-             class="btn btn-square btn-ghost"
-             aria-label="My Account"
-             title="My Account">
-            {{if .SessionUserID}}
-            {{renderComponent "UserAvatar" (userAvatarProps .SessionUserID .SessionAvatarVersion .AdminUsername "lg")}}
-            {{else}}
-            {{ lucide "user-circle" "w-5 h-5" }}
-            {{end}}
-          </a>
-          {{end}}
+          {{if .AdminUsername}}{{renderComponent "TopbarUserMenu" .}}{{end}}
         </div>
       </div>
       {{/* Mobile location trail — the desktop topbar is hidden < lg, so the
