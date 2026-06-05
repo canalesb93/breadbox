@@ -362,7 +362,7 @@ templ accessRevealNameField() {
 		<label class="text-[0.7rem] font-medium text-base-content/50 mb-1 flex items-center justify-between">
 			<span>Name</span>
 			<span x-show="saved" x-cloak class="inline-flex items-center gap-1 text-success font-normal lowercase">
-				<i data-lucide="check" class="w-3 h-3"></i>
+				@components.LucideIcon("check", "w-3 h-3")
 				Saved
 			</span>
 		</label>
