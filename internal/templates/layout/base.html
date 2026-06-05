@@ -2701,6 +2701,10 @@
 
       // Handle form submissions
       document.addEventListener('submit', function(e) {
+        // A handler that called preventDefault() is taking over client-side —
+        // no navigation is coming, so starting the nav bar would leave it
+        // trickling forever (e.g. the connect wizard's step transition).
+        if (e.defaultPrevented) return;
         var form = e.target;
         if (form && form.method && form.method.toLowerCase() === 'get') {
           start();

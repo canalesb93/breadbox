@@ -32,6 +32,13 @@ type Provider interface {
 
 	// RemoveConnection revokes the provider's access and marks the connection removed.
 	RemoveConnection(ctx context.Context, conn Connection) error
+
+	// ReconcilesPendingByPolling reports whether this provider re-returns its
+	// full transaction window on every sync (date-range polling), so the sync
+	// engine should soft-delete pending rows no longer present in the window.
+	// True for poll-based providers (Teller, SimpleFIN); false for cursor/
+	// webhook providers (Plaid) and import-only providers (CSV).
+	ReconcilesPendingByPolling() bool
 }
 
 type LinkSession struct {

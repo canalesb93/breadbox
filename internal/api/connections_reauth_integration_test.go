@@ -67,6 +67,7 @@ func (f *fakeProvider) HandleWebhook(context.Context, provider.WebhookPayload) (
 func (f *fakeProvider) RemoveConnection(context.Context, provider.Connection) error {
 	panic("fakeProvider.RemoveConnection not implemented")
 }
+func (f *fakeProvider) ReconcilesPendingByPolling() bool { return false }
 
 // reauthEnv is the per-test harness for the reauth endpoints.
 type reauthEnv struct {

@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -261,6 +262,8 @@ func providerLabel(p string) string {
 		return "Plaid"
 	case "teller":
 		return "Teller"
+	case "simplefin":
+		return "SimpleFIN"
 	case "csv":
 		return "CSV"
 	default:
@@ -276,6 +279,8 @@ func providerIcon(p string) string {
 		return "building-2"
 	case "teller":
 		return "landmark"
+	case "simplefin":
+		return "key-round"
 	case "csv":
 		return "file-spreadsheet"
 	default:
@@ -402,7 +407,7 @@ func NewConnectionHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"CurrentPage": "connections",
 			"CSRFToken":   GetCSRFToken(r),
 		}
-		renderConnectionNew(w, r, tr, data, users, a.Providers["plaid"] != nil, a.Providers["teller"] != nil, a.Config.TellerEnv)
+		renderConnectionNew(w, r, tr, data, users, a.Providers["plaid"] != nil, a.Providers["teller"] != nil, a.Providers["simplefin"] != nil, a.Config.TellerEnv)
 	}
 }
 
@@ -416,7 +421,7 @@ func renderConnectionNew(
 	tr *TemplateRenderer,
 	data map[string]any,
 	users []db.User,
-	hasPlaid, hasTeller bool,
+	hasPlaid, hasTeller, hasSimpleFin bool,
 	tellerEnv string,
 ) {
 	data["Breadcrumbs"] = []components.Breadcrumb{
@@ -424,10 +429,11 @@ func renderConnectionNew(
 		{Label: "Connect New Bank"},
 	}
 	props := pages.ConnectionNewProps{
-		CSRFToken: GetCSRFToken(r),
-		HasPlaid:  hasPlaid,
-		HasTeller: hasTeller,
-		TellerEnv: tellerEnv,
+		CSRFToken:    GetCSRFToken(r),
+		HasPlaid:     hasPlaid,
+		HasTeller:    hasTeller,
+		HasSimpleFin: hasSimpleFin,
+		TellerEnv:    tellerEnv,
 	}
 	for _, u := range users {
 		props.Users = append(props.Users, pages.ConnectionNewUser{
@@ -551,6 +557,14 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// SimpleFIN discovers the real institution name during the claim (the
+		// browser only sends the "SimpleFIN" placeholder), so prefer what the
+		// provider returned.
+		institutionName := req.InstitutionName
+		if providerName == "simplefin" && conn.InstitutionName != "" {
+			institutionName = conn.InstitutionName
+		}
+
 		// Persist the connection + accounts via the shared service helper.
 		// REST (api.PlaidExchangeHandler) calls the same path so both
 		// surfaces stay byte-identical on what lands in the DB.
@@ -558,7 +572,7 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			UserID:          userID,
 			Provider:        providerName,
 			InstitutionID:   req.InstitutionID,
-			InstitutionName: req.InstitutionName,
+			InstitutionName: institutionName,
 			Conn:            conn,
 			Accounts:        accounts,
 		})
@@ -568,13 +582,29 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// SimpleFIN's bridge expects ≤24 requests/day, so default new SimpleFIN
+		// connections to a daily sync cadence rather than the global interval.
+		if providerName == "simplefin" {
+			if _, err := a.Queries.UpdateConnectionSyncInterval(r.Context(), db.UpdateConnectionSyncIntervalParams{
+				ID:                          result.ID,
+				SyncIntervalOverrideMinutes: pgconv.Int4(simplefinSyncIntervalMinutes),
+			}); err != nil {
+				a.Logger.Warn("set simplefin sync interval", "error", err, "connection_id", pgconv.FormatUUID(result.ID))
+			}
+		}
+
 		writeJSON(w, http.StatusCreated, exchangeTokenResponse{
 			ConnectionID:    pgconv.FormatUUID(result.ID),
-			InstitutionName: req.InstitutionName,
+			InstitutionName: institutionName,
 			Status:          "active",
 		})
 	}
 }
+
+// simplefinSyncIntervalMinutes is the default per-connection sync cadence for
+// SimpleFIN connections (daily), chosen to stay within the bridge's expected
+// ~24-requests/day budget.
+const simplefinSyncIntervalMinutes = 24 * 60
 
 // ConnectionDetailHandler serves GET /admin/connections/{id}.
 func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
@@ -1045,21 +1075,40 @@ func ConnectionReauthAPIHandler(a *app.App) http.HandlerFunc {
 }
 
 // ConnectionReauthCompleteHandler serves POST /admin/api/connections/{id}/reauth-complete.
+//
+// For SDK providers (Plaid/Teller) the relink happens client-side and this
+// handler only flips the connection back to active. SimpleFIN has no SDK: the
+// browser posts a freshly pasted setup token, which we claim and store as the
+// new credential on the existing connection row (keeping its identity).
 func ConnectionReauthCompleteHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
 		if !ok {
 			return
 		}
 
-		// Update connection status to active and clear errors.
-		err := a.Queries.UpdateBankConnectionStatus(r.Context(), db.UpdateBankConnectionStatusParams{
+		conn, err := a.Queries.GetBankConnection(ctx, connID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Connection not found"})
+			return
+		}
+
+		if string(conn.Provider) == "simplefin" {
+			if !reauthSimplefin(a, w, r, connID) {
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"status": "active"})
+			return
+		}
+
+		// SDK providers: just clear errors and reactivate.
+		if err := a.Queries.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
 			ID:           connID,
 			Status:       db.ConnectionStatusActive,
 			ErrorCode:    pgtype.Text{},
 			ErrorMessage: pgtype.Text{},
-		})
-		if err != nil {
+		}); err != nil {
 			a.Logger.Error("reactivate bank connection", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection status"})
 			return
@@ -1067,6 +1116,49 @@ func ConnectionReauthCompleteHandler(a *app.App) http.HandlerFunc {
 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "active"})
 	}
+}
+
+// reauthSimplefin claims a freshly pasted SimpleFIN setup token and rotates the
+// connection's stored credentials in place. It writes the JSON error response
+// itself and returns false on failure.
+func reauthSimplefin(a *app.App, w http.ResponseWriter, r *http.Request, connID pgtype.UUID) bool {
+	var req struct {
+		PublicToken string `json:"public_token"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return false
+	}
+	if strings.TrimSpace(req.PublicToken) == "" {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "Setup token is required"})
+		return false
+	}
+
+	prov, ok := a.Providers["simplefin"]
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "simplefin provider not configured"})
+		return false
+	}
+
+	// Claim the token (verifies it works + refreshes account discovery). Only
+	// the rotated credential is kept; the existing connection row's identity is
+	// preserved.
+	newConn, _, err := prov.ExchangeToken(r.Context(), req.PublicToken)
+	if err != nil {
+		a.Logger.Error("simplefin reauth claim", "error", err)
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to claim token: " + err.Error()})
+		return false
+	}
+
+	if err := a.Queries.UpdateBankConnectionCredentials(r.Context(), db.UpdateBankConnectionCredentialsParams{
+		ID:                   connID,
+		EncryptedCredentials: newConn.EncryptedCredentials,
+	}); err != nil {
+		a.Logger.Error("simplefin reauth update credentials", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
+		return false
+	}
+
+	return true
 }
 
 // DeleteConnectionHandler serves DELETE /admin/api/connections/{id}.

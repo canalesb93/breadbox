@@ -27,6 +27,12 @@ type ProvidersProps struct {
 	TellerCertConfigured    bool
 	TellerWebhookConfigured bool
 
+	// SimpleFIN state. SimpleFIN has no server-level credential — it's an
+	// opt-in toggle deciding whether the provider is offered at connect time
+	// (the access token is pasted per connection).
+	SimpleFINEnabled bool
+	SimpleFINFromEnv bool
+
 	// Encryption-key availability (needed to store cert PEM bytes).
 	HasEncryptionKey bool
 
