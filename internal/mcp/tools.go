@@ -35,7 +35,7 @@ type queryTransactionsInput struct {
 	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, provider_name"`
 	SortOrder     string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
-	Fields        string   `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: minimal (provider_name,amount,date), core (id,date,amount,provider_name,iso_currency_code), category (category,provider_category_primary,provider_category_detailed), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
+	Fields        string   `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Aliases: minimal (provider_name,amount,date), core (id,date,amount,provider_name,iso_currency_code), category (category,provider_category_primary,provider_category_detailed), timestamps (created_at,updated_at,datetime,authorized_datetime). Default when omitted: core,category (a compact projection). Pass fields=all for every field. id is always included."`
 }
 
 type countTransactionsInput struct {
@@ -120,7 +120,21 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 		return errorResult(err), nil, nil
 	}
 
-	fieldSet, err := service.ParseFields(input.Fields)
+	// Lean-by-default: an omitted fields param returns a compact projection
+	// (core identity + category) rather than all ~22 fields. Agents rarely set
+	// fields and the full row is mostly unused, so the default response is the
+	// cheap one. Pass fields=all for the complete struct (the legacy default),
+	// or any explicit field/alias list to widen or narrow. This default is
+	// MCP-only — the REST API (which shares service.ParseFields) keeps
+	// returning full objects when ?fields= is omitted.
+	fieldsRaw := input.Fields
+	switch fieldsRaw {
+	case "":
+		fieldsRaw = defaultTransactionFields
+	case "all":
+		fieldsRaw = "" // ParseFields("") → nil → full struct
+	}
+	fieldSet, err := service.ParseFields(fieldsRaw)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -142,15 +156,79 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 		for i, t := range result.Transactions {
 			filtered[i] = service.FilterTransactionFields(t, fieldSet)
 		}
-		return jsonResult(map[string]any{
+		resp := map[string]any{
 			"transactions": filtered,
 			"next_cursor":  result.NextCursor,
 			"has_more":     result.HasMore,
 			"limit":        result.Limit,
-		})
+		}
+		// Currency hoisting: when every returned row shares one currency (the
+		// overwhelmingly common single-currency household case), emit it once
+		// at the top level and drop the per-row copies. A response that mixes
+		// currencies (or carries a null one) falls back to per-row. Agents read
+		// the top-level iso_currency_code when present, else the per-row field.
+		if cur, ok := hoistUniformCurrency(filtered); ok {
+			resp["iso_currency_code"] = cur
+		}
+		return jsonResult(resp)
 	}
 
 	return jsonResult(result)
+}
+
+// defaultTransactionFields is the compact projection query_transactions returns
+// when the caller omits fields. core = id,date,amount,provider_name,
+// iso_currency_code; category = the resolved category + provider category
+// hints. Callers widen with fields=all or any explicit alias/field list.
+const defaultTransactionFields = "core,category"
+
+// hoistUniformCurrency strips the per-row iso_currency_code from a projected
+// transaction list when every row shares one non-empty currency, returning the
+// common code so the caller can emit it once at the top level. It returns
+// ("", false) — leaving the rows untouched — when the list is empty, when any
+// row omits the field (it wasn't in the projection), or when currencies differ
+// or are null. This is the single-currency optimization: one top-level
+// iso_currency_code instead of N identical copies, with a safe per-row fallback
+// the moment a response actually mixes currencies.
+func hoistUniformCurrency(rows []map[string]any) (string, bool) {
+	if len(rows) == 0 {
+		return "", false
+	}
+	common := ""
+	for _, r := range rows {
+		v, present := r["iso_currency_code"]
+		if !present {
+			return "", false
+		}
+		c, ok := currencyString(v)
+		if !ok {
+			return "", false
+		}
+		if common == "" {
+			common = c
+		} else if c != common {
+			return "", false
+		}
+	}
+	for _, r := range rows {
+		delete(r, "iso_currency_code")
+	}
+	return common, true
+}
+
+// currencyString coerces a projected iso_currency_code value (string or
+// *string, per FilterTransactionFields) to a non-empty currency code.
+func currencyString(v any) (string, bool) {
+	switch s := v.(type) {
+	case string:
+		return s, s != ""
+	case *string:
+		if s == nil || *s == "" {
+			return "", false
+		}
+		return *s, true
+	}
+	return "", false
 }
 
 func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToolRequest, input countTransactionsInput) (*mcpsdk.CallToolResult, any, error) {

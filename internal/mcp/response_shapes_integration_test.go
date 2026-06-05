@@ -461,8 +461,9 @@ func TestTransactionSummaryResponseShape(t *testing.T) {
 }
 
 // TestMerchantSummaryResponseShape pins {merchants, totals, filters} + row fields.
-// TestQueryTransactionsResponseShape pins category as an object (not a slug
-// string) and the wrapper envelope.
+// TestQueryTransactionsResponseShape pins the lean-by-default projection
+// (core,category), category as an object (not a slug string), the wrapper
+// envelope, and top-level currency hoisting when rows share one currency.
 func TestQueryTransactionsResponseShape(t *testing.T) {
 	f := seedFixtures(t)
 	res, _, err := f.svc.handleQueryTransactions(f.ctx, nil, queryTransactionsInput{
@@ -477,8 +478,14 @@ func TestQueryTransactionsResponseShape(t *testing.T) {
 		t.Fatal("expected at least one transaction")
 	}
 	txn := asObject(t, "query_transactions.transactions[0]", txns[0])
+	// Lean default = core,category. id is always included; fields outside the
+	// default projection (account_id, provider_merchant_name, timestamps,
+	// metadata) must be absent unless explicitly requested.
 	requireKeys(t, "query_transactions.transactions[0]", txn,
-		"id", "account_id", "amount", "date", "provider_name", "category",
+		"id", "amount", "date", "provider_name", "category",
+	)
+	requireAbsent(t, "query_transactions.transactions[0]", txn,
+		"account_id", "provider_merchant_name", "created_at", "updated_at", "metadata", "short_id",
 	)
 	switch v := txn["category"].(type) {
 	case map[string]any:
@@ -489,6 +496,41 @@ func TestQueryTransactionsResponseShape(t *testing.T) {
 	default:
 		t.Errorf("category must be object or null, got %T (%v)", v, v)
 	}
+	// Currency hoisting: the seeded rows are all USD, so iso_currency_code is
+	// emitted once at the top level and dropped from each row. (Written to
+	// tolerate the per-row fallback too, in case fixtures ever go multi-currency.)
+	if cur, hoisted := out["iso_currency_code"]; hoisted {
+		if s, _ := cur.(string); s == "" {
+			t.Errorf("top-level iso_currency_code must be a non-empty string, got %v", cur)
+		}
+		requireAbsent(t, "query_transactions.transactions[0]", txn, "iso_currency_code")
+	} else {
+		requireKeys(t, "query_transactions.transactions[0]", txn, "iso_currency_code")
+	}
+}
+
+// TestQueryTransactionsFieldsAll pins that fields=all restores the full
+// per-row struct (the pre-lean-default contract) and suppresses currency
+// hoisting — full fidelity is full fidelity.
+func TestQueryTransactionsFieldsAll(t *testing.T) {
+	f := seedFixtures(t)
+	res, _, err := f.svc.handleQueryTransactions(f.ctx, nil, queryTransactionsInput{
+		Limit:  10,
+		Fields: "all",
+	})
+	out := decodeToolResult[map[string]any](t, "query_transactions(all)", res, err)
+	requireKeys(t, "query_transactions(all)", out, "transactions", "has_more", "limit")
+	// fields=all means no projection map, so no top-level hoisting.
+	requireAbsent(t, "query_transactions(all)", out, "iso_currency_code")
+	txns := asArray(t, "query_transactions(all).transactions", out["transactions"])
+	if len(txns) == 0 {
+		t.Fatal("expected at least one transaction")
+	}
+	txn := asObject(t, "query_transactions(all).transactions[0]", txns[0])
+	requireKeys(t, "query_transactions(all).transactions[0]", txn,
+		"id", "account_id", "amount", "date", "provider_name",
+		"iso_currency_code", "provider_merchant_name", "category", "created_at", "metadata",
+	)
 }
 
 // TestPreviewRuleResponseShape pins `sample_matches` (not `sample`) + sample
