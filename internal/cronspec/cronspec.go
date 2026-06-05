@@ -6,6 +6,7 @@ package cronspec
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -83,14 +84,28 @@ func ResolveCron(presetKey, customCron string) (expr string, preset string, err 
 	return customCron, CustomKey, nil
 }
 
+// Parse parses a standard 5-field cron expression evaluated in the named IANA
+// timezone (e.g. "America/Los_Angeles"). An empty tzName parses in the server's
+// local zone (robfig's default). The returned Schedule's Next() honors the
+// timezone regardless of the reference time's location, via robfig's
+// `CRON_TZ=` prefix — so this is the single place tz-anchoring is applied, and
+// stored cron strings stay clean (no embedded prefix).
+func Parse(expr, tzName string) (cron.Schedule, error) {
+	expr = strings.TrimSpace(expr)
+	if tzName != "" {
+		return cron.ParseStandard("CRON_TZ=" + tzName + " " + expr)
+	}
+	return cron.ParseStandard(expr)
+}
+
 // NextRun returns the earliest upcoming fire time across the given cron
-// expressions (strictly after `from`), and whether any valid expression was
-// found. Invalid expressions are skipped.
-func NextRun(exprs []string, from time.Time) (time.Time, bool) {
+// expressions (strictly after `from`), evaluated in tzName, and whether any
+// valid expression was found. Invalid expressions are skipped.
+func NextRun(exprs []string, tzName string, from time.Time) (time.Time, bool) {
 	var earliest time.Time
 	found := false
 	for _, e := range exprs {
-		sc, err := cron.ParseStandard(e)
+		sc, err := Parse(e, tzName)
 		if err != nil {
 			continue
 		}
@@ -103,12 +118,42 @@ func NextRun(exprs []string, from time.Time) (time.Time, bool) {
 	return earliest, found
 }
 
-// DuePassed reports whether any of the cron expressions has a fire time in the
-// half-open window (since, now] — i.e. a scheduled run was missed since `since`.
-// Used to render "due now" without re-deriving the scheduler's logic.
-func DuePassed(exprs []string, since, now time.Time) bool {
+// NextRuns returns the next n fire times of a single expression evaluated in
+// tzName, each in tzName's location (for display). Empty if the expression is
+// invalid or n <= 0.
+func NextRuns(expr, tzName string, from time.Time, n int) []time.Time {
+	if n <= 0 {
+		return nil
+	}
+	sc, err := Parse(expr, tzName)
+	if err != nil {
+		return nil
+	}
+	loc := from.Location()
+	if tzName != "" {
+		if l, lerr := time.LoadLocation(tzName); lerr == nil {
+			loc = l
+		}
+	}
+	out := make([]time.Time, 0, n)
+	t := from
+	for i := 0; i < n; i++ {
+		t = sc.Next(t)
+		if t.IsZero() {
+			break
+		}
+		out = append(out, t.In(loc))
+	}
+	return out
+}
+
+// DuePassed reports whether any of the cron expressions (evaluated in tzName)
+// has a fire time in the half-open window (since, now] — i.e. a scheduled run
+// was missed since `since`. Used to render "due now" without re-deriving the
+// scheduler's logic.
+func DuePassed(exprs []string, tzName string, since, now time.Time) bool {
 	for _, e := range exprs {
-		sc, err := cron.ParseStandard(e)
+		sc, err := Parse(e, tzName)
 		if err != nil {
 			continue
 		}

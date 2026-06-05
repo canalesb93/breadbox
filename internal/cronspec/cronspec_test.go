@@ -47,7 +47,7 @@ func TestHumanize(t *testing.T) {
 func TestNextRun(t *testing.T) {
 	now := time.Date(2026, 6, 4, 9, 0, 0, 0, time.UTC)
 	// Earliest across two exprs: 12:00 beats 18:00.
-	next, ok := NextRun([]string{"0 18 * * *", "0 12 * * *"}, now)
+	next, ok := NextRun([]string{"0 18 * * *", "0 12 * * *"}, "", now)
 	if !ok {
 		t.Fatal("expected a next run")
 	}
@@ -55,10 +55,10 @@ func TestNextRun(t *testing.T) {
 		t.Errorf("NextRun = %v, want %v", next, want)
 	}
 	// All invalid → not found.
-	if _, ok := NextRun([]string{"bad"}, now); ok {
+	if _, ok := NextRun([]string{"bad"}, "", now); ok {
 		t.Error("expected no next run for invalid expr")
 	}
-	if _, ok := NextRun(nil, now); ok {
+	if _, ok := NextRun(nil, "", now); ok {
 		t.Error("expected no next run for empty exprs")
 	}
 }
@@ -66,11 +66,11 @@ func TestNextRun(t *testing.T) {
 func TestDuePassed(t *testing.T) {
 	now := time.Date(2026, 6, 4, 9, 0, 0, 0, time.UTC)
 	// Nightly 03:00 fired between 02:00 and 09:00 → due.
-	if !DuePassed([]string{"0 3 * * *"}, time.Date(2026, 6, 4, 2, 0, 0, 0, time.UTC), now) {
+	if !DuePassed([]string{"0 3 * * *"}, "", time.Date(2026, 6, 4, 2, 0, 0, 0, time.UTC), now) {
 		t.Error("expected due (03:00 fire passed since 02:00)")
 	}
 	// Synced 04:00, nightly's next fire is tomorrow 03:00 > now → not due.
-	if DuePassed([]string{"0 3 * * *"}, time.Date(2026, 6, 4, 4, 0, 0, 0, time.UTC), now) {
+	if DuePassed([]string{"0 3 * * *"}, "", time.Date(2026, 6, 4, 4, 0, 0, 0, time.UTC), now) {
 		t.Error("expected not due (next fire is tomorrow)")
 	}
 }
