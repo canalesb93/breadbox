@@ -2,11 +2,11 @@ package components
 
 // RadioCard is a radio input styled as a selectable card — an icon + title +
 // optional subtitle in a bordered tile that lights up (primary border, soft
-// primary fill, primary icon, a check affordance) when chosen. It's the
-// "pick one of a few options, each worth a sentence" control: roomier and more
-// legible than a bare radio list, lighter than a wizard step. The Workflows
-// drawer uses a 2-up pair for the trigger choice (Custom schedule vs After each
-// sync); drop N of them into a grid for more.
+// primary fill, primary icon) when chosen. It's the "pick one of a few
+// options, each worth a sentence" control: roomier and more legible than a
+// bare radio list, lighter than a wizard step. The Workflows drawer uses a
+// 2-up pair for the trigger choice (Custom schedule vs After each sync); drop
+// N of them into a grid for more.
 //
 // Binding is flexible so the same card works server-rendered or Alpine-driven:
 //   - Native: set Checked on the default card and share Name across the group;
@@ -45,7 +45,7 @@ type RadioCardProps struct {
 }
 
 templ RadioCard(p RadioCardProps) {
-	<label class={ "group block h-full cursor-pointer", p.Class }>
+	<label class={ "group block h-full cursor-pointer select-none transition-transform duration-150 active:scale-[0.97]", p.Class }>
 		<input
 			type="radio"
 			name={ p.Name }
@@ -67,9 +67,6 @@ templ RadioCard(p RadioCardProps) {
 					@LucideIcon(p.Icon, "w-4 h-4 shrink-0")
 				}
 				<span class="text-sm font-medium text-base-content">{ p.Title }</span>
-				<span class="ml-auto inline-flex shrink-0 text-primary opacity-0 scale-90 transition-all duration-150 group-has-[:checked]:opacity-100 group-has-[:checked]:scale-100">
-					@LucideIcon("check", "w-4 h-4")
-				</span>
 			</div>
 			if p.Subtitle != "" {
 				<div class="mt-1 text-xs text-base-content/55">{ p.Subtitle }</div>
