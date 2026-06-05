@@ -10,6 +10,12 @@ Tools are classified as **Read** or **Write**:
 - **Write tools** require the MCP mode to be set to `read_write` (configurable in the admin dashboard under MCP Settings)
 - Individual tools can be disabled from the admin dashboard
 
+## Response size
+
+Token-heavy read tools are **lean by default** — they return a compact field projection and let you opt into more via the `fields` parameter (`fields=all` for the full payload). See `query_transactions`, `list_series`, and `list_transaction_rules`.
+
+Every tool response is also subject to a **byte cap** (default ~100 KB ≈ 25K tokens). A response over the cap returns a `RESPONSE_TOO_LARGE` error asking you to narrow the query (add filters, lower `limit`, paginate via `next_cursor`, or use `fields`) rather than emitting an oversized payload. Operators can raise or disable the cap via the `BREADBOX_MCP_MAX_RESPONSE_BYTES` environment variable (`0` disables it).
+
 ## Sessions
 
 Before using any tools, agents should call `create_session` to establish a session. This provides the agent with dataset context and server instructions.
@@ -21,6 +27,8 @@ Before using any tools, agents should call `create_session` to establish a sessi
 ### query_transactions (Read)
 
 Query transactions with composable filters and cursor pagination.
+
+**Lean by default.** When `fields` is omitted the response is a compact projection (`core,category`) rather than all ~22 fields — pass `fields=all` for the full row, or any explicit alias/field list. When every returned row shares one currency, `iso_currency_code` is emitted once at the top level of the envelope and dropped from each row (per-row fallback when a page mixes currencies). This default is MCP-only; the REST API (`GET /api/v1/transactions`) still returns full objects when `?fields=` is omitted.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -39,7 +47,7 @@ Query transactions with composable filters and cursor pagination.
 | `any_tag` | array | OR filter — must have at least one slug. |
 | `sort_by` | string | `date` (default), `amount`, `provider_name` |
 | `sort_order` | string | `desc` (default), `asc` |
-| `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
+| `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps`. Omitted → `core,category` (lean default); `all` → every field. `id` always included. |
 | `cursor` | string | Pagination cursor |
 | `limit` | int | Results per page (default 50, max 500) |
 
@@ -251,7 +259,7 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). Each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, `confidence` (`auto` | `confirmed` | `rejected`), and `detection_signals` — the raw evidence the detector used. Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. Read `status=candidate` to find series awaiting a verdict.
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
 
 ### get_series (Read)
 
@@ -324,13 +332,16 @@ Create a rule that fires during sync. Actions compose (`set_category` + `add_tag
 
 ### list_transaction_rules (Read)
 
-List rules with optional filters. Returns actions, priority, hit_count, last_hit_at.
+List rules with optional filters and cursor pagination. **Lean by default** (`fields` omitted → `summary` projection): each row carries `name`, `enabled`, `priority`, `trigger`, `category_slug` / `category_display_name`, `hit_count`, `last_hit_at`, `created_by_type` — the roster view, **without** the `conditions` / `actions` trees. Pass `fields=all` to inspect or audit full rule definitions. Mirror of `breadbox://rules` (which always returns full).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `search` | string | Substring / words / fuzzy search on rule name |
 | `category_slug` | string | Filter by target category |
 | `enabled` | bool | Filter by enabled status |
+| `fields` | string | Field selection. Alias: `summary` (default). `all` → full definition incl. `conditions`/`actions`. |
+| `cursor` | string | Pagination cursor |
+| `limit` | int | Results per page (default 50, max 500) |
 
 ### update_transaction_rule (Write)
 
