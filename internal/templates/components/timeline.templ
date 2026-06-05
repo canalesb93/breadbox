@@ -212,7 +212,7 @@ templ TimelineSystemRow(p TimelineRowProps) {
 			if p.IconTone != "custom" {
 				<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", timelineIconBg(p.IconTone) } aria-hidden="true">
 					if p.Icon != "" {
-						@LucideIcon(p.Icon, "w-3 h-3 " + timelineIconColor(p.IconTone))
+						@LucideIcon(p.Icon, "w-3 h-3 "+timelineIconColor(p.IconTone))
 					}
 				</span>
 			}

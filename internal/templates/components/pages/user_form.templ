@@ -155,7 +155,8 @@ templ userFormCreate() {
 					</template>
 					<div class="flex gap-3 pt-2">
 						<button type="submit" class="btn btn-primary btn-sm whitespace-nowrap" :disabled="submitting">
-							<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("plus", "w-4 h-4") Create Member</span>
+							<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("plus", "w-4 h-4")
+Create Member</span>
 							<span x-show="submitting" class="loading loading-spinner loading-sm"></span>
 						</button>
 						<a href="/household" class="btn btn-ghost btn-sm">Cancel</a>
@@ -191,9 +192,11 @@ templ userFormEdit(p UserFormProps) {
 					<div class="bb-icon-header__text">
 						<h2 class="text-sm font-semibold truncate">{ userFormName(p.User) }</h2>
 						<p class="text-xs text-base-content/45">
-							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("upload", "w-3 h-3") Upload photo</button>
+							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("upload", "w-3 h-3")
+Upload photo</button>
 							<span class="text-base-content/20">·</span>
-							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("refresh-cw", "w-3 h-3") Regenerate</button>
+							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("refresh-cw", "w-3 h-3")
+Regenerate</button>
 							<template x-if="hasCustomAvatar">
 								<span>
 									<span class="text-base-content/20">·</span>
@@ -257,7 +260,8 @@ templ userFormEdit(p UserFormProps) {
 			<div class="bb-action-row">
 				<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
+					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5")
+Save Changes</span>
 					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>

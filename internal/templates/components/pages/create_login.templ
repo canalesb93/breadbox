@@ -74,11 +74,13 @@ templ createLoginManage(p CreateLoginProps) {
 			<!-- Action row -->
 			<div class="bb-action-row">
 				<span x-show="saved" x-transition.opacity class="text-xs text-success inline-flex items-center gap-1 mr-2">
-					@components.LucideIcon("check", "w-3.5 h-3.5") Saved
+					@components.LucideIcon("check", "w-3.5 h-3.5")
+					Saved
 				</span>
 				<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 				<button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary gap-1.5 min-w-32">
-					<span x-show="!saving" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
+					<span x-show="!saving" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5")
+Save Changes</span>
 					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>
@@ -146,7 +148,8 @@ templ createLoginManage(p CreateLoginProps) {
 							<button @click="confirming = false" :disabled="deleting" class="btn btn-ghost btn-sm">Cancel</button>
 							<button @click="confirmDelete()" :disabled="deleting" class="btn btn-error btn-sm gap-1.5 min-w-28">
 								<span x-show="!deleting" class="inline-flex items-center gap-1.5">
-									@components.LucideIcon("user-x", "w-3.5 h-3.5") Confirm Delete
+									@components.LucideIcon("user-x", "w-3.5 h-3.5")
+									Confirm Delete
 								</span>
 								<span x-show="deleting" class="loading loading-spinner loading-xs"></span>
 							</button>
@@ -218,7 +221,8 @@ templ createLoginNew(p CreateLoginProps) {
 				<div class="bb-action-row">
 					<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 					<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-						<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("user-plus", "w-3.5 h-3.5") Create Login</span>
+						<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("user-plus", "w-3.5 h-3.5")
+Create Login</span>
 						<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 					</button>
 				</div>

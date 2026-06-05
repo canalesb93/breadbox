@@ -178,6 +178,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// plaintext inline (no /new form or /created subpage).
 		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
 		r.Post("/settings/api-keys/new", APIKeyCreatePageHandler(svc, sm, tr))
+		r.Post("/settings/api-keys/{id}/rename", APIKeyRenamePageHandler(svc, sm, tr))
 
 		r.Get("/settings/oauth-clients", redirectGET("/settings/api-keys"))
 		r.Post("/settings/oauth-clients/new", OAuthClientCreatePageHandler(svc, sm, tr))

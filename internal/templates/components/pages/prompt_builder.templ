@@ -1,7 +1,7 @@
 package pages
 
-
 import "breadbox/internal/templates/components"
+
 // PromptBuilder renders the /agent-prompts/builder/{type} prompt builder page. Hosts
 // inside the base layout via TemplateRenderer.RenderWithTempl — the handler
 // passes the typed props and the bridge drops the rendered HTML into
@@ -355,22 +355,87 @@ templ PromptBuilder(p PromptBuilderProps) {
 							</template>
 						</div>
 						<style>
-							.bb-markdown { font-size: 0.875rem; line-height: 1.7; color: var(--color-base-content); }
-							.bb-markdown h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem; border-bottom: 1px solid oklch(var(--bc) / 0.1); padding-bottom: 0.5rem; }
-							.bb-markdown h2 { font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: oklch(var(--bc) / 0.8); }
-							.bb-markdown h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
-							.bb-markdown p { margin: 0.5rem 0; }
-							.bb-markdown ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
-							.bb-markdown ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
-							.bb-markdown li { margin: 0.25rem 0; }
-							.bb-markdown li > p { margin: 0; display: inline; }
-							.bb-markdown code { font-size: 0.8em; background: oklch(var(--bc) / 0.06); padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-family: ui-monospace, monospace; }
-							.bb-markdown pre { background: oklch(var(--bc) / 0.04); border: 1px solid oklch(var(--bc) / 0.08); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.75rem 0; }
-							.bb-markdown pre code { background: none; padding: 0; font-size: 0.8rem; }
-							.bb-markdown strong { font-weight: 600; }
-							.bb-markdown hr { border: none; border-top: 1px solid oklch(var(--bc) / 0.1); margin: 1.5rem 0; }
-							.bb-markdown blockquote { border-left: 3px solid oklch(var(--p)); padding-left: 1rem; margin: 0.75rem 0; color: oklch(var(--bc) / 0.6); }
-							.bb-markdown ul ul, .bb-markdown ol ul { margin: 0.15rem 0; }
+							.bb-markdown {
+								font-size: 0.875rem;
+								line-height: 1.7;
+								color: var(--color-base-content);
+							}
+							.bb-markdown h1 {
+								font-size: 1.5rem;
+								font-weight: 700;
+								margin: 1.5rem 0 0.75rem;
+								border-bottom: 1px solid oklch(var(--bc) / 0.1);
+								padding-bottom: 0.5rem;
+							}
+							.bb-markdown h2 {
+								font-size: 1.15rem;
+								font-weight: 700;
+								margin: 1.5rem 0 0.5rem;
+								color: oklch(var(--bc) / 0.8);
+							}
+							.bb-markdown h3 {
+								font-size: 1rem;
+								font-weight: 600;
+								margin: 1.25rem 0 0.5rem;
+							}
+							.bb-markdown p {
+								margin: 0.5rem 0;
+							}
+							.bb-markdown ul {
+								list-style-type: disc;
+								padding-left: 1.5rem;
+								margin: 0.5rem 0;
+							}
+							.bb-markdown ol {
+								list-style-type: decimal;
+								padding-left: 1.5rem;
+								margin: 0.5rem 0;
+							}
+							.bb-markdown li {
+								margin: 0.25rem 0;
+							}
+							.bb-markdown li > p {
+								margin: 0;
+								display: inline;
+							}
+							.bb-markdown code {
+								font-size: 0.8em;
+								background: oklch(var(--bc) / 0.06);
+								padding: 0.15rem 0.35rem;
+								border-radius: 0.25rem;
+								font-family: ui-monospace, monospace;
+							}
+							.bb-markdown pre {
+								background: oklch(var(--bc) / 0.04);
+								border: 1px solid oklch(var(--bc) / 0.08);
+								border-radius: 0.5rem;
+								padding: 0.75rem 1rem;
+								overflow-x: auto;
+								margin: 0.75rem 0;
+							}
+							.bb-markdown pre code {
+								background: none;
+								padding: 0;
+								font-size: 0.8rem;
+							}
+							.bb-markdown strong {
+								font-weight: 600;
+							}
+							.bb-markdown hr {
+								border: none;
+								border-top: 1px solid oklch(var(--bc) / 0.1);
+								margin: 1.5rem 0;
+							}
+							.bb-markdown blockquote {
+								border-left: 3px solid oklch(var(--p));
+								padding-left: 1rem;
+								margin: 0.75rem 0;
+								color: oklch(var(--bc) / 0.6);
+							}
+							.bb-markdown ul ul,
+							.bb-markdown ol ul {
+								margin: 0.15rem 0;
+							}
 						</style>
 					</div>
 				</div>
