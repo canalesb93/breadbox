@@ -1,0 +1,235 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// ConnectorsSettings renders the /settings/connectors tab — the global
+// custom-MCP connector library. The top level is a simple Providers-style
+// directory; add/edit happens in a modal, and a second modal imports from a
+// pasted mcpServers JSON. Header values are never sent to the browser.
+//
+// The Alpine factory lives in static/js/admin/components/connectors.js and is
+// hydrated from @templ.JSONScript("connectors-data", …).
+templ ConnectorsSettings(p ConnectorsSettingsProps) {
+	<script src="/static/js/admin/components/connectors.js"></script>
+	@templ.JSONScript("connectors-data", connectorsJSONData(p.Connectors))
+	<div x-data="connectors">
+		@settingsTabHeader(settingsTabHeaderProps{
+			Title:    "Connectors",
+			Subtitle: "Custom MCP servers your workflows can call — e.g. a remote Gmail MCP for receipt lookups. Configure once here, then enable per workflow.",
+			Right:    connectorsHeaderActions(),
+		})
+		if p.FormError != "" {
+			<div role="alert" class="alert alert-error alert-soft mb-4 rounded-xl">
+				@components.LucideIcon("circle-x", "w-4 h-4")
+				<span>{ p.FormError }</span>
+			</div>
+		}
+		if p.FormSuccess != "" {
+			<div role="alert" class="alert alert-success alert-soft mb-4 rounded-xl">
+				@components.LucideIcon("circle-check", "w-4 h-4")
+				<span>{ p.FormSuccess }</span>
+			</div>
+		}
+		if len(p.Connectors) == 0 {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:      "cable",
+				Title:     "No connectors yet",
+				Body:      "Add a custom MCP server to give your workflows extra capabilities, then enable it from a workflow's reconfigure panel.",
+				CustomCTA: connectorsEmptyCTA(),
+			})
+		} else {
+			<div class="space-y-2">
+				for _, c := range p.Connectors {
+					@connectorDirectoryRow(c)
+				}
+			</div>
+		}
+		@connectorFormModal(p.CSRFToken)
+		@connectorImportModal(p.CSRFToken)
+	</div>
+}
+
+// connectorsHeaderActions is the header's right slot: Import JSON + Add.
+templ connectorsHeaderActions() {
+	<div class="flex items-center gap-2">
+		<button type="button" class="btn btn-sm btn-ghost gap-2" @click="openImport()">
+			@components.LucideIcon("braces", "w-4 h-4")
+			<span class="max-sm:hidden">Import JSON</span>
+		</button>
+		<button type="button" class="btn btn-sm btn-primary gap-2" @click="openAdd()">
+			@components.LucideIcon("plus", "w-4 h-4")
+			Add connector
+		</button>
+	</div>
+}
+
+templ connectorsEmptyCTA() {
+	<button type="button" class="btn btn-sm btn-primary gap-2" @click="openAdd()">
+		@components.LucideIcon("plus", "w-4 h-4")
+		Add connector
+	</button>
+}
+
+// connectorDirectoryRow is one clickable row in the directory. The whole row
+// opens the edit modal (hydrated by short_id); the row stays scannable.
+templ connectorDirectoryRow(c ConnectorView) {
+	<button
+		type="button"
+		class="w-full flex items-center gap-3 bb-card p-3 text-left hover:bg-base-200/40 transition-colors"
+		@click={ "openEdit('" + c.ShortID + "')" }
+	>
+		<span class="w-9 h-9 rounded-lg bg-base-200 shrink-0 inline-flex items-center justify-center">
+			@components.LucideIcon("cable", "w-4 h-4 text-base-content/60")
+		</span>
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2">
+				<span class="text-sm font-medium font-mono truncate">{ c.Name }</span>
+				<span class="badge badge-ghost badge-xs uppercase tracking-wide">{ c.Transport }</span>
+			</div>
+			<div class="text-xs text-base-content/45 truncate">{ c.URL }</div>
+		</div>
+		<div class="flex items-center gap-2 shrink-0">
+			if c.HasSecret {
+				<span class="badge badge-soft badge-success badge-sm gap-1">
+					@components.LucideIcon("lock", "w-3 h-3")
+					{ connectorHeaderSummary(c) }
+				</span>
+			} else {
+				<span class="badge badge-ghost badge-sm">{ connectorHeaderSummary(c) }</span>
+			}
+			@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content/30")
+		</div>
+	</button>
+}
+
+// connectorFormModal is the shared add/edit modal. The Alpine factory swaps the
+// form action between POST /-/connectors (add) and /-/connectors/{id}/update
+// (edit) and populates the fields. Header VALUES are write-only: on edit the
+// inputs render blank with a "keep" placeholder; an empty value carries the
+// stored secret forward.
+templ connectorFormModal(csrf string) {
+	<div class="modal" :class="{ 'modal-open': formOpen }" @keydown.escape.window="closeForm()">
+		<div class="modal-box max-w-2xl rounded-xl">
+			<div class="flex items-center justify-between mb-1">
+				<h3 class="text-base font-semibold" x-text="mode === 'edit' ? 'Edit connector' : 'Add connector'"></h3>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" @click="closeForm()" aria-label="Close">
+					@components.LucideIcon("x", "w-4 h-4")
+				</button>
+			</div>
+			<form method="POST" x-bind:action="formAction()" class="space-y-4 mt-3">
+				<input type="hidden" name="_csrf" value={ csrf }/>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div>
+						<label class="text-xs font-medium text-base-content/60" for="connector-name">Server name</label>
+						<input id="connector-name" type="text" name="name" x-model="name" placeholder="gmail" class="bb-form-input font-mono text-sm mt-1" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="31" required/>
+						<p class="text-xs text-base-content/40 mt-1">Lowercase id — becomes the <code>mcp__&lt;name&gt;</code> tool prefix.</p>
+					</div>
+					<div>
+						<label class="text-xs font-medium text-base-content/60" for="connector-transport">Transport</label>
+						<select id="connector-transport" name="transport" x-model="transport" class="select select-sm w-full mt-1">
+							<option value="http">HTTP</option>
+						</select>
+					</div>
+				</div>
+				<div>
+					<label class="text-xs font-medium text-base-content/60" for="connector-url">Server URL</label>
+					<input id="connector-url" type="url" name="url" x-model="url" placeholder="https://mcp.yourserver.com/mcp" class="bb-form-input font-mono text-sm mt-1 w-full" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="2000" required/>
+				</div>
+				<div>
+					<label class="text-xs font-medium text-base-content/60" for="connector-note">Note <span class="text-base-content/40">(optional)</span></label>
+					<textarea id="connector-note" name="note" x-model="note" rows="2" placeholder="Tell the agent how and when to use this connector — injected into its prompt." class="textarea textarea-bordered w-full text-sm mt-1" maxlength="2000"></textarea>
+				</div>
+				<div>
+					<div class="flex items-center justify-between mb-1">
+						<label class="text-xs font-medium text-base-content/60">Custom headers <span class="text-base-content/40">(optional)</span></label>
+					</div>
+					<div class="space-y-2">
+						<template x-for="(h, i) in headers" :key="i">
+							<div class="flex items-center gap-2">
+								<input type="text" name="header_name" x-model="h.name" placeholder="Header name" class="bb-form-input font-mono text-sm flex-1" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="120"/>
+								<input type="password" name="header_value" x-model="h.value" :placeholder="h.stored ? '•••• stored (blank = keep)' : 'Header value'" class="bb-form-input font-mono text-sm flex-1" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="4000"/>
+								<button type="button" class="btn btn-ghost btn-sm btn-square text-error" @click="removeHeader(i)" aria-label="Remove header">
+									@components.LucideIcon("trash-2", "w-4 h-4")
+								</button>
+							</div>
+						</template>
+					</div>
+					<button type="button" class="btn btn-ghost btn-xs gap-1.5 mt-2" @click="addHeader()">
+						@components.LucideIcon("plus", "w-3.5 h-3.5")
+						Add custom header
+					</button>
+				</div>
+				<div class="flex items-center justify-between pt-2">
+					<template x-if="mode === 'edit'">
+						<span @click.stop>
+							<button type="button" class="btn btn-ghost btn-sm text-error gap-2" x-show="!confirmingDelete" @click="confirmingDelete = true">
+								@components.LucideIcon("trash-2", "w-4 h-4")
+								Delete
+							</button>
+							<span x-show="confirmingDelete" x-cloak class="flex items-center gap-2">
+								<span class="text-xs text-base-content/60">Delete this connector?</span>
+								<button type="button" class="btn btn-ghost btn-sm" @click="confirmingDelete = false">Cancel</button>
+								<button type="button" class="btn btn-error btn-sm" @click="submitDelete()">Delete</button>
+							</span>
+						</span>
+					</template>
+					<div class="flex items-center gap-2 ml-auto">
+						<button type="button" class="btn btn-ghost btn-sm" @click="closeForm()">Cancel</button>
+						<button type="submit" class="btn btn-primary btn-sm">Save</button>
+					</div>
+				</div>
+			</form>
+			<!-- Delete posts as its own form (forms can't nest); driven by submitDelete(). -->
+			<form method="POST" x-ref="deleteForm" x-bind:action="deleteAction()" class="hidden">
+				<input type="hidden" name="_csrf" value={ csrf }/>
+			</form>
+		</div>
+		<div class="modal-backdrop" @click="closeForm()"></div>
+	</div>
+}
+
+// connectorImportModal pastes a Claude/Manus-style mcpServers JSON. stdio
+// entries are skipped server-side; only HTTP servers become connectors.
+templ connectorImportModal(csrf string) {
+	<div class="modal" :class="{ 'modal-open': importOpen }" @keydown.escape.window="importOpen = false">
+		<div class="modal-box max-w-2xl rounded-xl">
+			<div class="flex items-center justify-between mb-1">
+				<div>
+					<h3 class="text-base font-semibold">Import by JSON</h3>
+					<p class="text-xs text-base-content/50">Paste an <code>mcpServers</code> configuration. Only HTTP servers are imported.</p>
+				</div>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" @click="importOpen = false" aria-label="Close">
+					@components.LucideIcon("x", "w-4 h-4")
+				</button>
+			</div>
+			<form method="POST" action="/-/connectors/import" class="mt-3 space-y-3">
+				<input type="hidden" name="_csrf" value={ csrf }/>
+				<textarea
+					name="config_json"
+					rows="12"
+					class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed"
+					placeholder={ connectorImportPlaceholder() }
+					spellcheck="false"
+					required
+				></textarea>
+				<div class="flex items-center justify-end gap-2">
+					<button type="button" class="btn btn-ghost btn-sm" @click="importOpen = false">Cancel</button>
+					<button type="submit" class="btn btn-primary btn-sm">Import</button>
+				</div>
+			</form>
+		</div>
+		<div class="modal-backdrop" @click="importOpen = false"></div>
+	</div>
+}
+
+func connectorImportPlaceholder() string {
+	return `{
+  "mcpServers": {
+    "gmail": {
+      "type": "http",
+      "url": "https://gmail-mcp.example.com/mcp",
+      "headers": { "Authorization": "Bearer sk-..." }
+    }
+  }
+}`
+}
