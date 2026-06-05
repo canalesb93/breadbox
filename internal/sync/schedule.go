@@ -8,6 +8,9 @@ import (
 	"hash/fnv"
 	"time"
 
+	"breadbox/internal/appconfig"
+	"breadbox/internal/cronspec"
+
 	"github.com/robfig/cron/v3"
 )
 
@@ -59,12 +62,16 @@ func (s *Scheduler) loadScheduleResolver(ctx context.Context, fallbackIntervalMi
 		return nil, fmt.Errorf("list sync schedule connection pairs: %w", err)
 	}
 
+	// Cron is evaluated in the configured instance timezone (the single source
+	// of truth for "what clock the cron means"); unset → server local.
+	tzName := appconfig.String(ctx, s.queries, appconfig.KeyInstanceTimezone, "")
+
 	r := &scheduleResolver{perConn: make(map[[16]byte][]cron.Schedule)}
 	parsed := make(map[[16]byte]cron.Schedule, len(rows))
 	appliesToAll := make(map[[16]byte]bool, len(rows))
 
 	for _, row := range rows {
-		sc, err := cron.ParseStandard(row.Cron)
+		sc, err := cronspec.Parse(row.Cron, tzName)
 		if err != nil {
 			s.logger.Warn("skipping sync schedule with invalid cron", "cron", row.Cron, "error", err)
 			continue

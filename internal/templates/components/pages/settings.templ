@@ -99,6 +99,27 @@ templ settingsSyncSection(p SettingsProps) {
 			Caption: settingsSyncCaption(p),
 			Right:   newScheduleButton(),
 		}) {
+			@components.SettingsRow(components.SettingsRowProps{
+				Label:   "Timezone",
+				Caption: "Schedules are evaluated in this zone",
+				For:     "instance_timezone",
+			}) {
+				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+					Action:    "/settings/timezone",
+					CSRFToken: p.CSRFToken,
+					Label:     "Timezone saved",
+				}) {
+					<select id="instance_timezone" name="instance_timezone" class="select select-sm bg-base-200">
+						@tzOption("", p.InstanceTimezone, "Server default")
+						for _, tz := range commonTimezones() {
+							@tzOption(tz, p.InstanceTimezone, tz)
+						}
+						if p.InstanceTimezone != "" && !isCommonTimezone(p.InstanceTimezone) {
+							@tzOption(p.InstanceTimezone, p.InstanceTimezone, p.InstanceTimezone)
+						}
+					</select>
+				}
+			}
 			if len(p.SyncSchedules) == 0 {
 				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
 					<p class="text-sm text-base-content/55 leading-snug">
@@ -137,16 +158,20 @@ templ settingsSyncSection(p SettingsProps) {
 				}
 			}
 		}
+		<!-- Create + per-schedule edit drawers (slide-over from the right) -->
+		@ScheduleDrawer(p.NewScheduleForm)
+		for _, f := range p.EditScheduleForms {
+			@ScheduleDrawer(f)
+		}
 	</div>
 }
 
-// newScheduleButton is the section's primary action — links to the
-// dedicated schedule form page.
+// newScheduleButton is the section's primary action — opens the create drawer.
 templ newScheduleButton() {
-	<a href="/settings/sync/schedules/new" class="btn btn-primary btn-sm gap-2">
+	<button type="button" @click="$store.drawers.open('schedule-new')" class="btn btn-primary btn-sm gap-2">
 		@components.LucideIcon("plus", "w-4 h-4")
 		New schedule
-	</a>
+	</button>
 }
 
 // settingsScheduleRow renders one schedule: its name + human cadence and
@@ -168,9 +193,9 @@ templ settingsScheduleRow(p SettingsProps, sched service.SyncScheduleView) {
 					<input type="checkbox" name="enabled" class="toggle toggle-sm toggle-primary" aria-label="Enabled"/>
 				}
 			}
-			<a href={ scheduleEditURL(sched.ShortID) } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
+			<button type="button" @click={ "$store.drawers.open('schedule-" + sched.ShortID + "')" } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
 				@components.LucideIcon("pencil", "w-4 h-4")
-			</a>
+			</button>
 			<form method="POST" action={ scheduleDeleteURL(sched.ShortID) } onsubmit="return confirm('Delete this schedule?')">
 				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
 				<button type="submit" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Delete schedule">
@@ -445,6 +470,44 @@ templ settingsDeveloperSection() {
 // ---------------------------------------------------------------------
 // Helpers reused by handlers + by other settings tabs
 // ---------------------------------------------------------------------
+templ tzOption(value, current, label string) {
+	if value == current {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+// commonTimezones is a curated shortlist for the instance-timezone picker —
+// enough to cover most self-hosters without shipping the full IANA database in
+// a select. A configured zone outside this list is appended as its own option.
+func commonTimezones() []string {
+	return []string{
+		"UTC",
+		"America/Los_Angeles",
+		"America/Denver",
+		"America/Chicago",
+		"America/New_York",
+		"America/Sao_Paulo",
+		"Europe/London",
+		"Europe/Paris",
+		"Europe/Berlin",
+		"Europe/Madrid",
+		"Asia/Kolkata",
+		"Asia/Singapore",
+		"Asia/Tokyo",
+		"Australia/Sydney",
+	}
+}
+
+func isCommonTimezone(tz string) bool {
+	for _, t := range commonTimezones() {
+		if t == tz {
+			return true
+		}
+	}
+	return false
+}
 
 templ retentionOption(value, current int, label string) {
 	if value == current {

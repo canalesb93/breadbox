@@ -141,6 +141,7 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 		// Load the schedule resolution once for the whole list (two queries),
 		// then resolve each connection's effective schedules from it.
 		allSchedules, perConnSchedules, _ := svc.SyncScheduleResolution(ctx)
+		tzName := svc.InstanceTimezone(ctx)
 		for i := range enriched {
 			if enriched[i].HasBalance {
 				total := 0.0
@@ -156,7 +157,7 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 				Provider:     enriched[i].Provider,
 				Paused:       enriched[i].Paused,
 				LastSyncedAt: enriched[i].LastSyncedAt,
-			}, effectiveSchedules(allSchedules, perConnSchedules, enriched[i].ID), now)
+			}, effectiveSchedules(allSchedules, perConnSchedules, enriched[i].ID), tzName, now)
 
 			// Compute staleness.
 			if string(enriched[i].Status) != "disconnected" {
@@ -792,7 +793,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			Provider:     conn.Provider,
 			Paused:       conn.Paused,
 			LastSyncedAt: conn.LastSyncedAt,
-		}, effectiveSchedules(allSchedules, perConnSchedules, conn.ID), now)
+		}, effectiveSchedules(allSchedules, perConnSchedules, conn.ID), a.Service.InstanceTimezone(ctx), now)
 
 		data := map[string]any{
 			"PageTitle":   conn.InstitutionName.String,
@@ -1458,7 +1459,7 @@ func effectiveSchedules(all []service.ScheduleRef, perConn map[string][]service.
 // sync schedules (the union of applies_to_all + connection-targeted schedules,
 // resolved via service.SyncScheduleResolution). Wall-clock anchored — mirrors
 // the scheduler's scheduleDue/scheduleNextRun, minus jitter.
-func computeNextSync(p syncScheduleParams, schedules []service.ScheduleRef, now time.Time) NextSyncInfo {
+func computeNextSync(p syncScheduleParams, schedules []service.ScheduleRef, tzName string, now time.Time) NextSyncInfo {
 	// Disconnected or CSV connections don't sync on a schedule.
 	if string(p.Status) == "disconnected" || string(p.Provider) == "csv" {
 		return NextSyncInfo{IsDisconnected: true, Label: "No schedule"}
@@ -1478,7 +1479,13 @@ func computeNextSync(p syncScheduleParams, schedules []service.ScheduleRef, now 
 	names := make([]string, 0, len(schedules))
 	crons := make([]string, 0, len(schedules))
 	for _, s := range schedules {
-		names = append(names, s.Name)
+		// "Name — every 15 minutes": both the label and the readable cadence,
+		// so "Default schedule" alone never looks opaque.
+		label := s.Name
+		if s.Human != "" {
+			label += " — " + s.Human
+		}
+		names = append(names, label)
 		crons = append(crons, s.Cron)
 	}
 	info := NextSyncInfo{ScheduleNames: names}
@@ -1491,13 +1498,13 @@ func computeNextSync(p syncScheduleParams, schedules []service.ScheduleRef, now 
 	}
 
 	// A scheduled fire passed since the last sync → due now.
-	if cronspec.DuePassed(crons, p.LastSyncedAt.Time, now) {
+	if cronspec.DuePassed(crons, tzName, p.LastSyncedAt.Time, now) {
 		info.IsOverdue = true
 		info.Label = "Due now"
 		return info
 	}
 
-	if next, ok := cronspec.NextRun(crons, now); ok {
+	if next, ok := cronspec.NextRun(crons, tzName, now); ok {
 		info.NextSyncAt = next
 		info.Label = relativeTimeUntil(next, now)
 	}

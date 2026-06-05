@@ -54,6 +54,14 @@ type SettingsProps struct {
 	// replacement for the single global interval). Rendered as a list in
 	// the General → Sync section.
 	SyncSchedules []service.SyncScheduleView
+	// NewScheduleForm + EditScheduleForms drive the create/edit drawers
+	// rendered server-side in the Sync section (one per schedule + a create
+	// drawer), so the nested CronField hydrates with correct values.
+	NewScheduleForm   ScheduleFormProps
+	EditScheduleForms []ScheduleFormProps
+	// InstanceTimezone is the configured IANA zone cron is evaluated in
+	// (empty = server local). Surfaced as the Sync-section timezone picker.
+	InstanceTimezone string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
 

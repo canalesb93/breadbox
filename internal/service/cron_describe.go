@@ -3,13 +3,68 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
 
+	"breadbox/internal/appconfig"
+	"breadbox/internal/cronspec"
+
 	lcron "github.com/lnquy/cron"
 	rcron "github.com/robfig/cron/v3"
 )
+
+// InstanceTimezone returns the configured instance IANA timezone (e.g.
+// "America/Los_Angeles"), or "" when unset or invalid. Callers treat "" as the
+// server process's local zone. This is the single clock every cron schedule is
+// evaluated and previewed in.
+func (s *Service) InstanceTimezone(ctx context.Context) string {
+	tz := strings.TrimSpace(appconfig.String(ctx, s.Queries, appconfig.KeyInstanceTimezone, ""))
+	if tz == "" {
+		return ""
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		return ""
+	}
+	return tz
+}
+
+// InstanceTimezoneLabel is a human display label for the instance zone — the
+// IANA name when configured, else the server zone's abbreviation (e.g. "UTC").
+func (s *Service) InstanceTimezoneLabel(ctx context.Context) string {
+	if tz := s.InstanceTimezone(ctx); tz != "" {
+		return tz
+	}
+	z, _ := time.Now().Zone()
+	return z
+}
+
+// CronPreviewResult is the JSON shape returned to the cron-field component: the
+// validity, the English description, the next N fire times (formatted in the
+// instance timezone), and the zone label they're shown in.
+type CronPreviewResult struct {
+	Valid       bool     `json:"valid"`
+	Description string   `json:"description"`
+	NextRuns    []string `json:"next_runs"`
+	TZLabel     string   `json:"tz_label"`
+}
+
+// CronPreview validates + describes a cron expression and computes its next n
+// fire times, all in the instance timezone. Powers the shared cron-field
+// live preview for sync schedules and workflows alike.
+func (s *Service) CronPreview(ctx context.Context, expr string, n int) CronPreviewResult {
+	tz := s.InstanceTimezone(ctx)
+	valid, desc := s.DescribeCron(expr)
+	res := CronPreviewResult{Valid: valid, Description: desc, TZLabel: s.InstanceTimezoneLabel(ctx)}
+	if !valid {
+		return res
+	}
+	for _, f := range cronspec.NextRuns(strings.TrimSpace(expr), tz, time.Now(), n) {
+		res.NextRuns = append(res.NextRuns, f.Format("Mon Jan 2 · 3:04 PM"))
+	}
+	return res
+}
 
 // cronDescriptor renders a cron expression as an English sentence. Built
 // once at package init (stateless + concurrency-safe). English-only keeps

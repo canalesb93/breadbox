@@ -16,14 +16,14 @@ import (
 // DesignGalleryProps is the prop bag for the /design page — the full
 // component gallery rendered on one scrollable page with section anchors.
 type DesignGalleryProps struct {
-	Sections    []DesignSection
+	Sections []DesignSection
 }
 
 // DesignComponentProps is the prop bag for /design/c/{slug} — a single
 // component rendered in isolation so agents (and humans) can focus
 // screenshots on one piece at a time.
 type DesignComponentProps struct {
-	Section     DesignSection
+	Section DesignSection
 }
 
 // DesignSection describes one entry in the design system gallery.
@@ -225,6 +225,13 @@ func DesignSections() []DesignSection {
 			Description: "Inputs, selects, textareas, checkboxes, toggles, file inputs.",
 			Group:       "forms",
 			Render:      func() templ.Component { return SectionFormControls() },
+		},
+		{
+			Slug:        "cron-field",
+			Title:       "Cron field",
+			Description: "components.CronField — the shared cron input: timezone-aware preset chips, a custom 5-field expression, and a live preview (English description + next runs in the instance timezone). The active preset is derived from the cron value, so unmatched expressions show Custom rather than a wrong preset. Powers sync schedules and workflows.",
+			Group:       "forms",
+			Render:      func() templ.Component { return SectionCronField() },
 		},
 		{
 			Slug:        "radio-card",

@@ -427,6 +427,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
 
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
+		r.Post("/settings/timezone", SettingsTimezonePostHandler(a, sm))
 
 		// Sync schedules — wall-clock cron schedules that replace the single
 		// global interval. List lives in Settings → Sync; create/edit is a
@@ -544,6 +545,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 			// Preview the composed internal base prompt for a preset (read-only JSON).
 			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
+			// Shared cron live-preview for the cron-field component (description
+			// + next fires, in the instance timezone). Read-only JSON.
+			r.Get("/cron/preview", CronPreviewAdminHandler(svc))
 			// Human-readable preview of a cron expression for the schedule field
 			// (read-only JSON). Single-segment path — never shadows {slug}/*.
 			r.Get("/workflows/cron-preview", WorkflowCronPreviewAdminHandler(svc))

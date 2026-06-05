@@ -58,7 +58,7 @@ func TestComputeNextSync(t *testing.T) {
 		info := computeNextSync(syncScheduleParams{
 			Status:   db.ConnectionStatusDisconnected,
 			Provider: db.ProviderTypePlaid,
-		}, nightly, now)
+		}, nightly, "", now)
 		if !info.IsDisconnected || info.Label != "No schedule" {
 			t.Errorf("expected disconnected/No schedule, got %+v", info)
 		}
@@ -68,7 +68,7 @@ func TestComputeNextSync(t *testing.T) {
 		info := computeNextSync(syncScheduleParams{
 			Status:   db.ConnectionStatusActive,
 			Provider: db.ProviderTypeCsv,
-		}, nightly, now)
+		}, nightly, "", now)
 		if !info.IsDisconnected {
 			t.Error("expected IsDisconnected=true for CSV")
 		}
@@ -79,7 +79,7 @@ func TestComputeNextSync(t *testing.T) {
 			Status:   db.ConnectionStatusActive,
 			Provider: db.ProviderTypePlaid,
 			Paused:   true,
-		}, nightly, now)
+		}, nightly, "", now)
 		if !info.IsPaused || info.Label != "Paused" {
 			t.Errorf("expected paused, got %+v", info)
 		}
@@ -89,7 +89,7 @@ func TestComputeNextSync(t *testing.T) {
 		info := computeNextSync(syncScheduleParams{
 			Status:   db.ConnectionStatusActive,
 			Provider: db.ProviderTypePlaid,
-		}, nil, now)
+		}, nil, "", now)
 		if info.Label != "No schedule" || info.IsOverdue {
 			t.Errorf("expected 'No schedule' with no schedules, got %+v", info)
 		}
@@ -99,7 +99,7 @@ func TestComputeNextSync(t *testing.T) {
 		info := computeNextSync(syncScheduleParams{
 			Status:   db.ConnectionStatusActive,
 			Provider: db.ProviderTypePlaid,
-		}, nightly, now)
+		}, nightly, "", now)
 		if !info.IsOverdue || info.Label != "Pending first sync" {
 			t.Errorf("expected pending first sync, got %+v", info)
 		}
@@ -115,7 +115,7 @@ func TestComputeNextSync(t *testing.T) {
 			Status:       db.ConnectionStatusActive,
 			Provider:     db.ProviderTypePlaid,
 			LastSyncedAt: tsAt(time.Date(2026, 3, 26, 4, 0, 0, 0, time.UTC)),
-		}, nightly, now)
+		}, nightly, "", now)
 		if info.IsOverdue {
 			t.Errorf("expected not overdue, got %+v", info)
 		}
@@ -131,7 +131,7 @@ func TestComputeNextSync(t *testing.T) {
 			Status:       db.ConnectionStatusActive,
 			Provider:     db.ProviderTypePlaid,
 			LastSyncedAt: tsAt(time.Date(2026, 3, 26, 2, 0, 0, 0, time.UTC)),
-		}, nightly, now)
+		}, nightly, "", now)
 		if !info.IsOverdue || info.Label != "Due now" {
 			t.Errorf("expected due now, got %+v", info)
 		}
@@ -143,7 +143,7 @@ func TestComputeNextSync(t *testing.T) {
 			Status:       db.ConnectionStatusActive,
 			Provider:     db.ProviderTypeTeller,
 			LastSyncedAt: tsAt(now),
-		}, hourly, now)
+		}, hourly, "", now)
 		if info.IsOverdue {
 			t.Errorf("expected not overdue, got %+v", info)
 		}
@@ -159,7 +159,7 @@ func TestComputeNextSync(t *testing.T) {
 			Status:       db.ConnectionStatusActive,
 			Provider:     db.ProviderTypePlaid,
 			LastSyncedAt: tsAt(now),
-		}, append(append([]service.ScheduleRef{}, nightly...), hourly...), now)
+		}, append(append([]service.ScheduleRef{}, nightly...), hourly...), "", now)
 		if info.Label != "in 1h" {
 			t.Errorf("expected earliest 'in 1h', got %q", info.Label)
 		}
