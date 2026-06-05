@@ -168,46 +168,6 @@ func TestPauseConnection_NotFound(t *testing.T) {
 	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
 }
 
-func TestUpdateSyncInterval_Set(t *testing.T) {
-	env := setupTestEnv(t)
-	user := testutil.MustCreateUser(t, env.Queries, "Alice")
-	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_interval_set")
-
-	resp := env.doPost(t, "/api/v1/connections/"+conn.ShortID+"/sync-interval", map[string]any{
-		"interval_minutes": 30,
-	})
-	assertStatus(t, resp, http.StatusOK)
-	var got connectionDetail
-	parseJSON(t, resp, &got)
-	if got.SyncIntervalOverrideMinutes == nil || *got.SyncIntervalOverrideMinutes != 30 {
-		t.Errorf("want sync_interval_override_minutes=30, got %v", got.SyncIntervalOverrideMinutes)
-	}
-}
-
-func TestUpdateSyncInterval_Clear(t *testing.T) {
-	env := setupTestEnv(t)
-	user := testutil.MustCreateUser(t, env.Queries, "Alice")
-	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "ext_interval_clear")
-
-	// First set a non-default value.
-	resp := env.doPost(t, "/api/v1/connections/"+conn.ShortID+"/sync-interval", map[string]any{
-		"interval_minutes": 45,
-	})
-	assertStatus(t, resp, http.StatusOK)
-	resp.Body.Close()
-
-	// Now clear via null.
-	resp = env.doPost(t, "/api/v1/connections/"+conn.ShortID+"/sync-interval", map[string]any{
-		"interval_minutes": nil,
-	})
-	assertStatus(t, resp, http.StatusOK)
-	var got connectionDetail
-	parseJSON(t, resp, &got)
-	if got.SyncIntervalOverrideMinutes != nil {
-		t.Errorf("want nil after clear, got %v", *got.SyncIntervalOverrideMinutes)
-	}
-}
-
 func TestTriggerConnectionSync(t *testing.T) {
 	env := setupTestEnv(t)
 	waitForSyncDrain(t, env)
@@ -248,7 +208,6 @@ func TestConnectionMgmt_RequiresWriteScope(t *testing.T) {
 		{"delete", "DELETE", "/api/v1/connections/" + conn.ShortID, nil},
 		{"per-conn sync", "POST", "/api/v1/connections/" + conn.ShortID + "/sync", nil},
 		{"paused", "POST", "/api/v1/connections/" + conn.ShortID + "/paused", map[string]any{"paused": true}},
-		{"sync-interval", "POST", "/api/v1/connections/" + conn.ShortID + "/sync-interval", map[string]any{"interval_minutes": 30}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

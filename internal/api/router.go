@@ -151,7 +151,6 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/sync", TriggerSyncHandler(svc))
 			r.Post("/connections/{id}/sync", SyncConnectionHandler(svc))
 			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
-			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))
 			r.Delete("/connections/{id}", DeleteConnectionHandler(svc))
 			r.Post("/connections/{id}/reauth", ConnectionReauthHandler(a))
 			r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))

@@ -43,6 +43,8 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
 | `accounts` | Individual bank accounts (checking, savings, credit cards) within a connection. Mirrors the Plaid Account object. |
 | `transactions` | Financial transactions synced from providers. Soft-deleted on removal. |
 | `sync_logs` | Immutable audit trail of every sync operation attempt. |
+| `sync_schedules` | Wall-clock cron sync schedules; the household's sync cadence (replaces the global interval). |
+| `sync_schedule_connections` | Many-to-many join mapping schedules to the connections they cover. |
 | `api_keys` | Hashed API keys for REST API and MCP access. |
 | `app_config` | Key-value store for runtime configuration set during the first-run setup wizard. |
 | `tags` | Reusable labels attached to transactions (e.g. `needs-review`). |
@@ -298,7 +300,7 @@ CREATE TYPE connection_status AS ENUM (
 | `new_accounts_available` | `BOOLEAN` | No | `FALSE` | Set to `TRUE` when Plaid reports that new accounts are available to add for this item (from `NEW_ACCOUNTS_AVAILABLE` webhook). Cleared after the user reviews the accounts in the dashboard. |
 | `consent_expiration_time` | `TIMESTAMPTZ` | Yes | `NULL` | When the user's consent for this Plaid item expires, as reported by Plaid. `NULL` if the institution does not enforce consent expiration. |
 | `paused` | `BOOLEAN` | No | `FALSE` | When `TRUE`, cron-scheduled syncs skip this connection. Manual "Sync Now" still works. Orthogonal to `status`. Added in Phase 10 (migration 00015). |
-| `sync_interval_override_minutes` | `INTEGER` | Yes | `NULL` | Per-connection sync interval override. When set, cron checks this connection's staleness individually. `NULL` uses the global `sync_interval_minutes`. Added in Phase 10 (migration 00015). |
+| `sync_interval_override_minutes` | `INTEGER` | Yes | `NULL` | **Deprecated** (no longer consulted by the scheduler). Per-connection cadence is now expressed via `sync_schedules` + `sync_schedule_connections`. Column retained to avoid a destructive migration; still feeds the coarse list-page "stale" heuristic. Added in Phase 10 (migration 00015). |
 | `last_synced_at` | `TIMESTAMPTZ` | Yes | `NULL` | Timestamp of the most recently completed successful sync. `NULL` if never synced. Used to compute "last seen" display and detect stale connections. Note: `last_attempted_sync_at` (the time of the most recent sync attempt regardless of outcome) does not need its own column — it can be derived from `sync_logs` with `SELECT MAX(started_at) FROM sync_logs WHERE connection_id = $1`. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
@@ -848,6 +850,46 @@ There is **no** unique constraint on the dedup signature `(merchant_key, iso_cur
 #### Field ownership (edit surface)
 
 User/agent-editable (via `PATCH /series/{id}` / `update_series`, protected from re-detection): `name`, `expected_amount` (+ `iso_currency_code`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id`. `type` is edited via `set_series_type`; `merchant_key` via `rekey_series`; `status`/`confidence` via verdicts (`review_series`). Detector-owned (read-only): `detection_source`, `last_amount`, `last_seen_date`, `occurrence_count`, `detection_signals`. Derived (read-only): `next_expected_date`.
+
+---
+
+### 2.13 `sync_schedules`
+
+Wall-clock-anchored sync schedules. Replaces the legacy single global interval
+(`app_config.sync_interval_minutes`, which re-anchored to each connection's last
+sync and drifted) with named cron schedules. Each tick (every 15 min) resolves a
+connection's **effective schedules** — the union of all `applies_to_all=TRUE`
+schedules plus any explicitly targeting it via `sync_schedule_connections` — and
+syncs when ANY of them has fired since the connection's last successful sync.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
+| `short_id` | `TEXT` | No | trigger | 8-char base62, via `set_short_id()`. |
+| `name` | `TEXT` | No | — | Display name (e.g. "Nightly"). |
+| `cron` | `TEXT` | No | — | Standard 5-field cron, evaluated in the server's local timezone. |
+| `preset` | `TEXT` | Yes | `NULL` | Catalog preset key (`nightly`, `hourly`, …) or `custom`; drives humanization. |
+| `applies_to_all` | `BOOLEAN` | No | `FALSE` | When `TRUE`, covers every connection (including ones added later); `sync_schedule_connections` rows are ignored. |
+| `enabled` | `BOOLEAN` | No | `TRUE` | Disabled schedules are skipped by the scheduler and excluded from resolution. |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Audit timestamps. |
+
+Seeded on migration from the prior `sync_interval_minutes` so cadence is preserved
+on the first tick. The legacy `sync_interval_minutes` remains only as the
+empty-table fallback and a coarse list-page staleness threshold.
+
+### 2.14 `sync_schedule_connections`
+
+Many-to-many join: a schedule targets X connections; a connection has N schedules.
+A connection's effective schedules are the **union** of `applies_to_all` schedules
+plus its explicit rows here — there is no "override vs stack" distinction.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `schedule_id` | `UUID` | No | — | FK → `sync_schedules.id`, `ON DELETE CASCADE`. |
+| `connection_id` | `UUID` | No | — | FK → `bank_connections.id`, `ON DELETE CASCADE`. |
+
+Primary key is `(schedule_id, connection_id)`; a reverse index on `connection_id`
+accelerates "which schedules target this connection" during resolution.
 
 ---
 

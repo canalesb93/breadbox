@@ -65,6 +65,8 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		nextSyncTime = formatNextSync(a.Scheduler.NextRun())
 	}
 
+	syncSchedules, _ := a.Service.ListSyncSchedules(ctx)
+
 	props := pages.SettingsProps{
 		CSRFToken:            GetCSRFToken(r),
 		SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
@@ -78,6 +80,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
 		OnboardingDismissed:  onboardingDismissed,
 		NextSyncTime:         nextSyncTime,
+		SyncSchedules:        syncSchedules,
 		ConfigSources:        a.Config.ConfigSources,
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,
@@ -131,34 +134,6 @@ func HelpSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 		data["CurrentPage"] = "help"
 		data["Flash"] = GetFlash(r.Context(), sm)
 		renderSettingsTab(tr, w, r, data, pages.SettingsTabHelp, pages.SettingsHelp(props))
-	}
-}
-
-// SettingsSyncPostHandler serves POST /admin/settings/sync.
-func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		syncIntervalStr := r.FormValue("sync_interval_minutes")
-
-		syncInterval, err := strconv.Atoi(syncIntervalStr)
-		if err != nil || !isValidSyncInterval(syncInterval) {
-			FlashRedirect(w, r, sm, "error", "Invalid sync interval.", "/settings")
-			return
-		}
-
-		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "sync_interval_minutes",
-			Value: pgconv.Text(strconv.Itoa(syncInterval)),
-		}); err != nil {
-			a.Logger.Error("save sync interval", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to save sync interval.", "/settings")
-			return
-		}
-		a.Config.SyncIntervalMinutes = syncInterval
-
-		SetFlash(ctx, sm, "success", "Sync settings saved.")
-		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 	}
 }
 
@@ -280,4 +255,3 @@ func formatUptime(d time.Duration) string {
 	}
 	return fmt.Sprintf("%dm", minutes)
 }
-

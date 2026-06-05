@@ -140,7 +140,6 @@ See the Transactions table — comments are nested under `/transactions/{transac
 | POST | `/connections` | W | Create from a provider payload (`provider` discriminator: `plaid`, `teller`) |
 | POST | `/connections/{id}/sync` | W | Trigger sync for one connection (202; runs async) |
 | POST | `/connections/{id}/paused` | W | Pause or resume scheduled syncs |
-| POST | `/connections/{id}/sync-interval` | W | Set or clear per-connection interval override |
 | POST | `/connections/{id}/reauth` | W | Start re-auth flow; returns a fresh link token |
 | POST | `/connections/{id}/reauth-complete` | W | Mark connection active again after the user finishes re-auth |
 | DELETE | `/connections/{id}` | W | Soft-disconnect (wipes encrypted tokens, transactions soft-deleted) |

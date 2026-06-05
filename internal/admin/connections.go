@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/cronspec"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
@@ -45,8 +46,9 @@ type NextSyncInfo struct {
 	IsPaused bool
 	// IsDisconnected is true when the connection is disconnected or CSV.
 	IsDisconnected bool
-	// EffectiveIntervalMinutes is the sync interval including backoff.
-	EffectiveIntervalMinutes int
+	// ScheduleNames are the names of the schedules covering this connection,
+	// for a "Syncs on: Nightly, Hourly" subline.
+	ScheduleNames []string
 }
 
 // ConnectionWithAccounts pairs a connection row with its accounts and computed totals.
@@ -136,6 +138,9 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 		// next-sync schedule, and staleness.
 		now := time.Now()
 		globalInterval := a.Config.SyncIntervalMinutes
+		// Load the schedule resolution once for the whole list (two queries),
+		// then resolve each connection's effective schedules from it.
+		allSchedules, perConnSchedules, _ := svc.SyncScheduleResolution(ctx)
 		for i := range enriched {
 			if enriched[i].HasBalance {
 				total := 0.0
@@ -147,13 +152,11 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 				enriched[i].TotalBalance = total
 			}
 			enriched[i].NextSync = computeNextSync(syncScheduleParams{
-				Status:                      enriched[i].Status,
-				Provider:                    enriched[i].Provider,
-				Paused:                      enriched[i].Paused,
-				SyncIntervalOverrideMinutes: enriched[i].SyncIntervalOverrideMinutes,
-				ConsecutiveFailures:         enriched[i].ConsecutiveFailures,
-				LastSyncedAt:                enriched[i].LastSyncedAt,
-			}, globalInterval, now)
+				Status:       enriched[i].Status,
+				Provider:     enriched[i].Provider,
+				Paused:       enriched[i].Paused,
+				LastSyncedAt: enriched[i].LastSyncedAt,
+			}, effectiveSchedules(allSchedules, perConnSchedules, enriched[i].ID), now)
 
 			// Compute staleness.
 			if string(enriched[i].Status) != "disconnected" {
@@ -610,14 +613,12 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// SimpleFIN's bridge expects ≤24 requests/day, so default new SimpleFIN
-		// connections to a daily sync cadence rather than the global interval.
+		// SimpleFIN's bridge expects ≤24 requests/day, so put new SimpleFIN
+		// connections on a shared daily schedule rather than the household
+		// default (which may be more frequent).
 		if providerName == "simplefin" {
-			if _, err := a.Queries.UpdateConnectionSyncInterval(r.Context(), db.UpdateConnectionSyncIntervalParams{
-				ID:                          result.ID,
-				SyncIntervalOverrideMinutes: pgconv.Int4(simplefinSyncIntervalMinutes),
-			}); err != nil {
-				a.Logger.Warn("set simplefin sync interval", "error", err, "connection_id", pgconv.FormatUUID(result.ID))
+			if err := a.Service.AssignConnectionToManagedSchedule(r.Context(), pgconv.FormatUUID(result.ID), simplefinScheduleName, simplefinScheduleCron); err != nil {
+				a.Logger.Warn("assign simplefin daily schedule", "error", err, "connection_id", pgconv.FormatUUID(result.ID))
 			}
 		}
 
@@ -629,10 +630,14 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
-// simplefinSyncIntervalMinutes is the default per-connection sync cadence for
-// SimpleFIN connections (daily), chosen to stay within the bridge's expected
-// ~24-requests/day budget.
-const simplefinSyncIntervalMinutes = 24 * 60
+// simplefinScheduleName / simplefinScheduleCron define the shared daily sync
+// schedule new SimpleFIN connections are added to, chosen to stay within the
+// bridge's expected ~24-requests/day budget. One schedule covers all SimpleFIN
+// connections (idempotent find-or-create on assignment).
+const (
+	simplefinScheduleName = "SimpleFIN (daily)"
+	simplefinScheduleCron = "0 6 * * *"
+)
 
 // ConnectionDetailHandler serves GET /admin/connections/{id}.
 func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
@@ -780,15 +785,14 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			}
 		}
 
-		// Compute next sync schedule.
+		// Compute next sync from this connection's effective schedules.
+		allSchedules, perConnSchedules, _ := a.Service.SyncScheduleResolution(ctx)
 		nextSync := computeNextSync(syncScheduleParams{
-			Status:                      conn.Status,
-			Provider:                    conn.Provider,
-			Paused:                      conn.Paused,
-			SyncIntervalOverrideMinutes: conn.SyncIntervalOverrideMinutes,
-			ConsecutiveFailures:         conn.ConsecutiveFailures,
-			LastSyncedAt:                conn.LastSyncedAt,
-		}, a.Config.SyncIntervalMinutes, now)
+			Status:       conn.Status,
+			Provider:     conn.Provider,
+			Paused:       conn.Paused,
+			LastSyncedAt: conn.LastSyncedAt,
+		}, effectiveSchedules(allSchedules, perConnSchedules, conn.ID), now)
 
 		data := map[string]any{
 			"PageTitle":   conn.InstitutionName.String,
@@ -860,22 +864,20 @@ func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetail
 		ConnID:    in.ConnID,
 		CSRFToken: in.CSRFToken,
 		// Connection fields
-		Provider:                          string(in.Conn.Provider),
-		Status:                            string(in.Conn.Status),
-		InstitutionName:                   in.Conn.InstitutionName.String,
-		UserName:                          in.Conn.UserName.String,
-		UserNameValid:                     in.Conn.UserName.Valid,
-		Paused:                            in.Conn.Paused,
-		ConsecutiveFailures:               in.Conn.ConsecutiveFailures,
-		HasErrorCode:                      in.Conn.ErrorCode.Valid,
-		ErrorCode:                         in.Conn.ErrorCode.String,
-		HasErrorMessage:                   in.Conn.ErrorMessage.Valid,
-		ErrorMessage:                      in.Conn.ErrorMessage.String,
-		LastSyncedAtValid:                 in.Conn.LastSyncedAt.Valid,
-		CreatedAtValid:                    in.Conn.CreatedAt.Valid,
-		LastErrorAtValid:                  in.Conn.LastErrorAt.Valid,
-		SyncIntervalOverrideMinutesValid:  in.Conn.SyncIntervalOverrideMinutes.Valid,
-		SyncIntervalOverrideMinutesValue:  in.Conn.SyncIntervalOverrideMinutes.Int32,
+		Provider:            string(in.Conn.Provider),
+		Status:              string(in.Conn.Status),
+		InstitutionName:     in.Conn.InstitutionName.String,
+		UserName:            in.Conn.UserName.String,
+		UserNameValid:       in.Conn.UserName.Valid,
+		Paused:              in.Conn.Paused,
+		ConsecutiveFailures: in.Conn.ConsecutiveFailures,
+		HasErrorCode:        in.Conn.ErrorCode.Valid,
+		ErrorCode:           in.Conn.ErrorCode.String,
+		HasErrorMessage:     in.Conn.ErrorMessage.Valid,
+		ErrorMessage:        in.Conn.ErrorMessage.String,
+		LastSyncedAtValid:   in.Conn.LastSyncedAt.Valid,
+		CreatedAtValid:      in.Conn.CreatedAt.Valid,
+		LastErrorAtValid:    in.Conn.LastErrorAt.Valid,
 
 		LastSyncStatus:             in.LastSyncStatus,
 		LastSyncErrorMessageValid:  in.LastSyncErrorMessage.Valid,
@@ -896,11 +898,11 @@ func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetail
 		HasBalance:   in.HasBalance,
 
 		NextSync: pages.NextSyncInfo{
-			Label:                    in.NextSync.Label,
-			IsOverdue:                in.NextSync.IsOverdue,
-			IsPaused:                 in.NextSync.IsPaused,
-			IsDisconnected:           in.NextSync.IsDisconnected,
-			EffectiveIntervalMinutes: in.NextSync.EffectiveIntervalMinutes,
+			Label:          in.NextSync.Label,
+			IsOverdue:      in.NextSync.IsOverdue,
+			IsPaused:       in.NextSync.IsPaused,
+			IsDisconnected: in.NextSync.IsDisconnected,
+			ScheduleNames:  in.NextSync.ScheduleNames,
 		},
 	}
 
@@ -1429,55 +1431,34 @@ func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.Hand
 	}
 }
 
-// UpdateConnectionSyncIntervalHandler serves POST /admin/api/connections/{id}/sync-interval.
-func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
-		if !ok {
-			return
-		}
-
-		var req struct {
-			Minutes *int32 `json:"minutes"`
-		}
-		if !decodeJSON(w, r, &req) {
-			return
-		}
-
-		var interval pgtype.Int4
-		if req.Minutes != nil {
-			interval = pgconv.Int4(*req.Minutes)
-		}
-
-		conn, err := a.Queries.UpdateConnectionSyncInterval(r.Context(), db.UpdateConnectionSyncIntervalParams{
-			ID:                          connID,
-			SyncIntervalOverrideMinutes: interval,
-		})
-		if err != nil {
-			a.Logger.Error("update connection sync interval", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
-			return
-		}
-
-		writeJSON(w, http.StatusOK, conn)
-	}
-}
-
 // syncScheduleParams holds the fields needed to compute next-sync info.
 // Works with both ListBankConnectionsRow and GetBankConnectionRow.
 type syncScheduleParams struct {
-	Status                      db.ConnectionStatus
-	Provider                    db.ProviderType
-	Paused                      bool
-	SyncIntervalOverrideMinutes pgtype.Int4
-	ConsecutiveFailures         int32
-	LastSyncedAt                pgtype.Timestamptz
+	Status       db.ConnectionStatus
+	Provider     db.ProviderType
+	Paused       bool
+	LastSyncedAt pgtype.Timestamptz
 }
 
-// computeNextSync calculates when a connection will next be eligible for cron
-// sync, using the same staleness logic as the scheduler. This mirrors the logic
-// in internal/sync/scheduler.go syncAllScheduled.
-func computeNextSync(p syncScheduleParams, globalIntervalMinutes int, now time.Time) NextSyncInfo {
+// effectiveSchedules returns the schedules that apply to a connection: the
+// union of the household's applies_to_all schedules plus any explicitly
+// targeting it. Resolved from a single service.SyncScheduleResolution call.
+func effectiveSchedules(all []service.ScheduleRef, perConn map[string][]service.ScheduleRef, connID pgtype.UUID) []service.ScheduleRef {
+	extra := perConn[pgconv.FormatUUID(connID)]
+	if len(all) == 0 {
+		return extra
+	}
+	out := make([]service.ScheduleRef, 0, len(all)+len(extra))
+	out = append(out, all...)
+	out = append(out, extra...)
+	return out
+}
+
+// computeNextSync calculates when a connection will next sync from its effective
+// sync schedules (the union of applies_to_all + connection-targeted schedules,
+// resolved via service.SyncScheduleResolution). Wall-clock anchored — mirrors
+// the scheduler's scheduleDue/scheduleNextRun, minus jitter.
+func computeNextSync(p syncScheduleParams, schedules []service.ScheduleRef, now time.Time) NextSyncInfo {
 	// Disconnected or CSV connections don't sync on a schedule.
 	if string(p.Status) == "disconnected" || string(p.Provider) == "csv" {
 		return NextSyncInfo{IsDisconnected: true, Label: "No schedule"}
@@ -1488,48 +1469,39 @@ func computeNextSync(p syncScheduleParams, globalIntervalMinutes int, now time.T
 		return NextSyncInfo{IsPaused: true, Label: "Paused"}
 	}
 
-	// Compute effective interval with backoff (mirrors scheduler.go backoffInterval).
-	baseMinutes := globalIntervalMinutes
-	if p.SyncIntervalOverrideMinutes.Valid {
-		baseMinutes = int(p.SyncIntervalOverrideMinutes.Int32)
-	}
-	effectiveMinutes := syncBackoffInterval(baseMinutes, p.ConsecutiveFailures)
-
-	info := NextSyncInfo{
-		EffectiveIntervalMinutes: effectiveMinutes,
+	// No schedule covers this connection — it won't auto-sync (manual/webhook
+	// still work).
+	if len(schedules) == 0 {
+		return NextSyncInfo{Label: "No schedule"}
 	}
 
-	// Never synced — eligible immediately on next cron tick.
+	names := make([]string, 0, len(schedules))
+	crons := make([]string, 0, len(schedules))
+	for _, s := range schedules {
+		names = append(names, s.Name)
+		crons = append(crons, s.Cron)
+	}
+	info := NextSyncInfo{ScheduleNames: names}
+
+	// Never synced — eligible on the next tick.
 	if !p.LastSyncedAt.Valid {
 		info.IsOverdue = true
 		info.Label = "Pending first sync"
 		return info
 	}
 
-	nextSyncAt := p.LastSyncedAt.Time.Add(time.Duration(effectiveMinutes) * time.Minute)
-	info.NextSyncAt = nextSyncAt
-
-	if nextSyncAt.Before(now) || nextSyncAt.Equal(now) {
+	// A scheduled fire passed since the last sync → due now.
+	if cronspec.DuePassed(crons, p.LastSyncedAt.Time, now) {
 		info.IsOverdue = true
 		info.Label = "Due now"
 		return info
 	}
 
-	info.Label = relativeTimeUntil(nextSyncAt, now)
+	if next, ok := cronspec.NextRun(crons, now); ok {
+		info.NextSyncAt = next
+		info.Label = relativeTimeUntil(next, now)
+	}
 	return info
-}
-
-// syncBackoffInterval returns an adjusted sync interval in minutes based on
-// consecutive failures. Mirrors internal/sync/scheduler.go backoffInterval.
-func syncBackoffInterval(baseMinutes int, consecutiveFailures int32) int {
-	if consecutiveFailures <= 0 {
-		return baseMinutes
-	}
-	exp := int(consecutiveFailures)
-	if exp > 4 {
-		exp = 4
-	}
-	return baseMinutes * (1 << exp)
 }
 
 // relativeTimeUntil formats a future time as a human-readable duration string
@@ -1559,4 +1531,3 @@ func relativeTimeUntil(target, now time.Time) string {
 		return "in <1m"
 	}
 }
-
