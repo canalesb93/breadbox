@@ -414,7 +414,8 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="bb-tool-row">
 				<details class="bb-tool" data-tool-event="use">
 					<summary class="bb-tool__summary">
-						<div class="bb-tool__icon">@components.LucideIcon("wrench", "w-3.5 h-3.5")</div>
+						<div class="bb-tool__icon">@components.LucideIcon("wrench", "w-3.5 h-3.5")
+</div>
 						<span class="bb-tool__label">
 							if ev.ToolResultJSON != "" {
 								Tool
@@ -433,7 +434,8 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 					</summary>
 					<div class="bb-tool__body bb-tool__body--paired">
 						<div class="bb-tool__section">
-							<div class="bb-tool__section-label">@components.LucideIcon("arrow-right", "w-3 h-3") Input</div>
+							<div class="bb-tool__section-label">@components.LucideIcon("arrow-right", "w-3 h-3")
+Input</div>
 							if ev.ToolInputJSON != "" {
 								@components.JSONViewer(components.JSONViewerProps{Source: ev.ToolInputJSON, MaxDepth: 0, ShowCopy: true})
 							} else {
@@ -442,7 +444,8 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 						</div>
 						if ev.ToolResultJSON != "" {
 							<div class="bb-tool__section">
-								<div class="bb-tool__section-label bb-tool__section-label--result">@components.LucideIcon("arrow-left", "w-3 h-3") Result</div>
+								<div class="bb-tool__section-label bb-tool__section-label--result">@components.LucideIcon("arrow-left", "w-3 h-3")
+Result</div>
 								@components.JSONViewer(components.JSONViewerProps{Source: ev.ToolResultJSON, MaxDepth: 0, ShowCopy: true})
 							</div>
 						}
@@ -453,7 +456,8 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="bb-tool-row">
 				<details class="bb-tool" data-tool-event="result">
 					<summary class="bb-tool__summary">
-						<div class="bb-tool__icon bb-tool__icon--result">@components.LucideIcon("check-check", "w-3.5 h-3.5")</div>
+						<div class="bb-tool__icon bb-tool__icon--result">@components.LucideIcon("check-check", "w-3.5 h-3.5")
+</div>
 						<span class="bb-tool__label">Tool result</span>
 						if ev.ToolName != "" {
 							<span class="bb-tool__name font-mono">{ agentRunToolDisplay(ev.ToolName) }</span>
@@ -530,7 +534,8 @@ templ agentRunTranscriptEvent(ev TranscriptEvent, idx int) {
 			<li class="bb-tool-row">
 				<details class="bb-tool">
 					<summary class="bb-tool__summary">
-						<div class="bb-tool__icon bb-tool__icon--raw">@components.LucideIcon("code-2", "w-3.5 h-3.5")</div>
+						<div class="bb-tool__icon bb-tool__icon--raw">@components.LucideIcon("code-2", "w-3.5 h-3.5")
+</div>
 						<span class="bb-tool__label">Raw event</span>
 						if ev.Type != "" {
 							<span class="bb-tool__name font-mono">{ ev.Type }</span>
@@ -557,7 +562,6 @@ func agentRunToolDisplay(name string) string {
 }
 
 // ─── Side panel ─────────────────────────────────────────────────────
-
 templ agentRunStatsCard(p AgentRunDetailProps) {
 	<div class="bb-card p-4" x-ref="stats">
 		<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-3">Usage</h3>

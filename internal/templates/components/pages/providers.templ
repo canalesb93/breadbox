@@ -586,8 +586,10 @@ templ providerEnvNotice() {
 templ providerTestFooterButton() {
 	<div class="flex items-center gap-3 mr-auto min-w-0">
 		<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="testConnection()" :disabled="testing">
-			<span x-show="!testing" class="flex items-center gap-1.5">@components.LucideIcon("plug", "w-3.5 h-3.5")
-Test connection</span>
+			<span x-show="!testing" class="flex items-center gap-1.5">
+				@components.LucideIcon("plug", "w-3.5 h-3.5")
+				Test connection
+			</span>
 			<span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing…</span>
 		</button>
 		<span x-show="testResult" x-cloak class="text-xs truncate" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>

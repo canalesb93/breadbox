@@ -591,14 +591,14 @@ func agentFormToolScopeOrDefault(v string) string {
 // and restore them when they flip back to Automatic.
 func agentFormInitialJSON(f AgentFormFields) map[string]any {
 	return map[string]any{
-		"cron":                      f.ScheduleCron,
-		"system_prompt":             f.SystemPrompt,
-		"quiet_hours_start":         f.QuietHoursStart,
-		"quiet_hours_end":           f.QuietHoursEnd,
-		"allowed_tools":             f.AllowedTools,
-		"max_turns":                 f.MaxTurns,
-		"max_budget_usd":            f.MaxBudgetUSD,
-		"enabled":                   f.Enabled,
-		"trigger_on_sync_complete":  f.TriggerOnSyncComplete,
+		"cron":                     f.ScheduleCron,
+		"system_prompt":            f.SystemPrompt,
+		"quiet_hours_start":        f.QuietHoursStart,
+		"quiet_hours_end":          f.QuietHoursEnd,
+		"allowed_tools":            f.AllowedTools,
+		"max_turns":                f.MaxTurns,
+		"max_budget_usd":           f.MaxBudgetUSD,
+		"enabled":                  f.Enabled,
+		"trigger_on_sync_complete": f.TriggerOnSyncComplete,
 	}
 }

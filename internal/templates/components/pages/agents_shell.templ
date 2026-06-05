@@ -1,8 +1,6 @@
 package pages
 
-import (
-	"breadbox/internal/templates/components"
-)
+import "breadbox/internal/templates/components"
 
 // agentsTabBar renders the Runs / Agents two-tab nav shared between
 // /agents (runs landing) and /agents/definitions (agents list). Both
@@ -67,6 +65,7 @@ templ agentsHeaderActions(modalID string, runDisabled bool) {
 // openAgentRunModal is the click handler that opens the run-an-agent
 // modal dialog. Kept as a Go-side helper so the inline `onclick`
 // stays a single statement and the lint passes.
+
 script openAgentRunModal(modalID string) {
 	var el = document.getElementById(modalID);
 	if (el && typeof el.showModal === 'function') el.showModal();
@@ -190,4 +189,3 @@ type agentRunModalPayload struct {
 	Agents       []AgentRunsAgentOption `json:"agents"`
 	LastPrefixes map[string]string      `json:"last_prefixes"`
 }
-

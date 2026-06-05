@@ -53,10 +53,10 @@ const (
 
 type SetupStepProps struct {
 	Number       int
-	Icon         string        // topical lucide name (e.g. "users","landmark","link-2","refresh-cw","bot")
+	Icon         string // topical lucide name (e.g. "users","landmark","link-2","refresh-cw","bot")
 	Title        string
-	Description  string        // shown in active/in_progress/pending states
-	Summary      string        // shown when Complete (compact confirmation line)
+	Description  string // shown in active/in_progress/pending states
+	Summary      string // shown when Complete (compact confirmation line)
 	State        SetupStepState
 	TimeEstimate string        // "~1 min" — shown in active/pending meta row; hide when ""
 	Optional     bool          // render an "Optional" badge
