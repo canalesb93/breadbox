@@ -368,7 +368,7 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleGetSyncStatus, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_transaction_rules", Title: "List Rules", Classification: ToolRead,
-			Description: "List transaction rules with their conditions, actions, and pipeline stage. Mirror of breadbox://rules. Filter by category_slug, enabled, or search by name. Read this before authoring new rules to avoid duplicates.",
+			Description: "List transaction rules. Filter by category_slug, enabled, or search by name. Read this before authoring new rules to avoid duplicates. Lean by default: returns a summary projection (name, enabled, priority, trigger, category, hit_count) without the conditions/actions trees — pass fields=all to inspect or audit full rule definitions. Mirror of breadbox://rules (which always returns full).",
 		}, s.handleListTransactionRules, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_workflows", Title: "List Workflows", Classification: ToolRead,
@@ -376,7 +376,7 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleListWorkflows, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_series", Title: "List Recurring Series", Classification: ToolRead,
-			Description: "List detected recurring series (subscriptions, bills, loans). Optional status filter (active|candidate|paused|cancelled). Each row carries cadence, expected_amount + iso_currency_code (never sum across currencies), next_expected_date, occurrence_count, confidence (auto|confirmed|rejected), and detection_signals — the raw evidence the detector used (interval_cv, amount_branch, merchant_key_is_fallback). Read status=candidate to find series awaiting a confirm/reject verdict; calibrate from the signals before deciding.",
+			Description: "List detected recurring series (subscriptions, bills, loans). Optional status filter (active|candidate|paused|cancelled). Lean by default: each row carries identity + renewal prediction (cadence, expected_amount + iso_currency_code — never sum across currencies, next_expected_date, occurrence_count, confidence), but NOT the verbose detection_signals evidence. Read status=candidate to find series awaiting a confirm/reject verdict; pass fields=all (or use get_series for one series) to see detection_signals — interval_cv, amount_branch, merchant_key_is_fallback — before deciding.",
 		}, s.handleListSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "get_series", Title: "Get Recurring Series", Classification: ToolRead,
@@ -426,7 +426,7 @@ func (s *MCPServer) buildToolRegistry() {
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transactions", Title: "Query Transactions", Classification: ToolRead,
-			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
+			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own.",
 		}, s.handleQueryTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "count_transactions", Title: "Count Transactions", Classification: ToolRead,

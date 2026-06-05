@@ -47,6 +47,7 @@ type listTransactionRulesInput struct {
 	SearchMode   string `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+	Fields       string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Alias: summary (name,enabled,priority,trigger,category,hit_count,last_hit_at; the default — omits the conditions and actions trees). Default when omitted: summary. Pass fields=all for every field including the full conditions/actions. id is always included."`
 }
 
 // --- Handlers ---
@@ -120,9 +121,37 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 		return errorResult(err), nil, nil
 	}
 
+	// Lean-by-default: the rule roster omits the conditions/actions trees (the
+	// heavy, deeply-nested part) unless the caller asks. Pass fields=all to
+	// inspect or audit full rule definitions.
+	fieldsRaw := input.Fields
+	switch fieldsRaw {
+	case "":
+		fieldsRaw = service.DefaultRuleFields
+	case "all":
+		fieldsRaw = "" // ParseRuleFields("") → nil → full struct
+	}
+	fieldSet, err := service.ParseRuleFields(fieldsRaw)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
 	result, err := s.svc.ListTransactionRules(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
+	}
+
+	if fieldSet != nil {
+		projected := make([]map[string]any, len(result.Rules))
+		for i, r := range result.Rules {
+			projected[i] = service.FilterRuleFields(r, fieldSet)
+		}
+		return jsonResult(map[string]any{
+			"rules":       projected,
+			"next_cursor": result.NextCursor,
+			"has_more":    result.HasMore,
+			"total":       result.Total,
+		})
 	}
 	return jsonResult(result)
 }
