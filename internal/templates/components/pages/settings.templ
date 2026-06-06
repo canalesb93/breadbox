@@ -255,11 +255,12 @@ templ settingsAvatarsSection(p SettingsProps) {
 		Title:   "Avatars",
 		Caption: "DiceBear styles for auto-generated identicons — uploaded avatars are unaffected",
 	}) {
-		@settingsAvatarPickerRow(p, "user", "Users", p.AvatarUserStyle, userPreviewSeeds())
-		@settingsAvatarPickerRow(p, "agent", "Agents", p.AvatarAgentStyle, agentPreviewSeeds())
+		@settingsAvatarPickerRow(p, "user", "Users", "Household members", p.AvatarUserStyle, userPreviewSeeds())
+		@settingsAvatarPickerRow(p, "agent", "Agents", "AI workflow runners", p.AvatarAgentStyle, agentPreviewSeeds())
 		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-			<p class="text-xs text-base-content/45 leading-snug">
-				Browsers cache avatars for 24h — hard-refresh after changing a style.
+			<p class="flex items-start gap-1.5 text-xs text-base-content/45 leading-snug">
+				@components.LucideIcon("info", "w-3.5 h-3.5 shrink-0 mt-px opacity-80")
+				<span>Browsers cache avatars for 24h — hard-refresh after changing a style.</span>
 			</p>
 		}
 	}
@@ -267,22 +268,35 @@ templ settingsAvatarsSection(p SettingsProps) {
 
 // settingsAvatarPickerRow renders one actor-bucket picker (User or
 // Agent). actor matches the form field the POST handler dispatches
-// on; both POSTs go to /settings/avatar-style.
-templ settingsAvatarPickerRow(p SettingsProps, actor, label, current string, seeds []string) {
+// on; both POSTs go to /settings/avatar-style. The live preview tiles
+// re-render as the <select> changes (Alpine `style` x-model), so the
+// operator sees the chosen style before the auto-save toast confirms.
+templ settingsAvatarPickerRow(p SettingsProps, actor, label, caption, current string, seeds []string) {
 	<div x-data={ "{ style: $el.dataset.style }" } data-style={ current } class="contents">
 		@components.SettingsRow(components.SettingsRowProps{
-			Label: label,
-			For:   "avatar_style_" + actor,
-			Stack: true,
+			Label:   label,
+			Caption: caption,
+			For:     "avatar_style_" + actor,
+			Stack:   true,
 		}) {
-			<div class="flex flex-wrap items-center gap-3">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div class="flex items-center gap-1.5">
+					for _, seed := range seeds {
+						<img
+							class="w-9 h-9 rounded-full bg-base-200 ring-1 ring-base-300/60"
+							loading="lazy"
+							alt={ "Preview " + seed }
+							:src={ avatarPreviewExpr(seed) }
+						/>
+					}
+				</div>
 				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
 					Action:    "/settings/avatar-style",
 					CSRFToken: p.CSRFToken,
 					Label:     label + " avatar style saved",
 				}) {
 					<input type="hidden" name="actor" value={ actor }/>
-					<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200" x-model="style">
+					<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200 w-44" x-model="style">
 						for _, opt := range p.AvatarStyles {
 							if opt.ID == current {
 								<option value={ opt.ID } selected>{ opt.Label }</option>
@@ -292,15 +306,6 @@ templ settingsAvatarPickerRow(p SettingsProps, actor, label, current string, see
 						}
 					</select>
 				}
-				<div class="flex items-center gap-2">
-					for _, seed := range seeds {
-						<img
-							class="w-9 h-9 rounded-full bg-base-200"
-							alt={ "Preview " + seed }
-							:src={ avatarPreviewExpr(seed) }
-						/>
-					}
-				</div>
 			</div>
 		}
 	</div>
