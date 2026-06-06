@@ -168,16 +168,22 @@ templ editableAvatarShuffle(p EditableAvatarProps) {
 // Remove are explicit controls so the three actions read distinctly. An optional
 // inline error renders below the controls.
 templ editableAvatarFull(p EditableAvatarProps, up EditableAvatarUpload) {
-	<div>
+	// imgLoading is owned locally so the shuffle reseed animates exactly like
+	// the shuffle-only shape — dim, scale-down and blur under a spinner while
+	// the new DiceBear SVG fetches, then a spring-back on load. It's combined
+	// with the caller's upload-loading flag (LoadingExpr) so an in-flight
+	// upload shows the same treatment. avatarSrc / regenerate / onFileSelect
+	// resolve from the parent avatarEditor scope; imgLoading is merged in here.
+	<div x-data="{ imgLoading: false }">
 		<div class="flex items-center gap-4">
 			<div class={ "relative group shrink-0 " + editableAvatarSizeClass(p.SizeClass, true) }>
 				<img
 					x-bind:src={ p.SrcExpr }
-					if up.LoadingExpr != "" {
-						x-bind:class={ up.LoadingExpr + " ? 'opacity-40 scale-90' : 'scale-100'" }
-					}
+					@load="imgLoading = false"
+					@error="imgLoading = false"
+					x-bind:class={ editableAvatarImgClassExpr(up.LoadingExpr) }
 					alt={ p.Alt }
-					class="w-full h-full rounded-full object-cover bg-base-200 ring-2 ring-base-300 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+					class="w-full h-full rounded-full object-cover bg-base-200 ring-2 ring-base-300 transition-[transform,filter,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
 				/>
 				<!-- Camera hover overlay — the avatar surface opens the file
 				     picker. group-focus-within keeps it visible during keyboard
@@ -191,23 +197,23 @@ templ editableAvatarFull(p EditableAvatarProps, up EditableAvatarUpload) {
 				>
 					@LucideIcon("camera", "w-5 h-5 text-white")
 				</button>
-				<!-- Loading overlay while an upload is in flight. -->
-				if up.LoadingExpr != "" {
-					<span
-						x-show={ up.LoadingExpr }
-						x-cloak
-						x-transition:enter="transition-opacity ease-out duration-200"
-						x-transition:enter-start="opacity-0"
-						x-transition:enter-end="opacity-100"
-						x-transition:leave="transition-opacity ease-in duration-150"
-						x-transition:leave-start="opacity-100"
-						x-transition:leave-end="opacity-0"
-						class="absolute inset-0 flex items-center justify-center"
-						aria-hidden="true"
-					>
-						<span class="loading loading-spinner loading-sm text-primary"></span>
-					</span>
-				}
+				<!-- Loading overlay: same spinner-over-dimmed-avatar treatment as
+				     the shuffle-only shape, shown while a shuffle reseeds or an
+				     upload is in flight. -->
+				<span
+					x-show={ editableAvatarLoadCond(up.LoadingExpr) }
+					x-cloak
+					x-transition:enter="transition-opacity ease-out duration-200"
+					x-transition:enter-start="opacity-0"
+					x-transition:enter-end="opacity-100"
+					x-transition:leave="transition-opacity ease-in duration-150"
+					x-transition:leave-start="opacity-100"
+					x-transition:leave-end="opacity-0"
+					class="absolute inset-0 flex items-center justify-center"
+					aria-hidden="true"
+				>
+					<span class="loading loading-spinner loading-sm text-primary"></span>
+				</span>
 				<!-- Persistent corner cue: a small camera badge so the
 				     "change photo" affordance is discoverable without hover. -->
 				<span
@@ -232,7 +238,7 @@ templ editableAvatarFull(p EditableAvatarProps, up EditableAvatarUpload) {
 					Upload
 				</button>
 				if p.OnShuffle != "" {
-					<button type="button" @click={ p.OnShuffle } class="btn btn-ghost btn-xs gap-1.5">
+					<button type="button" @click={ "imgLoading = true; " + p.OnShuffle } x-bind:aria-busy="imgLoading" class="btn btn-ghost btn-xs gap-1.5">
 						@LucideIcon("shuffle", "w-3.5 h-3.5")
 						Shuffle
 					</button>
@@ -256,6 +262,24 @@ templ editableAvatarFull(p EditableAvatarProps, up EditableAvatarUpload) {
 			</template>
 		}
 	</div>
+}
+
+// editableAvatarLoadCond returns the Alpine boolean expression that is truthy
+// while the full-shape avatar should show its loading treatment: the locally
+// owned imgLoading (shuffle reseed in flight) OR'd with the caller's optional
+// upload-loading flag.
+func editableAvatarLoadCond(loadingExpr string) string {
+	if loadingExpr == "" {
+		return "imgLoading"
+	}
+	return "(imgLoading || " + loadingExpr + ")"
+}
+
+// editableAvatarImgClassExpr returns the x-bind:class expression that dims,
+// scales down and blurs the avatar while loading, then springs it back — the
+// same motion the shuffle-only shape uses, so the two shapes animate identically.
+func editableAvatarImgClassExpr(loadingExpr string) string {
+	return editableAvatarLoadCond(loadingExpr) + " ? 'opacity-40 scale-90 blur-[2px]' : 'opacity-100 scale-100 blur-none'"
 }
 
 // editableAvatarSizeClass returns the avatar's w/h utilities, defaulting to the
