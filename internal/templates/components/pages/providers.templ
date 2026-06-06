@@ -124,9 +124,9 @@ templ providersSimplefinDrawer(p ProvidersProps, h *service.ProviderHealthSummar
 						@providerField(providerFieldProps{Label: "Offer SimpleFIN", For: "simplefin_enabled"}) {
 							<label class="flex items-center gap-3 cursor-pointer">
 								if p.SimpleFINEnabled {
-									<input type="checkbox" id="simplefin_enabled" name="simplefin_enabled" value="on" class="toggle toggle-primary" checked/>
+									<input type="checkbox" id="simplefin_enabled" name="simplefin_enabled" value="on" class="toggle" checked/>
 								} else {
-									<input type="checkbox" id="simplefin_enabled" name="simplefin_enabled" value="on" class="toggle toggle-primary"/>
+									<input type="checkbox" id="simplefin_enabled" name="simplefin_enabled" value="on" class="toggle"/>
 								}
 								<span class="text-sm text-base-content/70">Available when adding a connection</span>
 							</label>
