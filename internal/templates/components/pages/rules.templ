@@ -251,6 +251,10 @@ templ rulesEmpty(filtered bool) {
 // smaller viewports via `hidden md:table-cell` etc. Anything we hide on
 // mobile is folded into the second line under the name so no signal is
 // lost — only the column density changes.
+// rulesRow renders one rule. Clicking anywhere on the row toggles the
+// rule's enablement; the name link, toggle cell, and overflow cell stop
+// propagation so they keep their own behavior (open detail / toggle /
+// open the actions menu).
 templ rulesRow(r RulesRow) {
 	<tr
 		class={ "hover:bg-base-200/40 cursor-pointer", templ.KV("opacity-60", !r.Enabled) }
@@ -261,10 +265,11 @@ templ rulesRow(r RulesRow) {
 		if !r.IsSystem {
 			data-can-delete="true"
 		}
-		@click={ "window.location.href='/rules/" + r.ID + "'" }
+		@click={ "toggleRule('" + r.ID + "')" }
 	>
 		<!-- Toggle column. Click is scoped to the cell so the row's
-		     navigate-on-click doesn't fire. -->
+		     toggle-on-click doesn't double-fire against the explicit
+		     control (which would net out to no change). -->
 		<td class="align-middle text-center" @click.stop>
 			<input
 				type="checkbox"

@@ -152,8 +152,9 @@ document.addEventListener('alpine:init', function () {
     action: function () {
       var row = window.bbRuleNav.currentRow();
       if (!row) return;
-      // Prefer the dedicated edit URL; fall back to the detail page (same
-      // destination as clicking the row).
+      // Prefer the dedicated edit URL; fall back to the detail page. (A
+      // row click toggles enablement; Space mirrors that — Enter is the
+      // keyboard path to open/edit a rule.)
       var url = row.getAttribute('data-edit-url') || row.getAttribute('data-open-url');
       if (url) window.location.href = url;
     },
