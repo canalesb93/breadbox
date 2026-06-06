@@ -128,6 +128,12 @@ jobs:
             type=raw,value=${{ steps.ver.outputs.tag }}
             type=raw,value=${{ steps.ver.outputs.bare }}
             type=raw,value=latest
+          # Same OCI labels as ci.yml so release images carry the repo link
+          # (org.opencontainers.image.source) + version/license metadata. The
+          # build step below MUST pass steps.meta.outputs.labels, or release
+          # images ship unlabelled.
+          labels: |
+            org.opencontainers.image.documentation=https://docs.breadbox.sh
 
       - uses: docker/build-push-action@v6
         with:
@@ -135,6 +141,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.ver.outputs.tag }}
           cache-from: type=gha
