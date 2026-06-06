@@ -1,6 +1,9 @@
 package pages
 
-import "breadbox/internal/templates/components"
+import (
+	"breadbox/internal/cronspec"
+	"breadbox/internal/templates/components"
+)
 
 // WorkflowsGallery is the /workflows preset gallery: codified, configurable,
 // one-click automations grouped by category. "Set up" opens a right-side
@@ -17,7 +20,6 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 	<div
 		x-data="workflowsGallery"
 		data-csrf={ p.CSRFToken }
-		data-server-utc-offset-min={ serverUTCOffsetMin() }
 		x-init="$store.shortcuts.setScope('workflows')"
 		x-destroy="$store.shortcuts.setScope('global')"
 	>
@@ -118,7 +120,7 @@ templ workflowReconfigureDrawer() {
 			</div>
 			<div x-show="!reconfigure.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
 				<div x-show="!reconfigure.oneOff" x-cloak>
-					@workflowTriggerFields("reconfigure.triggerOnSync", "reconfigure.scheduleCron")
+					@workflowTriggerFields("reconfigure.triggerOnSync", "reconfigure.scheduleCron", "")
 				</div>
 				@workflowModelField("reconfigure.model")
 				<template x-for="opt in reconfigure.options" :key="opt.key">
@@ -455,22 +457,25 @@ templ workflowOneOffControls(preset WorkflowPresetCardProps, isAdmin bool) {
 // drawer (reconfigure.* state, JS-hydrated) share one implementation.
 
 // workflowTriggerFields renders the Mintlify-style "When should the workflow
-// run?" radio cards (Custom schedule / After each sync) plus, when custom,
-// the schedule shortcut pills + cron input + a live human-readable preview.
-// triggerVar holds 'true'|'false' (matching the trigger_on_sync form field);
-// cronVar holds the cron string (the schedule_cron form field).
-templ workflowTriggerFields(triggerVar, cronVar string) {
+// run?" radio cards (Custom schedule / After each sync) plus, when custom, the
+// shared CronField component (schedule shortcut chips + cron input + a one-line
+// live preview). triggerVar holds 'true'|'false' (the trigger_on_sync form
+// field). The cron is sourced two ways: the setup drawer passes its
+// server-seeded value as cronValue (CronField.Value); the reconfigure drawer
+// passes cronModelExpr ("reconfigure.scheduleCron") so the JS-hydrated value
+// flows in via CronField's one-way x-effect. Either way the resolved cron is
+// submitted as schedule_cron by CronField's hidden input.
+templ workflowTriggerFields(triggerVar, cronModelExpr, cronValue string) {
 	<div>
 		<div class="text-sm font-medium mb-2">When should the workflow run?</div>
 		<div class="grid grid-cols-2 gap-2">
 			@components.RadioCard(components.RadioCardProps{
-				Name:       "trigger_on_sync",
-				Value:      "false",
-				Icon:       "calendar-clock",
-				Title:      "Custom schedule",
-				Subtitle:   "On a recurring cron schedule",
-				ModelExpr:  triggerVar,
-				ChangeExpr: "describeCron(" + cronVar + ")",
+				Name:      "trigger_on_sync",
+				Value:     "false",
+				Icon:      "calendar-clock",
+				Title:     "Custom schedule",
+				Subtitle:  "On a recurring cron schedule",
+				ModelExpr: triggerVar,
 			})
 			@components.RadioCard(components.RadioCardProps{
 				Name:      "trigger_on_sync",
@@ -483,46 +488,17 @@ templ workflowTriggerFields(triggerVar, cronVar string) {
 		</div>
 		<div x-show={ triggerVar + " === 'false'" } x-cloak class="mt-3 space-y-2">
 			<div class="text-xs font-medium text-base-content/70">Schedule</div>
-			<div class="flex flex-wrap gap-1.5">
-				@workflowCronPill(cronVar, "0 9 * * *", "Daily")
-				@workflowCronPill(cronVar, "0 9 * * 1", "Every Monday")
-				@workflowCronPill(cronVar, "0 9 * * 5", "Every Friday")
-				@workflowCronPill(cronVar, "0 9 1 * *", "Monthly")
-			</div>
-			<input
-				type="text"
-				name="schedule_cron"
-				x-model={ cronVar }
-				@input.debounce.400ms={ "describeCron(" + cronVar + ")" }
-				class="input input-sm w-full font-mono"
-				placeholder="0 8 * * *"
-				autocomplete="off"
-				spellcheck="false"
-			/>
-			<div class="text-xs text-base-content/55 flex items-center gap-1.5 min-h-4">
-				<span x-show="cronPreviewLoading" class="loading loading-spinner loading-xs"></span>
-				<span x-text="cronPreview || 'Enter a schedule'"></span>
-			</div>
+			@components.CronField(components.CronFieldProps{
+				Name:               "schedule_cron",
+				Value:              cronValue,
+				Presets:            cronspec.WorkflowSchedulePresets,
+				PreviewURL:         "/-/workflows/cron-preview",
+				LocalizePresets:    true,
+				ServerUTCOffsetMin: serverUTCOffsetMinInt(),
+				ModelExpr:          cronModelExpr,
+			})
 		</div>
 	</div>
-}
-
-// workflowCronPill is one schedule shortcut. `value` is the cron in the
-// VIEWER's local timezone (e.g. "0 9 * * *" = 9 AM their time); on click it's
-// converted to the SERVER-local cron the scheduler stores via
-// localCronToServer(), then the preview refreshes. The pill highlights when
-// the current (server-local) cron equals this shortcut's local intent, so it
-// stays lit across timezones whether clicked, typed, or hydrated from a saved
-// workflow.
-templ workflowCronPill(cronVar, value, label string) {
-	<button
-		type="button"
-		class="btn btn-sm"
-		x-bind:class={ "cronPillActive('" + value + "', " + cronVar + ") ? 'btn-primary' : 'btn-soft'" }
-		@click={ cronVar + " = localCronToServer('" + value + "'); describeCron(" + cronVar + ")" }
-	>
-		{ label }
-	</button>
 }
 
 // workflowModelField is the model <select>, bound to modelVar (the `model`
@@ -654,7 +630,7 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 			})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
 				if !preset.OneOff {
-					@workflowTriggerFields("triggerOnSync", "cron")
+					@workflowTriggerFields("triggerOnSync", "", workflowSeededCron(preset))
 				}
 				@workflowModelField("model")
 				for _, opt := range preset.Options {

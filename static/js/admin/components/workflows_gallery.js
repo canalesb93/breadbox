@@ -3,75 +3,16 @@
 // root element's data-csrf attribute. Registers via Alpine.data per the admin
 // page convention (see docs/design-system.md → "Alpine page components").
 document.addEventListener('alpine:init', function () {
-  // ---- cron timezone shift ------------------------------------------------
-  //
-  // The scheduler fires cron in the SERVER's local timezone, but the schedule
-  // shortcut pills express a friendly hour in the VIEWER's timezone ("Daily" =
-  // 9 AM your time). The helpers below convert a viewer-local cron into the
-  // server-local cron we store + submit — the exact inverse of the shift the
-  // cron-preview endpoint (service.DescribeCronInTZ) applies to render a stored
-  // cron back in the viewer's time, so the two round-trip. Ported from
-  // service.shiftCronTimeFields so the client and server agree.
-
-  function cronSingleInt(s) {
-    return /^\d+$/.test(s) ? parseInt(s, 10) : null;
-  }
-
-  // Shift a day-of-week field (single value or comma list, 0/7 = Sunday) by
-  // dayDelta days, wrapping within the week. Returns null for ranges, steps, or
-  // named days so the caller falls back to the unshifted expression.
-  function cronShiftDow(field, dayDelta) {
-    var parts = field.split(',');
-    var out = [];
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!/^\d+$/.test(p)) return null;
-      var n = parseInt(p, 10);
-      if (n < 0 || n > 7) return null;
-      if (n === 7) n = 0; // normalize Sunday
-      out.push(String(((n + dayDelta) % 7 + 7) % 7));
-    }
-    return out.join(',');
-  }
-
-  // Shift a standard 5-field cron's time-of-day by deltaMin minutes, carrying a
-  // midnight wrap into the day-of-week set. Returns null for the
-  // non-representable cases (non-integer minute/hour, or a day-of-month
-  // constrained schedule whose wrap would land on a different calendar day) so
-  // the caller keeps the original. Mirrors service.shiftCronTimeFields.
-  function cronShiftTimeFields(expr, deltaMin) {
-    var f = String(expr).trim().split(/\s+/);
-    if (f.length !== 5) return null;
-    var minute = cronSingleInt(f[0]);
-    var hour = cronSingleInt(f[1]);
-    if (minute === null || hour === null) return null;
-    var total = hour * 60 + minute + deltaMin;
-    var dayDelta = 0;
-    while (total < 0) { total += 1440; dayDelta--; }
-    while (total >= 1440) { total -= 1440; dayDelta++; }
-    f[0] = String(total % 60);
-    f[1] = String(Math.floor(total / 60));
-    if (dayDelta !== 0) {
-      if (f[2] !== '*' || f[3] !== '*') return null; // monthly/dom + wrap → too risky
-      if (f[4] !== '*') { // "*" is daily — a wrap leaves it daily
-        var shifted = cronShiftDow(f[4], dayDelta);
-        if (shifted === null) return null;
-        f[4] = shifted;
-      }
-    }
-    return f.join(' ');
-  }
-  // -------------------------------------------------------------------------
+  // The schedule trigger's cron input — chips, custom field, live preview, and
+  // the viewer-local → server-local timezone shift — lives in the shared
+  // cronField component (static/js/admin/components/cron_field.js). This factory
+  // just owns the drawers around it; the cron value two-way binds via the
+  // CronField's ModelExpr (the setup drawer's `cron`, reconfigure's
+  // `reconfigure.scheduleCron`).
 
   Alpine.data('workflowsGallery', function () {
     return {
       csrfToken: '',
-      // Server's UTC offset in minutes (east of UTC), seeded from the root
-      // element's data-server-utc-offset-min. Drives localCronToServer() so the
-      // schedule shortcut pills resolve to the viewer's local hour. 0 (no
-      // shift) is the right fallback for the common self-hosted case where the
-      // server and the viewer share a timezone.
-      serverUtcOffsetMin: 0,
       // Drawer open/close is owned by the global $store.drawers store
       // (see layout/base.html). The configure drawers are keyed
       // 'wf-config-<presetSlug>'; the shared reconfigure drawer is
@@ -121,14 +62,6 @@ document.addEventListener('alpine:init', function () {
       },
       // -------------------------------------------------------------------
 
-      // --- Schedule preview ----------------------------------------------
-      // cronPreview holds the human-readable rendering of the current cron
-      // (from GET /-/workflows/cron-preview). Shared by both drawers since
-      // only one is open at a time. describeCron() refreshes it.
-      cronPreview: '',
-      cronPreviewLoading: false,
-      // -------------------------------------------------------------------
-
       // runningOneOff[slug] is true while a one-off's Run-now request is in
       // flight, so each card's inline Run button can show a spinner + disable
       // itself (preventing a double-dispatch). Keyed by preset slug since two
@@ -138,33 +71,6 @@ document.addEventListener('alpine:init', function () {
 
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
-        var off = parseInt(this.$el.dataset.serverUtcOffsetMin || '0', 10);
-        this.serverUtcOffsetMin = isNaN(off) ? 0 : off;
-      },
-
-      // localCronToServer converts a viewer-local cron (what a shortcut pill
-      // means — e.g. "0 9 * * *" is 9 AM in the viewer's timezone) into the
-      // server-local cron the scheduler stores + fires. Falls back to the input
-      // unchanged when there's no timezone delta (server tz == viewer tz, the
-      // common self-hosted case) or the shift isn't representable.
-      localCronToServer: function (localExpr) {
-        var viewerOff;
-        try {
-          viewerOff = -new Date().getTimezoneOffset(); // minutes east of UTC
-        } catch (e) {
-          return localExpr;
-        }
-        var deltaMin = this.serverUtcOffsetMin - viewerOff; // viewer-local → server-local
-        if (!deltaMin) return localExpr;
-        return cronShiftTimeFields(localExpr, deltaMin) || localExpr;
-      },
-
-      // cronPillActive highlights a shortcut pill when the current
-      // (server-local) cron equals that pill's viewer-local intent converted to
-      // server time — so a pill stays lit whether it was clicked, typed, or
-      // hydrated from a saved workflow, and across timezones.
-      cronPillActive: function (localExpr, currentCron) {
-        return this.localCronToServer(localExpr).trim() === String(currentCron || '').trim();
       },
 
       restorePageState: function () {
@@ -503,7 +409,6 @@ document.addEventListener('alpine:init', function () {
         self.reconfigure.maxBudget = '';
         self.reconfigure.avatarSeed = '';
         self.reconfigure.connectors = [];
-        self.cronPreview = '';
         Alpine.store('drawers').open('wf-reconfigure');
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/config', {
           credentials: 'same-origin',
@@ -527,7 +432,9 @@ document.addEventListener('alpine:init', function () {
             self.reconfigure.connectors = (Array.isArray(data.connectors) ? data.connectors : []).map(function (c) {
               return { name: c.name, url: c.url || '', enabled: !!c.enabled };
             });
-            if (self.reconfigure.triggerOnSync === 'false') self.describeCron(self.reconfigure.scheduleCron);
+            // The embedded CronField is two-way bound to reconfigure.scheduleCron
+            // (its ModelExpr), so the hydrated value pushes in and the component
+            // refreshes its own live preview — no manual priming needed here.
           })
           .catch(function (e) {
             console.error('openReconfigure failed', e);
@@ -562,39 +469,6 @@ document.addEventListener('alpine:init', function () {
         var hex = '';
         for (var j = 0; j < bytes.length; j++) hex += ('0' + bytes[j].toString(16)).slice(-2);
         this.reconfigure.avatarSeed = hex;
-      },
-
-      // describeCron fetches a human-readable rendering of a cron expression
-      // for the schedule preview. Debounced at the call site
-      // (@input.debounce in the template); here it just fetches + stores.
-      describeCron: function (cron) {
-        var self = this;
-        cron = (cron || '').trim();
-        if (!cron) {
-          self.cronPreview = '';
-          return;
-        }
-        self.cronPreviewLoading = true;
-        // Pass the viewer's IANA timezone so the preview renders the schedule
-        // in their local time (the scheduler fires cron in the server's tz).
-        var tz = '';
-        try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { tz = ''; }
-        fetch('/-/workflows/cron-preview?cron=' + encodeURIComponent(cron) + (tz ? '&tz=' + encodeURIComponent(tz) : ''), {
-          credentials: 'same-origin',
-          headers: { Accept: 'application/json' },
-        })
-          .then(function (res) {
-            return res.json();
-          })
-          .then(function (data) {
-            self.cronPreview = data && data.description ? data.description : '';
-          })
-          .catch(function () {
-            self.cronPreview = '';
-          })
-          .finally(function () {
-            self.cronPreviewLoading = false;
-          });
       },
 
       // Submit the reconfigure drawer: re-compose the workflow's schedule,

@@ -483,16 +483,29 @@ templ SectionFormControls() {
 // ─── Cron field ────────────────────────────────────────────────────────
 templ SectionCronField() {
 	<div class="flex flex-col gap-6">
-		@designExample("Default (preset chips + custom + live preview)", "components.CronField — timezone-aware preset chips, a custom 5-field expression, and a live preview (English description + next runs in the instance timezone, fetched from /-/cron/preview). The active preset is derived from the cron value, so an unmatched expression shows Custom with the raw cron — never a wrong preset label.") {
+		@designExample("Sync schedule (full catalog, instance timezone)", "components.CronField — preset shortcut chips, an always-visible 5-field custom input, and a one-line live preview (English description, fetched from /-/cron/preview). The active chip is derived from the cron value, so an unmatched expression lights no chip and shows the raw cron in the input — never a wrong preset label.") {
 			<div class="max-w-md">
 				@components.CronField(components.CronFieldProps{
-					Name:    "ds_cron_a",
-					Value:   "0 6,18 * * *",
-					Presets: cronspec.Presets,
+					Name:       "ds_cron_a",
+					PresetName: "ds_preset_a",
+					Value:      "0 6,18 * * *",
+					Presets:    cronspec.Presets,
 				})
 			</div>
 		}
-		@designExample("Custom expression (no matching preset)", "An expression with no catalog match opens on the Custom chip with the raw cron visible — the case that previously mis-rendered as 'Every 15 minutes'.") {
+		@designExample("Workflow schedule (curated chips, viewer-local)", "The same component the workflow setup/reconfigure drawers use: the short WorkflowSchedulePresets catalog with LocalizePresets — each chip is a friendly hour in the viewer's timezone (Daily = 9 AM your time), converted to the server-local cron the scheduler fires. Preview from /-/workflows/cron-preview.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:               "ds_cron_wf",
+					Value:              "0 9 * * 1",
+					Presets:            cronspec.WorkflowSchedulePresets,
+					PreviewURL:         "/-/workflows/cron-preview",
+					LocalizePresets:    true,
+					ServerUTCOffsetMin: serverUTCOffsetMinInt(),
+				})
+			</div>
+		}
+		@designExample("Custom expression (no matching chip)", "An expression with no catalog match lights no chip and shows the raw cron in the input — the case that previously mis-rendered as 'Every 15 minutes'.") {
 			<div class="max-w-md">
 				@components.CronField(components.CronFieldProps{
 					Name:    "ds_cron_b",
@@ -501,7 +514,7 @@ templ SectionCronField() {
 				})
 			</div>
 		}
-		@designExample("Empty (new schedule)", "No initial value — chips only, no preview until a cadence is chosen or typed.") {
+		@designExample("Empty (new schedule)", "No initial value — chips and an empty input, the preview prompting 'Enter a schedule' until a cadence is chosen or typed.") {
 			<div class="max-w-md">
 				@components.CronField(components.CronFieldProps{
 					Name:    "ds_cron_c",
