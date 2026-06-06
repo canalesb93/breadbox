@@ -39,6 +39,19 @@ var Presets = []Preset{
 	{Key: CustomKey, Label: "Custom…", Cron: ""},
 }
 
+// WorkflowSchedulePresets is the short, curated shortcut set shown by the
+// workflow setup/reconfigure drawers — friendlier than the full Presets
+// catalog (no sub-hour intervals; a workflow runs daily/weekly/monthly, not
+// every 15 minutes). The crons are expressed in the VIEWER's local time (9 AM
+// "their time"); the CronField component converts them to the server-local cron
+// the scheduler fires when LocalizePresets is set. Order matters (chip order).
+var WorkflowSchedulePresets = []Preset{
+	{Key: "wf_daily", Label: "Daily", Cron: "0 9 * * *"},
+	{Key: "wf_weekly_mon", Label: "Every Monday", Cron: "0 9 * * 1"},
+	{Key: "wf_weekly_fri", Label: "Every Friday", Cron: "0 9 * * 5"},
+	{Key: "wf_monthly", Label: "Monthly", Cron: "0 9 1 * *"},
+}
+
 // PresetByKey returns the preset for a key, or false if unknown.
 func PresetByKey(key string) (Preset, bool) {
 	for _, p := range Presets {

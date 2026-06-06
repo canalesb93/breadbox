@@ -1,72 +1,72 @@
 package components
 
-// CronField is the shared cron-input component: preset chips + a custom
-// expression input + a live preview (English description and next fire times,
-// in the instance timezone). Used by sync schedules and workflows.
+// CronField is the shared cron-input component: a row of preset shortcut chips,
+// an always-visible custom expression input, and a one-line live preview (an
+// English description of when the schedule next fires). Used by both sync
+// schedules and workflows — the look is identical; the timezone behavior is a
+// prop (LocalizePresets + ServerUTCOffsetMin) so workflows can express chips in
+// the viewer's local time while sync schedules apply preset crons literally.
 //
 // Submits the resolved cron expression as `Name` (hidden, bound to the live
-// value) and — when PresetName is set — the active preset key. The active
-// preset is derived from the cron VALUE, so an unmatched expression always
-// shows "Custom" with the raw cron rather than a wrong preset label.
+// value) and — when PresetName is set — the active preset key. The active chip
+// is derived from the cron VALUE, so an unmatched expression lights no chip and
+// shows the raw cron in the input rather than a wrong preset label.
 //
 // The Alpine factory lives in static/js/admin/components/cron_field.js; the
-// live preview is fetched from PreviewURL (default /-/cron/preview).
+// preview description is fetched from PreviewURL (default /-/cron/preview).
 templ CronField(p CronFieldProps) {
 	<script src="/static/js/admin/components/cron_field.js"></script>
-	<div x-data="cronField" data-config={ cronFieldConfigJSON(p) } class="space-y-2.5">
-		<!-- Preset chips -->
-		<div class="flex flex-wrap gap-1.5">
-			<template x-for="preset in presets" :key="preset.key">
-				<button
-					type="button"
-					class="btn btn-xs"
-					:class="active === preset.key ? 'btn-primary' : 'btn-ghost'"
-					@click="applyPreset(preset)"
-					x-text="preset.label"
-				></button>
-			</template>
+	if p.ModelExpr != "" {
+		// One-way hydration: when the caller's expression changes (e.g. the
+		// reconfigure drawer's value arrives from a fetch), push it into the
+		// component's cron. The submitted value flows back out via the hidden
+		// input below, so the parent doesn't need the live value — this stays a
+		// one-way bind and never clobbers user edits (x-effect only re-runs when
+		// the source expression changes, not when the user types).
+		<div x-data="cronField" data-config={ cronFieldConfigJSON(p) } x-effect={ "cron = " + p.ModelExpr } class="space-y-2">
+			@cronFieldBody(p)
 		</div>
-		<!-- Custom expression input — shown only when the custom chip is active -->
-		<div x-show="active === customKey" x-cloak class="space-y-1">
-			<input
-				type="text"
-				x-model="cron"
-				@input="onInput()"
-				placeholder="0 6,18 * * *"
-				class="bb-form-input input input-sm w-full font-mono"
-				aria-label="Custom cron expression"
-			/>
-			<p class="text-[0.7rem] text-base-content/45 leading-snug">
-				Standard 5-field cron — minute hour day month weekday.
-			</p>
+	} else {
+		<div x-data="cronField" data-config={ cronFieldConfigJSON(p) } class="space-y-2">
+			@cronFieldBody(p)
 		</div>
-		<!-- Resolved values submitted with the form -->
-		<input type="hidden" name={ p.Name } :value="cron"/>
-		if p.PresetName != "" {
-			<input type="hidden" name={ p.PresetName } :value="active"/>
-		}
-		<!-- Live preview -->
-		<div x-show="cron.trim().length > 0" x-cloak class="rounded-xl border border-base-300/70 bg-base-200/40 p-3 text-xs">
-			<template x-if="preview.valid">
-				<div class="space-y-1.5">
-					<p class="font-medium text-base-content/80" x-text="preview.description"></p>
-					<div class="flex items-baseline justify-between gap-2">
-						<p class="text-base-content/50">Next runs</p>
-						<p class="text-base-content/40 truncate" x-text="preview.tz ? '· ' + preview.tz : ''"></p>
-					</div>
-					<ul class="space-y-0.5 text-base-content/70 tabular-nums">
-						<template x-for="run in preview.runs" :key="run">
-							<li x-text="run"></li>
-						</template>
-					</ul>
-				</div>
-			</template>
-			<template x-if="!preview.valid">
-				<div class="flex items-center gap-2 text-error">
-					@LucideIcon("alert-circle", "w-3.5 h-3.5")
-					<span x-text="preview.description || 'Not a valid cron expression'"></span>
-				</div>
-			</template>
-		</div>
+	}
+}
+
+// cronFieldBody is the shared inner markup, factored out so the root element can
+// optionally carry x-modelable/x-model (caller two-way binding) without
+// duplicating the chips / input / preview.
+templ cronFieldBody(p CronFieldProps) {
+	<!-- Preset shortcut chips (empty-cron entries, e.g. legacy "Custom…", are skipped) -->
+	<div class="flex flex-wrap gap-1.5">
+		<template x-for="preset in presets" :key="preset.key">
+			<button
+				type="button"
+				class="btn btn-sm"
+				:class="presetActive(preset) ? 'btn-primary' : 'btn-soft'"
+				@click="applyPreset(preset)"
+				x-text="preset.label"
+			></button>
+		</template>
+	</div>
+	<!-- Custom expression input — always visible -->
+	<input
+		type="text"
+		x-model="cron"
+		placeholder="0 9 * * *"
+		class="input input-sm w-full font-mono"
+		aria-label="Cron expression"
+		autocomplete="off"
+		spellcheck="false"
+	/>
+	<!-- Resolved values submitted with the form -->
+	<input type="hidden" name={ p.Name } :value="cron"/>
+	if p.PresetName != "" {
+		<input type="hidden" name={ p.PresetName } :value="activeKey()"/>
+	}
+	<!-- One-line live preview -->
+	<div class="text-xs flex items-center gap-1.5 min-h-4" :class="preview.invalid ? 'text-error' : 'text-base-content/55'">
+		<span x-show="preview.loading" class="loading loading-spinner loading-xs"></span>
+		<span x-text="previewText()"></span>
 	</div>
 }
