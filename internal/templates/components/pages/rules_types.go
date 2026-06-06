@@ -78,6 +78,12 @@ type RulesRow struct {
 	ConditionSummary string
 	ActionsCount    int
 	ActionsSummary  string
+	// PrimaryActionType is the single action's type ("set_category",
+	// "add_tag", "remove_tag", "add_comment", "assign_series") when the
+	// rule has exactly one action; "" when it has zero or multiple actions.
+	// Drives the Action-column icon so the column reflects what the rule
+	// *does*, not just whether it sets a category.
+	PrimaryActionType string
 }
 
 // BuildRulesRow flattens a service.TransactionRuleResponse into the
@@ -116,6 +122,9 @@ func BuildRulesRow(r service.TransactionRuleResponse) RulesRow {
 		categoryName = *r.CategoryName
 	}
 	row.ActionsSummary = service.ActionsSummary(r.Actions, categoryName)
+	if len(r.Actions) == 1 {
+		row.PrimaryActionType = r.Actions[0].Type
+	}
 
 	return row
 }
