@@ -183,15 +183,19 @@ tag is published on GitHub — when you see it, run:
 
 ```bash
 cd /opt/breadbox       # or $HOME/.breadbox for user installs
-docker compose pull
-docker compose up -d
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
+
+The installer writes the Compose file as `docker-compose.prod.yml`, so the
+`-f` flag is required (a bare `docker compose pull` looks for
+`docker-compose.yml` and won't find it).
 
 If you installed with a domain (Caddy enabled), include the profile:
 
 ```bash
-docker compose --profile caddy pull
-docker compose --profile caddy up -d
+docker compose --profile caddy -f docker-compose.prod.yml pull
+docker compose --profile caddy -f docker-compose.prod.yml up -d
 ```
 
 ### Pinning a specific version
@@ -203,7 +207,7 @@ By default `docker-compose.prod.yml` references `ghcr.io/canalesb93/breadbox:lat
 image: ghcr.io/canalesb93/breadbox:v0.1.0
 ```
 
-Then `docker compose pull && docker compose up -d` will hold that version.
+Then `docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d` will hold that version.
 
 ### Unattended updates
 
@@ -215,7 +219,7 @@ when updates happen, which matters for a self-hosted financial app.
 Simple cron-driven equivalent:
 
 ```bash
-0 3 * * * cd /opt/breadbox && docker compose pull && docker compose up -d >> /var/log/breadbox-update.log 2>&1
+0 3 * * * cd /opt/breadbox && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d >> /var/log/breadbox-update.log 2>&1
 ```
 
 ## Uninstalling
