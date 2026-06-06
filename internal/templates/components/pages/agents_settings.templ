@@ -308,9 +308,9 @@ templ mcpToolsDrawer(p AgentsSettingsProps) {
 templ agentsSettingsToolRow(t AgentsSettingsTool) {
 	<label class="flex items-start gap-3 p-2 rounded-xl hover:bg-base-200/50 transition-colors cursor-pointer">
 		if t.Enabled {
-			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" checked/>
+			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm mt-0.5 flex-shrink-0" checked/>
 		} else {
-			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0"/>
+			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm mt-0.5 flex-shrink-0"/>
 		}
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">

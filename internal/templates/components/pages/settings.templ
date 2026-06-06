@@ -188,9 +188,9 @@ templ settingsScheduleRow(p SettingsProps, sched service.SyncScheduleView) {
 				Label:     "Schedule updated",
 			}) {
 				if sched.Enabled {
-					<input type="checkbox" name="enabled" class="toggle toggle-sm toggle-primary" checked aria-label="Enabled"/>
+					<input type="checkbox" name="enabled" class="toggle toggle-sm" checked aria-label="Enabled"/>
 				} else {
-					<input type="checkbox" name="enabled" class="toggle toggle-sm toggle-primary" aria-label="Enabled"/>
+					<input type="checkbox" name="enabled" class="toggle toggle-sm" aria-label="Enabled"/>
 				}
 			}
 			<button type="button" @click={ "$store.drawers.open('schedule-" + sched.ShortID + "')" } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
