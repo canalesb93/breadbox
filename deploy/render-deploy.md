@@ -69,8 +69,9 @@ land on `/setup`, create your admin.
 
 ## Updating
 
-Because the service pulls a fixed image tag (`:latest`), Render does
-**not** auto-redeploy when upstream `main` advances — by design, so
+The service pulls `:latest`, which tracks the **newest stable
+release** (not every commit to `main`). Render does **not**
+auto-redeploy when a new release is published — by design, so
 self-hosters of a financial app control their own upgrade timing.
 
 To pull a newer image, click **Manual Deploy** → **Deploy latest
@@ -78,10 +79,11 @@ image** on the service in the Render dashboard. The breadbox admin
 dashboard also surfaces an "update available" badge in the sidebar
 when a newer GitHub release exists.
 
-To pin to a specific release, edit the `image.url` in your
-`render.yaml` (or your own template copy) — e.g.
-`ghcr.io/canalesb93/breadbox:v0.1.0` — and Render redeploys to that
-tag on the next sync.
+To pin to a specific release (recommended for full reproducibility),
+edit the `image.url` in your `render.yaml` (or your own template
+copy) — e.g. `ghcr.io/canalesb93/breadbox:v0.1.0` — and Render
+redeploys to that tag on the next sync. To instead track the
+unreleased tip of `main`, use `ghcr.io/canalesb93/breadbox:edge`.
 
 ## Cost notes
 

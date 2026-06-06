@@ -194,16 +194,37 @@ docker compose --profile caddy pull
 docker compose --profile caddy up -d
 ```
 
+### Image tags
+
+Breadbox publishes three kinds of tag to `ghcr.io/canalesb93/breadbox`,
+following the usual registry convention:
+
+| Tag | Points at | Updated when | Use it for |
+| --- | --- | --- | --- |
+| `:latest` | the **newest stable release** | a `vX.Y.Z` tag is cut | the default — released, tested software with automatic minor upgrades |
+| `:vX.Y.Z` (and `:X.Y.Z`) | that **exact release**, immutable | never (frozen) | full control — pin it and upgrade deliberately |
+| `:edge` | the **rolling tip of `main`** | every merge to `main` | bleeding edge — try changes before they're released |
+
+`:latest` is **not** a per-commit rolling tag — it only moves forward when
+a release is published. If you want the tip of `main`, use `:edge`. Each
+`main` commit also gets an immutable `:sha-<short>` tag for precise
+rollback.
+
+`install.sh` defaults to pinning the specific release tag it finds
+(`:vX.Y.Z`), so fresh installs are reproducible out of the box; it only
+falls back to `:edge` when no release exists yet.
+
 ### Pinning a specific version
 
 By default `docker-compose.prod.yml` references `ghcr.io/canalesb93/breadbox:latest`
-(rolling). To pin a specific release, edit the `image:` line:
+(the newest stable release). To pin a specific release, edit the `image:` line:
 
 ```yaml
 image: ghcr.io/canalesb93/breadbox:v0.1.0
 ```
 
 Then `docker compose pull && docker compose up -d` will hold that version.
+To instead track the unreleased tip of `main`, set the tag to `:edge`.
 
 ### Unattended updates
 
