@@ -131,15 +131,29 @@ document.addEventListener('alpine:init', function () {
         }).then(function (res) {
           var serverToldUs = !!res.headers.get('X-BB-Flash-Message');
           self._showFlashFromHeaders(res.headers);
+          // In-place autosave success (the schedule toggle, the timezone
+          // select, …) replies 204 No Content with no redirect: the control
+          // already shows the new value, so there's nothing to swap and
+          // nowhere to navigate. Bail before the redirect handling below —
+          // otherwise res.url is the POST-only action endpoint, which the
+          // classifier reads as "left the settings space" and hard-navigates
+          // to via GET, hitting a 405 ("this page isn't working"). See
+          // ScheduleToggleHandler / SettingsTimezonePostHandler.
+          if (res.status === 204 || res.status === 205) {
+            reenable();
+            return null;
+          }
           var finalUrl = res.url || action;
           var dest = parseSettingsRedirect(finalUrl);
-          // Redirect target outside the settings space (password change →
-          // /login, etc.) → hand off to a real navigation.
-          if (!dest.settings) {
+          // A genuine server redirect to a non-settings URL (password change
+          // → /login, etc.) hands off to a real navigation. The res.redirected
+          // guard keeps a non-redirected in-place response from ever
+          // hard-navigating to its own POST-only action endpoint.
+          if (!dest.settings && res.redirected) {
             window.location.href = finalUrl;
             return null;
           }
-          var targetTab = dest.tab || self.currentTab;
+          var targetTab = (dest.settings && dest.tab) ? dest.tab : self.currentTab;
           var sameTab = targetTab === self.currentTab;
           var swapOpts = { skipInlineScripts: sameTab, preserveScroll: sameTab };
           if (!res.ok) {
