@@ -4,7 +4,8 @@ description: >
   Validate a Breadbox admin UI change in a real browser and produce a screenshot as PR
   evidence. Prefers Chrome DevTools MCP when available; falls back to headless Chromium
   via Playwright in cloud sessions where the MCP is not loaded. Saves a JPEG under 1MB,
-  uploads to GitHub's native CDN via `gh release upload`, ready to embed in a PR.
+  uploads to the self-hosted bb-artifacts.exe.xyz CDN (auth via `gh auth token`; `gh
+  release upload` as fallback), ready to embed in a PR.
   Triggers: "validate the UI change", "screenshot this page", "capture the transactions page",
   "attach a screenshot to the PR", "show me how it looks", or any task needing a visual
   of the running app before a PR can be marked done.
@@ -189,23 +190,20 @@ If over 1MB: retake at `quality: 70` or drop `fullPage`.
 
 ### 7. Upload
 
-**Preferred (local sessions): self-hosted bb-artifacts.exe.xyz.** If the upload
-token is present in `.local.env`, push there — public read, ~180-day auto-expiry,
-no release clutter. See the `github-image-hosting` skill for full details.
+**Preferred: self-hosted bb-artifacts.exe.xyz** — auth with your GitHub token via
+`gh auth token`, which is present in **both** local and cloud sessions (`gh` is
+sandbox-exempt). Public read, ~180-day auto-expiry, no release clutter. See the
+`github-image-hosting` skill for full details.
 
 ```bash
-IMGHOST_TOKEN=$(grep -E '^IMGHOST_TOKEN=' .local.env | cut -d= -f2- 2>/dev/null)
-if [ -n "$IMGHOST_TOKEN" ]; then
-  URL=$(curl -sf -H "Authorization: Bearer $IMGHOST_TOKEN" \
-            -F file=@/tmp/app-<PAGE>.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
-  echo "$URL"
-fi
+URL=$(curl -sf -H "Authorization: Bearer $(gh auth token)" \
+          -F file=@/tmp/app-<PAGE>.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
+echo "$URL"
 ```
 
-**Fallback (cloud sessions, or token absent): GitHub release CDN.** In cloud
-sessions `.local.env` isn't checked out, so `IMGHOST_TOKEN` is empty — use `gh`
-(already sandbox-exempt — no network allowlist required) to upload to a dedicated
-GitHub prerelease. This gives a permanent, GitHub-native URL.
+**Fallback: GitHub release CDN** (only if bb-artifacts is unreachable or `gh` isn't
+authed). `gh` is sandbox-exempt — no network allowlist required — and gives a
+permanent, GitHub-native URL.
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
