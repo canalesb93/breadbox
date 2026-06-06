@@ -2414,6 +2414,8 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Remove tag " + a.TagSlug
 	case "add_comment":
 		return "Add comment"
+	case "assign_series":
+		return "Assign to series"
 	default:
 		return a.Type
 	}
