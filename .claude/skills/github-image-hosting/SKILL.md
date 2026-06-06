@@ -5,8 +5,8 @@ description: >
   embedding in PRs, issues, and comments, or for sharing a rendered debug page.
   Defaults to the self-hosted host at bb-artifacts.exe.xyz — authenticated upload
   via your GitHub token (`gh auth token`, works in local AND cloud sessions);
-  public read; ~180-day retention; 25MB cap. Falls back to img402.dev, then a
-  GitHub release-asset CDN, only if the host is unreachable.
+  public read; ~180-day retention; 25MB cap. Falls back to img402.dev only if the
+  host is unreachable.
   Triggers: "screenshot this", "attach an image", "add a screenshot to the PR",
   "upload this mockup", "host this HTML", "share a debug snapshot", or any task
   producing an image or HTML page that needs a shareable URL.
@@ -81,36 +81,15 @@ the Bearer:
     echo "ARTIFACT_URL=$URL" >> "$GITHUB_ENV"
 ```
 
-## Fallbacks
+## Fallback: img402.dev (ephemeral)
 
-Only needed if bb-artifacts is unreachable or `gh` isn't authed.
-
-### Fallback 1: img402.dev (ephemeral)
-
-Constraints: 1MB max, 7-day expiry, shared 1,000 uploads/day global cap, and
-occasional outages. Requires `img402.dev` in the sandbox allowlist — it is.
+Only if bb-artifacts is unreachable. Constraints: 1MB max, 7-day expiry, shared
+1,000 uploads/day global cap, and occasional outages. Requires `img402.dev` in the
+sandbox allowlist — it is.
 
 ```bash
 URL=$(curl -s -X POST https://img402.dev/api/free -F image=@"$FILE" | jq -r .url)
 # -> https://i.img402.dev/<id>.jpg   (images only, <1MB — re-encode if larger)
-```
-
-### Fallback 2: GitHub release asset CDN (permanent)
-
-Last resort. `gh` is sandbox-exempt, so it needs no network allowlist. GitHub-hosted
-URLs are permanent (they live in the repo's release assets) — fine as a safety net,
-but they clutter releases, so prefer the ephemeral options above.
-
-```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-gh release view screenshots-cdn --repo "$REPO" >/dev/null 2>&1 || \
-  gh release create screenshots-cdn --repo "$REPO" --prerelease \
-    --title "Screenshots CDN" --notes "Auto-uploaded PR validation screenshots."
-
-FNAME="$(date +%Y%m%d-%H%M%S)-$(basename "$FILE")"
-cp "$FILE" "/tmp/$FNAME"
-gh release upload screenshots-cdn "/tmp/$FNAME" --clobber --repo "$REPO"
-IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
 ```
 
 ## Embed formats
