@@ -669,7 +669,7 @@
     @apply opacity-100;
   }
   .bb-settings-content {
-    @apply flex-1 min-w-0 lg:max-w-5xl;
+    @apply flex-1 min-w-0;
   }
 
   /* lg+: the rail is a sticky, full-height column — the in-flow peer of the
