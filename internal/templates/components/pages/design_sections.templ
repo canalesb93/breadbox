@@ -3206,14 +3206,14 @@ templ SectionUserAvatar() {
 	</div>
 }
 
-// SectionEditableAvatar showcases components.EditableAvatar — the avatar +
-// shuffle/regenerate affordance from the Workflows reconfigure-drawer header.
-// Each example wraps the component in a tiny Alpine scope so the shuffle button
-// is live: clicking it mints a new seed and the avatar reseeds. SrcExpr /
-// OnShuffle are Alpine expressions, so the component is state-agnostic.
+// SectionEditableAvatar showcases components.EditableAvatar in both shapes —
+// the shuffle-only agent affordance (whole surface reseeds) and the full
+// user-identity editor (upload / shuffle / remove). Each example wraps the
+// component in a tiny Alpine scope so the controls are live. SrcExpr / OnShuffle
+// and the Upload expressions are all Alpine, so the component is state-agnostic.
 templ SectionEditableAvatar() {
 	<div class="flex flex-col gap-6">
-		@designExample("Shuffle to reseed — tap the avatar", "The entire avatar is the shuffle control (one button): pointer cursor, and on hover it lifts slightly while the corner badge's glyph tints primary. Tap anywhere and the state change is animated — the current avatar dims, scales down and blurs under a spinner while the new DiceBear SVG fetches, then the fresh avatar springs back in (overshoot ease) as the spinner fades. Hover/press/loading motion is transform/filter/opacity only, so flipping the theme never flashes a stroke. The chip shows the current seed.") {
+		@designExample("Shuffle to reseed — tap the avatar (agent shape)", "Upload == nil: the entire avatar is the shuffle control (one button): pointer cursor, and on hover it lifts slightly while the corner badge's glyph tints primary. Tap anywhere and the state change is animated — the current avatar dims, scales down and blurs under a spinner while the new DiceBear SVG fetches, then the fresh avatar springs back in (overshoot ease) as the spinner fades. Hover/press/loading motion is transform/filter/opacity only, so flipping the theme never flashes a stroke. The chip shows the current seed.") {
 			<div x-data="{ s: 'editable-demo' }" class="flex items-center gap-4">
 				@components.EditableAvatar(components.EditableAvatarProps{
 					SrcExpr:   "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'",
@@ -3223,19 +3223,37 @@ templ SectionEditableAvatar() {
 				<code class="text-xs text-base-content/50 px-2 py-1 rounded bg-base-200" x-text="s"></code>
 			</div>
 		}
-		@designExample("Sizes", "SizeClass overrides the tile dimensions; the whole avatar stays the tap target at every size, with a 20px corner badge as the cue. Default is w-11 h-11 (44px) — the reconfigure-drawer header size. All three share one seed here, so a shuffle reseeds them together.") {
+		@designExample("Full editor — upload, shuffle, remove (user shape)", "Upload != nil: the avatar surface becomes click-to-upload (camera hover overlay + a persistent corner camera cue so it's discoverable on touch), and a control row renders beneath — Upload, Shuffle, and Remove (the last gated on hasCustomAvatar). An inline error renders below the controls when ErrorExpr is truthy. This is the identity editor on /settings/account and /household/{id}/edit; live pages pair it with the avatarEditor factory. The demo scope mocks that contract so shuffle reseeds, Upload flags a custom image, and Remove resets.") {
+			<div
+				x-data="{ avatarSrc: '/avatars/preview/editable-user?size=112', avatarUploading: false, hasCustomAvatar: true, avatarError: '', onFileSelect() { this.hasCustomAvatar = true }, regenerate() { this.avatarSrc = '/avatars/preview/eu-' + Math.floor(Math.random() * 1e9).toString(36) + '?size=112'; this.hasCustomAvatar = false }, removeAvatar() { this.avatarSrc = '/avatars/preview/editable-user?size=112'; this.hasCustomAvatar = false } }"
+			>
+				@components.EditableAvatar(components.EditableAvatarProps{
+					SrcExpr:   "avatarSrc",
+					OnShuffle: "regenerate()",
+					Alt:       "Demo user avatar",
+					Upload: &components.EditableAvatarUpload{
+						OnFileSelect:  "onFileSelect",
+						OnRemove:      "removeAvatar()",
+						HasCustomExpr: "hasCustomAvatar",
+						LoadingExpr:   "avatarUploading",
+						ErrorExpr:     "avatarError",
+					},
+				})
+			</div>
+		}
+		@designExample("Sizes", "SizeClass overrides the tile dimensions; the whole avatar stays the tap target at every size, with a 20px corner badge as the cue. Default is w-14 h-14 (56px) — shared by both shapes so an un-overridden agent and user avatar match. All three share one seed here, so a shuffle reseeds them together.") {
 			<div x-data="{ s: 'editable-sizes' }" class="flex items-end gap-6">
 				<div class="flex flex-col items-center gap-2">
 					<span class="text-xs text-base-content/40">40px</span>
 					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=80'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-10 h-10"})
 				</div>
 				<div class="flex flex-col items-center gap-2">
-					<span class="text-xs text-base-content/40">44px · default</span>
-					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar"})
+					<span class="text-xs text-base-content/40">56px · default</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=112'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar"})
 				</div>
 				<div class="flex flex-col items-center gap-2">
-					<span class="text-xs text-base-content/40">56px</span>
-					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=112'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-14 h-14"})
+					<span class="text-xs text-base-content/40">64px</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=128'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-16 h-16"})
 				</div>
 			</div>
 		}
