@@ -23,6 +23,9 @@ metadata:
 Upload a screenshot, image, or HTML/text snapshot and get back a public URL —
 embed it in a PR/issue or open it directly to view a rendered debug page.
 
+**Always use bb-artifacts first.** img402 is only a fallback for when bb-artifacts
+is unreachable — never reach for it (or anything else) while bb-artifacts is up.
+
 Host: **bb-artifacts.exe.xyz** (self-hosted on exe.dev). **Reads are public**
 (GitHub's camo proxy and anyone with the link can fetch). **Uploads are
 authenticated** by either of two means:
