@@ -322,7 +322,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "editable-avatar",
 			Title:       "Editable avatar",
-			Description: "components.EditableAvatar — a live avatar whose entire surface is a shuffle/regenerate control (corner badge as the cue). The \"change this identity's picture\" affordance used by the Workflows reconfigure-drawer header. SrcExpr/OnShuffle are Alpine expressions so it drops into any seed-owning scope; the ring + badge tint primary and the glyph spins on hover.",
+			Description: "components.EditableAvatar — a live, editable avatar in two shapes. Shuffle-only (Upload nil): the whole surface is a shuffle/regenerate control with a corner badge cue — the agent/Workflows reconfigure-drawer header. Full editor (Upload set): click-to-upload avatar + an Upload/Shuffle/Remove control row + inline error — the user-identity editor on /settings/account and /household/{id}/edit. Every action is an Alpine expression, so it drops into any seed/upload-owning scope.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionEditableAvatar() },
 		},
