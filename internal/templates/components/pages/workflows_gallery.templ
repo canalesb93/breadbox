@@ -9,13 +9,9 @@ import (
 // one-click automations grouped by category. "Set up" opens a right-side
 // configure drawer; enabling instantiates a workflow with a run toggle.
 templ WorkflowsGallery(p WorkflowsGalleryProps) {
-	// marked + DOMPurify + the shared bbRenderMarkdown helper power the
-	// "Preview prompt" modal, which renders the composed base prompt as
-	// markdown (same pipeline as reports / agent-run prompts) rather than
-	// dumping the raw source.
-	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
-	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
-	<script src="/static/js/admin/markdown.js"></script>
+	// The "Preview prompt" modal renders the composed base prompt as
+	// Markdown server-side (goldmark + bluemonday), delivered as prompt_html
+	// by GET /-/workflows/{slug}/prompt — no client-side markdown parser.
 	<script src="/static/js/admin/components/workflows_gallery.js"></script>
 	<div
 		x-data="workflowsGallery"
@@ -277,7 +273,7 @@ templ workflowPromptPreviewModal() {
 				<span class="loading loading-spinner loading-sm"></span>
 				Loading prompt…
 			</div>
-			// Rendered as markdown via bbRenderMarkdown() in previewPrompt();
+			// Filled with server-rendered prompt_html in previewPrompt();
 			// x-ref lets the factory target this element after the async fetch.
 			<div
 				x-show="!previewLoading"

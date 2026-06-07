@@ -25,7 +25,7 @@ templ Feed(p FeedProps) {
 	     verb surfaces the first line of the comment body for a quick peek;
 	     the full body lives on the per-tx page (click-through via the
 	     transaction ref). The /feed view stays a glance surface — no
-	     marked / DOMPurify scanner cost on every visit. -->
+	     markdown rendering cost on every visit. -->
 	<div x-data x-init="$store.shortcuts.setScope('feed')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@feedHero(p)
 	if len(p.ConnectionAlerts) > 0 {

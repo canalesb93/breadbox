@@ -278,15 +278,9 @@ function fetchTimelineRows(txId, replaceCommentIDs, opts) {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
-      // Render markdown inside any freshly-inserted comment bubbles.
-      // The shared scanner is loaded as a sibling script in
-      // transaction_detail.templ; it auto-runs on DOMContentLoaded for
-      // server-rendered rows but optimistic inserts (and tombstone
-      // swaps) bypass that, so we re-scan each new node here. Idempotent
-      // — already-rendered bubbles carry data-markdown-rendered="1".
-      if (typeof window.bbRenderMarkdown === 'function') {
-        nodes.forEach(function (n) { window.bbRenderMarkdown(n); });
-      }
+      // Comment bubbles arrive already rendered: the timeline-rows endpoint
+      // emits server-side Markdown (goldmark) into .bb-prose, so there's no
+      // client-side markdown pass to run on freshly-inserted nodes.
       return inserted;
     });
 }

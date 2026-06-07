@@ -173,12 +173,8 @@ document.addEventListener('alpine:init', function () {
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
               window.lucide.createIcons();
             }
-            // Run the shared markdown scanner against the new bubbles.
-            // Idempotent — already-rendered nodes are skipped via the
-            // markdown.js dataset.markdownRendered guard.
-            if (typeof window.bbRenderMarkdown === 'function') {
-              window.bbRenderMarkdown(threadEl);
-            }
+            // The transcript fragment is server-rendered (markdown included
+            // via goldmark), so there's no client-side markdown pass here.
             // Only auto-scroll when (a) more events landed AND (b) the
             // operator was already near the bottom. That keeps "reading
             // from the middle while a run streams" usable.

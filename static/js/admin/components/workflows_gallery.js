@@ -21,11 +21,12 @@ document.addEventListener('alpine:init', function () {
 
       // --- F2: preview internal prompt -----------------------------------
       // State for the "Preview prompt" modal: the composed base prompt is
-      // fetched on demand from /-/workflows/{slug}/prompt and rendered as
-      // markdown (via bbRenderMarkdown) into the x-ref="previewBody" element.
-      // previewLoading drives the in-modal spinner.
+      // fetched on demand from /-/workflows/{slug}/prompt, which returns
+      // server-rendered prompt_html injected into the x-ref="previewBody"
+      // element. previewLoading drives the in-modal spinner.
       previewTitle: '',
       previewBody: '',
+      previewBodyHTML: '',
       previewLoading: false,
       // previewCopied briefly flips true after a successful Copy so the
       // button can show a "Copied" confirmation.
@@ -555,10 +556,12 @@ document.addEventListener('alpine:init', function () {
           .then(function (data) {
             self.previewTitle = data.title || self.previewTitle;
             self.previewBody = data.prompt || '';
+            self.previewBodyHTML = data.prompt_html || '';
           })
           .catch(function (e) {
             console.error('previewPrompt failed', e);
             self.previewBody = 'Could not load the prompt for this workflow. Please try again.';
+            self.previewBodyHTML = '<p>Could not load the prompt for this workflow. Please try again.</p>';
           })
           .finally(function () {
             self.previewLoading = false;
@@ -566,23 +569,17 @@ document.addEventListener('alpine:init', function () {
           });
       },
 
-      // Render the fetched base prompt as markdown into the preview element.
-      // The body arrives async and the modal is reused across opens, so we
-      // clear bbRenderMarkdown's idempotency flag (data-markdown-rendered)
-      // before re-pointing data-markdown at the new content. Falls back to
-      // plain text if the shared renderer isn't loaded.
+      // Inject the server-rendered, sanitized prompt HTML into the preview
+      // element. The markdown is rendered server-side (goldmark + bluemonday)
+      // and arrives as prompt_html, so there's no client-side parser; we set
+      // innerHTML directly. The body arrives async and the modal is reused
+      // across opens, so this runs on each open.
       renderPreviewBody: function () {
         var self = this;
         self.$nextTick(function () {
           var el = self.$refs.previewBody;
           if (!el) return;
-          el.removeAttribute('data-markdown-rendered');
-          el.setAttribute('data-markdown', self.previewBody || '');
-          if (typeof window.bbRenderMarkdown === 'function') {
-            window.bbRenderMarkdown(el);
-          } else {
-            el.textContent = self.previewBody || '';
-          }
+          el.innerHTML = self.previewBodyHTML || '';
           // The body element is reused across opens; reset its scroll so a
           // new prompt always starts at the top rather than wherever the
           // previous one was left scrolled. The element is x-show-gated on

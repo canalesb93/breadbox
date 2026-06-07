@@ -6,15 +6,27 @@ import (
 	"errors"
 	"net/http"
 
+	"breadbox/internal/markdown"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
 )
 
+// workflowPromptResponse is the JSON shape for GET /-/workflows/{slug}/prompt.
+// It promotes the service preview fields (slug, title, prompt) and adds
+// prompt_html — the prompt rendered server-side to a sanitized .bb-prose
+// fragment. The gallery modal injects prompt_html for display and uses the
+// raw prompt for the copy-to-clipboard affordance.
+type workflowPromptResponse struct {
+	*service.WorkflowPromptPreview
+	PromptHTML string `json:"prompt_html"`
+}
+
 // WorkflowPromptPreviewAdminHandler handles GET /-/workflows/{slug}/prompt.
 // It returns the fully composed base prompt for a preset as JSON
-// {slug, title, prompt}, powering the gallery's "Preview prompt" modal. Read-
-// only — it reads the code-defined preset registry, instantiates nothing.
+// {slug, title, prompt, prompt_html}, powering the gallery's "Preview prompt"
+// modal. Read-only — it reads the code-defined preset registry, instantiates
+// nothing.
 func WorkflowPromptPreviewAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
@@ -28,6 +40,9 @@ func WorkflowPromptPreviewAdminHandler(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
-		writeJSON(w, http.StatusOK, preview)
+		writeJSON(w, http.StatusOK, workflowPromptResponse{
+			WorkflowPromptPreview: preview,
+			PromptHTML:            string(markdown.Render(preview.Prompt)),
+		})
 	}
 }

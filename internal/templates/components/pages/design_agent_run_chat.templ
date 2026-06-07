@@ -17,27 +17,80 @@ import (
 //                            /agents/runs/{id} page composes.
 
 // ─── Markdown prose ─────────────────────────────────────────────────
+// The canonical proving ground for the single server-side markdown
+// renderer (internal/markdown: goldmark + chroma + bluemonday). Every
+// production surface — agent transcripts, reports, transaction comments,
+// the workflow prompt preview — renders through @components.Markdown into
+// the same .bb-prose, so what you see here is what those pages render.
 templ SectionMarkdownProse() {
 	<div class="flex flex-col gap-6">
 		@designExample(
 			"Assistant text",
-			"components.Markdown takes a string of agent-emitted text and renders headers, lists, code blocks, links, and tables inside a `.bb-prose` wrapper. The chat-bubble in the run-detail page is the primary consumer; the reports body will adopt it next.",
+			"components.Markdown renders a string of agent-emitted text — headings, lists, emphasis, blockquotes — inside a `.bb-prose` wrapper. The run-detail chat bubble and the agent-prompt panes are the primary consumers.",
 		) {
 			<div class="bb-card p-4 max-w-2xl">
 				@components.Markdown(designMarkdownSampleAssistant())
 			</div>
 		}
 		@designExample(
-			"Code blocks + tables",
-			"Fenced blocks (` ``` `) preserve whitespace + escape every HTML metachar. GFM tables accept `---:` for right-align — used for the cost columns in agent post-mortem reports.",
+			"Headings & anchors",
+			"All six ATX levels render; each heading gets an auto-generated `id` slug (goldmark WithAutoHeadingID) so long reports get linkable, scrollable sections.",
 		) {
 			<div class="bb-card p-4 max-w-2xl">
-				@components.Markdown(designMarkdownSampleCodeAndTable())
+				@components.Markdown(designMarkdownSampleHeadings())
 			</div>
 		}
 		@designExample(
-			"Safety",
-			"Raw HTML in the source is escaped; only http/https/mailto links survive — `javascript:` is stripped down to the visible label.",
+			"Lists & task lists",
+			"Ordered, unordered, and nested lists. GFM task-list checkboxes (`- [x]` / `- [ ]`) render as read-only checkboxes — common in agent plans and report checklists.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleLists())
+			</div>
+		}
+		@designExample(
+			"Syntax highlighting",
+			"Fenced code blocks are highlighted server-side by chroma (class-based tokens themed via CSS, light + dark — no JS). Language is taken from the fence info string.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleCode())
+			</div>
+		}
+		@designExample(
+			"GFM tables",
+			"GitHub-flavored tables with column alignment (`:--`, `:-:`, `--:`). Used for the cost/amount columns in agent post-mortem reports.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleTable())
+			</div>
+		}
+		@designExample(
+			"Typography",
+			"Inline `code`, **bold**, *italic*, ~~strikethrough~~, autolinked URLs, and the Typographer extension (smart quotes, en/em dashes, ellipsis).",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleTypography())
+			</div>
+		}
+		@designExample(
+			"Hard-wraps (comments)",
+			"@components.MarkdownBreaks turns a single newline into a line break — the chat-style variant transaction comments use, so a multi-line composer note keeps its shape.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.MarkdownBreaks(designMarkdownSampleBreaks())
+			</div>
+		}
+		@designExample(
+			"Report scale (bb-prose-lg)",
+			"@components.MarkdownLarge adds the .bb-prose-lg modifier — larger headings and more generous spacing for full-page report bodies.",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.MarkdownLarge(designMarkdownSampleHeadings())
+			</div>
+		}
+		@designExample(
+			"Safety (XSS-inert)",
+			"Raw HTML in the source is dropped (goldmark WithUnsafe off) and the output is sanitized by bluemonday. `<script>`, event handlers, and `javascript:`/`data:` links never survive — only http/https/mailto links render.",
 		) {
 			<div class="bb-card p-4 max-w-2xl">
 				@components.Markdown(designMarkdownSampleSafety())
@@ -60,20 +113,66 @@ func designMarkdownSampleAssistant() string {
 		"> Heads-up: I'll mark anything ambiguous for review rather than guessing."
 }
 
-func designMarkdownSampleCodeAndTable() string {
-	return "Here's the rule I'd suggest:\n\n" +
+func designMarkdownSampleHeadings() string {
+	return "# Monthly spend review\n\n" +
+		"## Summary\n\n" +
+		"Spending was up 8% month-over-month, driven by groceries.\n\n" +
+		"### Groceries\n\n" +
+		"Whole Foods accounted for most of the increase.\n\n" +
+		"#### Notable merchants\n\n" +
+		"A few new merchants showed up this month."
+}
+
+func designMarkdownSampleLists() string {
+	return "Plan for this run:\n\n" +
+		"- [x] Pull the last 30 days of transactions\n" +
+		"- [x] Bucket by merchant\n" +
+		"- [ ] Surface the top 5 by total\n" +
+		"- [ ] Flag anything ambiguous for review\n\n" +
+		"Ordered steps with nesting:\n\n" +
+		"1. Group transactions\n" +
+		"   - case-insensitive merchant match\n" +
+		"   - ignore pending\n" +
+		"2. Rank by total amount\n" +
+		"3. Return the top 5"
+}
+
+func designMarkdownSampleCode() string {
+	return "A SQL query:\n\n" +
 		"```sql\nSELECT merchant_name, SUM(amount) AS total\nFROM transactions\nWHERE date >= NOW() - INTERVAL '30 days'\nGROUP BY merchant_name\nORDER BY total DESC\nLIMIT 5;\n```\n\n" +
-		"And the top 5 from the dry run:\n\n" +
+		"The Go that runs it:\n\n" +
+		"```go\nfunc topMerchants(ctx context.Context, db *pgxpool.Pool) ([]Merchant, error) {\n\trows, err := db.Query(ctx, topMerchantsSQL)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"query: %w\", err)\n\t}\n\tdefer rows.Close()\n\treturn scanMerchants(rows)\n}\n```\n\n" +
+		"And a shell one-liner:\n\n" +
+		"```bash\ncurl -s \"$BB/api/v1/transactions?limit=5\" | jq '.transactions[].merchant_name'\n```"
+}
+
+func designMarkdownSampleTable() string {
+	return "Top 5 merchants from the dry run:\n\n" +
 		"| Merchant      | Txns | Total       |\n" +
-		"|---------------|-----:|------------:|\n" +
+		"|:--------------|-----:|------------:|\n" +
 		"| Whole Foods   |   12 |   $384.12   |\n" +
 		"| Lyft          |   18 |   $192.40   |\n" +
 		"| Apple.com     |    3 |    $59.97   |"
 }
 
+func designMarkdownSampleTypography() string {
+	return "Inline `code`, **bold**, *italic*, and ~~struck-through~~ text all render. " +
+		"Bare URLs autolink: https://breadbox.sh.\n\n" +
+		"The Typographer extension cleans up punctuation — \"smart quotes\", an en-dash (1–5), " +
+		"an em-dash (really -- it does), and an ellipsis..."
+}
+
+func designMarkdownSampleBreaks() string {
+	return "Heads up on this charge:\n" +
+		"it posted twice on the same day.\n" +
+		"Marking the duplicate for review."
+}
+
 func designMarkdownSampleSafety() string {
-	return "Links: a good [example.com](https://example.com) survives, a [bad one](javascript:alert(1)) renders as plain text.\n\n" +
-		"Inline HTML like <script>alert('hi')</script> is escaped, so `<script>` shows up literally."
+	return "Links: a good [example.com](https://example.com) survives; a [bad one](javascript:alert(1)) is stripped to plain text.\n\n" +
+		"Raw HTML is dropped entirely — an inline <script>alert('hi')</script> and an " +
+		"<img src=x onerror=alert(1)> never reach the page.\n\n" +
+		"Even a crafted [data-URI link](data:text/html,<script>alert(1)</script>) is neutralized."
 }
 
 // ─── JSON viewer ────────────────────────────────────────────────────
