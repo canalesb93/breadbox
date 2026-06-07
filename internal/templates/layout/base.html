@@ -751,7 +751,7 @@
             <button type="button" class="btn btn-ghost btn-sm" @click="close()">Cancel</button>
             <button type="button" class="btn btn-primary btn-sm gap-2" @click="save()">
               <span x-text="saveLabel"></span>
-              <kbd class="kbd kbd-xs">⌘&nbsp;↵</kbd>
+              {{renderComponent "KbdCombo" (strs "cmd" "enter")}}
             </button>
           </div>
         </template>
