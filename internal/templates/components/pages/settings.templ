@@ -27,6 +27,7 @@ templ SettingsGeneral(p SettingsProps) {
 			@settingsSyncSection(p)
 			@settingsAppearanceSection()
 			@settingsAvatarsSection(p)
+			@settingsSyncLogsSection(p)
 		</div>
 	</div>
 }
@@ -131,6 +132,20 @@ templ settingsSyncSection(p SettingsProps) {
 				@settingsScheduleRow(p, sched)
 			}
 		}
+		<!-- Create + per-schedule edit drawers (slide-over from the right) -->
+		@ScheduleDrawer(p.NewScheduleForm)
+		for _, f := range p.EditScheduleForms {
+			@ScheduleDrawer(f)
+		}
+	</div>
+}
+
+// settingsSyncLogsSection is the log-retention control. It lives at the
+// bottom of the General tab — below Avatars — because retention is a
+// low-touch maintenance setting, not part of the day-to-day schedule
+// configuration above.
+templ settingsSyncLogsSection(p SettingsProps) {
+	<div id="retention">
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:  "scroll",
 			Title: "Sync logs",
@@ -157,11 +172,6 @@ templ settingsSyncSection(p SettingsProps) {
 					</select>
 				}
 			}
-		}
-		<!-- Create + per-schedule edit drawers (slide-over from the right) -->
-		@ScheduleDrawer(p.NewScheduleForm)
-		for _, f := range p.EditScheduleForms {
-			@ScheduleDrawer(f)
 		}
 	</div>
 }
@@ -256,7 +266,7 @@ templ settingsAvatarsSection(p SettingsProps) {
 		Caption: "DiceBear styles for auto-generated identicons — uploaded avatars are unaffected",
 	}) {
 		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+			<div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
 				@settingsAvatarPicker(p, "user", "Users", "Household members", p.AvatarUserStyle, userPreviewSeeds())
 				@settingsAvatarPicker(p, "agent", "Agents", "AI workflow runners", p.AvatarAgentStyle, agentPreviewSeeds())
 			</div>
