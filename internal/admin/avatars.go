@@ -57,12 +57,21 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 			// stable slug (/avatars/<slug>?type=agent), so resolve any
 			// per-workflow custom seed before generating — keeping the slug-
 			// keyed render and the api_keys-keyed render (below) consistent.
-			seed := idStr
 			if actor == avatar.ActorAgent {
-				seed = agentAvatarSeed(r.Context(), a.Queries, idStr)
+				seed := agentAvatarSeed(r.Context(), a.Queries, idStr)
+				serveGeneratedAvatarForActor(w, r, seed, actor, size)
+				return
 			}
-			serveGeneratedAvatarForActor(w, r, seed, actor, size)
-			return
+			// The id may be a user short_id. UserAvatar embeds short_ids
+			// (not full UUIDs) in avatar URLs, so without this lookup,
+			// uploaded profile images are never served — the handler would
+			// always fall through to a generated DiceBear avatar.
+			resolved, rerr := a.Queries.GetUserUUIDByShortID(r.Context(), idStr)
+			if rerr != nil {
+				serveGeneratedAvatarForActor(w, r, idStr, actor, size)
+				return
+			}
+			uid = resolved
 		}
 
 		row, err := a.Queries.GetUserAvatar(r.Context(), uid)
