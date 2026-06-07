@@ -73,21 +73,21 @@ func TestReadCustomWorkflowInput(t *testing.T) {
 			t.Errorf("toolScope = %q, want read_only", in.toolScope)
 		}
 	})
-	t.Run("trigger + schedule + caps parse", func(t *testing.T) {
+	t.Run("schedule mode + caps parse", func(t *testing.T) {
 		in, err := parse(url.Values{
-			"name":            {"Sweep"},
-			"prompt":          {"do"},
-			"trigger_on_sync": {"true"},
-			"schedule_cron":   {"0 8 * * *"},
-			"max_turns":       {"12"},
-			"max_budget_usd":  {"2.50"},
-			"enabled":         {"true"},
+			"name":           {"Sweep"},
+			"prompt":         {"do"},
+			"trigger_mode":   {"schedule"},
+			"schedule_cron":  {"0 8 * * *"},
+			"max_turns":      {"12"},
+			"max_budget_usd": {"2.50"},
+			"enabled":        {"true"},
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !in.triggerOnSync {
-			t.Error("triggerOnSync should be true")
+		if in.triggerOnSync {
+			t.Error("triggerOnSync should be false in schedule mode")
 		}
 		if in.scheduleCron != "0 8 * * *" {
 			t.Errorf("scheduleCron = %q", in.scheduleCron)
@@ -100,6 +100,30 @@ func TestReadCustomWorkflowInput(t *testing.T) {
 		}
 		if !in.enabled {
 			t.Error("enabled should be true")
+		}
+	})
+	t.Run("sync mode sets trigger_on_sync, ignores cron", func(t *testing.T) {
+		in, _ := parse(url.Values{
+			"name":          {"S"},
+			"prompt":        {"do"},
+			"trigger_mode":  {"sync"},
+			"schedule_cron": {"0 8 * * *"},
+		})
+		if !in.triggerOnSync {
+			t.Error("triggerOnSync should be true in sync mode")
+		}
+		if in.scheduleCron != "" {
+			t.Errorf("scheduleCron should be empty in sync mode, got %q", in.scheduleCron)
+		}
+	})
+	t.Run("manual mode = no trigger", func(t *testing.T) {
+		in, _ := parse(url.Values{
+			"name":         {"M"},
+			"prompt":       {"do"},
+			"trigger_mode": {"manual"},
+		})
+		if in.triggerOnSync || in.scheduleCron != "" {
+			t.Errorf("manual should have no trigger: onSync=%v cron=%q", in.triggerOnSync, in.scheduleCron)
 		}
 	})
 	t.Run("rejects bad budget", func(t *testing.T) {
