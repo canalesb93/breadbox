@@ -28,7 +28,7 @@ templ SectionMarkdownProse() {
 			"Assistant text",
 			"components.Markdown renders a string of agent-emitted text — headings, lists, emphasis, blockquotes — inside a `.bb-prose` wrapper. The run-detail chat bubble and the agent-prompt panes are the primary consumers.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleAssistant())
 			</div>
 		}
@@ -36,7 +36,7 @@ templ SectionMarkdownProse() {
 			"Headings & anchors",
 			"All six ATX levels render; each heading gets an auto-generated `id` slug (goldmark WithAutoHeadingID) so long reports get linkable, scrollable sections.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleHeadings())
 			</div>
 		}
@@ -44,7 +44,7 @@ templ SectionMarkdownProse() {
 			"Lists & task lists",
 			"Ordered, unordered, and nested lists. GFM task-list checkboxes (`- [x]` / `- [ ]`) render as read-only checkboxes — common in agent plans and report checklists.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleLists())
 			</div>
 		}
@@ -52,7 +52,7 @@ templ SectionMarkdownProse() {
 			"Syntax highlighting",
 			"Fenced code blocks are highlighted server-side by chroma (class-based tokens themed via CSS, light + dark — no JS). Language is taken from the fence info string.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleCode())
 			</div>
 		}
@@ -60,7 +60,7 @@ templ SectionMarkdownProse() {
 			"GFM tables",
 			"GitHub-flavored tables with column alignment (`:--`, `:-:`, `--:`). Used for the cost/amount columns in agent post-mortem reports.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleTable())
 			</div>
 		}
@@ -68,7 +68,7 @@ templ SectionMarkdownProse() {
 			"Callouts / admonitions",
 			"GitHub-style > [!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION] render as colored, icon'd boxes — ideal for agent reports flagging things. Pure server-side (goldmark blockquote transform + lucide icons).",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleCallouts())
 			</div>
 		}
@@ -76,7 +76,7 @@ templ SectionMarkdownProse() {
 			"Typography",
 			"Inline `code`, **bold**, *italic*, ~~strikethrough~~, autolinked URLs, and the Typographer extension (smart quotes, en/em dashes, ellipsis).",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleTypography())
 			</div>
 		}
@@ -84,7 +84,7 @@ templ SectionMarkdownProse() {
 			"Hard-wraps (comments)",
 			"@components.MarkdownBreaks turns a single newline into a line break — the chat-style variant transaction comments use, so a multi-line composer note keeps its shape.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.MarkdownBreaks(designMarkdownSampleBreaks())
 			</div>
 		}
@@ -92,7 +92,7 @@ templ SectionMarkdownProse() {
 			"Report scale (bb-prose-lg)",
 			"@components.MarkdownLarge adds the .bb-prose-lg modifier — larger headings and more generous spacing for full-page report bodies.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.MarkdownLarge(designMarkdownSampleHeadings())
 			</div>
 		}
@@ -100,7 +100,7 @@ templ SectionMarkdownProse() {
 			"Safety (XSS-inert)",
 			"Raw HTML in the source is dropped (goldmark WithUnsafe off) and the output is sanitized by bluemonday. `<script>`, event handlers, and `javascript:`/`data:` links never survive — only http/https/mailto links render.",
 		) {
-			<div class="bb-card p-4 max-w-2xl">
+			<div class="bb-card p-4">
 				@components.Markdown(designMarkdownSampleSafety())
 			</div>
 		}

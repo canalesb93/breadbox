@@ -238,6 +238,9 @@ func TestHeadingAnchor(t *testing.T) {
 	if !strings.Contains(out, `class="bb-heading-anchor" href="#spending-review"`) {
 		t.Errorf("missing hover-anchor link: %s", out)
 	}
+	if !strings.Contains(out, `data-lucide="link"`) {
+		t.Errorf("anchor should use a link icon: %s", out)
+	}
 }
 
 func TestCodeBlockChrome(t *testing.T) {

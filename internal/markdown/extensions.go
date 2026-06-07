@@ -151,12 +151,16 @@ func (r *bbNodeRenderer) renderHeading(w util.BufWriter, _ []byte, n ast.Node, e
 		_, _ = fmt.Fprintf(w, "<h%d", h.Level)
 		gmhtml.RenderAttributes(w, n, gmhtml.HeadingAttributeFilter)
 		_ = w.WriteByte('>')
+	} else {
+		// Trailing hover-anchor: a link icon after the heading text, revealed on
+		// hover. Trailing (not gutter) keeps the heading's left edge aligned
+		// with paragraphs and avoids overflowing tight containers; the link
+		// glyph reads as "copy link to this section".
 		if id, ok := n.AttributeString("id"); ok {
 			if b, ok := id.([]byte); ok {
-				_, _ = fmt.Fprintf(w, `<a class="bb-heading-anchor" href="#%s" aria-hidden="true" tabindex="-1">#</a>`, util.EscapeHTML(b))
+				_, _ = fmt.Fprintf(w, `<a class="bb-heading-anchor" href="#%s" aria-label="Link to this section"><i data-lucide="link" class="bb-heading-anchor-icon" aria-hidden="true"></i></a>`, util.EscapeHTML(b))
 			}
 		}
-	} else {
 		_, _ = fmt.Fprintf(w, "</h%d>\n", h.Level)
 	}
 	return ast.WalkContinue, nil
