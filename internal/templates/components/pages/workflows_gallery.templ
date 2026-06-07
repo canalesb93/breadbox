@@ -315,7 +315,12 @@ templ workflowPromptPreviewModal() {
 // right. Set up, Run now, Reconfigure, and Preview prompt all live in the
 // drawer the gear opens, so the row itself stays uncluttered.
 templ workflowPresetCard(preset WorkflowPresetCardProps, isAdmin bool) {
-	<div class="bb-card px-4 py-3 h-full flex items-center gap-3">
+	<div
+		class={ "bb-card px-4 py-3 h-full flex items-center gap-3", templ.KV("bb-card--interactive", !preset.OneOff && isAdmin) }
+		if !preset.OneOff && isAdmin {
+			@click="cardClick($event)"
+		}
+	>
 		<div class={ presetTileClasses(preset.Enabled && !preset.OneOff) }>
 			@components.LucideIcon(preset.Icon, "w-5 h-5")
 			if preset.LastRun != nil && preset.LastRun.Status == "error" {
@@ -365,10 +370,15 @@ templ workflowCardControls(preset WorkflowPresetCardProps, isAdmin bool) {
 			</button>
 		}
 	} else if isAdmin {
+		// Not yet set up: clicking the toggle (or the row) optimistically flips
+		// it on and opens the setup drawer. Saving keeps it on; cancelling
+		// (Cancel / Esc / backdrop) reverts it via the drawer-close watcher,
+		// keyed off data-setup-slug.
 		<input
 			type="checkbox"
 			class="toggle toggle-sm"
-			@click.prevent={ workflowOpenConfigJS(preset) }
+			data-setup-slug={ preset.Slug }
+			@click={ "beginSetup('" + preset.Slug + "', $event.target)" }
 			aria-label={ "Set up " + preset.Name }
 		/>
 		<button
