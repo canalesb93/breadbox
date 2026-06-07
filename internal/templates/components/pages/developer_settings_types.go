@@ -14,7 +14,11 @@ type DeveloperSettingsProps struct {
 }
 
 // DeveloperSettingsFormFields holds the editable developer settings.
+// UploadTokenMasked is the masked display of the stored artifact upload token
+// (empty when none is set); the input itself is always rendered blank so a
+// resubmit never writes the mask back.
 type DeveloperSettingsFormFields struct {
-	Enabled    bool
-	GithubRepo string
+	Enabled           bool
+	GithubRepo        string
+	UploadTokenMasked string
 }

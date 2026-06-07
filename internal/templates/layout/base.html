@@ -279,6 +279,19 @@
         init: function() {
           var self = this;
           mq.addEventListener('change', function(e) { self.systemDark = e.matches; });
+          // Cross-document sync: the `storage` event fires in every OTHER
+          // same-origin document (other tabs, and — load-bearing here — the
+          // embedded component iframe on /design/c/{slug}?embed=1) when one of
+          // them writes localStorage. Without this, toggling the theme on the
+          // standalone component page updates the parent but leaves the iframe
+          // stuck on its load-time theme. e.key is null on clear(); re-read
+          // through read() either way so we stay in sync with the source.
+          window.addEventListener('storage', function(e) {
+            if (e.key !== null && e.key !== KEY) return;
+            var pref = read();
+            self.preference = pref;
+            apply(pref);
+          });
         },
       });
     });

@@ -743,8 +743,8 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 // card, the whole row toggles run-state on click for admins (cardClick).
 templ workflowCustomCard(c WorkflowCustomCardProps, isAdmin bool) {
 	<div
-		class={ "bb-card px-4 py-3 h-full flex items-center gap-3", templ.KV("bb-card--interactive", isAdmin) }
-		if isAdmin {
+		class={ "bb-card px-4 py-3 h-full flex items-center gap-3", templ.KV("bb-card--interactive", isAdmin && !c.Manual) }
+		if isAdmin && !c.Manual {
 			@click="cardClick($event)"
 		}
 	>
@@ -764,27 +764,73 @@ templ workflowCustomCard(c WorkflowCustomCardProps, isAdmin bool) {
 			<div class="text-xs text-base-content/60 mt-0.5 line-clamp-2">{ c.Description }</div>
 		</div>
 		<div class="flex items-center gap-1 shrink-0">
-			<input
-				type="checkbox"
-				class="toggle toggle-sm"
-				if c.Enabled {
-					checked
+			if c.Manual {
+				@workflowCustomManualControls(c, isAdmin)
+			} else {
+				<input
+					type="checkbox"
+					class="toggle toggle-sm"
+					if c.Enabled {
+						checked
+					}
+					aria-label={ "Toggle " + c.Name }
+					@change={ "toggleWorkflow('" + c.Slug + "', $event.target)" }
+				/>
+				if isAdmin {
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm btn-square text-base-content/55"
+						@click={ "openCustom('" + c.Slug + "')" }
+						aria-label={ "Edit " + c.Name }
+					>
+						@components.LucideIcon("settings", "w-4 h-4")
+					</button>
 				}
-				aria-label={ "Toggle " + c.Name }
-				@change={ "toggleWorkflow('" + c.Slug + "', $event.target)" }
-			/>
-			if isAdmin {
-				<button
-					type="button"
-					class="btn btn-ghost btn-sm btn-square text-base-content/55"
-					@click={ "openCustom('" + c.Slug + "')" }
-					aria-label={ "Edit " + c.Name }
-				>
-					@components.LucideIcon("settings", "w-4 h-4")
-				</button>
 			}
 		</div>
 	</div>
+}
+
+// workflowCustomManualControls is the right-side cluster for a manual-only
+// custom workflow (no schedule, no post-sync trigger) — it has no recurring
+// on/off state, so it shows copy + run + settings like a one-off preset
+// instead of a run toggle. Copy is available to everyone (read-only); run +
+// settings are admin-only. The run button holds a spinner for the whole run
+// via runningOneOff[slug] (shared with the one-off cards).
+templ workflowCustomManualControls(c WorkflowCustomCardProps, isAdmin bool) {
+	<button
+		type="button"
+		class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+		data-tip="Copy prompt"
+		@click={ "copyCustomPrompt('" + c.Slug + "')" }
+		aria-label={ "Copy the " + c.Name + " prompt" }
+	>
+		@components.LucideIcon("copy", "w-4 h-4")
+	</button>
+	if isAdmin {
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+			data-tip="Run now"
+			@click={ "runCustomNow('" + c.Slug + "', '" + jsEscape(c.Name) + "')" }
+			x-bind:disabled={ "runningOneOff['" + c.Slug + "']" }
+			aria-label={ "Run " + c.Name + " now" }
+		>
+			<span x-show={ "!runningOneOff['" + c.Slug + "']" }>
+				@components.LucideIcon("play", "w-4 h-4")
+			</span>
+			<span class="loading loading-spinner loading-xs" x-show={ "runningOneOff['" + c.Slug + "']" } x-cloak></span>
+		</button>
+		<button
+			type="button"
+			class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+			data-tip="Settings"
+			@click={ "openCustom('" + c.Slug + "')" }
+			aria-label={ "Edit " + c.Name }
+		>
+			@components.LucideIcon("settings", "w-4 h-4")
+		</button>
+	}
 }
 
 // workflowCustomCreateRow is the dashed "add" affordance at the tail of the
@@ -889,7 +935,46 @@ templ workflowCustomDrawer() {
 					></textarea>
 					<div class="text-xs text-base-content/40 mt-1">This is the entire workflow prompt — there's no template behind it.</div>
 				</div>
-				@workflowTriggerFields("custom.triggerOnSync", "custom.scheduleCron", "")
+				<div>
+					<div class="text-sm font-medium mb-2">When should the workflow run?</div>
+					<div class="grid grid-cols-1 gap-2">
+						@components.RadioCard(components.RadioCardProps{
+							Name:      "trigger_mode",
+							Value:     "manual",
+							Icon:      "hand",
+							Title:     "Manual only",
+							Subtitle:  "Runs only when you trigger it",
+							ModelExpr: "custom.triggerMode",
+						})
+						@components.RadioCard(components.RadioCardProps{
+							Name:      "trigger_mode",
+							Value:     "schedule",
+							Icon:      "calendar-clock",
+							Title:     "Custom schedule",
+							Subtitle:  "On a recurring cron schedule",
+							ModelExpr: "custom.triggerMode",
+						})
+						@components.RadioCard(components.RadioCardProps{
+							Name:      "trigger_mode",
+							Value:     "sync",
+							Icon:      "refresh-cw",
+							Title:     "After each sync",
+							Subtitle:  "Right after new data lands",
+							ModelExpr: "custom.triggerMode",
+						})
+					</div>
+					<div x-show="custom.triggerMode === 'schedule'" x-cloak class="mt-3 space-y-2">
+						<div class="text-xs font-medium text-base-content/70">Schedule</div>
+						@components.CronField(components.CronFieldProps{
+							Name:               "schedule_cron",
+							Presets:            cronspec.WorkflowSchedulePresets,
+							PreviewURL:         "/-/workflows/cron-preview",
+							LocalizePresets:    true,
+							ServerUTCOffsetMin: serverUTCOffsetMinInt(),
+							ModelExpr:          "custom.scheduleCron",
+						})
+					</div>
+				</div>
 				@workflowModelField("custom.model")
 				<div>
 					<div class="text-sm font-medium mb-1.5">Tool access</div>
@@ -902,6 +987,30 @@ templ workflowCustomDrawer() {
 				@workflowAdvancedFields("custom.maxTurns", "custom.maxBudget")
 			</div>
 			@components.DrawerFooter() {
+				<!-- Edit-mode actions: delete the workflow + run it now. Hidden on
+				     create (no slug yet); the mr-auto on Run now pushes Cancel/Save
+				     to the right, matching the reconfigure drawer. -->
+				<button
+					type="button"
+					class="btn btn-ghost btn-sm btn-square text-error/70 hover:text-error tooltip tooltip-top"
+					data-tip="Delete workflow"
+					x-show="custom.isEdit"
+					@click="removeWorkflow(custom.slug, custom.name)"
+					x-bind:disabled="custom.loading"
+					aria-label="Delete workflow"
+				>
+					@components.LucideIcon("trash-2", "w-4 h-4")
+				</button>
+				<button
+					type="button"
+					class="btn btn-soft btn-sm gap-1.5 mr-auto"
+					x-show="custom.isEdit"
+					@click="runWorkflow(custom.slug); $store.drawers.close()"
+					x-bind:disabled="custom.loading"
+				>
+					@components.LucideIcon("play", "w-4 h-4")
+					Run now
+				</button>
 				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
 				<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="custom.loading">
 					@components.LucideIcon("save", "w-4 h-4")
