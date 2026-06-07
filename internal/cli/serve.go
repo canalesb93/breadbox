@@ -219,6 +219,18 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 		logger.Warn("pg_dump not found — backup service disabled")
 	}
 
+	// Hourly sweep of abandoned/expired CSV import sessions (drops their staged
+	// rows + raw file blob). Best-effort; never fatal.
+	if err := scheduler.AddFunc("23 * * * *", func() {
+		if n, serr := a.Service.SweepExpiredImportSessions(context.Background()); serr != nil {
+			logger.Warn("csv import session sweep failed", "error", serr)
+		} else if n > 0 {
+			logger.Info("csv import session sweep", "deleted", n)
+		}
+	}); err != nil {
+		logger.Error("failed to add csv import sweep cron", "error", err)
+	}
+
 	go scheduler.RunStartupSync(ctx, cfg.SyncIntervalMinutes)
 
 	router := api.NewRouter(a, version)

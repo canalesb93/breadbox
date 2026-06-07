@@ -674,6 +674,24 @@ func (s *Service) ApplyImportSession(ctx context.Context, sessionIDOrShort strin
 	return result, nil
 }
 
+// SweepExpiredImportSessions deletes un-applied sessions past their TTL. CASCADE
+// removes their staged rows; the raw_blob goes with them. Returns the count.
+func (s *Service) SweepExpiredImportSessions(ctx context.Context) (int, error) {
+	expired, err := s.Queries.ListExpiredCSVImportSessions(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, sess := range expired {
+		if err := s.Queries.DeleteCSVImportSession(ctx, sess.ID); err != nil {
+			s.Logger.Warn("csv import: sweep delete failed", "session", sess.ShortID, "error", err)
+			continue
+		}
+		n++
+	}
+	return n, nil
+}
+
 // GetImportSession returns the service view of a session by id or short id.
 func (s *Service) GetImportSession(ctx context.Context, sessionIDOrShort string) (*ImportSession, error) {
 	sess, err := s.getSession(ctx, sessionIDOrShort)

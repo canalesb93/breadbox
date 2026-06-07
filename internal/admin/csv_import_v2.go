@@ -202,6 +202,61 @@ func CSVV2ApplyHandler(a *app.App, sm *scs.SessionManager, svc *service.Service)
 	}
 }
 
+// CSVV2ProfilesListHandler serves GET /-/csv/v2/profiles.
+func CSVV2ProfilesListHandler(a *app.App, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profiles, err := svc.ListCSVProfiles(r.Context())
+		if err != nil {
+			a.Logger.Debug("csv v2 list profiles failed", "error", err)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list profiles")
+			return
+		}
+		writeJSON(w, http.StatusOK, profiles)
+	}
+}
+
+// CSVV2ProfileRenameHandler serves PATCH /-/csv/v2/profiles/{id}.
+func CSVV2ProfileRenameHandler(a *app.App, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if req.Name == "" {
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "name is required")
+			return
+		}
+		prof, err := svc.RenameCSVProfile(r.Context(), chi.URLParam(r, "id"), req.Name)
+		if err != nil {
+			writeProfileErr(w, a, "rename", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, prof)
+	}
+}
+
+// CSVV2ProfileDeleteHandler serves DELETE /-/csv/v2/profiles/{id}.
+func CSVV2ProfileDeleteHandler(a *app.App, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := svc.DeleteCSVProfile(r.Context(), chi.URLParam(r, "id")); err != nil {
+			writeProfileErr(w, a, "delete", err)
+			return
+		}
+		writeOK(w)
+	}
+}
+
+func writeProfileErr(w http.ResponseWriter, a *app.App, op string, err error) {
+	if errors.Is(err, service.ErrProfileNotFound) {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Import profile not found")
+		return
+	}
+	a.Logger.Debug("csv v2 profile "+op+" failed", "error", err)
+	writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+}
+
 // defaultImportUser resolves the household user for a new import: the explicit
 // value if given, otherwise the sole household member.
 func defaultImportUser(r *http.Request, svc *service.Service, explicit string) (string, error) {
