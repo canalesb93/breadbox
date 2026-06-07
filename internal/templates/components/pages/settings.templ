@@ -265,6 +265,7 @@ templ settingsAvatarsSection(p SettingsProps) {
 		Icon:    "user-circle",
 		Title:   "Avatars",
 		Caption: "DiceBear styles for auto-generated identicons — uploaded avatars are unaffected",
+		Right:   settingsAvatarStylesLink(),
 	}) {
 		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
 			<div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
@@ -279,6 +280,21 @@ templ settingsAvatarsSection(p SettingsProps) {
 			</p>
 		}
 	}
+}
+
+// settingsAvatarStylesLink is the section-header affordance pointing at
+// DiceBear's full style gallery, so operators can browse every available
+// style at the source before picking one in the selects below.
+templ settingsAvatarStylesLink() {
+	<a
+		href="https://www.dicebear.com/styles/"
+		target="_blank"
+		rel="noopener noreferrer"
+		class="btn btn-ghost btn-xs gap-1.5"
+	>
+		Browse styles
+		@components.LucideIcon("external-link", "w-3.5 h-3.5")
+	</a>
 }
 
 // settingsAvatarPicker renders one actor-bucket picker (User or Agent)
