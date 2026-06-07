@@ -190,13 +190,14 @@ If over 1MB: retake at `quality: 70` or drop `fullPage`.
 
 ### 7. Upload
 
-**Preferred: self-hosted bb-artifacts.exe.xyz** — auth with your GitHub token via
-`gh auth token`, which is present in **both** local and cloud sessions (`gh` is
-sandbox-exempt). Public read, ~180-day auto-expiry, no release clutter. See the
-`github-image-hosting` skill for full details.
+**Preferred: self-hosted bb-artifacts.exe.xyz** — auth with a configured
+`IMGHOST_UPLOAD_TOKEN` (cloud/remote sessions export it) or, if unset, your GitHub
+identity via `gh auth token` (local). Public read, ~180-day auto-expiry, no release
+clutter. See the `github-image-hosting` skill for full details.
 
 ```bash
-URL=$(curl -sf -H "Authorization: Bearer $(gh auth token)" \
+AUTH="${IMGHOST_UPLOAD_TOKEN:-$(gh auth token 2>/dev/null)}"
+URL=$(curl -sf -H "Authorization: Bearer $AUTH" \
           -F file=@/tmp/app-<PAGE>.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
 echo "$URL"
 ```

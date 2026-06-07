@@ -30,23 +30,26 @@ Host: **bb-artifacts.exe.xyz** (self-hosted on exe.dev). **Reads are public**
 (GitHub's camo proxy and anyone with the link can fetch). **Uploads are
 authenticated** by either of two means:
 
-- **GitHub identity** — send your GitHub token as the Bearer; the server checks it
-  resolves to an allowed login (`canalesb93`). `gh auth token` works in **both
-  local and cloud** Claude sessions, so there's no secret to store. This is the
-  default for agents.
-- **Static upload token** — a shared secret (for CI, or any non-`gh` context). See
-  the CI section below.
+- **Static upload token** — send a secret as the Bearer. Set `IMGHOST_UPLOAD_TOKEN`
+  in the environment and it's used automatically. This is how cloud/remote sessions
+  and CI authenticate.
+- **GitHub identity** — if `IMGHOST_UPLOAD_TOKEN` isn't set, send your GitHub token
+  (`gh auth token`); the server allows it if it resolves to login `canalesb93`. This
+  is the zero-config path for local sessions.
 
-## Primary: bb-artifacts.exe.xyz (GitHub-identity)
+## Primary: bb-artifacts.exe.xyz
 
 ```bash
-URL=$(curl -sf -H "Authorization: Bearer $(gh auth token)" \
+# Prefer a configured upload token (cloud/remote export IMGHOST_UPLOAD_TOKEN);
+# otherwise fall back to your GitHub identity via gh (local sessions).
+AUTH="${IMGHOST_UPLOAD_TOKEN:-$(gh auth token 2>/dev/null)}"
+URL=$(curl -sf -H "Authorization: Bearer $AUTH" \
           -F file=@/tmp/screenshot.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
 echo "$URL"   # -> https://bb-artifacts.exe.xyz/f/<id>.jpg
 ```
 
-`gh` is sandbox-exempt and authenticated in both local and cloud sessions, so this
-is the one path that works everywhere. No `jq`? Parse with python:
+Both `gh` and `IMGHOST_UPLOAD_TOKEN` are available across local and cloud sessions,
+so this path works everywhere. No `jq`? Parse with python:
 `python3 -c "import sys,json;print(json.load(sys.stdin)['url'])"`.
 
 **Accepted**: images (`png/jpg/jpeg/gif/webp/svg/bmp/ico`), `html/htm`, `txt/md/log`,
@@ -65,16 +68,18 @@ returned URL renders in a browser. Handy for capturing a rendered page, a failin
 template, or a large log to share without pasting it inline.
 
 ```bash
-URL=$(curl -sf -H "Authorization: Bearer $(gh auth token)" \
+AUTH="${IMGHOST_UPLOAD_TOKEN:-$(gh auth token 2>/dev/null)}"
+URL=$(curl -sf -H "Authorization: Bearer $AUTH" \
           -F file=@/tmp/debug-snapshot.html https://bb-artifacts.exe.xyz/upload | jq -r .url)
 echo "$URL"   # open in a browser to view the rendered page
 ```
 
-### From CI (or any non-`gh` context): static upload token
+### The `IMGHOST_UPLOAD_TOKEN` secret (cloud/remote sessions + CI)
 
-In GitHub Actions the ambient token is a bot, not you, so use the static upload
-secret instead. Store it as a repo secret (`IMGHOST_UPLOAD_TOKEN`) and send it as
-the Bearer:
+Cloud/remote Claude sessions export `IMGHOST_UPLOAD_TOKEN` in their environment —
+the snippets above pick it up automatically. For GitHub Actions the ambient token
+is a bot, not you, so store the same secret as a repo secret
+(`IMGHOST_UPLOAD_TOKEN`) and send it as the Bearer:
 
 ```yaml
 - name: Upload screenshot to bb-artifacts
