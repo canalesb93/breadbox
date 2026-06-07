@@ -43,10 +43,8 @@ func TestMaskedDots(t *testing.T) {
 func TestSaveKeyRendersMaskedNotPlain(t *testing.T) {
 	const key = "deadbeefcafebabe1234567890abcdef" + "deadbeefcafebabe1234567890abcdef"
 	props := SaveKeyProps{
-		PageTitle:        "Save encryption key",
-		EncryptionKey:    key,
-		OnePasswordValue: "AAA",
-		ItemTitle:        "Breadbox encryption key (test)",
+		PageTitle:     "Save encryption key",
+		EncryptionKey: key,
 	}
 	var buf strings.Builder
 	if err := SaveKey(props).Render(context.Background(), &buf); err != nil {

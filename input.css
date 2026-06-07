@@ -1486,10 +1486,13 @@
      vertical position and matches the visual of password-reveal patterns
      elsewhere (GitHub recovery codes, Auth0 client secrets, etc). */
   .bb-key-display {
-    @apply bg-base-200/60 border border-base-300 rounded-lg
-           px-3.5 py-3 font-mono text-xs leading-relaxed
+    @apply flex items-center min-h-13 bg-base-200/50 border border-base-300 rounded-xl
+           px-4 py-3.5 font-mono text-sm leading-relaxed
            text-base-content/85
            whitespace-nowrap overflow-x-auto overscroll-x-contain;
+    /* Space the glyphs out so the 64 dots/chars read as a key rather than
+       a packed block — the masked bullets especially look cramped at 0. */
+    letter-spacing: 0.12em;
     /* Thin, theme-aware scrollbar so it doesn't dominate the field. */
     scrollbar-width: thin;
   }

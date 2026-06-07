@@ -23,9 +23,9 @@ templ SaveKey(p SaveKeyProps) {
 		FlashType: p.FlashType,
 		FlashMsg:  p.FlashMsg,
 	}) {
-		<!-- Self-registering web component: <onepassword-save-button>. Vendored from @1password/save-button 1.3.0. -->
-		<script type="module" src="/static/js/vendor/onepassword-save-button.js"></script>
-		<!-- Page behavior: reveal toggle, clipboard copy, 1Password proxy. -->
+		<!-- Page behavior: reveal toggle + clipboard copy (with an
+		     execCommand fallback for plain-HTTP LAN installs where
+		     navigator.clipboard is unavailable). -->
 		<script src="/static/js/admin/components/setup_save_key.js"></script>
 		<div class="text-center mb-7">
 			<div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -64,43 +64,17 @@ templ SaveKey(p SaveKeyProps) {
 					class="bb-key-display"
 				><span data-key-text>{ maskedDots(p.EncryptionKey) }</span></div>
 			</div>
-			<!-- The 1Password web component is functional but ugly; we
-			     park it off-screen and proxy clicks from our own daisy
-			     button below. Keeping it in the DOM is what gives the
-			     extension something to attach to. -->
-			<onepassword-save-button
-				data-onepassword-type="login"
-				value={ p.OnePasswordValue }
-				class="blue"
-				padding="normal"
-				aria-hidden="true"
-				tabindex="-1"
-				style="position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none"
-			></onepassword-save-button>
-			<!-- Two equal-weight save options. Copy goes to the clipboard;
-			     "Save in 1Password" forwards to the hidden web component.
-			     Both styled identically so neither reads as preferred — the
-			     user picks whichever workflow fits their password manager. -->
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-				<button
-					type="button"
-					data-action="copy"
-					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
-				>
-					<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
-					<i data-lucide="check" class="w-4 h-4 hidden text-success" data-copy-done></i>
-					<span data-copy-label>Copy</span>
-				</button>
-				<button
-					type="button"
-					data-action="save-1password"
-					class="btn btn-primary btn-soft btn-sm h-11 gap-2 w-full"
-					title="Requires the 1Password browser extension"
-				>
-					@components.BrandIcon("1password", "w-4 h-4")
-					<span>Save in 1Password</span>
-				</button>
-			</div>
+			<!-- Copy to clipboard. Full width — the only save affordance
+			     besides the reveal toggle above. -->
+			<button
+				type="button"
+				data-action="copy"
+				class="btn btn-primary btn-soft h-11 gap-2 w-full"
+			>
+				<i data-lucide="clipboard" class="w-4 h-4" data-copy-icon></i>
+				<i data-lucide="check" class="w-4 h-4 hidden text-success" data-copy-done></i>
+				<span data-copy-label>Copy to clipboard</span>
+			</button>
 			<!-- Lost-it-later callout. Quieter visual weight than a daisy alert. -->
 			<div class="rounded-lg bg-base-200/40 border border-base-300/70 px-3.5 py-3 text-xs text-base-content/60 leading-relaxed">
 				<div class="flex items-start gap-2.5">
