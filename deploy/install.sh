@@ -963,7 +963,12 @@ if [ "$healthy" -eq 1 ]; then
         || { [ "$BB_INIT_SYSTEM" != "none" ] \
              && prompt_yn "Register a ${BB_INIT_SYSTEM} unit so Breadbox restarts on boot?" "n"; }; then
         printf "\n"
-        register_daemon
+        # Never let daemon registration abort the install: a non-root user
+        # answering "y" hits the "requires root" path (register_daemon_systemd
+        # returns 1), and under `set -e` that would kill the script BEFORE the
+        # success banner — leaving Breadbox running but the setup URL unprinted.
+        # Registration is opt-in convenience; failing it must not hide the URL.
+        register_daemon || true
     fi
 
     # Platform-reachability check. Breadbox is healthy locally on
