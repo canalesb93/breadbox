@@ -48,6 +48,76 @@ ON CONFLICT (provider_transaction_id) DO UPDATE SET
   END
 RETURNING *;
 
+-- name: UpsertTransactionV2 :one
+-- Like UpsertTransaction but also stores the account-independent content_hash
+-- (used by CSV import v2 dedup) and returns whether the row was newly inserted
+-- (xmax = 0 on INSERT, non-zero on the ON CONFLICT UPDATE path) so callers get
+-- reliable insert-vs-update counts without timestamp heuristics.
+INSERT INTO transactions (
+  account_id, provider_transaction_id, provider_pending_transaction_id,
+  amount, iso_currency_code, date, authorized_date,
+  datetime, authorized_datetime, provider_name, provider_merchant_name,
+  provider_category_primary, provider_category_detailed, provider_category_confidence,
+  provider_payment_channel, pending, category_id, provider_raw, merchant_key,
+  content_hash
+) VALUES (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+)
+ON CONFLICT (provider_transaction_id) DO UPDATE SET
+  account_id = EXCLUDED.account_id,
+  merchant_key = EXCLUDED.merchant_key,
+  provider_pending_transaction_id = EXCLUDED.provider_pending_transaction_id,
+  amount = EXCLUDED.amount,
+  iso_currency_code = EXCLUDED.iso_currency_code,
+  date = EXCLUDED.date,
+  authorized_date = EXCLUDED.authorized_date,
+  datetime = EXCLUDED.datetime,
+  authorized_datetime = EXCLUDED.authorized_datetime,
+  provider_name = EXCLUDED.provider_name,
+  provider_merchant_name = EXCLUDED.provider_merchant_name,
+  provider_category_primary = EXCLUDED.provider_category_primary,
+  provider_category_detailed = EXCLUDED.provider_category_detailed,
+  provider_category_confidence = EXCLUDED.provider_category_confidence,
+  provider_payment_channel = EXCLUDED.provider_payment_channel,
+  pending = EXCLUDED.pending,
+  provider_raw = COALESCE(EXCLUDED.provider_raw, transactions.provider_raw),
+  content_hash = COALESCE(EXCLUDED.content_hash, transactions.content_hash),
+  category_id = CASE
+    WHEN transactions.category_override <> 'none' THEN transactions.category_id
+    WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
+    ELSE transactions.category_id
+  END,
+  deleted_at = NULL,
+  updated_at = CASE
+    WHEN transactions.amount IS DISTINCT FROM EXCLUDED.amount
+      OR transactions.provider_name IS DISTINCT FROM EXCLUDED.provider_name
+      OR transactions.pending IS DISTINCT FROM EXCLUDED.pending
+      OR transactions.provider_merchant_name IS DISTINCT FROM EXCLUDED.provider_merchant_name
+      OR transactions.provider_category_primary IS DISTINCT FROM EXCLUDED.provider_category_primary
+      OR transactions.provider_category_detailed IS DISTINCT FROM EXCLUDED.provider_category_detailed
+      OR transactions.deleted_at IS NOT NULL
+    THEN NOW()
+    ELSE transactions.updated_at
+  END
+RETURNING *, (xmax = 0) AS inserted;
+
+-- name: ListAccountTransactionsForDedup :many
+-- Live transactions in an account within a date window — the candidate set the
+-- CSV import classifier compares incoming rows against (provider-agnostic, so it
+-- also dedupes against Plaid/Teller rows already in the account).
+SELECT id, date, amount, provider_name, provider_merchant_name,
+       content_hash, provider_transaction_id
+FROM transactions
+WHERE account_id = $1 AND deleted_at IS NULL AND date BETWEEN $2 AND $3;
+
+-- name: ListTransactionKeysInRange :many
+-- (account_id, date, amount) for all live transactions in a date window, across
+-- every account — used to score how well an uploaded CSV overlaps each candidate
+-- account during account auto-detection.
+SELECT account_id, date, amount
+FROM transactions
+WHERE deleted_at IS NULL AND account_id IS NOT NULL AND date BETWEEN $1 AND $2;
+
 -- name: SoftDeleteTransactionByExternalID :exec
 UPDATE transactions SET deleted_at = NOW() WHERE provider_transaction_id = $1 AND deleted_at IS NULL;
 

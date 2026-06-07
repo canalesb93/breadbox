@@ -1,0 +1,269 @@
+package components
+
+// ImportModal is the drop-anywhere CSV import flow: a large daisy modal that
+// walks analyze → resolve account → preview/edit → apply → result. It is
+// mounted once globally from base.html and driven by the $store.csvImport store
+// (drop overlay + open/close) plus the csvImport Alpine factory
+// (static/js/admin/components/csv_import_v2.js).
+templ ImportModal() {
+	<script src="/static/js/admin/components/csv_import_v2.js"></script>
+	<div
+		x-data="csvImport"
+		class="modal modal-bottom sm:modal-middle"
+		:class="{ 'modal-open': $store.csvImport.active }"
+		role="dialog"
+		aria-label="Import transactions"
+	>
+		<div class="modal-box max-w-6xl w-full max-h-[90vh] p-0 flex flex-col rounded-2xl overflow-hidden">
+			<!-- Header -->
+			<div class="flex items-center justify-between gap-3 border-b border-base-300 px-5 py-4 shrink-0">
+				<div class="min-w-0">
+					<div class="flex items-center gap-2 text-base font-semibold">
+						@LucideIcon("file-spreadsheet", "w-4 h-4 text-primary")
+						<span>Import transactions</span>
+					</div>
+					<div class="text-xs text-base-content/60 truncate" x-text="filename || 'CSV import'"></div>
+				</div>
+				<button class="btn btn-ghost btn-sm btn-circle" @click="closeFlow()" aria-label="Close">
+					@LucideIcon("x", "w-4 h-4")
+				</button>
+			</div>
+			<!-- Body -->
+			<div class="flex-1 overflow-y-auto">
+				@importModalAnalyzing()
+				@importModalError()
+				@importModalAccount()
+				@importModalPreview()
+				@importModalResult()
+			</div>
+			<!-- Footer -->
+			<div class="border-t border-base-300 px-5 py-3 flex items-center justify-between gap-3 shrink-0" x-show="step === 'account' || step === 'preview'">
+				<div class="text-xs text-base-content/60" x-show="step === 'preview'">
+					<span class="font-medium text-base-content" x-text="summary.included_count || 0"></span>
+					<span> of </span>
+					<span x-text="summary.total || 0"></span>
+					<span> rows will be imported</span>
+				</div>
+				<div x-show="step === 'account'"></div>
+				<div class="flex items-center gap-2 ml-auto">
+					<button class="btn btn-ghost btn-sm" @click="closeFlow()">Cancel</button>
+					<button
+						x-show="step === 'account'"
+						class="btn btn-primary btn-sm gap-2"
+						:disabled="!selectedAccountId && !createNew"
+						@click="resolve()"
+					>
+						Continue
+						@LucideIcon("arrow-right", "w-4 h-4")
+					</button>
+					<button
+						x-show="step === 'preview'"
+						class="btn btn-primary btn-sm gap-2"
+						:disabled="loading || (summary.included_count || 0) === 0"
+						@click="apply()"
+					>
+						<span class="loading loading-spinner loading-xs" x-show="loading"></span>
+						<span x-text="'Import ' + (summary.included_count || 0) + ' transaction' + ((summary.included_count || 0) === 1 ? '' : 's')"></span>
+					</button>
+				</div>
+			</div>
+		</div>
+		<div class="modal-backdrop bg-black/40" @click="closeFlow()"></div>
+	</div>
+}
+
+templ importModalAnalyzing() {
+	<div x-show="step === 'analyzing'" class="flex flex-col items-center justify-center gap-3 py-20 text-center">
+		<span class="loading loading-spinner loading-md text-primary"></span>
+		<div class="text-sm text-base-content/70">Analyzing your file…</div>
+	</div>
+}
+
+templ importModalError() {
+	<div x-show="step === 'error'" class="p-6">
+		<div class="alert alert-error rounded-xl">
+			@LucideIcon("alert-circle", "w-5 h-5")
+			<span x-text="errorMsg"></span>
+		</div>
+		<div class="mt-4">
+			<button class="btn btn-ghost btn-sm" @click="closeFlow()">Close</button>
+		</div>
+	</div>
+}
+
+// Account selection: ranked suggestions + create-new.
+templ importModalAccount() {
+	<div x-show="step === 'account'" class="p-5 space-y-4">
+		<div>
+			<div class="text-sm font-semibold">Which account is this?</div>
+			<div class="text-xs text-base-content/60">We ranked your accounts by how well the file matches. Pick one, or create a new account.</div>
+		</div>
+		<div class="space-y-2">
+			<template x-for="m in accounts" :key="m.account_id">
+				<label class="flex items-start gap-3 p-3 rounded-xl border border-base-300 hover:bg-base-200 cursor-pointer transition-colors"
+					:class="{ 'border-primary ring-1 ring-primary bg-primary/5': selectedAccountId === m.account_id && !createNew }">
+					<input type="radio" name="csv-account" class="radio radio-sm radio-primary mt-0.5"
+						:value="m.account_id" @change="selectedAccountId = m.account_id; createNew = false"
+						:checked="selectedAccountId === m.account_id && !createNew"/>
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-2">
+							<span class="font-medium text-sm truncate" x-text="m.account_name"></span>
+							<span class="badge badge-soft badge-sm"
+								:class="{ 'badge-success': m.confidence === 'high', 'badge-warning': m.confidence === 'medium', 'badge-neutral': m.confidence === 'low' }"
+								x-text="m.confidence + ' match'"></span>
+							<span class="badge badge-ghost badge-xs" x-show="m.profile_match">saved profile</span>
+						</div>
+						<div class="text-xs text-base-content/60 truncate" x-text="(m.institution ? m.institution + ' · ' : '') + (m.reasons || []).join(' · ')"></div>
+					</div>
+				</label>
+			</template>
+			<div x-show="accounts.length === 0" class="text-sm text-base-content/60 px-1 py-2">No existing accounts yet — create one below.</div>
+		</div>
+		<!-- Create new -->
+		<label class="flex items-start gap-3 p-3 rounded-xl border border-base-300 hover:bg-base-200 cursor-pointer transition-colors"
+			:class="{ 'border-primary ring-1 ring-primary bg-primary/5': createNew }">
+			<input type="radio" name="csv-account" class="radio radio-sm radio-primary mt-0.5" @change="createNew = true; selectedAccountId = ''" :checked="createNew"/>
+			<div class="min-w-0 flex-1">
+				<div class="font-medium text-sm flex items-center gap-2">
+					@LucideIcon("plus", "w-4 h-4")
+					<span>Create a new account</span>
+				</div>
+				<input type="text" x-model="newName" placeholder="Account name (e.g. Chase Checking)"
+					class="input input-sm input-bordered w-full mt-2" x-show="createNew" @click.stop/>
+			</div>
+		</label>
+	</div>
+}
+
+// Preview: summary chips + classification filter + paginated table.
+templ importModalPreview() {
+	<div x-show="step === 'preview'" class="flex flex-col">
+		<!-- Summary + filters -->
+		<div class="flex flex-wrap items-center gap-2 px-5 py-3 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+			<div class="join">
+				<button class="join-item btn btn-sm" :class="statusFilter === '' ? 'btn-active' : ''" @click="setFilter('')">
+					All <span class="opacity-60" x-text="'(' + (summary.total || 0) + ')'"></span>
+				</button>
+				<button class="join-item btn btn-sm" :class="statusFilter === 'new' ? 'btn-active' : ''" @click="setFilter('new')">
+					New <span class="opacity-60" x-text="'(' + (summary.counts?.new || 0) + ')'"></span>
+				</button>
+				<button class="join-item btn btn-sm" :class="statusFilter === 'probable_dup' ? 'btn-active' : ''" @click="setFilter('probable_dup')">
+					Maybe dup <span class="opacity-60" x-text="'(' + (summary.counts?.probable_dup || 0) + ')'"></span>
+				</button>
+				<button class="join-item btn btn-sm" :class="statusFilter === 'exact_dup' ? 'btn-active' : ''" @click="setFilter('exact_dup')">
+					Duplicate <span class="opacity-60" x-text="'(' + (summary.counts?.exact_dup || 0) + ')'"></span>
+				</button>
+				<button class="join-item btn btn-sm" :class="statusFilter === 'error' ? 'btn-active' : ''" @click="setFilter('error')" x-show="(summary.counts?.error || 0) > 0">
+					Errors <span class="opacity-60" x-text="'(' + (summary.counts?.error || 0) + ')'"></span>
+				</button>
+			</div>
+			<div class="ml-auto flex items-center gap-2">
+				<button class="btn btn-ghost btn-xs gap-1.5" @click="bulk('exclude', '')">
+					@LucideIcon("copy-x", "w-3.5 h-3.5")
+					Exclude duplicates
+				</button>
+				<button class="btn btn-ghost btn-xs gap-1.5" @click="bulk('include', '')">
+					@LucideIcon("copy-check", "w-3.5 h-3.5")
+					Include duplicates
+				</button>
+			</div>
+		</div>
+		<!-- Table -->
+		<div class="overflow-x-auto">
+			<table class="table table-sm">
+				<thead>
+					<tr>
+						<th class="w-10"></th>
+						<th>Date</th>
+						<th class="text-right">Amount</th>
+						<th>Description</th>
+						<th>Status</th>
+						<th class="w-10"></th>
+					</tr>
+				</thead>
+				<tbody>
+					<template x-for="r in rows" :key="r.id">
+						<tr class="hover:bg-base-200" :class="{ 'opacity-50': !r.include }">
+							<td>
+								<input type="checkbox" class="checkbox checkbox-sm" :checked="r.include" @change="toggleRow(r)"
+									:disabled="r.classification === 'error'"/>
+							</td>
+							<!-- view mode -->
+							<template x-if="editingId !== r.id">
+								<td x-text="r.date || '—'"></td>
+							</template>
+							<template x-if="editingId === r.id">
+								<td><input type="date" x-model="edit.date" class="input input-xs input-bordered w-32"/></td>
+							</template>
+							<template x-if="editingId !== r.id">
+								<td class="text-right tabular-nums" x-text="r.amount || '—'"></td>
+							</template>
+							<template x-if="editingId === r.id">
+								<td><input type="text" x-model="edit.amount" class="input input-xs input-bordered w-24 text-right"/></td>
+							</template>
+							<template x-if="editingId !== r.id">
+								<td class="max-w-xs truncate" x-text="r.description || r.parse_error || '—'" :class="{ 'text-error': r.classification === 'error' }"></td>
+							</template>
+							<template x-if="editingId === r.id">
+								<td><input type="text" x-model="edit.description" class="input input-xs input-bordered w-full"/></td>
+							</template>
+							<td>
+								<span class="badge badge-soft badge-sm" :class="badgeTone(r.classification)" x-text="classLabel(r.classification)"></span>
+								<div class="text-xs text-base-content/50 truncate max-w-[14rem]" x-show="r.match_reason" x-text="r.match_reason"></div>
+							</td>
+							<td class="text-right">
+								<template x-if="editingId !== r.id">
+									<button class="btn btn-ghost btn-xs btn-circle" @click="startEdit(r)" aria-label="Edit row">
+										@LucideIcon("pencil", "w-3.5 h-3.5")
+									</button>
+								</template>
+								<template x-if="editingId === r.id">
+									<div class="flex gap-1 justify-end">
+										<button class="btn btn-ghost btn-xs btn-circle" @click="saveEdit(r)" aria-label="Save">
+											@LucideIcon("check", "w-3.5 h-3.5 text-success")
+										</button>
+										<button class="btn btn-ghost btn-xs btn-circle" @click="editingId = null" aria-label="Cancel">
+											@LucideIcon("x", "w-3.5 h-3.5")
+										</button>
+									</div>
+								</template>
+							</td>
+						</tr>
+					</template>
+				</tbody>
+			</table>
+			<div x-show="rows.length === 0" class="py-12 text-center text-sm text-base-content/60">No rows in this view.</div>
+		</div>
+		<!-- Pagination -->
+		<div class="flex items-center justify-center gap-2 py-3" x-show="page > 1 || hasMore">
+			<div class="join">
+				<button class="join-item btn btn-sm" :disabled="page <= 1" @click="prevPage()">
+					@LucideIcon("chevron-left", "w-4 h-4")
+					Prev
+				</button>
+				<button class="join-item btn btn-sm btn-disabled" x-text="'Page ' + page"></button>
+				<button class="join-item btn btn-sm" :disabled="!hasMore" @click="nextPage()">
+					Next
+					@LucideIcon("chevron-right", "w-4 h-4")
+				</button>
+			</div>
+		</div>
+	</div>
+}
+
+templ importModalResult() {
+	<div x-show="step === 'result'" class="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
+		<div class="flex items-center justify-center w-14 h-14 rounded-full bg-success/10">
+			@LucideIcon("check", "w-7 h-7 text-success")
+		</div>
+		<div>
+			<div class="text-base font-semibold">Import complete</div>
+			<div class="text-sm text-base-content/60 mt-1">
+				<span class="font-medium text-success" x-text="result.NewCount || 0"></span> added
+				<span x-show="(result.UpdatedCount || 0) > 0">· <span class="font-medium" x-text="result.UpdatedCount"></span> updated</span>
+				<span x-show="(result.SkippedCount || 0) > 0">· <span class="font-medium" x-text="result.SkippedCount"></span> skipped</span>
+			</div>
+		</div>
+		<button class="btn btn-primary btn-sm" @click="closeFlow()">Done</button>
+	</div>
+}

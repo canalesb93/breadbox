@@ -3508,3 +3508,101 @@ templ designSettingsCreateButton() {
 templ designSettingsSaveButton(label string) {
 	<button type="submit" class="btn btn-sm btn-primary" disabled>{ label }</button>
 }
+
+// SectionCSVImport showcases the drop-anywhere CSV import flow's building
+// blocks (static markup — the live flow is components.ImportModal driven by the
+// csvImport Alpine factory + $store.csvImport). Variant matrix: drop overlay,
+// ranked account picker rows, classification badges, a preview table slice, and
+// the success screen.
+templ SectionCSVImport() {
+	<div class="flex flex-col gap-6">
+		@designExample("Drop overlay", "Shown full-window when a file is dragged over any page.") {
+			<div class="relative h-48 rounded-xl border border-base-300 overflow-hidden bg-base-200/40">
+				<div class="absolute inset-0 flex items-center justify-center bg-base-100/80 backdrop-blur-sm">
+					<div class="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-primary/5 px-12 py-8 text-center">
+						@components.LucideIcon("upload-cloud", "w-10 h-10 text-primary")
+						<div class="text-base font-semibold">Drop your CSV to import</div>
+						<div class="text-sm text-base-content/60">We'll detect the account and preview changes before saving.</div>
+					</div>
+				</div>
+			</div>
+		}
+		@designExample("Account suggestions", "Ranked by mask, transaction overlap, institution, and saved profiles.") {
+			<div class="space-y-2 max-w-xl">
+				<label class="flex items-start gap-3 p-3 rounded-xl border border-primary ring-1 ring-primary bg-primary/5">
+					<input type="radio" class="radio radio-sm radio-primary mt-0.5" checked disabled/>
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-2">
+							<span class="font-medium text-sm">Chase Checking</span>
+							<span class="badge badge-soft badge-success badge-sm">high match</span>
+							<span class="badge badge-ghost badge-xs">saved profile</span>
+						</div>
+						<div class="text-xs text-base-content/60">Chase · saved import profile · 92% of rows already here</div>
+					</div>
+				</label>
+				<label class="flex items-start gap-3 p-3 rounded-xl border border-base-300">
+					<input type="radio" class="radio radio-sm radio-primary mt-0.5" disabled/>
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-2">
+							<span class="font-medium text-sm">Amex Platinum</span>
+							<span class="badge badge-soft badge-warning badge-sm">medium match</span>
+						</div>
+						<div class="text-xs text-base-content/60">American Express · card ending 1009 matches</div>
+					</div>
+				</label>
+				<label class="flex items-start gap-3 p-3 rounded-xl border border-base-300">
+					<input type="radio" class="radio radio-sm radio-primary mt-0.5" disabled/>
+					<div class="min-w-0 flex-1">
+						<div class="font-medium text-sm flex items-center gap-2">
+							@components.LucideIcon("plus", "w-4 h-4")
+							<span>Create a new account</span>
+						</div>
+					</div>
+				</label>
+			</div>
+		}
+		@designExample("Classification badges", "Per-row verdict in the preview table.") {
+			<div class="flex flex-wrap gap-2">
+				<span class="badge badge-soft badge-success badge-sm">New</span>
+				<span class="badge badge-soft badge-warning badge-sm">Maybe dup</span>
+				<span class="badge badge-soft badge-neutral badge-sm">Duplicate</span>
+				<span class="badge badge-soft badge-error badge-sm">Error</span>
+			</div>
+		}
+		@designExample("Preview table", "Server-paginated; checkbox toggles include, pencil edits inline.") {
+			<div class="overflow-x-auto">
+				<table class="table table-sm">
+					<thead>
+						<tr><th class="w-10"></th><th>Date</th><th class="text-right">Amount</th><th>Description</th><th>Status</th></tr>
+					</thead>
+					<tbody>
+						<tr class="hover:bg-base-200">
+							<td><input type="checkbox" class="checkbox checkbox-sm" checked disabled/></td>
+							<td>2026-07-03</td><td class="text-right tabular-nums">30.00</td><td>DINNER</td>
+							<td><span class="badge badge-soft badge-success badge-sm">New</span></td>
+						</tr>
+						<tr class="hover:bg-base-200 opacity-50">
+							<td><input type="checkbox" class="checkbox checkbox-sm" disabled/></td>
+							<td>2026-07-01</td><td class="text-right tabular-nums">10.00</td><td>COFFEE</td>
+							<td>
+								<span class="badge badge-soft badge-neutral badge-sm">Duplicate</span>
+								<div class="text-xs text-base-content/50">already imported</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		}
+		@designExample("Success", "Result screen after apply.") {
+			<div class="flex flex-col items-center justify-center gap-4 py-8 text-center">
+				<div class="flex items-center justify-center w-14 h-14 rounded-full bg-success/10">
+					@components.LucideIcon("check", "w-7 h-7 text-success")
+				</div>
+				<div>
+					<div class="text-base font-semibold">Import complete</div>
+					<div class="text-sm text-base-content/60 mt-1"><span class="font-medium text-success">1</span> added · <span class="font-medium">2</span> skipped</div>
+				</div>
+			</div>
+		}
+	</div>
+}

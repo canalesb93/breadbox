@@ -10,6 +10,7 @@ import (
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/textmatch"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -240,40 +241,11 @@ func pickBestCandidate(depName, depMerchant string, candidates []matchCandidate)
 }
 
 // nameSimilarityScore computes how similar two transactions' names are.
-// Returns score (0-3) and which fields matched.
+// Returns score (0-3) and which fields matched. The scoring lives in the
+// tag-free internal/textmatch package so the CSV import classifier can reuse
+// the exact same logic without importing the sync package.
 func nameSimilarityScore(depName, depMerchant, priName, priMerchant string) (int, []string) {
-	// Exact merchant_name match (highest signal).
-	// EqualFold covers case-insensitive equality without allocating.
-	if depMerchant != "" && priMerchant != "" &&
-		strings.EqualFold(depMerchant, priMerchant) {
-		return 3, []string{"merchant_name"}
-	}
-
-	// Merchant name contains or is contained.
-	if depMerchant != "" && priMerchant != "" {
-		depMerchantLower := strings.ToLower(depMerchant)
-		priMerchantLower := strings.ToLower(priMerchant)
-		if strings.Contains(depMerchantLower, priMerchantLower) ||
-			strings.Contains(priMerchantLower, depMerchantLower) {
-			return 2, []string{"merchant_name"}
-		}
-	}
-
-	// Exact name match.
-	if strings.EqualFold(depName, priName) {
-		return 2, []string{"name"}
-	}
-
-	// Name contains or is contained.
-	depNameLower := strings.ToLower(depName)
-	priNameLower := strings.ToLower(priName)
-	if strings.Contains(depNameLower, priNameLower) ||
-		strings.Contains(priNameLower, depNameLower) {
-		return 1, []string{"name"}
-	}
-
-	// No name similarity — still valid (date + amount matched).
-	return 0, nil
+	return textmatch.Score(depName, depMerchant, priName, priMerchant)
 }
 
 // nameSimilarityScoreLowered is the same as nameSimilarityScore but accepts
@@ -285,37 +257,11 @@ func nameSimilarityScoreLowered(
 	depMerchant, depMerchantLower,
 	priName, priMerchant string,
 ) (int, []string) {
-	// Exact merchant_name match (highest signal).
-	if depMerchant != "" && priMerchant != "" &&
-		strings.EqualFold(depMerchant, priMerchant) {
-		return 3, []string{"merchant_name"}
-	}
-
-	// Merchant name contains or is contained. We reuse depMerchantLower
-	// across candidates and only lower priMerchant on demand.
-	if depMerchant != "" && priMerchant != "" {
-		priMerchantLower := strings.ToLower(priMerchant)
-		if strings.Contains(depMerchantLower, priMerchantLower) ||
-			strings.Contains(priMerchantLower, depMerchantLower) {
-			return 2, []string{"merchant_name"}
-		}
-	}
-
-	// Exact name match.
-	if strings.EqualFold(depName, priName) {
-		return 2, []string{"name"}
-	}
-
-	// Name contains or is contained. Reuse the pre-lowered depName and
-	// lower priName on demand.
-	priNameLower := strings.ToLower(priName)
-	if strings.Contains(depNameLower, priNameLower) ||
-		strings.Contains(priNameLower, depNameLower) {
-		return 1, []string{"name"}
-	}
-
-	// No name similarity — still valid (date + amount matched).
-	return 0, nil
+	return textmatch.ScoreLowered(
+		depName, depNameLower,
+		depMerchant, depMerchantLower,
+		priName, priMerchant,
+	)
 }
 
 // buildMatchedOn returns which name fields matched between two transactions.

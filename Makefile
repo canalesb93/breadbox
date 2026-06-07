@@ -247,7 +247,7 @@ sqlc-install:
 	fi
 
 sqlc: sqlc-install
-	@rm -f internal/db/*.sql.go internal/db/models.go internal/db/db.go
+	@rm -f internal/db/*.sql.go internal/db/models.go internal/db/db.go internal/db/copyfrom.go
 	sqlc generate
 	@$(MAKE) sqlc-tag
 
@@ -256,7 +256,7 @@ sqlc: sqlc-install
 # `emit_build_tag` option (added in 1.27+), so we patch the artifacts in a
 # follow-up step. CI runs the same target.
 sqlc-tag:
-	@for f in internal/db/db.go internal/db/models.go internal/db/*.sql.go; do \
+	@for f in internal/db/db.go internal/db/models.go internal/db/copyfrom.go internal/db/*.sql.go; do \
 		if [ -f "$$f" ] && ! head -1 "$$f" | grep -q '^//go:build'; then \
 			printf '//go:build !lite\n\n' | cat - "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
 		fi; \

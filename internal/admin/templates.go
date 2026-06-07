@@ -93,6 +93,9 @@ var componentRegistry = map[string]componentAdapter{
 	"ThemeToggle": func(_ any) (templ.Component, error) {
 		return components.ThemeToggle(), nil
 	},
+	"ImportModal": func(_ any) (templ.Component, error) {
+		return components.ImportModal(), nil
+	},
 	"TopbarUserMenu": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {

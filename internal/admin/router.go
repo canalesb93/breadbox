@@ -578,6 +578,17 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/csv/preview", CSVPreviewHandler(a, sm))
 			r.Post("/csv/import", CSVImportHandler(a, sm, svc))
 
+			// CSV import v2 — drag-anywhere flow (analyze → resolve → preview → apply).
+			r.Post("/csv/v2/sessions", CSVV2CreateSessionHandler(a, sm, svc))
+			r.Post("/csv/v2/sessions/{id}/resolve", CSVV2ResolveHandler(a, svc))
+			r.Get("/csv/v2/sessions/{id}/rows", CSVV2RowsHandler(a, svc))
+			r.Patch("/csv/v2/sessions/{id}/rows/{rowId}", CSVV2EditRowHandler(a, svc))
+			r.Post("/csv/v2/sessions/{id}/bulk", CSVV2BulkHandler(a, svc))
+			r.Post("/csv/v2/sessions/{id}/apply", CSVV2ApplyHandler(a, sm, svc))
+			r.Get("/csv/v2/profiles", CSVV2ProfilesListHandler(a, svc))
+			r.Patch("/csv/v2/profiles/{id}", CSVV2ProfileRenameHandler(a, svc))
+			r.Delete("/csv/v2/profiles/{id}", CSVV2ProfileDeleteHandler(a, svc))
+
 			// API key + OAuth client revoke/delete — admin only.
 			r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
 			r.Delete("/oauth-clients/{id}", RevokeOAuthClientHandler(svc))
