@@ -816,10 +816,28 @@ templ workflowCustomDrawer() {
 		Title: "Custom workflow",
 	}) {
 		<form class="flex flex-col h-full" @submit.prevent="submitCustom($event.target)">
+			<!-- Identity header mirrors the reconfigure drawer: an editable
+			     DiceBear avatar (shuffle to reseed) + the name as an inline
+			     field. The name posts as `name`, the seed as the hidden
+			     `avatar_seed`. -->
 			<div class="flex items-center justify-between gap-4 p-5 border-b border-base-300 shrink-0">
-				<div class="flex items-center gap-3 min-w-0 flex-1">
-					@components.LucideIcon("wand-sparkles", "w-5 h-5 text-base-content/60 shrink-0")
-					<div class="text-lg font-semibold leading-tight" x-text="custom.isEdit ? 'Edit workflow' : 'New custom workflow'"></div>
+				<div class="flex items-center gap-3.5 min-w-0 flex-1">
+					@components.EditableAvatar(components.EditableAvatarProps{
+						SrcExpr:   "customAvatarSrc()",
+						OnShuffle: "shuffleCustomAvatar()",
+						Alt:       "Workflow avatar",
+						SizeClass: "w-12 h-12",
+					})
+					<input
+						type="text"
+						name="name"
+						x-model="custom.name"
+						maxlength="80"
+						required
+						placeholder="Workflow name"
+						aria-label="Workflow name"
+						class="input input-ghost !text-lg font-semibold leading-tight flex-1 min-w-0 h-auto py-1.5 px-1.5 -ml-1.5 rounded-lg transition-colors hover:bg-base-200/70"
+					/>
 				</div>
 				<div class="flex items-center gap-2 shrink-0">
 					<!-- Activate toggle (create only): set up + activate in one gesture.
@@ -832,24 +850,13 @@ templ workflowCustomDrawer() {
 						@components.LucideIcon("x", "w-4 h-4")
 					</button>
 				</div>
+				<input type="hidden" name="avatar_seed" x-model="custom.avatarSeed"/>
 			</div>
 			<div x-show="custom.loading" class="flex items-center gap-2 text-sm text-base-content/60 p-5">
 				<span class="loading loading-spinner loading-sm"></span>
 				Loading…
 			</div>
 			<div x-show="!custom.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
-				<div>
-					<div class="text-sm font-medium mb-1.5">Name</div>
-					<input
-						type="text"
-						name="name"
-						x-model="custom.name"
-						maxlength="80"
-						required
-						placeholder="e.g. Weekly anomaly sweep"
-						class="input input-sm w-full"
-					/>
-				</div>
 				<div>
 					<div class="text-sm font-medium mb-1.5">Prompt</div>
 					<textarea
