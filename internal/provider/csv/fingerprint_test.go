@@ -40,6 +40,11 @@ func TestExtractMaskFromFilename(t *testing.T) {
 		"acct_5555_2026.csv":            "5555",
 		"plain_transactions.csv":        "",
 		"/Users/me/Downloads/card-0001": "0001",
+		// Institution-glued last4 (real Chase/Amex export filenames).
+		"Chase0198_Activity_20260607.CSV": "0198",
+		"Amex1009.csv":                    "1009",
+		// A bare date stamp must not be mistaken for a mask.
+		"export_20260607.csv": "",
 	}
 	for fn, want := range cases {
 		if got := ExtractMask(fn, headers, nil); got != want {

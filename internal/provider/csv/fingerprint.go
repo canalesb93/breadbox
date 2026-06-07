@@ -42,6 +42,12 @@ var digitsRe = regexp.MustCompile(`\d+`)
 // "4321_". RE2 has no lookahead, so we consume one non-digit outside the group.
 var filenameMaskRe = regexp.MustCompile(`(?i)(?:x|ending|acct|account|card|no|#|-|_)\s*[-_ ]?(\d{4})(?:\D|$)`)
 
+// instMaskRe matches the very common "<institution><last4>" filename shape banks
+// use, e.g. "Chase0198_Activity.csv" or "Amex1009.csv" — letters immediately
+// followed by exactly 4 digits. Requiring a letter run before the digits avoids
+// matching date stamps like "_20260607" (preceded by a separator, not letters).
+var instMaskRe = regexp.MustCompile(`(?i)[a-z]{2,}(\d{4})(?:\D|$)`)
+
 // lastFour returns the trailing 4 digits of s (digits only), or "" if there are
 // fewer than 4 digits.
 func lastFour(s string) string {
@@ -83,6 +89,10 @@ func ExtractMask(filename string, headers []string, sampleRows [][]string) strin
 		base = base[idx+1:]
 	}
 	if m := filenameMaskRe.FindStringSubmatch(base); m != nil {
+		return m[1]
+	}
+	// "<institution><last4>" shape (Chase0198, Amex1009).
+	if m := instMaskRe.FindStringSubmatch(base); m != nil {
 		return m[1]
 	}
 

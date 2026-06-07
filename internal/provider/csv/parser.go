@@ -33,6 +33,12 @@ func ParseFile(raw []byte) (*ParsedFile, error) {
 	r.Comma = delim
 	r.LazyQuotes = true
 	r.TrimLeadingSpace = true
+	// Allow a variable number of fields per row. Real bank exports are ragged:
+	// Chase checking CSVs append a trailing comma to every data row (8 fields vs
+	// a 7-column header), and other banks pad/omit trailing empties. Column
+	// mapping is index-based and bounds-checked downstream, so extra/short
+	// trailing fields are harmless — failing the whole import over them is not.
+	r.FieldsPerRecord = -1
 
 	var allRows [][]string
 	for {

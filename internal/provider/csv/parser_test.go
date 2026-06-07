@@ -26,6 +26,29 @@ func TestParseFileCSV(t *testing.T) {
 	}
 }
 
+// TestParseFileRaggedRows covers real bank exports whose data rows carry a
+// trailing comma (more fields than the header) — e.g. Chase checking CSVs with
+// a "Check or Slip #" column plus a trailing comma. These must parse, not fail.
+func TestParseFileRaggedRows(t *testing.T) {
+	input := "Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #\n" +
+		"CREDIT,06/05/2026,\"META PAYROLL PPD ID: 9111\",8108.27,ACH_CREDIT,18754.72,,\n" +
+		"DEBIT,06/02/2026,\"AMEX ACH PMT WEB ID: 9493\",-2213.33,ACH_DEBIT,10646.45,,\n"
+
+	pf, err := ParseFile([]byte(input))
+	if err != nil {
+		t.Fatalf("ParseFile ragged: %v", err)
+	}
+	if len(pf.Rows) != 2 {
+		t.Fatalf("rows: got %d, want 2", len(pf.Rows))
+	}
+	if DetectTemplate(pf.Headers) == nil {
+		t.Error("expected Chase Checking template to match")
+	}
+	if pf.Rows[0][3] != "8108.27" {
+		t.Errorf("amount cell: got %q, want 8108.27", pf.Rows[0][3])
+	}
+}
+
 func TestParseFileTSV(t *testing.T) {
 	input := "Date\tAmount\tDescription\n2024-01-15\t42.50\tCoffee\n2024-01-16\t10.00\tGrocery\n"
 
