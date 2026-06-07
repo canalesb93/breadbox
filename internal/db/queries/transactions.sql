@@ -101,6 +101,23 @@ ON CONFLICT (provider_transaction_id) DO UPDATE SET
   END
 RETURNING *, (xmax = 0) AS inserted;
 
+-- name: ListAccountTransactionsForDedup :many
+-- Live transactions in an account within a date window — the candidate set the
+-- CSV import classifier compares incoming rows against (provider-agnostic, so it
+-- also dedupes against Plaid/Teller rows already in the account).
+SELECT id, date, amount, provider_name, provider_merchant_name,
+       content_hash, provider_transaction_id
+FROM transactions
+WHERE account_id = $1 AND deleted_at IS NULL AND date BETWEEN $2 AND $3;
+
+-- name: ListTransactionKeysInRange :many
+-- (account_id, date, amount) for all live transactions in a date window, across
+-- every account — used to score how well an uploaded CSV overlaps each candidate
+-- account during account auto-detection.
+SELECT account_id, date, amount
+FROM transactions
+WHERE deleted_at IS NULL AND account_id IS NOT NULL AND date BETWEEN $1 AND $2;
+
 -- name: SoftDeleteTransactionByExternalID :exec
 UPDATE transactions SET deleted_at = NOW() WHERE provider_transaction_id = $1 AND deleted_at IS NULL;
 
