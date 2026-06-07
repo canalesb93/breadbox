@@ -12,25 +12,38 @@ import (
 )
 
 // DevModeSettingsResponse is the read shape for Settings → Developer.
+// UploadToken is masked (never plaintext) and nil when unset.
 type DevModeSettingsResponse struct {
-	Enabled    bool   `json:"enabled"`
-	GithubRepo string `json:"github_repo"`
+	Enabled     bool    `json:"enabled"`
+	GithubRepo  string  `json:"github_repo"`
+	UploadToken *string `json:"upload_token,omitempty"`
 }
 
 // UpdateDevModeSettingsParams holds the writable Developer-Mode settings.
 // Nil = leave untouched. An empty GithubRepo clears it (falls back to the
-// default).
+// default). UploadToken: nil or empty = leave the stored token alone; non-empty
+// = replace it (stored encrypted).
 type UpdateDevModeSettingsParams struct {
-	Enabled    *bool
-	GithubRepo *string
+	Enabled     *bool
+	GithubRepo  *string
+	UploadToken *string
 }
 
-// GetDevModeSettings reads the devmode.* keys from app_config.
+// GetDevModeSettings reads the devmode.* keys from app_config. The upload token
+// is decrypted then masked for display; the plaintext never leaves the server.
 func (s *Service) GetDevModeSettings(ctx context.Context) (*DevModeSettingsResponse, error) {
-	return &DevModeSettingsResponse{
+	resp := &DevModeSettingsResponse{
 		Enabled:    appconfig.Bool(ctx, s.Queries, appconfig.KeyDevModeEnabled, false),
 		GithubRepo: appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo),
-	}, nil
+	}
+	if len(s.EncryptionKey) > 0 {
+		tok, _, err := appconfig.ReadEncrypted(ctx, s.Queries, appconfig.KeyDevModeUploadToken, s.EncryptionKey)
+		if err != nil {
+			return nil, fmt.Errorf("read devmode upload token: %w", err)
+		}
+		resp.UploadToken = maskToken(tok)
+	}
+	return resp, nil
 }
 
 // DevModeEnabled is a cheap single-key read used by the base-layout middleware
@@ -56,6 +69,16 @@ func (s *Service) UpdateDevModeSettings(ctx context.Context, p UpdateDevModeSett
 		}
 		if err := s.Queries.SetAppConfig(ctx, appconfigParam(appconfig.KeyDevModeGithubRepo, repo)); err != nil {
 			return nil, fmt.Errorf("set devmode_github_repo: %w", err)
+		}
+	}
+	if p.UploadToken != nil {
+		if tok := strings.TrimSpace(*p.UploadToken); tok != "" {
+			if len(s.EncryptionKey) == 0 {
+				return nil, fmt.Errorf("%w: ENCRYPTION_KEY must be set to store the upload token", ErrInvalidParameter)
+			}
+			if err := appconfig.WriteEncrypted(ctx, s.Queries, appconfig.KeyDevModeUploadToken, tok, s.EncryptionKey); err != nil {
+				return nil, fmt.Errorf("write devmode upload token: %w", err)
+			}
 		}
 	}
 	return s.GetDevModeSettings(ctx)

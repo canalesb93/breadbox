@@ -44,8 +44,9 @@ type DevReportResult struct {
 
 // CreateDevReport hosts the (redacted) screenshot + HTML snapshot on the
 // artifact store and builds a prefilled GitHub "new issue" draft URL with the
-// image embedded and the snapshot linked. No token, no DB — the draft rides
-// the user's GitHub session and they review + submit it.
+// image embedded and the snapshot linked. The GitHub draft rides the user's
+// GitHub session (no token for filing); the artifact upload is authenticated
+// server-side with the token from artifactUploadToken.
 //
 // Artifacts are public-read, so the client redacts financial data before
 // upload; uploads here are best-effort (a failure just omits that artifact).
@@ -57,15 +58,16 @@ func (s *Service) CreateDevReport(ctx context.Context, in CreateDevReportInput) 
 	}
 
 	repo := appconfig.String(ctx, s.Queries, appconfig.KeyDevModeGithubRepo, appconfig.DevModeDefaultRepo)
+	uploadToken := s.artifactUploadToken(ctx)
 
 	var imageURL, htmlURL string
 	if len(in.ScreenshotData) > 0 {
-		if u, err := uploadArtifact(ctx, in.ScreenshotData, "screenshot.jpg"); err == nil {
+		if u, err := uploadArtifact(ctx, in.ScreenshotData, "screenshot.jpg", uploadToken); err == nil {
 			imageURL = u
 		}
 	}
 	if strings.TrimSpace(in.HTMLSnapshot) != "" {
-		if u, err := uploadArtifact(ctx, []byte(in.HTMLSnapshot), "snapshot.html"); err == nil {
+		if u, err := uploadArtifact(ctx, []byte(in.HTMLSnapshot), "snapshot.html", uploadToken); err == nil {
 			htmlURL = u
 		}
 	}

@@ -88,6 +88,31 @@ templ developerModeSection(p DeveloperSettingsProps) {
 			}
 		}
 		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Artifact upload token",
+			Caption: "Bearer token the server uses to upload the screenshot + HTML snapshot to the artifact host. Stored encrypted; leave blank to keep the current value.",
+			For:     "upload_token",
+		}) {
+			<input
+				id="upload_token"
+				type="password"
+				name="upload_token"
+				value=""
+				placeholder="Paste an upload token"
+				autocomplete="off"
+				spellcheck="false"
+				class="bb-form-input font-mono min-w-72"
+			/>
+			if p.Form.UploadTokenMasked != "" {
+				<p class="text-xs text-base-content/50 mt-1">
+					Currently set ({ p.Form.UploadTokenMasked }). The <code>BB_ARTIFACTS_UPLOAD_TOKEN</code> env var overrides this when set.
+				</p>
+			} else {
+				<p class="text-xs text-warning mt-1">
+					Not set — the reporter can't upload artifacts until this (or the <code>BB_ARTIFACTS_UPLOAD_TOKEN</code> env var) is configured.
+				</p>
+			}
+		}
+		@components.SettingsRow(components.SettingsRowProps{
 			Label:   "Issue labels",
 			Caption: "Applied automatically — add these to the repo so GitHub keeps them.",
 		}) {
