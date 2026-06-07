@@ -1057,16 +1057,6 @@ templ SectionLoading() {
 				@components.CategoriesSkeleton()
 			</div>
 		}
-		@designExample("Agents list skeleton", "Placeholder mirroring /agents/definitions — count + 'Prompt library' header strip and the agent definitions table (Name + optional sync badge + description, Schedule cron + pretty subline, Last run pill + relative time, Next run, 30d cost, Enabled toggle, kebab). Primitive is exposed here for future AJAX swaps (toggleEnabled / runNow without a full page reload); the page is full-SSR today.") {
-			<div class="max-w-4xl">
-				@components.AgentsListSkeleton()
-			</div>
-		}
-		@designExample("Agent runs list skeleton", "Placeholder mirroring the /agents runs landing — 4-up 30d stat row (Runs / Errors / Cost / Avg duration), collapsed filter bar (icon + label + chip slots), and the divided card of rich run rows (icon tile + agent name + short-ID + status badge + trigger pill + meta line + trailing cost). Rows vary widths and toggle the optional error/note slots so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents is full-SSR today.") {
-			<div class="max-w-5xl">
-				@components.AgentRunsListSkeleton()
-			</div>
-		}
 		@designExample("Reports inbox skeleton", "Placeholder mirroring /reports — page header, filter tabs (All / Unread / Read + count + mark-all-read), and a divided card of inbox rows (bot avatar, meta line with optional priority dot + tag chips, title message bubble, mark-read + chevron actions). Primitive is exposed here for future AJAX swaps and adjacent agent-report panels (e.g. dashboard inbox preview); /reports is full-SSR today.") {
 			<div class="max-w-3xl">
 				@components.ReportsSkeleton()

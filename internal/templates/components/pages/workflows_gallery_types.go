@@ -108,10 +108,20 @@ func presetTileClasses(enabled bool) string {
 	return base + "bg-base-200 text-base-content/55"
 }
 
+// AgentSubsystemStatusProps is the readiness banner state. Mirrors
+// service.AgentSubsystemStatus but lives in the pages package so the
+// templ doesn't import the service tree.
+type AgentSubsystemStatusProps struct {
+	Ready          bool
+	AuthConfigured bool
+	BinaryPresent  bool
+	BinaryPath     string
+}
+
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.
 type WorkflowsGalleryProps struct {
 	Categories []WorkflowCategoryProps
-	// Status mirrors the agent runtime readiness (reused from agents_list_types).
+	// Status mirrors the agent runtime readiness.
 	Status    AgentSubsystemStatusProps
 	CSRFToken string
 	// ConsentAcknowledged is true once the household has acknowledged that
