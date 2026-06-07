@@ -25,16 +25,6 @@ templ DeveloperSettings(p DeveloperSettingsProps) {
 				<span>{ p.FormSuccess }</span>
 			</div>
 		}
-		if p.Form.Enabled {
-			<div role="note" class="alert alert-info alert-soft mb-4 rounded-xl">
-				@components.LucideIcon("external-link", "w-4 h-4")
-				<span>No token needed — filing opens a <strong>prefilled GitHub draft</strong> (description, screenshot, and context pre-populated) that you review and submit, using your existing GitHub session.</span>
-			</div>
-			<div role="note" class="alert alert-success alert-soft mb-4 rounded-xl">
-				@components.LucideIcon("shield-check", "w-4 h-4")
-				<span>Reports redact financial data by default — amounts, names, and other values are masked in the screenshot and HTML snapshot before they're uploaded to the artifact store and linked in the issue. Redaction can be turned off per-report from the reporter.</span>
-			</div>
-		}
 		<div class="space-y-6">
 			@developerModeSection(p)
 		</div>
@@ -47,7 +37,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "bug",
 		Title:   "Developer mode",
-		Caption: "Enable the floating reporter and point it at a GitHub repo",
+		Caption: "Enable the floating reporter and point it at a GitHub repo — amounts and names are redacted before upload by default",
 		Form: &components.SettingsSectionFormProps{
 			Action:    "/settings/developer",
 			CSRFToken: p.CSRFToken,
@@ -56,7 +46,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 	}) {
 		@components.SettingsRow(components.SettingsRowProps{
 			Label:   "Enable developer mode",
-			Caption: "Renders a floating reporter on every page for filing a GitHub issue draft",
+			Caption: "Renders a floating reporter on every page — filing opens a prefilled GitHub draft you review and submit using your existing GitHub session",
 			For:     "enabled",
 		}) {
 			<input
@@ -128,10 +118,8 @@ templ developerModeSection(p DeveloperSettingsProps) {
 }
 
 templ developerSettingsFooter() {
-	<div class="bb-action-row">
-		<button type="submit" class="btn btn-primary btn-sm gap-2">
-			@components.LucideIcon("save", "w-4 h-4")
-			Save changes
-		</button>
-	</div>
+	<button type="submit" class="btn btn-primary btn-sm gap-2">
+		@components.LucideIcon("save", "w-4 h-4")
+		Save changes
+	</button>
 }
