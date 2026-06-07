@@ -283,7 +283,7 @@ docker-down:
 css-install:
 	@if [ ! -f $(TAILWIND_BIN) ]; then \
 		echo "Downloading tailwindcss-extra..."; \
-		curl -sLo $(TAILWIND_BIN) -m 120 https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-$$(uname -s | tr '[:upper:]' '[:lower:]')-$$(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/'); \
+		curl -fsSL --retry 3 --retry-delay 2 -o $(TAILWIND_BIN) -m 120 https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-$$(uname -s | tr '[:upper:]' '[:lower:]')-$$(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/'); \
 		chmod +x $(TAILWIND_BIN); \
 	fi
 
