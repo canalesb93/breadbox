@@ -15,6 +15,21 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
+// buildAgentsListStatus maps the service readiness struct to the props
+// shape. Nil-safe: a nil status (shouldn't happen in practice — the
+// service method always returns a value) renders as "not ready".
+func buildAgentsListStatus(s *service.AgentSubsystemStatus) pages.AgentSubsystemStatusProps {
+	if s == nil {
+		return pages.AgentSubsystemStatusProps{}
+	}
+	return pages.AgentSubsystemStatusProps{
+		Ready:          s.Ready,
+		AuthConfigured: s.AuthConfigured,
+		BinaryPresent:  s.BinaryPresent,
+		BinaryPath:     s.BinaryPath,
+	}
+}
+
 // buildWorkflowSpendBanner derives the gallery's spend-ceiling banner from
 // the rolling-window spend status. No ceiling (unset or <= 0) → no banner.
 // Shown at >= 80% of the ceiling; "Over" once spend reaches it (runs paused).

@@ -7,10 +7,12 @@ User-facing reference: [docs.breadbox.sh/guides/multi-agent-reviewer](https://do
 ## The five layers
 
 ```
-admin UI (internal/admin/agents_list_page.go, agent_form_page.go,
-          agent_runs_page.go, agent_sdk_settings_page.go
-          backed by internal/templates/components/pages/agents_list.templ,
-          agent_form.templ, agent_runs.templ, agent_sdk_settings.templ)
+admin UI (internal/admin/workflows_gallery_page.go, workflows_runs_page.go,
+          agent_runs_page.go (run detail + transcript), agent_sdk_settings_page.go
+          backed by internal/templates/components/pages/workflows_gallery.templ,
+          workflows_runs.templ, agent_run_detail.templ, agent_sdk_settings.templ.
+          Custom + preset workflows are created/edited via drawers on /workflows;
+          the legacy /agents form + prompt-library wizard were removed.)
    │ REST /api/v1/agents/* (via browser session cookie)
    ▼
 internal/api/agents.go            ← HTTP handlers, error envelope mapping
