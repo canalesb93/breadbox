@@ -71,6 +71,12 @@ document.addEventListener('alpine:init', function () {
         }
         this.initialValue = this.value;
         this._onSaved = typeof detail.onSaved === 'function' ? detail.onSaved : null;
+        // Optional pre-rendered, sanitized HTML for the first preview render.
+        // Callers that already have server-rendered markdown (e.g. the
+        // workflow prompt endpoint returns prompt_html alongside the raw
+        // prompt) pass it here so we skip the /-/markdown/preview round-trip.
+        // Cleared after one use; toggling Edit→Preview re-renders from value.
+        this._prerenderedHTML = detail.html != null ? String(detail.html) : '';
 
         // Editable opens in the editor when asked, else in preview; preview-only
         // is always the rendered view.
@@ -144,6 +150,24 @@ document.addEventListener('alpine:init', function () {
       // Render the current buffer to sanitized HTML server-side and inject it.
       renderPreview: function () {
         var self = this;
+        // Fast path: a caller handed us already-sanitized HTML for the first
+        // render — inject it directly and skip the network round-trip.
+        if (self._prerenderedHTML) {
+          var html = self._prerenderedHTML;
+          self._prerenderedHTML = '';
+          self._seq++; // invalidate any render still in flight
+          self.loading = false;
+          self.$nextTick(function () {
+            var el = self.$refs.previewBody;
+            if (!el) return;
+            el.innerHTML = html;
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons();
+            }
+            el.scrollTop = 0;
+          });
+          return;
+        }
         var seq = ++self._seq;
         self.loading = true;
         fetch('/-/markdown/preview', {

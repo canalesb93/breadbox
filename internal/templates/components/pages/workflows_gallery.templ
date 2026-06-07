@@ -106,8 +106,8 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				}
 			}
 		}
-		// F2: workflow-prompt preview modal — one shared daisy dialog filled on demand by previewPrompt().
-		@workflowPromptPreviewModal()
+		// F2: the workflow-prompt preview now uses the shared global prompt
+		// modal (#bb-prompt-modal in base.html); previewPrompt() dispatches it.
 		// F3: one shared reconfigure drawer, hydrated by openReconfigure() from
 		// GET /-/workflows/{slug}/config. Admin-only (the link that opens it is).
 		if p.IsAdmin {
@@ -273,62 +273,6 @@ templ workflowReconfigureIdentityHeader() {
 		</div>
 		<input type="hidden" name="avatar_seed" x-model="reconfigure.avatarSeed"/>
 	</div>
-}
-
-// workflowPromptPreviewModal is the shared read-only dialog that shows a
-// preset's fully composed internal base prompt. previewPrompt() in the
-// gallery factory opens it (dialog.showModal()) and fills previewTitle /
-// previewBody from GET /-/workflows/{slug}/prompt.
-templ workflowPromptPreviewModal() {
-	<dialog id="wf-prompt-preview" class="modal modal-bottom sm:modal-middle" @keydown.c="if (!$event.metaKey && !$event.ctrlKey) copyPrompt()">
-		<div class="modal-box max-w-2xl">
-			<div class="flex items-start justify-between gap-3 mb-3">
-				<div class="flex items-start gap-2 min-w-0">
-					@components.LucideIcon("file-text", "w-5 h-5 mt-0.5 text-base-content/60 shrink-0")
-					<div class="min-w-0">
-						<h3 class="text-base font-semibold leading-tight truncate" x-text="previewTitle || 'Workflow prompt'"></h3>
-						<p class="text-xs text-base-content/60 mt-0.5">The built-in base prompt this workflow runs with, before any additional instructions.</p>
-					</div>
-				</div>
-				<form method="dialog">
-					<button class="btn btn-ghost btn-sm btn-square shrink-0" aria-label="Close">
-						@components.LucideIcon("x", "w-4 h-4")
-					</button>
-				</form>
-			</div>
-			<div x-show="previewLoading" class="flex items-center gap-2 text-sm text-base-content/60 py-6">
-				<span class="loading loading-spinner loading-sm"></span>
-				Loading prompt…
-			</div>
-			// Filled with server-rendered prompt_html in previewPrompt();
-			// x-ref lets the factory target this element after the async fetch.
-			<div
-				x-show="!previewLoading"
-				x-cloak
-				x-ref="previewBody"
-				class="bb-prose text-sm bg-base-200 rounded-xl p-4 max-h-[60vh] overflow-y-auto break-words"
-			></div>
-			<div class="modal-action mt-4">
-				<button type="button" class="btn btn-sm gap-2" :class="previewCopied ? 'btn-success' : 'btn-primary'" @click="copyPrompt()">
-					<span x-show="!previewCopied" class="inline-flex items-center gap-2">
-						@components.LucideIcon("copy", "w-4 h-4")
-						Copy
-						@components.Kbd("c")
-					</span>
-					<span x-show="previewCopied" x-cloak class="inline-flex items-center gap-2">
-						@components.LucideIcon("check", "w-4 h-4")
-						Copied
-					</span>
-				</button>
-				<form method="dialog">
-					<button class="btn btn-ghost btn-sm">Close</button>
-				</form>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button>close</button>
-		</form>
-	</dialog>
 }
 
 // workflowPresetCard is one preset row in the gallery grid — a clean,
