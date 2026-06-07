@@ -78,7 +78,10 @@ document.addEventListener('alpine:init', function () {
         // avatarSeed drives the header EditableAvatar preview + posts as the
         // hidden avatar_seed field. Empty = slug-seeded (the default).
         avatarSeed: '',
-        triggerOnSync: 'false',
+        // triggerMode is the 3-way trigger: 'manual' | 'schedule' | 'sync'.
+        // Posts as trigger_mode; the schedule CronField (custom.scheduleCron)
+        // only applies when 'schedule'.
+        triggerMode: 'manual',
         scheduleCron: '',
         model: 'claude-sonnet-4-6',
         toolScope: 'read_write',
@@ -580,7 +583,7 @@ document.addEventListener('alpine:init', function () {
         self.custom.name = '';
         self.custom.prompt = '';
         self.custom.avatarSeed = '';
-        self.custom.triggerOnSync = 'false';
+        self.custom.triggerMode = 'manual';
         self.custom.scheduleCron = '';
         self.custom.model = 'claude-sonnet-4-6';
         self.custom.toolScope = 'read_write';
@@ -601,8 +604,15 @@ document.addEventListener('alpine:init', function () {
           .then(function (data) {
             self.custom.name = data.name || '';
             self.custom.prompt = data.prompt || '';
-            self.custom.triggerOnSync = data.trigger_on_sync ? 'true' : 'false';
             self.custom.scheduleCron = data.schedule_cron || '';
+            // Derive the 3-way mode from the stored trigger_on_sync + cron.
+            if (data.trigger_on_sync) {
+              self.custom.triggerMode = 'sync';
+            } else if (data.schedule_cron) {
+              self.custom.triggerMode = 'schedule';
+            } else {
+              self.custom.triggerMode = 'manual';
+            }
             self.custom.model = data.model || 'claude-sonnet-4-6';
             self.custom.toolScope = data.tool_scope || 'read_write';
             self.custom.maxTurns = data.max_turns ? String(data.max_turns) : '';
@@ -668,6 +678,90 @@ document.addEventListener('alpine:init', function () {
         var hex = '';
         for (var j = 0; j < bytes.length; j++) hex += ('0' + bytes[j].toString(16)).slice(-2);
         this.custom.avatarSeed = hex;
+      },
+
+      // copyCustomPrompt copies a custom workflow's prompt to the clipboard from
+      // its config endpoint (the preset /prompt endpoint only knows presets).
+      // Backs the copy icon on manual custom cards.
+      copyCustomPrompt: function (slug) {
+        var self = this;
+        fetch('/-/custom-workflows/' + encodeURIComponent(slug), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            var text = (data && data.prompt) || '';
+            if (!text) {
+              self.toast('No prompt to copy.', 'error');
+              return;
+            }
+            var done = function () { self.toast('Prompt copied to clipboard.', 'success'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done).catch(function () {
+                self._copyFallback(text, done);
+              });
+            } else {
+              self._copyFallback(text, done);
+            }
+          })
+          .catch(function (e) {
+            console.error('copyCustomPrompt failed', e);
+            self.toast('Could not copy the prompt.', 'error');
+          });
+      },
+
+      // runCustomNow runs a manual custom workflow from its card's Run button,
+      // mirroring runOneOff's UX (cost-confirm gate + a spinner held for the
+      // whole run via runningOneOff[slug]). Unlike a one-off preset, the
+      // workflow already exists, so it dispatches /-/workflows/{slug}/run.
+      runCustomNow: function (slug, name) {
+        var self = this;
+        if (self.runningOneOff[slug]) return; // guard against a double-click
+        name = name || slug;
+        var go = function () { self._dispatchCustomRun(slug); };
+        if (typeof window.bbConfirm !== 'function') {
+          if (window.confirm('Run "' + name + '" now? This runs Claude over your financial data and incurs API cost.')) go();
+          return;
+        }
+        window.bbConfirm({
+          title: 'Run workflow now?',
+          message: 'Run "' + name + '" now? It runs Claude over your household’s financial data and incurs Anthropic API cost.',
+          confirmLabel: 'Run now',
+          variant: 'warning',
+        }).then(function (ok) { if (ok) go(); });
+      },
+
+      _dispatchCustomRun: function (slug) {
+        var self = this;
+        if (self.runningOneOff[slug]) return;
+        self.runningOneOff[slug] = true;
+        self._post('/-/workflows/' + encodeURIComponent(slug) + '/run')
+          .then(function (res) {
+            if (res.ok || res.status === 202) {
+              return res.json().catch(function () { return null; }).then(function (run) {
+                self.runStartedToast(run);
+                if (run && run.short_id) {
+                  self._pollOneOffRun(slug, run.short_id);
+                } else {
+                  self.runningOneOff[slug] = false;
+                }
+              });
+            }
+            return res.json().catch(function () { return null; }).then(function (body) {
+              self.runningOneOff[slug] = false;
+              self.runErrorToast(body);
+            });
+          })
+          .catch(function (e) {
+            console.error('runCustomNow failed', e);
+            self.runningOneOff[slug] = false;
+            self.toast('Network error — could not start the run.', 'error');
+            self.restorePageState();
+          });
       },
 
       // Remove a configured workflow — deletes its agent_definition, resetting
