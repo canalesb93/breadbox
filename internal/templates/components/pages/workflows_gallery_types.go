@@ -133,6 +133,24 @@ type WorkflowsGalleryProps struct {
 	// IsAdmin gates the "Set up" action: instantiating a workflow from a
 	// preset is admin-only. Non-admins see a disabled control + hint.
 	IsAdmin bool
+	// Custom holds the household's hand-authored workflows (source_template
+	// IS NULL) — rendered in their own section with a "Create custom
+	// workflow" affordance. Empty for non-admins (they can't create them).
+	Custom []WorkflowCustomCardProps
+}
+
+// WorkflowCustomCardProps is one hand-authored (non-preset) workflow card
+// in the gallery's "Custom" section. Unlike a preset card it carries no
+// template options — the operator authored the whole prompt — and is
+// edited via the shared custom-workflow drawer (openCustom).
+type WorkflowCustomCardProps struct {
+	Slug         string
+	Name         string
+	Description  string // first line of the prompt
+	Enabled      bool   // run-state (the card toggle flips it immediately)
+	AvatarSeed   string // DiceBear seed; empty = slug-seeded
+	TriggerLabel string // "After each sync" / a cron summary / "Manual"
+	LastRunError bool   // most recent run failed → red status dot
 }
 
 // WorkflowSpendBanner is the gallery's spend-ceiling state: shown when a
