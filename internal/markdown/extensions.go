@@ -75,13 +75,23 @@ func (calloutTransformer) Transform(doc *ast.Document, reader text.Reader, _ par
 		// into several Text nodes (the bracket is a link-opener), so matching
 		// against parsed children is unreliable.
 		firstLine := para.Lines().At(0)
-		if calloutRe.Find(bytes.TrimLeft(firstLine.Value(source), " \t")) == nil {
+		line := bytes.TrimSpace(firstLine.Value(source))
+		m := calloutRe.FindSubmatch(line)
+		if m == nil {
 			return ast.WalkContinue, nil
 		}
-		kind := strings.ToLower(string(calloutRe.FindSubmatch(bytes.TrimLeft(firstLine.Value(source), " \t"))[1]))
+		// The marker must be alone on its line (GitHub semantics). If there's
+		// trailing text on the same line it's an ordinary blockquote — leave it
+		// untouched so the text isn't silently dropped.
+		if len(bytes.TrimSpace(line[len(m[0]):])) != 0 {
+			return ast.WalkContinue, nil
+		}
+		kind := strings.ToLower(string(m[1]))
 		bq.SetAttributeString(calloutAttr, []byte(kind))
 
-		// Strip every inline child that lives on the marker's first line.
+		// Strip the marker: remove every inline child on the marker's first
+		// physical line. Anything below stays (the tight form keeps the body
+		// in the same paragraph).
 		var remove []ast.Node
 		for c := para.FirstChild(); c != nil; c = c.NextSibling() {
 			t, ok := c.(*ast.Text)
@@ -92,6 +102,11 @@ func (calloutTransformer) Transform(doc *ast.Document, reader text.Reader, _ par
 		}
 		for _, c := range remove {
 			para.RemoveChild(para, c)
+		}
+		// If the marker had its own paragraph (a blank line before the body),
+		// drop the now-empty paragraph so it doesn't render a stray <p>.
+		if para.FirstChild() == nil {
+			bq.RemoveChild(bq, para)
 		}
 		return ast.WalkSkipChildren, nil
 	})

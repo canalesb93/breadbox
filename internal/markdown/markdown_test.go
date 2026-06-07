@@ -202,6 +202,34 @@ func TestPlainBlockquoteStillRenders(t *testing.T) {
 	}
 }
 
+func TestCalloutMarkerMustBeAlone(t *testing.T) {
+	// A marker with trailing text on the same line is NOT a callout — it must
+	// render as a normal blockquote with the text intact (no data loss).
+	out := string(Render("> [!NOTE] remember to reconcile this"))
+	if strings.Contains(out, "bb-callout") {
+		t.Errorf("single-line marker+text should not be a callout: %s", out)
+	}
+	if !strings.Contains(out, "remember to reconcile this") {
+		t.Errorf("body text dropped: %s", out)
+	}
+}
+
+func TestCalloutTightAndBlankForms(t *testing.T) {
+	// Tight form: body on the next line, same paragraph.
+	tight := string(Render("> [!NOTE]\n> body here"))
+	if !strings.Contains(tight, "bb-callout-note") || !strings.Contains(tight, "body here") {
+		t.Errorf("tight callout wrong: %s", tight)
+	}
+	// Blank-separated form: marker paragraph must be dropped (no stray <p></p>).
+	blank := string(Render("> [!TIP]\n>\n> body here"))
+	if !strings.Contains(blank, "bb-callout-tip") || !strings.Contains(blank, "body here") {
+		t.Errorf("blank-form callout wrong: %s", blank)
+	}
+	if strings.Contains(blank, "<p></p>") {
+		t.Errorf("stray empty paragraph in callout: %s", blank)
+	}
+}
+
 func TestHeadingAnchor(t *testing.T) {
 	out := string(Render("## Spending Review"))
 	if !strings.Contains(out, `id="spending-review"`) {

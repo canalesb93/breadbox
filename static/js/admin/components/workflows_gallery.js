@@ -542,6 +542,7 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         self.previewTitle = name || slug;
         self.previewBody = '';
+        self.previewBodyHTML = '';
         self.previewLoading = true;
         var dialog = document.getElementById('wf-prompt-preview');
         if (dialog && typeof dialog.showModal === 'function') dialog.showModal();

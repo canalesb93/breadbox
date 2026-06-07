@@ -40,6 +40,9 @@
     var wrap = btn.closest('.bb-code');
     var pre = wrap && wrap.querySelector('pre');
     if (!pre) return;
-    copyText(pre.innerText.replace(/\n$/, ''), btn);
+    // textContent (not innerText): chroma styles each line as a flex box and
+    // emits a literal trailing newline per line, so innerText would double the
+    // newlines. textContent yields exactly the source text.
+    copyText(pre.textContent.replace(/\n$/, ''), btn);
   });
 })();
