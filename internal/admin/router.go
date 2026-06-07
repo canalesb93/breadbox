@@ -523,6 +523,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// the {slug}/* routes above.
 			r.Get("/workflows/runs/{shortId}/status", WorkflowRunStatusAdminHandler(svc))
 
+			// Render arbitrary Markdown to a sanitized .bb-prose fragment for the
+			// global prompt modal's live edit-preview (no client-side parser).
+			r.Post("/markdown/preview", MarkdownPreviewAdminHandler())
+
 			// Preview the composed internal base prompt for a preset (read-only JSON).
 			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
 			// Shared cron live-preview for the cron-field component (description

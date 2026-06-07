@@ -375,6 +375,13 @@ func DesignSections() []DesignSection {
 			Group:       "data",
 			Render:      func() templ.Component { return SectionJSONViewer() },
 		},
+		{
+			Slug:        "prompt-preview",
+			Title:       "Prompt preview modal",
+			Description: "The workflow \"Workflow prompt\" preview dialog — a read-only modal showing a workflow's fully composed base prompt rendered through components.Markdown into .bb-prose, with a Copy affordance. Opened on /workflows from the reconfigure drawer and preset cards. Proving ground before beefing up the modal's chrome.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionPromptPreview() },
+		},
 
 		// ── Feedback ────────────────────────────────────────────────
 		{
