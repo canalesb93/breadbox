@@ -201,7 +201,7 @@ func TestWorkflowRunStatusCounts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnableWorkflowFromPreset: %v", err)
 	}
-	plain := mustCreateAgentDefinition(t, svc, "plain-counts", true)
+	custom := mustCreateAgentDefinition(t, svc, "custom-counts", true)
 
 	ins := func(defID, status string) {
 		if _, e := pool.Exec(ctx,
@@ -214,17 +214,18 @@ func TestWorkflowRunStatusCounts(t *testing.T) {
 	ins(wf.ID, "success")
 	ins(wf.ID, "error")
 	ins(wf.ID, "skipped")
-	ins(plain.ID, "success") // not a workflow → excluded
+	ins(custom.ID, "success") // custom workflow → now included
 
+	// Unscoped: preset + custom workflow runs aggregate together (3 success).
 	counts, err := svc.WorkflowRunStatusCounts(ctx, "")
 	if err != nil {
 		t.Fatalf("WorkflowRunStatusCounts: %v", err)
 	}
-	if counts["success"] != 2 || counts["error"] != 1 || counts["skipped"] != 1 {
-		t.Fatalf("counts = %v, want success:2 error:1 skipped:1 (plain excluded)", counts)
+	if counts["success"] != 3 || counts["error"] != 1 || counts["skipped"] != 1 {
+		t.Fatalf("counts = %v, want success:3 error:1 skipped:1 (custom included)", counts)
 	}
 
-	// Filtered to the one workflow — same tally.
+	// Filtered to the one preset workflow — only its tally.
 	scoped, err := svc.WorkflowRunStatusCounts(ctx, wf.Slug)
 	if err != nil {
 		t.Fatalf("scoped counts: %v", err)

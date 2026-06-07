@@ -87,7 +87,7 @@ templ workflowRunsFilters(p WorkflowRunsProps) {
 templ workflowRunActions(slug, shortID string, ready bool) {
 	@components.OverflowMenu(components.OverflowMenuProps{
 		AriaLabel: "Run " + shortID + " actions",
-		Size:      "xs",
+		Size:      "sm",
 		Items: []components.OverflowMenuItem{
 			{
 				Label:     "Re-run workflow",
