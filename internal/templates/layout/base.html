@@ -689,9 +689,29 @@
        Logic lives in static/js/admin/components/prompt_modal.js. */ -}}
   <dialog x-data="bbPromptModal" id="bb-prompt-modal" x-cloak
           @bb-prompt-modal.window="open($event.detail)"
-          @keydown.enter.window="if (($event.metaKey || $event.ctrlKey) && $root.open && mode === 'editable') { $event.preventDefault(); save(); }"
+          @keydown.enter.window="if (($event.metaKey || $event.ctrlKey) && $root.open && mode === 'editable') { $event.preventDefault(); primary(); }"
+          @keydown.c.window="if ($root.open && !$event.metaKey && !$event.ctrlKey && !$event.altKey && !['INPUT','TEXTAREA'].includes((document.activeElement || {}).tagName)) { $event.preventDefault(); copy(); }"
+          @keydown.escape.window="if ($root.open) { $event.preventDefault(); $event.stopPropagation(); requestClose(); }"
+          @cancel="$event.preventDefault()"
           class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box max-w-2xl">
+    <div class="modal-box relative transition-[max-width] duration-200" :class="expanded ? 'max-w-5xl' : 'max-w-2xl'">
+      {{- /* Discard-confirmation overlay (top-layer-safe; a z-index dialog
+           would render behind this native modal). Shown when dismissing with
+           unsaved edits. */ -}}
+      <div x-show="confirmingDiscard" x-cloak
+           class="absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] bg-base-100/85 backdrop-blur-sm p-6">
+        <div class="max-w-sm text-center">
+          <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-error/10">
+            {{ lucide "alert-triangle" "w-5 h-5 text-error" }}
+          </div>
+          <h3 class="text-base font-semibold mb-1">Discard changes?</h3>
+          <p class="text-sm text-base-content/60 mb-4">You have unsaved edits to this prompt. Closing will discard them.</p>
+          <div class="flex items-center justify-center gap-2">
+            <button type="button" class="btn btn-ghost btn-sm" @click="confirmingDiscard = false">Keep editing</button>
+            <button type="button" class="btn btn-error btn-sm" @click="close()">Discard</button>
+          </div>
+        </div>
+      </div>
       <div class="flex items-start justify-between gap-3 mb-3">
         <div class="flex items-start gap-2 min-w-0">
           {{ lucide "file-text" "w-5 h-5 mt-0.5 text-base-content/60 shrink-0" }}
@@ -700,64 +720,82 @@
             <p class="text-xs text-base-content/60 mt-0.5" x-show="subtitle" x-text="subtitle"></p>
           </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <div class="join" x-show="mode === 'editable'">
-            <button type="button" class="join-item btn btn-xs gap-1" :class="view === 'edit' ? 'btn-primary' : ''" @click="setView('edit')">
-              {{ lucide "pencil" "w-3.5 h-3.5" }}Edit
-            </button>
-            <button type="button" class="join-item btn btn-xs gap-1" :class="view === 'preview' ? 'btn-primary' : ''" @click="setView('preview')">
-              {{ lucide "eye" "w-3.5 h-3.5" }}Preview
-            </button>
-          </div>
-          <form method="dialog">
-            <button class="btn btn-ghost btn-sm btn-square" aria-label="Close">
-              {{ lucide "x" "w-4 h-4" }}
-            </button>
-          </form>
+        <div class="flex items-center gap-1 shrink-0">
+          {{- /* Desktop-only expand toggle — grows the modal to a larger size. */ -}}
+          <button type="button" class="btn btn-ghost btn-sm btn-square hidden sm:inline-flex"
+                  @click="expanded = !expanded"
+                  :aria-label="expanded ? 'Shrink' : 'Expand'"
+                  :data-tip="expanded ? 'Shrink' : 'Expand'">
+            <span x-show="!expanded">{{ lucide "maximize-2" "w-4 h-4" }}</span>
+            <span x-show="expanded" x-cloak>{{ lucide "minimize-2" "w-4 h-4" }}</span>
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Close" @click="requestClose()">
+            {{ lucide "x" "w-4 h-4" }}
+          </button>
         </div>
       </div>
 
       {{- /* Editor */ -}}
       <div x-show="view === 'edit'">
         <textarea x-ref="editor" x-model="value"
-                  class="textarea textarea-bordered w-full text-sm font-mono leading-relaxed h-[55vh] resize-none"
+                  class="textarea textarea-bordered w-full text-sm font-mono leading-relaxed resize-none"
+                  :class="expanded ? 'h-[78vh]' : 'h-[55vh]'"
                   placeholder="Write the prompt in Markdown…"></textarea>
       </div>
 
-      {{- /* Preview (server-rendered into .bb-prose) */ -}}
-      <div x-show="view === 'preview'">
-        <div x-show="loading" class="flex items-center gap-2 text-sm text-base-content/60 py-6">
+      {{- /* Preview (server-rendered into .bb-prose). In editable mode the
+           preview area is pinned to the editor's height so toggling
+           Edit↔Preview — and the brief render spinner — never changes the
+           modal height. Preview-only sizes to its content. */ -}}
+      <div x-show="view === 'preview'" :class="mode === 'editable' ? (expanded ? 'h-[78vh]' : 'h-[55vh]') : ''">
+        <div x-show="loading"
+             class="flex items-center gap-2 text-sm text-base-content/60 py-6"
+             :class="mode === 'editable' ? 'h-full justify-center' : ''">
           <span class="loading loading-spinner loading-sm"></span>
           Rendering…
         </div>
         <div x-show="!loading" x-ref="previewBody"
-             class="bb-prose text-sm bg-base-200 border border-base-300 rounded-xl p-4 max-h-[60vh] overflow-y-auto break-words"></div>
+             :class="mode === 'editable' ? 'h-full' : (expanded ? 'max-h-[82vh]' : 'max-h-[60vh]')"
+             class="bb-prose text-sm bg-base-200 border border-base-300 rounded-xl p-4 overflow-y-auto break-words"></div>
       </div>
 
-      <div class="modal-action mt-4 gap-2">
-        <button type="button" class="btn btn-sm gap-2" :class="copied ? 'btn-success' : 'btn-ghost'" @click="copy()">
-          <span x-show="!copied" class="inline-flex items-center gap-2">
-            {{ lucide "copy" "w-4 h-4" }}Copy
-          </span>
-          <span x-show="copied" x-cloak class="inline-flex items-center gap-2">
-            {{ lucide "check" "w-4 h-4" }}Copied
-          </span>
-        </button>
-        <form method="dialog" x-show="mode === 'preview'">
-          <button class="btn btn-ghost btn-sm">Close</button>
-        </form>
-        <template x-if="mode === 'editable'">
-          <div class="flex items-center gap-2">
-            <button type="button" class="btn btn-ghost btn-sm" @click="close()">Cancel</button>
-            <button type="button" class="btn btn-primary btn-sm gap-2" @click="save()">
-              <span x-text="saveLabel"></span>
+      <div class="modal-action mt-4 justify-between">
+        {{- /* Bottom-left: single Edit⇄Preview toggle (editable only). The
+             label/icon reflects the target view. */ -}}
+        <div>
+          <template x-if="mode === 'editable'">
+            <button type="button" class="btn btn-soft btn-sm gap-1.5" @click="setView(view === 'edit' ? 'preview' : 'edit')">
+              <span x-show="view === 'edit'" class="inline-flex items-center gap-1.5">{{ lucide "eye" "w-4 h-4" }}Preview</span>
+              <span x-show="view === 'preview'" class="inline-flex items-center gap-1.5">{{ lucide "pencil" "w-4 h-4" }}Edit</span>
+            </button>
+          </template>
+        </div>
+        {{- /* Right: [dismiss] · copy · [save] — the dismiss button (Cancel
+             when editable, Close when preview-only) is always leftmost. */ -}}
+        <div class="flex items-center gap-2">
+          <template x-if="mode === 'editable'">
+            <button type="button" class="btn btn-ghost btn-sm" @click="requestClose()">Cancel</button>
+          </template>
+          <button type="button" class="btn btn-ghost btn-sm" x-show="mode === 'preview'" @click="requestClose()">Close</button>
+          <button type="button" class="btn btn-sm gap-2" :class="copied ? 'btn-success' : 'btn-soft'" @click="copy()">
+            <span x-show="!copied" class="inline-flex items-center gap-2">
+              {{ lucide "copy" "w-4 h-4" }}Copy
+              {{renderComponent "Kbd" "c"}}
+            </span>
+            <span x-show="copied" x-cloak class="inline-flex items-center gap-2">
+              {{ lucide "check" "w-4 h-4" }}Copied
+            </span>
+          </button>
+          <template x-if="mode === 'editable'">
+            <button type="button" class="btn btn-primary btn-sm gap-2" @click="primary()">
+              <span x-text="dirty ? saveLabel : 'Done'"></span>
               {{renderComponent "KbdCombo" (strs "cmd" "enter")}}
             </button>
-          </div>
-        </template>
+          </template>
+        </div>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
+    <form method="dialog" class="modal-backdrop" @submit.prevent="requestClose()">
       <button>close</button>
     </form>
   </dialog>

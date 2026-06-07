@@ -178,6 +178,10 @@
 @source inline("max-w-[768px] max-w-[390px]");
 /* Developer Mode reporter — arbitrary z-index/size only present in base.html. */
 @source inline("z-[9998] z-[9999] w-[min(92vw,24rem)] max-h-[85vh] max-h-32");
+/* Global prompt modal (base.html) — heights, expand transition, discard
+   overlay, overscroll: arbitrary/uncommon classes Tailwind can't see in
+   base.html or behind Alpine :class bindings. */
+@source inline("h-[55vh] h-[78vh] max-h-[60vh] max-h-[82vh] transition-[max-width] backdrop-blur-sm bg-base-100/85 rounded-[inherit] z-20");
 
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }
@@ -4670,3 +4674,7 @@
 .bb-prose .bb-heading-anchor-icon { width: 0.8em; height: 0.8em; }
 .bb-prose :is(h1, h2, h3, h4, h5, h6):hover .bb-heading-anchor,
 .bb-prose .bb-heading-anchor:focus-visible { opacity: 1; }
+
+/* Heading deep-link anchors are meaningless inside the prompt modal — the
+   slugs don't address anything navigable there — so hide them. */
+#bb-prompt-modal .bb-heading-anchor { display: none; }

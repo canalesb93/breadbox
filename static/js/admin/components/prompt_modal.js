@@ -28,12 +28,21 @@ document.addEventListener('alpine:init', function () {
       title: '',
       subtitle: '',
       value: '',
+      initialValue: '', // buffer at open; drives the dirty check
       loading: false,
       copied: false,
+      expanded: false, // desktop expand toggle (larger modal)
+      confirmingDiscard: false, // in-modal "discard unsaved edits?" overlay
       saveLabel: 'Save',
       _targetEl: null,
       _onSaved: null,
       _seq: 0, // guards against out-of-order render responses
+
+      // dirty is true once the buffer diverges from what we opened with.
+      // The primary button reads "Save" when dirty, "Done" when not.
+      get dirty() {
+        return this.value !== this.initialValue;
+      },
 
       open: function (detail) {
         detail = detail || {};
@@ -42,6 +51,8 @@ document.addEventListener('alpine:init', function () {
         this.subtitle = detail.subtitle || '';
         this.saveLabel = detail.saveLabel || 'Save';
         this.copied = false;
+        this.expanded = false; // always open at the default size
+        this.confirmingDiscard = false;
 
         // Resolve the target field first so we can fall back to its value.
         this._targetEl = null;
@@ -58,6 +69,7 @@ document.addEventListener('alpine:init', function () {
         } else {
           this.value = '';
         }
+        this.initialValue = this.value;
         this._onSaved = typeof detail.onSaved === 'function' ? detail.onSaved : null;
 
         // Editable opens in the editor when asked, else in preview; preview-only
@@ -75,7 +87,43 @@ document.addEventListener('alpine:init', function () {
       },
 
       close: function () {
+        this.confirmingDiscard = false;
         if (this.$root && this.$root.close && this.$root.open) this.$root.close();
+      },
+
+      // Every dismissal path (Esc/cancel event, header ✕, footer Cancel,
+      // backdrop click) funnels here so we can gate on focus + unsaved edits.
+      requestClose: function () {
+        // If the discard confirmation is up, Esc/cancel backs out of it.
+        if (this.confirmingDiscard) {
+          this.confirmingDiscard = false;
+          return;
+        }
+        // First Esc while the editor is focused just blurs it — a second Esc
+        // (editor no longer focused) actually dismisses. Match any focused
+        // field inside the dialog rather than strict ref identity, so this is
+        // robust to ref-resolution timing across browsers.
+        var ae = document.activeElement;
+        if (ae && this.$root && this.$root.contains(ae) &&
+            (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) {
+          ae.blur();
+          return;
+        }
+        // Unsaved edits → confirm before discarding (in-modal, since this
+        // dialog is in the top layer above any z-index overlay).
+        if (this.dirty) {
+          this.confirmingDiscard = true;
+          return;
+        }
+        this.close();
+      },
+
+      // The bottom-right primary action: persist when there are edits, else
+      // just dismiss ("Done"). Bound to the button and ⌘/Ctrl+Enter.
+      primary: function () {
+        if (this.mode !== 'editable') return;
+        if (this.dirty) this.save();
+        else this.close();
       },
 
       setView: function (v) {

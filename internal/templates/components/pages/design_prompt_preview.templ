@@ -43,7 +43,7 @@ templ SectionPromptPreview() {
 				<button
 					type="button"
 					class="btn btn-primary btn-sm gap-1.5 self-start"
-					@click="$dispatch('bb-prompt-modal', { mode: 'editable', edit: true, title: 'Custom workflow prompt', subtitle: 'Markdown — runs verbatim on every run.', saveLabel: 'Save prompt', target: $refs.promptField })"
+					@click="$dispatch('bb-prompt-modal', { mode: 'editable', edit: true, title: 'Custom workflow prompt', subtitle: 'Markdown — runs verbatim on every run.', target: $refs.promptField })"
 				>
 					@components.LucideIcon("pencil", "w-4 h-4")
 					Edit prompt
@@ -66,7 +66,7 @@ templ SectionPromptPreview() {
 				<button
 					type="button"
 					class="btn btn-outline btn-sm gap-1.5 self-start"
-					@click="$dispatch('bb-prompt-modal', { mode: 'editable', edit: false, title: 'Review prompt', subtitle: 'Preview first; switch to Edit to change it.', saveLabel: 'Save prompt', target: $refs.prefilledField })"
+					@click="$dispatch('bb-prompt-modal', { mode: 'editable', edit: false, title: 'Review prompt', subtitle: 'Preview first; switch to Edit to change it.', target: $refs.prefilledField })"
 				>
 					@components.LucideIcon("eye", "w-4 h-4")
 					View / edit prompt
