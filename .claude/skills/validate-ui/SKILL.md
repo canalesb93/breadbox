@@ -4,7 +4,8 @@ description: >
   Validate a Breadbox admin UI change in a real browser and produce a screenshot as PR
   evidence. Prefers Chrome DevTools MCP when available; falls back to headless Chromium
   via Playwright in cloud sessions where the MCP is not loaded. Saves a JPEG under 1MB,
-  uploads to GitHub's native CDN via `gh release upload`, ready to embed in a PR.
+  uploads to the self-hosted bb-artifacts.exe.xyz CDN (auth via `gh auth token`),
+  ready to embed in a PR.
   Triggers: "validate the UI change", "screenshot this page", "capture the transactions page",
   "attach a screenshot to the PR", "show me how it looks", or any task needing a visual
   of the running app before a PR can be marked done.
@@ -189,40 +190,24 @@ If over 1MB: retake at `quality: 70` or drop `fullPage`.
 
 ### 7. Upload
 
-**Preferred (local sessions): self-hosted bb-artifacts.exe.xyz.** If the upload
-token is present in `.local.env`, push there — public read, ~180-day auto-expiry,
-no release clutter. See the `github-image-hosting` skill for full details.
+**Preferred: self-hosted bb-artifacts.exe.xyz** — auth with a configured
+`IMGHOST_UPLOAD_TOKEN` (cloud/remote sessions export it) or, if unset, your GitHub
+identity via `gh auth token` (local). Public read, ~180-day auto-expiry, no release
+clutter. See the `github-image-hosting` skill for full details.
 
 ```bash
-IMGHOST_TOKEN=$(grep -E '^IMGHOST_TOKEN=' .local.env | cut -d= -f2- 2>/dev/null)
-if [ -n "$IMGHOST_TOKEN" ]; then
-  URL=$(curl -sf -H "Authorization: Bearer $IMGHOST_TOKEN" \
-            -F file=@/tmp/app-<PAGE>.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
-  echo "$URL"
-fi
+AUTH="${IMGHOST_UPLOAD_TOKEN:-$(gh auth token 2>/dev/null)}"
+URL=$(curl -sf -H "Authorization: Bearer $AUTH" \
+          -F file=@/tmp/app-<PAGE>.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
+echo "$URL"
 ```
 
-**Fallback (cloud sessions, or token absent): GitHub release CDN.** In cloud
-sessions `.local.env` isn't checked out, so `IMGHOST_TOKEN` is empty — use `gh`
-(already sandbox-exempt — no network allowlist required) to upload to a dedicated
-GitHub prerelease. This gives a permanent, GitHub-native URL.
+**Fallback: img402.dev** (only if bb-artifacts is unreachable). Tokenless and
+ephemeral, 1MB cap — fine for these JPEGs. Requires `img402.dev` in the sandbox
+allowlist — it is.
 
 ```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-
-# Ensure screenshots-cdn prerelease exists (idempotent)
-gh release view screenshots-cdn 2>/dev/null || \
-  gh release create screenshots-cdn \
-    --prerelease \
-    --title "Screenshots CDN" \
-    --notes "Auto-uploaded PR validation screenshots. Assets may be overwritten between runs."
-
-# Upload with a timestamped filename to avoid collisions
-FNAME="$(date +%Y%m%d-%H%M%S)-app-<PAGE>.jpg"
-cp /tmp/app-<PAGE>.jpg "/tmp/$FNAME"
-gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
-
-URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
+URL=$(curl -s -X POST https://img402.dev/api/free -F image=@/tmp/app-<PAGE>.jpg | jq -r .url)
 echo "$URL"
 ```
 
@@ -233,7 +218,7 @@ Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub M
 **Single screenshot:**
 
 ```html
-<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/FNAME.jpg" width="800" alt="<page> — after">
+<img src="https://bb-artifacts.exe.xyz/f/<id>.jpg" width="800" alt="<page> — after">
 ```
 
 **Before/after — side-by-side table** (preferred for visual diffs):
@@ -245,8 +230,8 @@ Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub M
     <th>After</th>
   </tr>
   <tr>
-    <td><img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/before.jpg" width="400" alt="before"></td>
-    <td><img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/after.jpg" width="400" alt="after"></td>
+    <td><img src="https://bb-artifacts.exe.xyz/f/<id-before>.jpg" width="400" alt="before"></td>
+    <td><img src="https://bb-artifacts.exe.xyz/f/<id-after>.jpg" width="400" alt="after"></td>
   </tr>
 </table>
 ```
@@ -254,14 +239,14 @@ Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub M
 **Mobile screenshot** (narrow — embed smaller):
 
 ```html
-<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/mobile.jpg" width="320" alt="<page> — mobile">
+<img src="https://bb-artifacts.exe.xyz/f/<id>.jpg" width="320" alt="<page> — mobile">
 ```
 
 **Tall capture you still want to include** (`fullPage: true`) — collapse it:
 
 ```html
 <details><summary><page> — full page</summary>
-<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/fullpage.jpg" width="800" alt="<page> — full page">
+<img src="https://bb-artifacts.exe.xyz/f/<id>.jpg" width="800" alt="<page> — full page">
 </details>
 ```
 
@@ -278,6 +263,6 @@ gh pr comment <PR_NUMBER> --body "<img src=\"$URL\" width=\"800\" alt=\"<page>\"
 - **Responsive changes always get at least two captures**: desktop (1280 or 1440) + mobile (390). Tablet (768) only when the change crosses the `md` breakpoint.
 - For before/after diffs, name the files `<PAGE>-before` and `<PAGE>-after` and embed them in the table above.
 - After template / CSS / Alpine changes, restart `make dev` before capturing so Tailwind / partials rebuild.
-- The `screenshots-cdn` prerelease is permanent — URLs stay valid indefinitely. Each new upload uses a timestamped filename so old URLs remain accessible.
+- bb-artifacts URLs are immutable per upload (random id) and auto-expire after ~180 days — long enough for PR review, short enough that stale screenshots clean themselves up.
 - For quick visual checks (not PR evidence), skip the upload step — the local JPEG is enough.
 - What does NOT work on GitHub Markdown: `![alt](url){width=600}` (ignored), `style="..."` attributes (stripped). Stick to `<img width="...">`.

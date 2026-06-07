@@ -4,6 +4,45 @@ All notable changes to Breadbox will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-06-05
+
+> **Pre-1.0.** Still on `0.x` — minor releases may include breaking changes.
+> This release is additive over 0.1.1 (no schema or API breaks); the notes
+> below are relative to 0.1.1.
+
+### Added
+
+- **SimpleFIN provider** — connect banks through a SimpleFIN bridge with a paste-the-token flow. Poll-only (no webhooks), it reconciles pending transactions on each sync via the new `ReconcilesPendingByPolling` capability. (#1743)
+- **Custom MCP connectors** — a global connector library on its own settings page lets you register external MCP servers with multiple (encrypted) headers, an injected note, and JSON import, then enable them per workflow. (#1725)
+- **Cron-anchored sync schedules** — sync is now driven by timezone-aware cron schedules with a many-to-many connection mapping, configured in a side drawer with live presets and a human-readable preview. Schedules anchor to the instance timezone via `CRON_TZ`. (#1748, #1751)
+- **`find_matching_rules` MCP tool** — agents can ask which rules match a transaction instead of pulling and scanning the entire rule set. (#1740)
+- **One-click API keys** — create a key inline from the API keys page, naming it and setting its permission at creation time. (#1746)
+
+### Changed
+
+- **Token-optimized MCP tool set** — `query_transactions`, `list_series`, and `list_transaction_rules` now return lean default field sets, hoist a shared currency, and cap response size, cutting tokens for the common agent path. (#1745)
+- **Connect flow** redesigned as a side drawer with provider icons. (#1747)
+- **Household member page** reworked to focus on member profiles. (#1731)
+- **Avatars** consolidated onto a single `EditableAvatar` component, with a tidied Avatars section on `/settings/general`. (#1758, #1762)
+- **Rules table** gained a dedicated action column and a larger overflow affordance, and a row click now toggles rule enablement. (#1761)
+- **Cron input** consolidated into one shared `CronField` component across sync and workflows. (#1763)
+- **Settings** content now expands to the full available width. (#1756)
+- **Toggles** default to the green (success) tone across the UI. (#1757)
+- **Connection reauth** uses a soft warning banner and drops the duplicate button. (#1750)
+- **Update banner** links to the docs update guide. (#1752)
+- **Releases** publish `:latest` (tagged release) vs `:edge` (main) container tags and label images with OCI metadata. (#1754, #1759)
+
+### Fixed
+
+- **Settings autosave** — in-place 204 autosaves no longer hard-navigate to a 405. (#1760)
+- **Accounts page** filters work again, and accounts show avatars instead of initials. (#1742)
+- **Privacy mode** — stronger obfuscation hex guarantee, wider PII redaction scope, and improved RadioCard UX. (#1738)
+- **Mobile** — the avatar menu opens a dropdown instead of navigating to settings, and the account profile section's mobile layout and avatar UX are fixed. (#1739, #1734)
+
+### Docs
+
+- Deploy update commands now use `-f docker-compose.prod.yml`. (#1755)
+
 ## [0.1.1] - 2026-06-04
 
 > **Pre-1.0.** Still on `0.x` — minor releases may include breaking changes.

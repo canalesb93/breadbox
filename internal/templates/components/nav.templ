@@ -82,7 +82,7 @@ templ Nav(p NavProps) {
 		// household/log admin tools are.
 		<div class="bb-sidebar-section">System</div>
 		if p.IsEditor {
-			@navLinkBadge("/connections", "link", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
+			@navLinkBadge("/connections", "cable", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
 			if p.IsAdmin {
 				@navLink("/household", "users", "Household", navActive(p.CurrentPage, "household"))
 				// Logs is intentionally hidden from the rail for now while we decide
@@ -118,14 +118,23 @@ templ Nav(p NavProps) {
 			<p class="bb-update-card__title">Version { p.NavLatestVersion }</p>
 			<p class="bb-update-card__desc">A new release of Breadbox is available.</p>
 			<a
-				href={ templ.SafeURL(p.NavLatestURL) }
+				href="https://docs.breadbox.sh/installation/updating"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="bb-update-card__action"
+				title="How to update Breadbox"
+			>
+				How to update
+				@LucideIcon("arrow-right", "")
+			</a>
+			<a
+				href={ templ.SafeURL(p.NavLatestURL) }
+				target="_blank"
+				rel="noopener noreferrer"
+				class="inline-flex items-center gap-1 text-xs text-base-content/50 no-underline hover:underline"
 				title={ "Release notes for " + p.NavLatestVersion }
 			>
-				Release notes
-				@LucideIcon("arrow-right", "")
+				View changelog
 			</a>
 		</div>
 	}

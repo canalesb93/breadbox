@@ -1,7 +1,7 @@
 package pages
 
-
 import "breadbox/internal/templates/components"
+
 // MCPGuide renders the Getting Started tab inside /agents. Originally
 // pages/mcp_guide.html in the html/template tree. The Alpine factory
 // lives in static/js/admin/components/mcp_guide.js and reads the MCP
@@ -103,10 +103,12 @@ templ MCPGuide(p MCPGuideProps) {
 					</div>
 					<div x-show="showFlavorToggle" x-cloak class="join rounded-lg border border-base-300">
 						<button class="join-item btn btn-xs gap-1.5 border-0" :class="flavor === 'guide' ? 'btn-active' : 'btn-ghost'" @click="flavor = 'guide'">
-							@components.LucideIcon("book-open", "w-3.5 h-3.5") Guide
+							@components.LucideIcon("book-open", "w-3.5 h-3.5")
+							Guide
 						</button>
 						<button class="join-item btn btn-xs gap-1.5 border-0" :class="flavor === 'config' ? 'btn-active' : 'btn-ghost'" @click="flavor = 'config'">
-							@components.LucideIcon("code", "w-3.5 h-3.5") Config
+							@components.LucideIcon("code", "w-3.5 h-3.5")
+							Config
 						</button>
 					</div>
 				</div>

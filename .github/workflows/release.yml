@@ -107,18 +107,33 @@ jobs:
         id: ver
         run: |
           if [ -n "${{ inputs.tag }}" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            tag="${{ inputs.tag }}"
           else
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            tag="${GITHUB_REF_NAME}"
           fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          # Bare semver (no leading v) — the no-prefix variant is a common
+          # registry convention, so publish both `:v0.1.0` and `:0.1.0`.
+          echo "bare=${tag#v}" >> "$GITHUB_OUTPUT"
 
+      # Releases own the stable, human-pickable tags. `:latest` always points
+      # at the newest GitHub release (NOT tip of main — that's ci.yml's
+      # `:edge`). Self-host templates (Railway, Render, docker-compose.prod.yml)
+      # and `:latest` users get released software, never an arbitrary commit.
       - uses: docker/metadata-action@v5
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=${{ steps.ver.outputs.tag }}
+            type=raw,value=${{ steps.ver.outputs.bare }}
             type=raw,value=latest
+          # Same OCI labels as ci.yml so release images carry the repo link
+          # (org.opencontainers.image.source) + version/license metadata. The
+          # build step below MUST pass steps.meta.outputs.labels, or release
+          # images ship unlabelled.
+          labels: |
+            org.opencontainers.image.documentation=https://docs.breadbox.sh
 
       - uses: docker/build-push-action@v6
         with:
@@ -126,6 +141,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.ver.outputs.tag }}
           cache-from: type=gha

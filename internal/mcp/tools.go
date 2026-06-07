@@ -366,6 +366,11 @@ type previewRuleInput struct {
 	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50). The match_count in the response reflects the full match set, not just the sample."`
 }
 
+type findMatchingRulesInput struct {
+	TransactionID string `json:"transaction_id,omitempty" jsonschema:"A transaction id or short_id to evaluate the full active rule set against. Every condition field (amount, category, tags, provider, account…) is checked against the row's real values. Use this to ask 'which existing rules already cover this specific transaction'. Provide exactly one of transaction_id or merchant."`
+	Merchant      string `json:"merchant,omitempty" jsonschema:"Free-text merchant/name to check coverage for. Builds a synthetic context with only the name fields set, so it matches name-based rules (provider_merchant_name / provider_name conditions) but not amount/category/tag rules. Use this before creating a merchant rule to ask 'is this merchant already handled?'. Provide exactly one of transaction_id or merchant."`
+}
+
 // handleCreateTransactionRule wires a single rule into the auto-categorization
 // pipeline. See breadbox://rule-dsl for the condition grammar.
 //
@@ -539,6 +544,21 @@ func (s *MCPServer) handlePreviewRule(_ context.Context, _ *mcpsdk.CallToolReque
 	}
 
 	result, err := s.svc.PreviewRule(ctx, conditions, input.SampleSize)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+// handleFindMatchingRules reports which existing active rules already match a
+// given transaction (or a synthetic merchant context). It's the cheap dedup
+// check: instead of listing all rules into context and eyeballing them, the
+// agent asks "is this already covered?" and gets back only the matches.
+func (s *MCPServer) handleFindMatchingRules(ctx context.Context, _ *mcpsdk.CallToolRequest, input findMatchingRulesInput) (*mcpsdk.CallToolResult, any, error) {
+	result, err := s.svc.FindMatchingRules(ctx, service.FindMatchingRulesParams{
+		TransactionID: input.TransactionID,
+		Merchant:      input.Merchant,
+	})
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

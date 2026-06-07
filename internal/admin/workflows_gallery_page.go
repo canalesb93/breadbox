@@ -15,6 +15,65 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
+// buildAgentsListStatus maps the service readiness struct to the props
+// shape. Nil-safe: a nil status (shouldn't happen in practice — the
+// service method always returns a value) renders as "not ready".
+func buildAgentsListStatus(s *service.AgentSubsystemStatus) pages.AgentSubsystemStatusProps {
+	if s == nil {
+		return pages.AgentSubsystemStatusProps{}
+	}
+	return pages.AgentSubsystemStatusProps{
+		Ready:          s.Ready,
+		AuthConfigured: s.AuthConfigured,
+		BinaryPresent:  s.BinaryPresent,
+		BinaryPath:     s.BinaryPath,
+	}
+}
+
+// buildCustomWorkflowCards maps the household's hand-authored workflows
+// (source_template IS NULL) into gallery cards for the Custom section.
+// Preset-instantiated definitions are skipped — they render in the preset
+// gallery above.
+func buildCustomWorkflowCards(defs []service.AgentDefinitionResponse) []pages.WorkflowCustomCardProps {
+	out := make([]pages.WorkflowCustomCardProps, 0, len(defs))
+	for _, d := range defs {
+		if d.SourceTemplate != nil {
+			continue // preset-backed → handled by the preset gallery
+		}
+		card := pages.WorkflowCustomCardProps{
+			Slug:        d.Slug,
+			Name:        d.Name,
+			Description: firstPromptLine(d.Prompt, 120),
+			Enabled:     d.Enabled,
+		}
+		if d.AvatarSeed != nil {
+			card.AvatarSeed = *d.AvatarSeed
+		}
+		if d.LastRun != nil && d.LastRun.Status == "error" {
+			card.LastRunError = true
+		}
+		out = append(out, card)
+	}
+	return out
+}
+
+// firstPromptLine returns the first non-empty line of a prompt, truncated to
+// max runes with an ellipsis. Drives the custom card's one-line description.
+func firstPromptLine(s string, max int) string {
+	for _, raw := range strings.Split(s, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		r := []rune(line)
+		if len(r) > max {
+			return string(r[:max]) + "…"
+		}
+		return line
+	}
+	return ""
+}
+
 // buildWorkflowSpendBanner derives the gallery's spend-ceiling banner from
 // the rolling-window spend status. No ceiling (unset or <= 0) → no banner.
 // Shown at >= 80% of the ceiling; "Over" once spend reaches it (runs paused).
@@ -71,9 +130,10 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			consented  bool
 			spend      service.HouseholdSpendStatus
 			lastRuns   map[string]*service.AgentRunSummary
+			defs       []service.AgentDefinitionResponse
 			wg         sync.WaitGroup
 		)
-		wg.Add(5)
+		wg.Add(6)
 		go func() { defer wg.Done(); presets, presetsErr = svc.ListWorkflowPresets(ctx) }()
 		go func() { defer wg.Done(); status = svc.GetAgentSubsystemStatus(ctx) }()
 		go func() { defer wg.Done(); consented = svc.WorkflowsConsentAcknowledged(ctx) }()
@@ -81,6 +141,9 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 		// Last-run summaries are a soft enrichment: a query hiccup drops the
 		// per-card "Last run" line but doesn't fail the gallery.
 		go func() { defer wg.Done(); lastRuns, _ = svc.GetEnabledWorkflowLastRuns(ctx) }()
+		// Definitions back the Custom section (source_template IS NULL). A
+		// failure just drops the section — the preset gallery still renders.
+		go func() { defer wg.Done(); defs, _ = svc.ListAgentDefinitions(ctx) }()
 		wg.Wait()
 
 		if presetsErr != nil {
@@ -95,6 +158,7 @@ func WorkflowsGalleryPageHandler(svc *service.Service, sm *scs.SessionManager, t
 			ConsentAcknowledged: consented,
 			Spend:               buildWorkflowSpendBanner(spend),
 			IsAdmin:             IsAdmin(sm, r),
+			Custom:              buildCustomWorkflowCards(defs),
 		}
 
 		data := BaseTemplateData(r, sm, "workflows", "Workflows")

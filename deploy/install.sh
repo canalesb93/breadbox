@@ -631,12 +631,15 @@ else
     info "Fetching latest release..."
     TAG=$(get_latest_tag)
     if [ "$TAG" = "latest" ]; then
-        # Pre-v0.1.0 there's no GitHub Release yet, so this fires for
-        # every install. Phrase as neutral info rather than a warning
-        # — the rolling :latest image is the right behavior in this
-        # state.
-        info "No release tagged yet — using :latest image (rolling)."
-        IMAGE_TAG="latest"
+        # No GitHub Release found (API failure, or a repo with no releases
+        # yet). The rolling tip-of-main image is `:edge`, not `:latest` —
+        # `:latest` is reserved for the newest stable release and only
+        # exists once release.yml has cut one. Fall back to `:edge` so the
+        # install still works and tracks main. Deployment files come from
+        # the `main` branch (see DOWNLOAD_REF below, still keyed off the
+        # "latest" sentinel in TAG).
+        info "No release tagged yet — using :edge image (rolling, tip of main)."
+        IMAGE_TAG="edge"
     else
         success "Latest release: ${TAG}"
         IMAGE_TAG="$TAG"
@@ -754,7 +757,7 @@ fi
 
 # Record the pinned tag for traceability and for any user-side scripting
 # that wants to know which release this dir was installed against.
-# "latest" signals the user picked rolling updates.
+# "edge" signals the user is on the rolling tip-of-main image.
 printf "%s\n" "$IMAGE_TAG" > "${INSTALL_DIR}/.breadbox-version"
 
 # --- Generate .env ---
@@ -960,7 +963,12 @@ if [ "$healthy" -eq 1 ]; then
         || { [ "$BB_INIT_SYSTEM" != "none" ] \
              && prompt_yn "Register a ${BB_INIT_SYSTEM} unit so Breadbox restarts on boot?" "n"; }; then
         printf "\n"
-        register_daemon
+        # Never let daemon registration abort the install: a non-root user
+        # answering "y" hits the "requires root" path (register_daemon_systemd
+        # returns 1), and under `set -e` that would kill the script BEFORE the
+        # success banner — leaving Breadbox running but the setup URL unprinted.
+        # Registration is opt-in convenience; failing it must not hide the URL.
+        register_daemon || true
     fi
 
     # Platform-reachability check. Breadbox is healthy locally on

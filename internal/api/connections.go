@@ -116,29 +116,3 @@ func PauseConnectionHandler(svc *service.Service) http.HandlerFunc {
 		writeData(w, conn)
 	}
 }
-
-// UpdateConnectionSyncIntervalHandler serves POST
-// /api/v1/connections/{id}/sync-interval — body:
-// {"interval_minutes": 30} or {"interval_minutes": null} to clear the
-// per-connection override.
-func UpdateConnectionSyncIntervalHandler(svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
-
-		var body struct {
-			IntervalMinutes *int `json:"interval_minutes"`
-		}
-		if !decodeJSON(w, r, &body) {
-			return
-		}
-
-		actor := service.ActorFromContext(r.Context())
-		conn, err := svc.UpdateConnectionSyncInterval(r.Context(), id, body.IntervalMinutes, actor)
-		if err != nil {
-			writeServiceError(w, err, "Connection not found", "Failed to update connection")
-			return
-		}
-
-		writeData(w, conn)
-	}
-}

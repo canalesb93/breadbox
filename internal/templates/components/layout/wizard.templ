@@ -33,7 +33,15 @@ templ Wizard(p WizardProps) {
 			     cross-origin font swap on hard-reload. @font-face declarations
 			     live in styles.css so this layout and base.html share them. -->
 			<link rel="preload" href="/static/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin/>
-			<style>body { font-family: 'Inter var', system-ui, -apple-system, sans-serif; }</style>
+			<style>
+				body {
+					font-family:
+						"Inter var",
+						system-ui,
+						-apple-system,
+						sans-serif;
+				}
+			</style>
 			<!-- Lucide: self-hosted + deferred. See base.html for rationale. -->
 			<script defer src="/static/js/vendor/lucide.min.js"></script>
 		</head>
@@ -65,10 +73,12 @@ templ Wizard(p WizardProps) {
 			<script>
 				// Lucide is loaded via `<script defer>` from `<head>`. Run createIcons
 				// once both the DOM is ready and the library has executed.
-				(function() {
-					function init() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
-					if (document.readyState === 'loading') {
-						document.addEventListener('DOMContentLoaded', init);
+				(function () {
+					function init() {
+						if (typeof lucide !== "undefined") lucide.createIcons();
+					}
+					if (document.readyState === "loading") {
+						document.addEventListener("DOMContentLoaded", init);
 					} else {
 						init();
 					}

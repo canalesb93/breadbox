@@ -135,7 +135,7 @@ templ userFormCreate() {
 								<span class="text-sm font-medium text-base-content/70">Create login account</span>
 								<p class="text-xs text-base-content/40 mt-0.5">Allow this member to sign in to Breadbox</p>
 							</div>
-							<input type="checkbox" x-model="createLogin" class="toggle toggle-primary toggle-sm"/>
+							<input type="checkbox" x-model="createLogin" class="toggle toggle-sm"/>
 						</label>
 						<!-- Role dropdown (shown when toggle is on) -->
 						<div x-show="createLogin" x-collapse>
@@ -155,7 +155,8 @@ templ userFormCreate() {
 					</template>
 					<div class="flex gap-3 pt-2">
 						<button type="submit" class="btn btn-primary btn-sm whitespace-nowrap" :disabled="submitting">
-							<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("plus", "w-4 h-4") Create Member</span>
+							<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("plus", "w-4 h-4")
+Create Member</span>
 							<span x-show="submitting" class="loading loading-spinner loading-sm"></span>
 						</button>
 						<a href="/household" class="btn btn-ghost btn-sm">Cancel</a>
@@ -174,47 +175,24 @@ templ userFormEdit(p UserFormProps) {
 		<form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
 			<!-- Header + fields -->
 			<div class="p-5 sm:p-6">
-				<!-- Avatar header -->
-				<div class="bb-icon-header">
-					<div class="relative group shrink-0">
-						<img :src="avatarSrc" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-base-300"/>
-						<button
-							type="button"
-							@click="$refs.fileInput.click()"
-							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-							title="Upload photo"
-						>
-							@components.LucideIcon("camera", "w-4 h-4 text-white")
-						</button>
-						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
-					</div>
-					<div class="bb-icon-header__text">
-						<h2 class="text-sm font-semibold truncate">{ userFormName(p.User) }</h2>
-						<p class="text-xs text-base-content/45">
-							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("upload", "w-3 h-3") Upload photo</button>
-							<span class="text-base-content/20">·</span>
-							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1">@components.LucideIcon("refresh-cw", "w-3 h-3") Regenerate</button>
-							<template x-if="hasCustomAvatar">
-								<span>
-									<span class="text-base-content/20">·</span>
-									<button type="button" @click="removeAvatar()" class="link link-hover text-error/70 hover:text-error">Remove</button>
-								</span>
-							</template>
-						</p>
-					</div>
+				<!-- Avatar editor — shared EditableAvatar (full shape):
+				     upload / shuffle / remove + inline error, driven by the
+				     surrounding avatarEditor factory. -->
+				<div class="mb-5">
+					<h2 class="text-sm font-semibold truncate mb-3">{ userFormName(p.User) }</h2>
+					@components.EditableAvatar(components.EditableAvatarProps{
+						SrcExpr:   "avatarSrc",
+						OnShuffle: "regenerate()",
+						Alt:       "Member avatar",
+						Upload: &components.EditableAvatarUpload{
+							OnFileSelect:  "onFileSelect",
+							OnRemove:      "removeAvatar()",
+							HasCustomExpr: "hasCustomAvatar",
+							LoadingExpr:   "avatarUploading",
+							ErrorExpr:     "avatarError",
+						},
+					})
 				</div>
-				<template x-if="avatarError">
-					<div role="alert" class="bb-form-error mb-4">
-						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
-						<span x-text="avatarError"></span>
-					</div>
-				</template>
-				<template x-if="avatarUploading">
-					<p class="text-xs text-base-content/50 mb-4 inline-flex items-center gap-1.5">
-						<span class="loading loading-spinner loading-xs"></span>
-						Uploading photo...
-					</p>
-				</template>
 				<!-- Form fields -->
 				<div class="space-y-4">
 					<div>
@@ -257,7 +235,8 @@ templ userFormEdit(p UserFormProps) {
 			<div class="bb-action-row">
 				<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 				<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5") Save Changes</span>
+					<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5")
+Save Changes</span>
 					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>

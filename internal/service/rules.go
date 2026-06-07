@@ -1761,6 +1761,146 @@ func (s *Service) PreviewRule(ctx context.Context, conditions Condition, sampleS
 	return s.previewRuleInternal(ctx, nil, conditions, sampleSize)
 }
 
+// FindMatchingRulesParams selects what to evaluate the active rule set against.
+// Exactly one of TransactionID or Merchant must be supplied.
+type FindMatchingRulesParams struct {
+	// TransactionID (UUID or short_id) anchors the lookup to a real stored
+	// transaction — every condition field (amount, category, tags, provider…)
+	// is evaluated against the row's true values.
+	TransactionID string
+	// Merchant is free text used to build a *synthetic* context with only the
+	// name fields populated (provider_name + provider_merchant_name). Rules
+	// that condition on amount/category/tags won't match a synthetic context,
+	// so this answers the narrower question "is this merchant already covered
+	// by a name-based rule?" — the common dedup case.
+	Merchant string
+}
+
+// MatchingRule is one active rule whose condition matched the evaluated
+// transaction context. The shape is deliberately compact — the agent needs to
+// know whether a merchant is already covered and by what, not the full rule.
+type MatchingRule struct {
+	ShortID string `json:"short_id"`
+	Name    string `json:"name"`
+	// SetsCategory is the slug of the category the rule's first set_category
+	// action assigns, or nil when the rule sets no category (e.g. a tag-only
+	// or comment-only rule).
+	SetsCategory *string `json:"sets_category,omitempty"`
+	Trigger      string  `json:"trigger"`
+	Priority     int     `json:"priority"`
+	Enabled      bool    `json:"enabled"`
+	HitCount     int     `json:"hit_count"`
+	// MatchAll flags a rule with no conditions (NULL conditions = match-all,
+	// e.g. the seeded needs-review tagger). These match every transaction, so
+	// surface them distinctly to avoid reading them as merchant coverage.
+	MatchAll bool `json:"match_all"`
+}
+
+// FindMatchingRulesResult wraps the matched rules with a count for quick
+// "already covered?" checks.
+type FindMatchingRulesResult struct {
+	MatchedCount int            `json:"matched_count"`
+	Rules        []MatchingRule `json:"rules"`
+}
+
+// FindMatchingRules evaluates every active, non-expired rule against a single
+// transaction context and returns those whose condition matches — the inverse
+// of PreviewRule (which evaluates one condition against many transactions).
+//
+// This is the efficient answer to "is this merchant already handled by a rule"
+// without loading the entire rule set into an agent's context: all rules are
+// compiled and evaluated in-process (O(rules), microseconds for hundreds of
+// rules) and only the handful of matches are returned. Rules evaluate in
+// pipeline-stage order (priority ASC), so the returned slice is ordered the
+// same way the sync resolver would apply them.
+//
+// Trigger is NOT filtered — a rule is reported if its *condition* matches,
+// regardless of on_create/on_change, since the caller wants coverage, not a
+// sync-time simulation.
+func (s *Service) FindMatchingRules(ctx context.Context, params FindMatchingRulesParams) (*FindMatchingRulesResult, error) {
+	hasTxn := strings.TrimSpace(params.TransactionID) != ""
+	hasMerchant := strings.TrimSpace(params.Merchant) != ""
+	if hasTxn == hasMerchant {
+		return nil, fmt.Errorf("%w: provide exactly one of transaction_id or merchant", ErrInvalidParameter)
+	}
+
+	// Build the context to evaluate against.
+	var tctx TransactionContext
+	if hasTxn {
+		loaded, err := s.loadTransactionContext(ctx, params.TransactionID)
+		if err != nil {
+			return nil, err
+		}
+		tctx = *loaded
+	} else {
+		// Synthetic context: only the name fields are known. Rule conditions on
+		// other fields simply won't match — which is the correct, conservative
+		// behavior for a name-only coverage check.
+		m := strings.TrimSpace(params.Merchant)
+		tctx = TransactionContext{Name: m, MerchantName: m}
+	}
+
+	rules, err := s.ListActiveRulesForSync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list active rules: %w", err)
+	}
+
+	result := &FindMatchingRulesResult{Rules: []MatchingRule{}}
+	for _, r := range rules {
+		compiled, err := CompileCondition(r.Conditions)
+		if err != nil {
+			// A rule with an uncompilable condition can't have matched at sync
+			// time either; skip it rather than failing the whole lookup.
+			continue
+		}
+		if !EvaluateCondition(compiled, tctx) {
+			continue
+		}
+		result.Rules = append(result.Rules, MatchingRule{
+			ShortID:      r.ShortID,
+			Name:         r.Name,
+			SetsCategory: r.CategorySlug,
+			Trigger:      r.Trigger,
+			Priority:     r.Priority,
+			Enabled:      r.Enabled,
+			HitCount:     r.HitCount,
+			MatchAll:     compiled == nil,
+		})
+	}
+	result.MatchedCount = len(result.Rules)
+	return result, nil
+}
+
+// loadTransactionContext resolves a transaction id/short_id and loads its full
+// rule-evaluation context (same JOINs + tag aggregation as the retroactive
+// apply path) so every condition field evaluates against the row's real values.
+func (s *Service) loadTransactionContext(ctx context.Context, idOrShort string) (*TransactionContext, error) {
+	txnUUID, err := s.resolveTransactionID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+
+	query := transactionContextQuery + " AND t.id = $1" + transactionContextGroupBy + " LIMIT 1"
+	rows, err := s.Pool.Query(ctx, query, txnUUID)
+	if err != nil {
+		return nil, fmt.Errorf("query transaction context: %w", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("query transaction context: %w", err)
+		}
+		return nil, fmt.Errorf("%w: transaction not found", ErrNotFound)
+	}
+	dest := make([]any, 14)
+	r := scanTransactionContextRow(dest)
+	if err := rows.Scan(dest...); err != nil {
+		return nil, fmt.Errorf("scan transaction context: %w", err)
+	}
+	return &r.tctx, nil
+}
+
 func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype.UUID, conditions Condition, sampleSize int) (*RulePreviewResult, error) {
 	if err := ValidateCondition(conditions); err != nil {
 		return nil, err
@@ -2274,6 +2414,8 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Remove tag " + a.TagSlug
 	case "add_comment":
 		return "Add comment"
+	case "assign_series":
+		return "Assign to series"
 	default:
 		return a.Type
 	}

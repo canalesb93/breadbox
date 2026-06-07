@@ -6,47 +6,45 @@ package pages
 // read off the layout. Kept flat so admin/connections.go can copy fields
 // one-to-one.
 type ConnectionDetailProps struct {
-	ConnID      string
-	CSRFToken   string
+	ConnID    string
+	CSRFToken string
 
 	// Connection fields (flattened from db.GetBankConnectionRow)
-	Provider                          string
-	Status                            string
-	InstitutionName                   string
-	UserName                          string
-	UserNameValid                     bool
-	Paused                            bool
-	ConsecutiveFailures               int32
-	HasErrorCode                      bool
-	ErrorCode                         string
-	HasErrorMessage                   bool
-	ErrorMessage                      string
-	LastSyncedAtValid                 bool
-	LastSyncedAtRelative              string
-	CreatedAtValid                    bool
-	CreatedAtFormatted                string
-	LastErrorAtValid                  bool
-	LastErrorAtRelative               string
-	SyncIntervalOverrideMinutesValid  bool
-	SyncIntervalOverrideMinutesValue  int32
+	Provider             string
+	Status               string
+	InstitutionName      string
+	UserName             string
+	UserNameValid        bool
+	Paused               bool
+	ConsecutiveFailures  int32
+	HasErrorCode         bool
+	ErrorCode            string
+	HasErrorMessage      bool
+	ErrorMessage         string
+	LastSyncedAtValid    bool
+	LastSyncedAtRelative string
+	CreatedAtValid       bool
+	CreatedAtFormatted   string
+	LastErrorAtValid     bool
+	LastErrorAtRelative  string
 
 	// Latest sync log status (for header badge — matches list page).
-	LastSyncStatus              string
-	LastSyncErrorMessageValid   bool
-	LastSyncErrorMessageString  string
+	LastSyncStatus             string
+	LastSyncErrorMessageValid  bool
+	LastSyncErrorMessageString string
 
 	// Sync health stats
-	TotalSyncs           int
-	SuccessSyncs         int
-	ErrorSyncs           int
-	SuccessRate          float64
-	TotalAdded           int
-	TotalModified        int
-	TotalRemoved         int
-	AvgDurationSec       float64
-	LastSuccessTime      string
-	LastSuccessRelative  string
-	DaySyncs             []DaySyncRow
+	TotalSyncs          int
+	SuccessSyncs        int
+	ErrorSyncs          int
+	SuccessRate         float64
+	TotalAdded          int
+	TotalModified       int
+	TotalRemoved        int
+	AvgDurationSec      float64
+	LastSuccessTime     string
+	LastSuccessRelative string
+	DaySyncs            []DaySyncRow
 
 	// Account totals
 	TotalBalance float64
@@ -76,11 +74,13 @@ type DaySyncRow struct {
 // connection. Mirrors admin.NextSyncInfo without the time.Time field
 // (the templ side only renders the precomputed Label).
 type NextSyncInfo struct {
-	Label                    string
-	IsOverdue                bool
-	IsPaused                 bool
-	IsDisconnected           bool
-	EffectiveIntervalMinutes int
+	Label          string
+	IsOverdue      bool
+	IsPaused       bool
+	IsDisconnected bool
+	// ScheduleNames are the schedules covering this connection, for a
+	// "Syncs on: Nightly, Hourly" subline.
+	ScheduleNames []string
 }
 
 // AccountRow is one account card in the Accounts grid.
@@ -102,18 +102,18 @@ type AccountRow struct {
 
 // SyncLogRow is one row in the Sync History list.
 type SyncLogRow struct {
-	ShortID         string
-	Status          string
-	Trigger         string
-	StartedAtValid  bool
-	StartedAtRelative string
-	DurationLabel   string // pre-formatted; empty when unavailable
-	HasDuration     bool
-	ErrorMessageValid  bool
-	ErrorMessageString string
+	ShortID              string
+	Status               string
+	Trigger              string
+	StartedAtValid       bool
+	StartedAtRelative    string
+	DurationLabel        string // pre-formatted; empty when unavailable
+	HasDuration          bool
+	ErrorMessageValid    bool
+	ErrorMessageString   string
 	ErrorMessageFriendly string // syncFriendlyError result; empty if no friendly fallback
-	AddedCount      int32
-	ModifiedCount   int32
-	RemovedCount    int32
-	UnchangedCount  int32
+	AddedCount           int32
+	ModifiedCount        int32
+	RemovedCount         int32
+	UnchangedCount       int32
 }

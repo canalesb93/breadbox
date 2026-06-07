@@ -129,12 +129,10 @@ templ Connections(p ConnectionsProps) {
 				</div>
 			} else {
 				@components.EmptyState(components.EmptyStateProps{
-					Icon:     "building-2",
-					Title:    "No bank connections yet",
-					Body:     "Connect your first bank to start syncing transactions and tracking your finances.",
-					CTAHref:  templ.SafeURL("/connections/new"),
-					CTAIcon:  "plus",
-					CTALabel: "Connect Your First Bank",
+					Icon:      "building-2",
+					Title:     "No bank connections yet",
+					Body:      "Connect your first bank to start syncing transactions and tracking your finances.",
+					CustomCTA: connectFirstBankBtn(),
 				})
 			}
 		</div>
@@ -169,6 +167,9 @@ templ Connections(p ConnectionsProps) {
 		<!-- /links tab -->
 		<!-- Create Account Link Modal -->
 		@connectionsCreateLinkModal(p)
+		<!-- Connect-a-bank drawer — opened from the "Connect Bank" button and
+		     the empty-state CTA. Replaces the old /connections/new page nav. -->
+		@connectBankDrawer(p)
 		<!-- Loading skeleton for the connections list, available for any future
 		     client-side refresh / pagination swap. Mirrors the SSR layout
 		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
@@ -207,11 +208,13 @@ templ connectionsCard(c ConnectionsRow) {
 				<div class="hidden sm:flex w-10 h-10 rounded-lg bg-base-200/60 items-center justify-center shrink-0">
 					switch c.Provider {
 						case "plaid":
-							@components.LucideIcon("building-2", "w-5 h-5 text-info")
+							@components.BrandIcon("plaid", "w-5 h-5")
 						case "teller":
-							@components.LucideIcon("landmark", "w-5 h-5 text-success")
+							@components.BrandIcon("teller", "w-5 h-5")
+						case "simplefin":
+							@components.BrandIcon("simplefin", "w-5 h-5")
 						default:
-							@components.LucideIcon("file-spreadsheet", "w-5 h-5 text-warning")
+							@components.LucideIcon("file-spreadsheet", "w-5 h-5 text-base-content/50")
 					}
 				</div>
 				<div class="min-w-0">
@@ -230,8 +233,10 @@ templ connectionsCard(c ConnectionsRow) {
 									<span class="badge badge-soft badge-error badge-sm cursor-help">Sync Error</span>
 									if c.LastSyncErrorMessage != "" {
 										<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-											<span class="flex items-center gap-1.5 text-error font-medium mb-1">@components.LucideIcon("alert-circle", "w-3 h-3")
-Last sync failed</span>
+											<span class="flex items-center gap-1.5 text-error font-medium mb-1">
+												@components.LucideIcon("alert-circle", "w-3 h-3")
+												Last sync failed
+											</span>
 											<span class="text-base-content/70">{ c.LastSyncErrorMessage }</span>
 										</span>
 									}
@@ -511,14 +516,42 @@ func connectionsAction(_ ConnectionsProps) templ.Component {
 }
 
 templ connectionsActionButtons() {
-	<a x-show="tab === 'connections'" x-cloak href="/connections/new" class="btn btn-primary btn-sm gap-2">
+	<button type="button" x-show="tab === 'connections'" x-cloak @click="$store.drawers.open('connect-bank')" class="btn btn-primary btn-sm gap-2">
 		@components.LucideIcon("plus", "w-4 h-4")
 		Connect Bank
-	</a>
+	</button>
 	<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm gap-2" onclick="document.getElementById('create-link-modal').showModal()">
 		@components.LucideIcon("plus", "w-4 h-4")
 		New Link
 	</button>
+}
+
+// connectFirstBankBtn is the empty-state CTA — opens the connect drawer
+// instead of navigating to the old /connections/new page.
+templ connectFirstBankBtn() {
+	<button type="button" @click="$store.drawers.open('connect-bank')" class="btn btn-primary btn-sm gap-2">
+		@components.LucideIcon("plus", "w-4 h-4")
+		Connect your first bank
+	</button>
+}
+
+// connectBankDrawer embeds the shared connectWizard partial in the standard
+// right-side Drawer. Opened via $store.drawers.open('connect-bank').
+templ connectBankDrawer(p ConnectionsProps) {
+	@components.Drawer(components.DrawerProps{ID: "connect-bank", Title: "Connect a bank", Size: "md"}) {
+		@components.DrawerHeader(components.DrawerHeaderProps{
+			Icon:     "building-2",
+			Title:    "Connect a bank",
+			Subtitle: "Sync transactions automatically",
+		})
+		<div class="flex-1 overflow-y-auto p-5">
+			if !p.HasPlaid && !p.HasTeller && !p.HasSimpleFin {
+				@connectNoProviders()
+			} else {
+				@connectWizard(p.ConnectInProps())
+			}
+		</div>
+	}
 }
 
 templ connectionsCreateLinkModal(p ConnectionsProps) {

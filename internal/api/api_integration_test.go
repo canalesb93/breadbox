@@ -197,7 +197,6 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/connections/{id}/relink", CreateHostedLinkRelinkHandler(svc))
 			r.Post("/connections/{id}/sync", SyncConnectionHandler(svc))
 			r.Post("/connections/{id}/paused", PauseConnectionHandler(svc))
-			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(svc))
 			r.Delete("/connections/{id}", DeleteConnectionHandler(svc))
 			r.Post("/users", CreateUserHandler(svc))
 			r.Patch("/users/{id}", UpdateUserHandler(svc))
@@ -347,7 +346,6 @@ func seedUncategorized(t *testing.T, q *db.Queries) db.Category {
 	}
 	return cat
 }
-
 
 // ============================================================
 // Authentication & Scope Tests

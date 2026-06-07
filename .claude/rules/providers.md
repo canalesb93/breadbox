@@ -8,9 +8,13 @@ paths:
 
 ## Interface
 
-`internal/provider.Provider` (in `provider.go`) is the abstraction. Implementations: `plaid/`, `teller/`, `csv/`.
+`internal/provider.Provider` (in `provider.go`) is the abstraction. Implementations: `plaid/`, `teller/`, `simplefin/`, `csv/`.
 
 Methods take a `Connection` **struct** (not an ID) so implementations can decrypt credentials internally without re-fetching from the DB.
+
+### `ReconcilesPendingByPolling() bool`
+
+A capability method on the interface: returns true for **poll-based** providers that re-return their full transaction window each sync (Teller, SimpleFIN), so the sync engine soft-deletes pending rows no longer present in the window. Returns false for cursor/webhook providers (Plaid) and import-only (CSV). The engine gates `cleanStalePending` on this instead of a hardcoded provider name — add a poll-based provider and it inherits the cleanup for free.
 
 ## Error sentinels
 
@@ -41,6 +45,16 @@ Connection storage uses generic columns: `external_id` + `encrypted_credentials`
 - **Amount sign is opposite Plaid**: Teller negative=debit, Plaid positive=debit. Provider negates before returning — downstream sees Plaid convention.
 - Sync: date-range polling with 10-day overlap (no cursor). Post-sync, soft-delete stale *pending* transactions not returned by the API. Posted transactions are **never** auto-deleted.
 - Raw Teller category strings (`dining`, `groceries`, etc.) stored directly in `category_primary`. Rules handle categorization.
+
+## SimpleFIN
+
+- No SDK. Token-paste, poll-only protocol (`internal/provider/simplefin/`). Full details in `docs/simplefin-integration.md`.
+- **Connect = claim.** `ExchangeToken` receives the pasted base64 *setup token*, decodes it to a one-time claim URL, `POST`s for the **access URL** (`https://user:pass@host/path`), and stores the encrypted access URL as the credential. `CreateLinkSession` returns `ErrNotSupported`.
+- **`external_id` is minted** (`internal/shortid`) — SimpleFIN exposes no stable upstream id and a single access URL spans many banks. Reauth keeps the row and rotates only `encrypted_credentials` (`UpdateBankConnectionCredentials`).
+- **Sign is inverted vs Plaid**: SimpleFIN positive = money in; negate uniformly (no per-account-type rule, unlike Teller).
+- **Sync**: date-range polling chunked into **≤90-day windows** (bridge cap). Cursor = last-sync RFC3339 timestamp. `ReconcilesPendingByPolling()` is true. New connections default to a **daily** `sync_interval_override_minutes` (bridge expects ≤24 req/day).
+- `HandleWebhook`/`CreateReauthSession` → `ErrNotSupported`; `RemoveConnection` → `nil` (no revoke endpoint). Account type defaults to `depository` (not exposed by SimpleFIN).
+- **Opt-in**: gated by `SIMPLEFIN_ENABLED` env / `simplefin_enabled` app_config (no server-level credential). Admin-page connect/relink only in v1 — no REST endpoint, not in the hosted-link allowlist.
 
 ## CSV
 

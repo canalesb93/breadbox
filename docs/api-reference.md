@@ -318,7 +318,6 @@ Errors on `POST /connections`:
 | GET | `/connections/{id}/status` | Read | Get connection status and last sync info |
 | POST | `/connections/{id}/sync` | Write | Trigger a sync for this single connection |
 | POST | `/connections/{id}/paused` | Write | Pause or resume scheduled syncs for a connection |
-| POST | `/connections/{id}/sync-interval` | Write | Set or clear a per-connection sync-interval override |
 | DELETE | `/connections/{id}` | Write | Soft-disconnect a connection (clears tokens, hides from list) |
 | POST | `/connections/{id}/reauth` | Write | Start the provider re-auth flow — returns a fresh link token |
 | POST | `/connections/{id}/reauth-complete` | Write | Mark connection active again after the user finishes the re-auth flow |
@@ -432,18 +431,6 @@ Toggle the `paused` flag — paused connections are skipped by the cron schedule
 | `paused` | bool | Required. `true` to pause, `false` to resume. |
 
 Returns `200` with the full connection detail (same shape as `GET /connections/{id}`). `404 NOT_FOUND` if the connection is missing.
-
-### POST `/connections/{id}/sync-interval`
-
-Set or clear the per-connection sync-interval override (minutes). When cleared, the connection falls back to the global default.
-
-**Body**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `interval_minutes` | int / null | Minutes between scheduled syncs. Pass `null` (or omit) to clear the override and revert to the global default. Values `<= 0` are treated as a clear. |
-
-Returns `200` with the full connection detail. `404 NOT_FOUND` if the connection is missing.
 
 ### DELETE `/connections/{id}`
 

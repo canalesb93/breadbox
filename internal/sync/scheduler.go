@@ -35,14 +35,15 @@ func NewScheduler(engine *Engine, queries *db.Queries, logger *slog.Logger, sync
 	}
 }
 
-// Start begins the cron scheduler. Cron fires every 15 minutes (the minimum
-// supported interval) and checks each connection's staleness individually.
+// Start begins the cron scheduler. The tick fires every 15 minutes (the
+// evaluation granularity) and checks each connection against its wall-clock sync
+// schedules. fallbackIntervalMinutes is only consulted if no schedules exist.
 // It also schedules a daily sync log cleanup job.
-func (s *Scheduler) Start(globalIntervalMinutes int) {
+func (s *Scheduler) Start(fallbackIntervalMinutes int) {
 	_, err := s.cron.AddFunc("@every 15m", func() {
 		ctx := context.Background()
 		s.logger.Info("cron sync starting")
-		synced, skipped := s.syncAllScheduled(ctx, globalIntervalMinutes)
+		synced, skipped := s.syncAllScheduled(ctx, fallbackIntervalMinutes)
 		s.logger.Info("cron sync completed", "synced", synced, "skipped", skipped)
 	})
 	if err != nil {
@@ -60,7 +61,7 @@ func (s *Scheduler) Start(globalIntervalMinutes int) {
 	}
 
 	s.cron.Start()
-	s.logger.Info("scheduler started", "check_interval", "15m", "global_sync_interval_minutes", globalIntervalMinutes)
+	s.logger.Info("scheduler started", "check_interval", "15m", "fallback_interval_minutes", fallbackIntervalMinutes)
 }
 
 // IsRunning returns true if the scheduler has any active cron entries.
@@ -108,9 +109,12 @@ func backoffInterval(baseMinutes int, consecutiveFailures int32) int {
 	return baseMinutes * (1 << exp)
 }
 
-// syncAllScheduled syncs all active, unpaused connections that are stale
-// according to their effective interval (per-connection override or global).
-func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes int) (synced, skipped int) {
+// syncAllScheduled syncs all active, unpaused connections that are due
+// according to their effective sync schedules (the union of `applies_to_all`
+// schedules plus any explicitly targeting the connection). Wall-clock anchored:
+// a connection is due when a scheduled fire time has passed since its last
+// successful sync. fallbackIntervalMinutes is only used if no schedules exist.
+func (s *Scheduler) syncAllScheduled(ctx context.Context, fallbackIntervalMinutes int) (synced, skipped int) {
 	connections, err := s.queries.ListActiveUnpausedConnections(ctx)
 	if err != nil {
 		s.logger.Error("list active unpaused connections", "error", err)
@@ -122,6 +126,12 @@ func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes 
 		return 0, 0
 	}
 
+	resolver, err := s.loadScheduleResolver(ctx, fallbackIntervalMinutes)
+	if err != nil {
+		s.logger.Error("load sync schedules", "error", err)
+		return 0, 0
+	}
+
 	now := time.Now()
 	const maxWorkers = 5
 	sem := make(chan struct{}, maxWorkers)
@@ -130,21 +140,24 @@ func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes 
 	done := make(chan result, len(connections))
 
 	for _, conn := range connections {
-		// Compute effective interval with backoff for consecutive failures.
-		baseMinutes := globalIntervalMinutes
-		if conn.SyncIntervalOverrideMinutes.Valid {
-			baseMinutes = int(conn.SyncIntervalOverrideMinutes.Int32)
+		// Hold back a failing connection until its backoff window elapses,
+		// regardless of how frequently its schedule would otherwise fire.
+		if conn.LastErrorAt.Valid && backoffSuppressed(conn.ConsecutiveFailures, conn.LastErrorAt.Time, now) {
+			skipped++
+			done <- result{}
+			continue
 		}
-		effectiveMinutes := backoffInterval(baseMinutes, conn.ConsecutiveFailures)
 
-		// Skip if not stale.
+		schedules := resolver.forConnection(conn.ID.Bytes)
+		jitter := connectionJitter(conn.ID.Bytes, jitterWindow)
+		lastSynced := time.Time{}
 		if conn.LastSyncedAt.Valid {
-			nextSync := conn.LastSyncedAt.Time.Add(time.Duration(effectiveMinutes) * time.Minute)
-			if nextSync.After(now) {
-				skipped++
-				done <- result{}
-				continue
-			}
+			lastSynced = conn.LastSyncedAt.Time
+		}
+		if !scheduleDue(schedules, lastSynced, now, jitter) {
+			skipped++
+			done <- result{}
+			continue
 		}
 
 		connID := conn.ID
@@ -172,9 +185,10 @@ func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes 
 	return synced, skipped
 }
 
-// RunStartupSync checks all active, unpaused connections and syncs any that
-// are stale (last synced more than their effective interval ago or never synced).
-func (s *Scheduler) RunStartupSync(ctx context.Context, globalIntervalMinutes int) {
+// RunStartupSync checks all active, unpaused connections and syncs any that are
+// due according to their schedules (a scheduled fire was missed while the server
+// was down, or the connection has never synced). This is the catch-up path.
+func (s *Scheduler) RunStartupSync(ctx context.Context, fallbackIntervalMinutes int) {
 	connections, err := s.queries.ListActiveUnpausedConnections(ctx)
 	if err != nil {
 		s.logger.Error("startup sync: failed to list connections", "error", err)
@@ -186,18 +200,26 @@ func (s *Scheduler) RunStartupSync(ctx context.Context, globalIntervalMinutes in
 		return
 	}
 
+	resolver, err := s.loadScheduleResolver(ctx, fallbackIntervalMinutes)
+	if err != nil {
+		s.logger.Error("startup sync: load sync schedules", "error", err)
+		return
+	}
+
 	now := time.Now()
 	var staleCount int
 
 	for _, conn := range connections {
-		baseMinutes := globalIntervalMinutes
-		if conn.SyncIntervalOverrideMinutes.Valid {
-			baseMinutes = int(conn.SyncIntervalOverrideMinutes.Int32)
+		if conn.LastErrorAt.Valid && backoffSuppressed(conn.ConsecutiveFailures, conn.LastErrorAt.Time, now) {
+			continue
 		}
-		effectiveMinutes := backoffInterval(baseMinutes, conn.ConsecutiveFailures)
-
-		threshold := now.Add(-time.Duration(effectiveMinutes) * time.Minute)
-		if !conn.LastSyncedAt.Valid || conn.LastSyncedAt.Time.Before(threshold) {
+		schedules := resolver.forConnection(conn.ID.Bytes)
+		jitter := connectionJitter(conn.ID.Bytes, jitterWindow)
+		lastSynced := time.Time{}
+		if conn.LastSyncedAt.Valid {
+			lastSynced = conn.LastSyncedAt.Time
+		}
+		if scheduleDue(schedules, lastSynced, now, jitter) {
 			staleCount++
 			syncCtx, cancel := context.WithTimeout(ctx, s.syncTimeout)
 			if err := s.engine.Sync(syncCtx, conn.ID, db.SyncTriggerCron); err != nil {

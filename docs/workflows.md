@@ -532,14 +532,25 @@ Token values (`agent.subscription_token`, `agent.anthropic_api_key`) are AES-256
 
 ---
 
-## Relationship to the Agents Surface
+## Preset vs. custom workflows
 
-Workflows and hand-authored Agents share the same underlying data layer:
+`/workflows` is the single management surface for all automations. Two kinds
+coexist in the gallery, backed by the same data layer:
+
+- **Preset workflows** — instantiated from a code-defined template
+  (`source_template IS NOT NULL`). The setup/reconfigure drawer exposes the
+  preset's options; the prompt is composed from the template.
+- **Custom workflows** — hand-authored (`source_template = NULL`). Created and
+  edited via the **custom-workflow drawer**, where the operator authors the
+  entire prompt themselves alongside schedule, model, and tool scope.
+
+Shared mechanics:
 
 - Both use the `workflows` table (formerly `agent_definitions`) and `workflow_runs` table (formerly `agent_runs`).
 - The orchestrator, scheduler, and sidecar are shared. There is one concurrency semaphore for all runs regardless of origin.
-- Workflows are distinguished by `source_template IS NOT NULL`; hand-authored agents have `source_template = NULL`.
-- The Settings -> Agents page (`/settings/agents`) configures the shared subsystem (Anthropic credentials, concurrency cap, global budget ceiling, notification webhook, runtime path) for both surfaces.
-- The `/agents` admin page (agent definitions list and form) remains the management surface for hand-authored agents; `/workflows` is the gallery surface for preset-backed ones.
+- The Settings → Workflows page (`/settings/workflows`) configures the shared subsystem (Anthropic credentials, concurrency cap, global budget ceiling, notification webhook, runtime path).
 
-Going forward, the recommended path for new automations is the preset gallery, which provides composed prompts, estimated costs, and configured defaults out of the box.
+> The legacy `/agents` admin surface — the standalone agent-definition list, the
+> hand-authored form (`/agents/new`, `/agents/{slug}/edit`), the per-agent detail
+> page, and the prompt-library wizard (`/agent-prompts`) — was removed. Those URLs
+> now redirect to `/workflows`.

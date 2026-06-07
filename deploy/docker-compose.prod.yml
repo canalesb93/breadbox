@@ -1,5 +1,12 @@
 services:
   breadbox:
+    # Image tags (see deploy/README.md → "Image tags"):
+    #   :latest   newest stable release (recommended default — what this file
+    #             ships with; managed platforms like Railway/Render pull it).
+    #   :vX.Y.Z   a specific, immutable release — pin this for full control
+    #             (install.sh rewrites the line below to the release it found).
+    #   :edge     rolling tip of main, rebuilt every merge — bleeding edge,
+    #             for testing upstream before it's released.
     image: ghcr.io/canalesb93/breadbox:latest
     restart: unless-stopped
     env_file: .env

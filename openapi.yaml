@@ -1038,27 +1038,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Connection" }
-  /api/v1/connections/{id}/sync-interval:
-    parameters: [{ $ref: "#/components/parameters/IDPath" }]
-    post:
-      tags: [Connections]
-      summary: Update connection sync interval
-      description: "**Requires `full_access` scope.**"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [interval_seconds]
-              properties:
-                interval_seconds: { type: integer }
-      responses:
-        "200":
-          description: Updated connection.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Connection" }
   /api/v1/connections/{id}/reauth:
     parameters: [{ $ref: "#/components/parameters/IDPath" }]
     post:
@@ -2779,7 +2758,15 @@ paths:
         `name`, `slug`, `prompt`, `model`, `max_turns`, `max_budget_usd`,
         `tool_scope`, `allowed_tools`, `schedule_cron`, and the iter-30
         `trigger_on_sync_complete` flag (fire after every successful
-        sync, in addition to any cron schedule). **Requires `full_access` scope.**
+        sync, in addition to any cron schedule).
+
+
+        Optionally includes `connectors`: an array of custom MCP connector
+        NAMES to enable on this workflow (mounted alongside the built-in
+        breadbox MCP — e.g. a remote Gmail MCP). The connector definitions +
+        credentials live in the global connector library, managed from the
+        Workflows settings page; this field only references them by name.
+        **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -2904,7 +2891,11 @@ paths:
     patch:
       tags: [Workflows]
       summary: Partial update of an agent definition
-      description: Omitted fields are unchanged. **Requires `full_access` scope.**
+      description: |
+        Omitted fields are unchanged. `connectors` is the list of enabled
+        connector NAMES (from the global connector library); omitting the key
+        leaves the set untouched, sending it replaces the set. **Requires
+        `full_access` scope.**
       requestBody:
         required: true
         content:

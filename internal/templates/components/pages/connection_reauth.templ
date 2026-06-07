@@ -68,6 +68,16 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 				:class="isError ? 'text-error' : 'text-base-content/50'"
 				x-text="status"
 			></p>
+			if p.Provider == "simplefin" {
+				<div class="w-full mb-6 text-left">
+					<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="simplefin-reauth-token">New setup token</label>
+					<textarea id="simplefin-reauth-token" rows="4" class="textarea w-full font-mono text-xs" placeholder="Paste a fresh SimpleFIN setup token…"></textarea>
+					<button type="button" class="btn btn-primary btn-sm mt-3" @click="submitSimplefin()">
+						@components.LucideIcon("link", "w-4 h-4")
+						Reconnect
+					</button>
+				</div>
+			}
 			<div class="flex items-center gap-3">
 				<button
 					type="button"
@@ -76,10 +86,12 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 					x-cloak
 					@click="startReauth()"
 				>
-					@components.LucideIcon("refresh-cw", "w-4 h-4") Retry
+					@components.LucideIcon("refresh-cw", "w-4 h-4")
+					Retry
 				</button>
 				<a href={ templ.SafeURL("/connections/" + p.ConnID) } class="btn btn-ghost btn-sm">
-					@components.LucideIcon("x", "w-4 h-4") Cancel
+					@components.LucideIcon("x", "w-4 h-4")
+					Cancel
 				</a>
 			</div>
 		</div>

@@ -2,134 +2,185 @@ package pages
 
 import "breadbox/internal/templates/components"
 
-// ConnectionNew renders the /admin/connections/new page — the two-step
-// "select details → bank link dialog" wizard that runs inside the base
-// layout. Hosts via TemplateRenderer.RenderWithTempl.
+// ConnectionNew renders the standalone /connections/new page — the
+// "choose a provider → link" wizard inside the base layout. The same
+// wizard body (connectWizard) is embedded in a side drawer on the
+// /connections list page (see connections.templ → connectBankDrawer),
+// so the markup lives in one shared partial.
 //
 // The Alpine factory lives in static/js/admin/components/connection_new.js
-// and is loaded synchronously at the top of the component (no defer) so
+// and is loaded synchronously at the top of connectWizard (no defer) so
 // Alpine.data('connectionNew', ...) registers before Alpine — itself
 // <script defer> in <head> — fires alpine:init. The Teller environment
 // (sandbox/development/production) flows in through data-teller-env on the
 // x-data root and is read once in the factory's init().
 templ ConnectionNew(p ConnectionNewProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Connect a bank</h1>
+			<p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
+		</div>
+	</div>
+	if !p.HasPlaid && !p.HasTeller && !p.HasSimpleFin {
+		<div class="bb-card p-8 max-w-lg">
+			@connectNoProviders()
+		</div>
+	} else {
+		<div class="bb-card p-6 max-w-lg">
+			@connectWizard(p)
+		</div>
+	}
+}
+
+// connectNoProviders is the empty state shown when no bank provider is
+// configured. Card-less so the caller (page card or drawer body) owns the
+// surface.
+templ connectNoProviders() {
+	<div class="flex flex-col items-center text-center py-6">
+		<div class="w-14 h-14 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
+			@components.LucideIcon("plug-zap", "w-7 h-7 text-warning")
+		</div>
+		<h2 class="text-base font-semibold mb-1">No providers configured</h2>
+		<p class="text-sm text-base-content/50 mb-5 max-w-xs">Configure at least one bank provider before connecting an account.</p>
+		<a href="/settings/providers" class="btn btn-primary btn-sm">
+			@components.LucideIcon("settings", "w-4 h-4")
+			Configure providers
+		</a>
+	</div>
+}
+
+// connectWizard is the shared, chrome-light connect flow: a provider
+// picker + family-member select (step-select), the SDK-link status panel
+// (step-link, Plaid/Teller), and the SimpleFIN token-paste panel
+// (step-simplefin). It renders no outer card/header — the page wraps it
+// in a bb-card and the drawer wraps it in a DrawerHeader + scroll body,
+// so the same IDs the factory keys off (member-form, step-*, etc.) exist
+// exactly once per page.
+templ connectWizard(p ConnectionNewProps) {
 	<!-- Component factory. Loaded synchronously (no defer) so the
 	     Alpine.data() registration runs before Alpine — itself deferred
 	     from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/connection_new.js"></script>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Connect New Bank</h1>
-			<p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
+	<div x-data="connectionNew" data-teller-env={ p.TellerEnv }>
+		<div id="step-select">
+			<form id="member-form" class="flex flex-col gap-5">
+				<div>
+					<label class="text-sm font-medium text-base-content/70 mb-2 block">Provider</label>
+					<div class="flex flex-col gap-2" id="provider-cards">
+						if p.HasPlaid {
+							@connectProviderRow("plaid", "plaid", "", "Plaid", "Thousands of US & Canadian banks", true)
+						}
+						if p.HasTeller {
+							@connectProviderRow("teller", "teller", "", "Teller", "Fast, developer-first US banks", !p.HasPlaid)
+						}
+						if p.HasSimpleFin {
+							@connectProviderRow("simplefin", "simplefin", "", "SimpleFIN", "Paste a token · privacy-first", !p.HasPlaid && !p.HasTeller)
+						}
+						@connectProviderRow("csv", "", "file-spreadsheet", "CSV", "Import a statement file manually", false)
+					</div>
+				</div>
+				if len(p.Users) == 1 {
+					<!-- Single household member: auto-selected, field hidden for a cleaner flow. -->
+					<select id="user_id" name="user_id" class="hidden">
+						<option value={ p.Users[0].ID } selected>{ p.Users[0].Name }</option>
+					</select>
+				} else {
+					<fieldset class="fieldset">
+						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family member</label>
+						<select id="user_id" name="user_id" required class="select w-full">
+							<option value="" disabled selected>Select a member…</option>
+							for _, u := range p.Users {
+								<option value={ u.ID }>{ u.Name }</option>
+							}
+						</select>
+					</fieldset>
+				}
+				<button type="submit" class="btn btn-primary btn-sm w-full justify-center gap-2">
+					Continue
+					@components.LucideIcon("arrow-right", "w-4 h-4")
+				</button>
+			</form>
 		</div>
+		<div id="step-link" class="hidden">
+			<div class="flex flex-col items-center text-center py-4">
+				<div class="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+					@components.LucideIcon("link", "w-7 h-7 text-primary")
+				</div>
+				<h2 class="text-base font-semibold mb-1">Connecting…</h2>
+				<p class="text-sm text-base-content/50 mb-1">Connecting for: <span id="member-name" class="font-semibold text-base-content"></span></p>
+				<p id="link-status" class="text-sm text-base-content/50 mb-5">Opening bank connection dialog…</p>
+				<div class="flex items-center gap-2">
+					<button id="retry-btn" class="btn btn-primary btn-sm hidden">
+						@components.LucideIcon("refresh-cw", "w-4 h-4")
+						Retry
+					</button>
+					<button id="back-btn" class="btn btn-ghost btn-sm">
+						@components.LucideIcon("arrow-left", "w-4 h-4")
+						Back
+					</button>
+				</div>
+			</div>
+		</div>
+		if p.HasSimpleFin {
+			<div id="step-simplefin" class="hidden">
+				<div class="flex items-center gap-3 mb-4">
+					<span class="w-10 h-10 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center shrink-0">
+						@components.BrandIcon("simplefin", "w-5 h-5")
+					</span>
+					<div>
+						<h2 class="text-sm font-semibold">Connect SimpleFIN</h2>
+						<p class="text-xs text-base-content/45">Connecting for: <span id="simplefin-member-name" class="font-medium text-base-content"></span></p>
+					</div>
+				</div>
+				<div class="flex flex-col gap-4">
+					<p class="text-sm text-base-content/60">
+						Paste the one-time setup token from your SimpleFIN bridge. Don't have one yet?
+						<a href="https://bridge.simplefin.org/simplefin/create" target="_blank" rel="noopener" class="link link-primary">Get a token</a>
+						— or use your own server's <code class="text-xs">/create</code> page if self-hosted.
+					</p>
+					<fieldset class="fieldset">
+						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="simplefin-token">Setup token</label>
+						<textarea id="simplefin-token" rows="4" class="textarea w-full font-mono text-xs" placeholder="Paste your SimpleFIN setup token…"></textarea>
+					</fieldset>
+					<p id="simplefin-status" class="text-sm text-base-content/50 min-h-5"></p>
+					<div class="flex items-center gap-2">
+						<button id="simplefin-submit" class="btn btn-primary btn-sm">
+							@components.LucideIcon("link", "w-4 h-4")
+							Connect
+						</button>
+						<button id="simplefin-back" class="btn btn-ghost btn-sm">
+							@components.LucideIcon("arrow-left", "w-4 h-4")
+							Back
+						</button>
+					</div>
+				</div>
+			</div>
+		}
 	</div>
-	if !p.HasPlaid && !p.HasTeller {
-		<!-- No providers configured -->
-		<div class="bb-card p-8 max-w-lg">
-			<div class="flex flex-col items-center text-center">
-				<div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
-					@components.LucideIcon("plug-zap", "w-8 h-8 text-warning")
-				</div>
-				<h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
-				<p class="text-sm text-base-content/50 mb-6">You need to configure at least one bank provider before creating connections.</p>
-				<a href="/settings/providers" class="btn btn-primary btn-sm">
-					@components.LucideIcon("settings", "w-4 h-4") Configure Providers
-				</a>
-			</div>
+}
+
+// connectProviderRow is one selectable provider in the picker — a brand
+// (or lucide) mark, name + one-line description, wrapping a sr-only radio
+// the connectionNew factory reads. peer-checked tints the row primary.
+templ connectProviderRow(value, brand, icon, name, desc string, checked bool) {
+	<label class="block cursor-pointer">
+		if checked {
+			<input type="radio" name="provider" value={ value } class="peer sr-only" checked/>
+		} else {
+			<input type="radio" name="provider" value={ value } class="peer sr-only"/>
+		}
+		<div class="flex items-center gap-3 p-3 rounded-xl border border-base-300 bg-base-200/30 transition-all duration-150 hover:border-base-content/20 peer-checked:border-primary peer-checked:bg-primary/5">
+			<span class="w-10 h-10 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center shrink-0">
+				if brand != "" {
+					@components.BrandIcon(brand, "w-5 h-5")
+				} else {
+					@components.LucideIcon(icon, "w-5 h-5 text-base-content/60")
+				}
+			</span>
+			<span class="min-w-0 flex-1">
+				<span class="block text-sm font-medium">{ name }</span>
+				<span class="block text-xs text-base-content/50 truncate">{ desc }</span>
+			</span>
 		</div>
-	} else {
-		<div x-data="connectionNew" data-teller-env={ p.TellerEnv }>
-			<div id="step-select">
-				<div class="bb-card p-8 max-w-lg">
-					<div class="flex items-center gap-3 mb-6">
-						@components.IconTile("primary", "user-plus")
-						<div>
-							<h2 class="text-base font-semibold">Select Details</h2>
-							<p class="text-xs text-base-content/45">Choose provider and family member</p>
-						</div>
-					</div>
-					<form id="member-form" class="flex flex-col gap-5">
-						<fieldset class="fieldset">
-							<label class="text-sm font-medium text-base-content/70 mb-1.5 block">Bank Provider</label>
-							<div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="provider-cards">
-								if p.HasPlaid {
-									<label class="relative cursor-pointer">
-										<input type="radio" name="provider" value="plaid" class="peer sr-only" checked/>
-										<div
-											class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
-                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
-										>
-											@components.LucideIcon("building-2", "w-6 h-6 text-base-content opacity-60")
-											<span class="text-sm font-medium">Plaid</span>
-										</div>
-									</label>
-								}
-								if p.HasTeller {
-									<label class="relative cursor-pointer">
-										if !p.HasPlaid {
-											<input type="radio" name="provider" value="teller" class="peer sr-only" checked/>
-										} else {
-											<input type="radio" name="provider" value="teller" class="peer sr-only"/>
-										}
-										<div
-											class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
-                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
-										>
-											@components.LucideIcon("landmark", "w-6 h-6 text-base-content opacity-60")
-											<span class="text-sm font-medium">Teller</span>
-										</div>
-									</label>
-								}
-								<label class="relative cursor-pointer">
-									<input type="radio" name="provider" value="csv" class="peer sr-only"/>
-									<div
-										class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
-                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300"
-									>
-										@components.LucideIcon("file-spreadsheet", "w-6 h-6 text-base-content opacity-60")
-										<span class="text-sm font-medium">CSV</span>
-									</div>
-								</label>
-							</div>
-						</fieldset>
-						<fieldset class="fieldset">
-							<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
-							<select id="user_id" name="user_id" required class="select w-full">
-								<option value="" disabled selected>Select a member...</option>
-								for _, u := range p.Users {
-									<option value={ u.ID }>{ u.Name }</option>
-								}
-							</select>
-						</fieldset>
-						<div class="pt-2">
-							<button type="submit" class="btn btn-primary btn-sm">
-								Continue
-								@components.LucideIcon("arrow-right", "w-4 h-4")
-							</button>
-						</div>
-					</form>
-				</div>
-			</div>
-			<div id="step-link" class="hidden">
-				<div class="bb-card p-8 max-w-lg">
-					<div class="flex flex-col items-center text-center">
-						<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-							@components.LucideIcon("link", "w-8 h-8 text-primary")
-						</div>
-						<h2 class="text-lg font-semibold mb-1">Connect Bank</h2>
-						<p class="text-sm text-base-content/50 mb-1">Connecting for: <span id="member-name" class="font-semibold text-base-content"></span></p>
-						<p id="link-status" class="text-sm text-base-content/50 mb-6">Opening bank connection dialog...</p>
-						<div class="flex items-center gap-3">
-							<button id="retry-btn" class="btn btn-primary btn-sm hidden">
-								@components.LucideIcon("refresh-cw", "w-4 h-4") Retry
-							</button>
-							<button id="back-btn" class="btn btn-ghost btn-sm">
-								@components.LucideIcon("arrow-left", "w-4 h-4") Back
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	}
+	</label>
 }

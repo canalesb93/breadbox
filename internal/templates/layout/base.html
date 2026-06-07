@@ -60,6 +60,10 @@
        [data-private] nodes. Non-deferred so it exists before Alpine's
        `privacy` store inits; its own pass waits for DOMContentLoaded. -->
   <script src="/static/js/admin/privacy.js"></script>
+  <!-- Copy-to-clipboard for server-rendered markdown code blocks (.bb-code).
+       Delegated listener — covers every code block on the page incl. ones
+       injected later by live polls. -->
+  <script src="/static/js/admin/code-copy.js" defer></script>
   <!-- fetchpriority="high" hints that the app stylesheet is render-blocking and
        critical. Safari 17.2+ and Chrome 102+ honor it; older browsers ignore. -->
   <link rel="stylesheet" href="/static/css/styles.css" fetchpriority="high">
@@ -818,7 +822,7 @@
         <div class="rounded-xl border border-base-200 p-2.5 space-y-2">
           <label class="flex items-start gap-2 cursor-pointer">
             <input type="checkbox" x-model="redact" @change="onRedactChange()"
-                   class="toggle toggle-sm toggle-success mt-0.5">
+                   class="toggle toggle-sm mt-0.5">
             <span class="min-w-0">
               <span class="text-xs font-medium flex items-center gap-1">
                 {{ lucide "shield-check" "w-3.5 h-3.5 text-success" }} Redact financial data
@@ -2090,9 +2094,7 @@
         { id: 'nav-recurring', group: 'Overview', title: 'Recurring', desc: 'Recurring charges and subscriptions', icon: 'repeat', href: '/recurring', keywords: 'subscriptions series recurring charges bills memberships renewals monthly' },
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
-        { id: 'nav-workflows', group: 'Manage', title: 'Workflows', desc: 'Agent automations and runs', icon: 'workflow', href: '/workflows', keywords: 'workflows automations agents runs schedule cron presets gallery sdk' },
-        { id: 'nav-agents', shortcutId: 'global.go.h', group: 'Manage', title: 'Agents', desc: 'Claude Agent SDK runs, prompt library, settings', icon: 'bot', href: '/agents', keywords: 'agent sdk runs prompts library wizard schedule cron mcp setup tools permissions' },
-        { id: 'nav-agent-prompts', group: 'Manage', title: 'Prompt library', desc: 'Starter prompt templates for agents', icon: 'sparkles', href: '/agent-prompts', keywords: 'wizard prompt library template starter' },
+        { id: 'nav-workflows', shortcutId: 'global.go.h', group: 'Manage', title: 'Workflows', desc: 'Agent automations and runs', icon: 'workflow', href: '/workflows', keywords: 'workflows automations agents runs schedule cron presets gallery sdk prompts custom' },
         { id: 'nav-rules', shortcutId: 'global.go.u', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
         { id: 'nav-categories', shortcutId: 'global.go.a', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
         { id: 'nav-tags', group: 'Manage', title: 'Tags', desc: 'Tag transactions and triage review queue', icon: 'tags', href: '/tags', keywords: 'labels needs-review triage annotations' },
@@ -2701,6 +2703,10 @@
 
       // Handle form submissions
       document.addEventListener('submit', function(e) {
+        // A handler that called preventDefault() is taking over client-side —
+        // no navigation is coming, so starting the nav bar would leave it
+        // trickling forever (e.g. the connect wizard's step transition).
+        if (e.defaultPrevented) return;
         var form = e.target;
         if (form && form.method && form.method.toLowerCase() === 'get') {
           start();

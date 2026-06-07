@@ -133,6 +133,13 @@ const (
 	// drafts against (e.g. "canalesb93/breadbox"). Defaults to
 	// DevModeDefaultRepo when unset.
 	KeyDevModeGithubRepo = "devmode.github_repo"
+
+	// KeyInstanceTimezone is the IANA timezone (e.g. "America/Los_Angeles")
+	// every cron schedule — sync schedules AND agent/workflow schedules — is
+	// evaluated in, and that schedule previews are rendered in. Unset or
+	// invalid falls back to the server process's local zone (time.Local).
+	// This is the single source of truth for "what clock the cron means".
+	KeyInstanceTimezone = "instance.timezone"
 )
 
 // DevModeDefaultRepo is the repository Developer Mode files against when

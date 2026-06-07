@@ -90,7 +90,6 @@ templ backupsStats(p BackupsProps) {
 // ---------------------------------------------------------------------
 // Schedule
 // ---------------------------------------------------------------------
-
 templ backupsScheduleSection(p BackupsProps) {
 	<div id="schedule">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -175,7 +174,6 @@ templ backupsRetentionOption(value int, label string, current int) {
 // ---------------------------------------------------------------------
 // File list
 // ---------------------------------------------------------------------
-
 templ backupsFilesSection(p BackupsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "archive",
@@ -292,7 +290,6 @@ templ backupsTriggerBadge(trigger string) {
 // ---------------------------------------------------------------------
 // Restore from upload
 // ---------------------------------------------------------------------
-
 templ backupsRestoreSection(p BackupsProps) {
 	<div id="restore">
 		@components.SettingsSection(components.SettingsSectionProps{

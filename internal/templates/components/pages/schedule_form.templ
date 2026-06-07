@@ -1,0 +1,146 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// ScheduleDrawer is the create/edit sync-schedule form rendered inside the
+// shared right-side Drawer, opened from Settings → Sync (keeps the settings
+// page itself clean). One drawer per schedule (id "schedule-<shortID>") plus a
+// create drawer ("schedule-new") is rendered server-side, so the nested
+// CronField hydrates with the right values without any fetch dance.
+templ ScheduleDrawer(p ScheduleFormProps) {
+	@components.Drawer(components.DrawerProps{ID: p.DrawerID(), Title: scheduleFormTitle(p), Size: "lg"}) {
+		<form
+			method="POST"
+			action={ templ.SafeURL(p.FormAction()) }
+			class="flex flex-col h-full"
+			x-data={ scheduleFormState(p) }
+		>
+			<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+			@components.DrawerHeader(components.DrawerHeaderProps{Icon: "refresh-cw", Title: scheduleFormTitle(p)})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				@scheduleFormFields(p)
+			</div>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm">
+					if p.IsEdit {
+						Save changes
+					} else {
+						Create schedule
+					}
+				</button>
+			}
+		</form>
+	}
+}
+
+// ScheduleForm is the standalone create/edit page — kept as a no-JS fallback
+// for direct URLs (the primary surface is the drawer above).
+templ ScheduleForm(p ScheduleFormProps) {
+	<div class="max-w-2xl mx-auto px-4 py-6" x-data={ scheduleFormState(p) }>
+		@components.PageHeader(components.PageHeaderProps{
+			Title: scheduleFormTitle(p),
+		})
+		if p.Error != "" {
+			<div class="alert alert-error alert-soft rounded-xl mb-4">
+				@components.LucideIcon("alert-circle", "w-4 h-4")
+				<span>{ p.Error }</span>
+			</div>
+		}
+		<form method="POST" action={ templ.SafeURL(p.FormAction()) } class="bb-card p-5 space-y-5">
+			<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+			@scheduleFormFields(p)
+			<div class="flex items-center justify-end gap-2 pt-2 border-t border-base-200">
+				<a href="/settings/general#sync" class="btn btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn btn-primary btn-sm">
+					if p.IsEdit {
+						Save changes
+					} else {
+						Create schedule
+					}
+				</button>
+			</div>
+		</form>
+	</div>
+}
+
+// scheduleFormFields renders the shared field set (name, cadence, targets,
+// enabled) used by both the drawer and the standalone page. The surrounding
+// <form>, CSRF token, and action buttons are the caller's.
+templ scheduleFormFields(p ScheduleFormProps) {
+	<!-- Name -->
+	<div class="space-y-1.5">
+		<label for={ "name-" + p.DrawerID() } class="bb-settings-row__label">Name</label>
+		<input
+			id={ "name-" + p.DrawerID() }
+			name="name"
+			type="text"
+			value={ p.Name }
+			placeholder="e.g. Nightly refresh"
+			class="bb-form-input input input-sm w-full"
+			required
+		/>
+	</div>
+	<!-- Cadence — shared cron component (presets + custom + live preview) -->
+	<div class="space-y-1.5">
+		<label class="bb-settings-row__label">Cadence</label>
+		@components.CronField(components.CronFieldProps{
+			Name:       "cron",
+			PresetName: "preset",
+			Value:      p.Cron,
+			Presets:    p.Presets,
+		})
+	</div>
+	<!-- Targets -->
+	<div class="space-y-2">
+		<label class="bb-settings-row__label">Applies to</label>
+		<label class="flex items-center gap-2 text-sm cursor-pointer">
+			<input type="checkbox" name="applies_to_all" class="checkbox checkbox-sm" x-model="all"/>
+			<span>All connections <span class="text-base-content/45">(including ones added later)</span></span>
+		</label>
+		<div class="mt-2 space-y-1.5 transition-opacity" :class="all ? 'opacity-40 pointer-events-none' : ''">
+			if len(p.Connections) == 0 {
+				<p class="text-sm text-base-content/55">No connections yet.</p>
+			}
+			for _, conn := range p.Connections {
+				<label class="flex items-center gap-2 text-sm cursor-pointer">
+					if p.SelectedConns[conn.ShortID] {
+						<input type="checkbox" name="connection_ids" value={ conn.ShortID } class="checkbox checkbox-sm" checked/>
+					} else {
+						<input type="checkbox" name="connection_ids" value={ conn.ShortID } class="checkbox checkbox-sm"/>
+					}
+					<span>{ connectionLabel(conn) }</span>
+				</label>
+			}
+		</div>
+	</div>
+	<!-- Enabled -->
+	<div class="space-y-1.5">
+		<label class="flex items-center gap-2 text-sm cursor-pointer">
+			if p.Enabled {
+				<input type="checkbox" name="enabled" class="toggle toggle-sm" checked/>
+			} else {
+				<input type="checkbox" name="enabled" class="toggle toggle-sm"/>
+			}
+			<span>Enabled</span>
+		</label>
+	</div>
+}
+
+func scheduleFormTitle(p ScheduleFormProps) string {
+	if p.IsEdit {
+		return "Edit sync schedule"
+	}
+	return "New sync schedule"
+}
+
+// scheduleFormState is the inline Alpine x-data: tracks the applies-to-all flag
+// (to dim the connection picker). The cron/preset state is owned by the nested
+// CronField component. Short enough to stay inline per the UI rules.
+func scheduleFormState(p ScheduleFormProps) string {
+	all := "false"
+	if p.AppliesToAll {
+		all = "true"
+	}
+	return "{ all: " + all + " }"
+}

@@ -8,7 +8,13 @@
 # Pulls the multi-arch image published by this repo's release CI — no
 # Dockerfile build at deploy time, no GitHub permissions required from
 # the user clicking the button. ~30 s deploys instead of ~4 min builds.
-# Trade-off: users don't get auto-redeploy on every `main` push;
+#
+# The :latest tag below tracks the newest STABLE RELEASE (cut by
+# release.yml on a vX.Y.Z tag), not the tip of main — so a one-click
+# deploy lands on released, tested software. For the bleeding edge use
+# :edge; to pin a release for full control use :vX.Y.Z. See
+# deploy/README.md → "Image tags".
+# Trade-off: users don't get auto-redeploy on every new release;
 # Render redeploys on manual trigger or when a new image tag is pulled.
 #
 # Render's `generateValue` produces base64, not hex, and Breadbox's

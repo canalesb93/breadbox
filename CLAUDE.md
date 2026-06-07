@@ -18,7 +18,7 @@ New admin UI pieces are authored as [`a-h/templ`](https://templ.guide) component
 - `internal/api/` — REST handlers. See `.claude/rules/api.md`.
 - `internal/admin/` — admin dashboard handlers. See `.claude/rules/api.md`.
 - `internal/mcp/` — MCP tool registry + server. See `.claude/rules/mcp.md`.
-- `internal/provider/` — provider interface + error sentinels. Subdirs: `plaid/`, `teller/`, `csv/`. See `.claude/rules/providers.md`.
+- `internal/provider/` — provider interface + error sentinels. Subdirs: `plaid/`, `teller/`, `simplefin/`, `csv/`. See `.claude/rules/providers.md`.
 - `internal/sync/` — sync engine, matcher, rule application. See `.claude/rules/sync.md`.
 - `internal/db/` — sqlc-generated code (`*.sql.go`), queries (`queries/*.sql`), migrations (`migrations/*.sql`). See `.claude/rules/migrations.md`.
 - `internal/templates/` — `html/template` admin UI. See `.claude/rules/ui.md`.
@@ -55,7 +55,7 @@ These bite in every session regardless of what you're touching.
 - Connection status: `active`, `error`, `pending_reauth`, `disconnected`
 - Sync status: `in_progress`, `success`, `error`
 - Sync trigger: `cron`, `webhook`, `manual`, `initial`
-- Provider type: `plaid`, `teller`, `csv`
+- Provider type: `plaid`, `teller`, `simplefin`, `csv`
 - API key scope: `full_access`, `read_only`
 - MCP mode: `read_only`, `read_write`
 - MCP tool classification: `read`, `write`
@@ -124,7 +124,7 @@ Canonical specs in `docs/`:
 - `rule-dsl.md` — **canonical transaction-rule DSL**: condition grammar, actions, triggers, pipeline-stage priority, sync-vs-retroactive, chaining
 - `design-system.md` — CSS framework, components, icons
 - `activity-timeline.md` — activity-timeline component contract (rendering, dedup, soft-delete tombstones, optimistic updates, how to add a new system-event kind)
-- `plaid-integration.md`, `teller-integration.md`, `csv-import.md` — provider specifics
+- `plaid-integration.md`, `teller-integration.md`, `simplefin-integration.md`, `csv-import.md` — provider specifics
 - `admin-dashboard.md`, `mcp-server.md`, `rest-api.md`, `backup.md` — subsystem details
 - `stacked-prs.md` — when and how to split work across stacked PRs using `gt`
 

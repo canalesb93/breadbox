@@ -79,40 +79,45 @@ templ gsWhatsNext() {
 
 // ── Steps ────────────────────────────────────────────────────────────────
 
-// gsStep1 — Add a household member.
+// gsStep1 — Configure a bank provider. This is the first real action: admin
+// creation already seeds the household with one member, so connecting your
+// money is what actually moves onboarding forward.
 templ gsStep1(p GettingStartedProps) {
 	@components.SetupStep(components.SetupStepProps{
 		Number:       1,
-		Icon:         "users",
-		Title:        "Add a household member",
-		Description:  "Create a household member so bank connections have someone to belong to.",
-		Summary:      "Household member added.",
-		State:        gsStepState(p.HasMember, 1, p.ActiveStep),
-		TimeEstimate: "~1 min",
-		Stat:         gsStat(p.MemberCount),
-		StatLabel:    gsPlural(p.MemberCount, "member", "members"),
-		CTAHref:      gsStepCTAHref(p.HasMember, "/household", "/household/new"),
-		CTAIcon:      gsStepCTAIcon(p.HasMember, "plus"),
-		CTALabel:     gsStepCTALabel(p.HasMember, "View members", "Add member"),
-	})
-}
-
-// gsStep2 — Configure a bank provider.
-templ gsStep2(p GettingStartedProps) {
-	@components.SetupStep(components.SetupStepProps{
-		Number:       2,
 		Icon:         "landmark",
 		Title:        "Configure a bank provider",
-		Description:  "Set up Plaid or Teller to link bank accounts — or import a CSV instead.",
+		Description:  "Set up Plaid, Teller, or SimpleFIN to link bank accounts — or import a CSV instead.",
 		Summary:      "Provider configured — ready to connect banks.",
-		State:        gsStepState(p.HasProvider, 2, p.ActiveStep),
+		State:        gsStepState(p.HasProvider, 1, p.ActiveStep),
 		TimeEstimate: "~2 min",
 		DocHref:      "https://docs.breadbox.sh",
 		DocLabel:     "How providers work",
 		CTAHref:      "/settings/providers",
 		CTAIcon:      gsStepCTAIcon(p.HasProvider, "settings"),
 		CTALabel:     gsStepCTALabel(p.HasProvider, "View providers", "Configure"),
-		CTADisabled:  gsStepPendingDisabled(p.HasProvider, 2, p.ActiveStep),
+		CTADisabled:  gsStepPendingDisabled(p.HasProvider, 1, p.ActiveStep),
+	})
+}
+
+// gsStep2 — Add a household member (optional). You're already the first member
+// from admin setup; this step only matters if you share finances with others,
+// so it carries an Optional badge and never blocks the steps below it.
+templ gsStep2(p GettingStartedProps) {
+	@components.SetupStep(components.SetupStepProps{
+		Number:       2,
+		Icon:         "users",
+		Title:        "Add a household member",
+		Description:  "You're already set up as the first member. Add others if you share finances — this step is optional.",
+		Summary:      "Household member added.",
+		State:        gsStepState(p.HasMember, 2, p.ActiveStep),
+		TimeEstimate: "~1 min",
+		Optional:     true,
+		Stat:         gsStat(p.MemberCount),
+		StatLabel:    gsPlural(p.MemberCount, "member", "members"),
+		CTAHref:      gsStepCTAHref(p.HasMember, "/household", "/household/new"),
+		CTAIcon:      gsStepCTAIcon(p.HasMember, "plus"),
+		CTALabel:     gsStepCTALabel(p.HasMember, "View members", "Add member"),
 	})
 }
 

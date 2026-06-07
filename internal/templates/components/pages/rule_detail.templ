@@ -106,7 +106,8 @@ templ ruleDetailMeta(p RuleDetailProps) {
 
 templ ruleDetailEditBtn(p RuleDetailProps) {
 	<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline">
-		@components.LucideIcon("pencil", "w-3.5 h-3.5") Edit
+		@components.LucideIcon("pencil", "w-3.5 h-3.5")
+		Edit
 	</a>
 }
 

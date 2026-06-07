@@ -9,8 +9,20 @@ import (
 	"breadbox/internal/config"
 	"breadbox/internal/provider"
 	plaidprovider "breadbox/internal/provider/plaid"
+	simplefinprovider "breadbox/internal/provider/simplefin"
 	tellerprovider "breadbox/internal/provider/teller"
 )
+
+// initSimpleFINProvider registers the SimpleFIN provider when the opt-in toggle
+// is enabled. SimpleFIN needs no server-level credential — the access token is
+// per-connection — so the only gate is cfg.SimpleFINEnabled.
+func initSimpleFINProvider(cfg *config.Config, providers map[string]provider.Provider, logger *slog.Logger) {
+	if !cfg.SimpleFINEnabled {
+		return
+	}
+	providers["simplefin"] = simplefinprovider.NewProvider(simplefinprovider.NewClient(), cfg.EncryptionKey, logger)
+	logger.Info("simplefin provider initialized")
+}
 
 // initTellerProvider creates the Teller provider from config (file paths or PEM bytes).
 func initTellerProvider(cfg *config.Config, providers map[string]provider.Provider, logger *slog.Logger) error {
@@ -63,6 +75,10 @@ func (a *App) ReinitProvider(name string) error {
 		if err := initTellerProvider(a.Config, a.Providers, a.Logger); err != nil {
 			return err
 		}
+
+	case "simplefin":
+		delete(a.Providers, "simplefin")
+		initSimpleFINProvider(a.Config, a.Providers, a.Logger)
 
 	default:
 		return fmt.Errorf("unknown provider: %s", name)

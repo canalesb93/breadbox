@@ -92,6 +92,7 @@ func (f *fakePlaidProvider) HandleWebhook(context.Context, provider.WebhookPaylo
 func (f *fakePlaidProvider) RemoveConnection(context.Context, provider.Connection) error {
 	panic("fakePlaidProvider.RemoveConnection not implemented")
 }
+func (f *fakePlaidProvider) ReconcilesPendingByPolling() bool { return false }
 
 // plaidLinkEnv is the per-test harness for the link-flow endpoints.
 type plaidLinkEnv struct {

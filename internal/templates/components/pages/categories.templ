@@ -29,7 +29,7 @@ templ Categories(p CategoriesProps) {
 		Title:                "Categories",
 		Subtitle:             "Organize transactions with a two-level taxonomy",
 		SubtitleHideOnMobile: true,
-		Action: categoriesNewCategoryAction(),
+		Action:               categoriesNewCategoryAction(),
 	})
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
@@ -67,7 +67,9 @@ templ Categories(p CategoriesProps) {
 	</div>
 	@deleteCategoryModal()
 	<script>
-		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
+		document.addEventListener("DOMContentLoaded", function () {
+			lucide.createIcons();
+		});
 	</script>
 }
 

@@ -3,6 +3,7 @@ package pages
 import (
 	"time"
 
+	"breadbox/internal/cronspec"
 	"breadbox/internal/templates/components"
 )
 
@@ -15,7 +16,6 @@ import (
 // bottom of this file so individual sections stay focused on markup.
 
 // ─── Foundations ───────────────────────────────────────────────────────
-
 templ SectionFoundations() {
 	<div class="flex flex-col gap-6">
 		@designExample("Color tokens", "DaisyUI semantic surfaces — adapt automatically across light/dark.") {
@@ -57,7 +57,6 @@ templ SectionFoundations() {
 }
 
 // ─── Buttons ───────────────────────────────────────────────────────────
-
 templ SectionButtons() {
 	<div class="flex flex-col gap-6">
 		@designExample("Sizes (sm + xs)", "Two sizes only. Vanilla daisy — no per-caller radius override. Future visual changes go through the daisy theme builder.") {
@@ -171,7 +170,6 @@ templ SectionButtons() {
 }
 
 // ─── Badges ────────────────────────────────────────────────────────────
-
 templ SectionBadges() {
 	<div class="flex flex-col gap-6">
 		@designExample("Status (badge-soft)", "Use statusBadge() / syncBadge() helpers — emits the canonical shape with badge-soft + badge-sm.") {
@@ -241,7 +239,6 @@ templ SectionRecurringChips() {
 }
 
 // ─── Recurring detail panels ─────────────────────────────────────────────
-
 templ SectionRecurringDetail() {
 	<div class="flex flex-col gap-6">
 		@designExample("Detection panel (SeriesDetectionPanel)", "The detection-forward hero: a match-strength badge, a plain-language summary, and the match-window range viz. Reframes a series as a detection rule, not a settings form.") {
@@ -328,7 +325,6 @@ templ SectionRecurringDetail() {
 }
 
 // ─── Alerts ────────────────────────────────────────────────────────────
-
 templ SectionAlerts() {
 	<div class="flex flex-col gap-6">
 		@designExample("Page-level alerts", "role=\"alert\" + rounded-xl + mb-6. Use the matching alert-{type} color.") {
@@ -367,7 +363,6 @@ templ SectionAlerts() {
 }
 
 // ─── Cards ─────────────────────────────────────────────────────────────
-
 templ SectionCards() {
 	<div class="flex flex-col gap-6">
 		@designExample("Simple (bb-card p-5)", "Direct content, no internal sections.") {
@@ -414,7 +409,6 @@ templ SectionCards() {
 }
 
 // ─── Form controls ─────────────────────────────────────────────────────
-
 templ SectionFormControls() {
 	<div class="flex flex-col gap-6">
 		@designExample("Text input", "Daisy 5 input is bordered by default — no input-bordered modifier needed. Pair with the text-xs label.") {
@@ -470,8 +464,8 @@ templ SectionFormControls() {
 					<span class="label-text">Notifications</span>
 				</label>
 				<label class="label cursor-pointer gap-2">
-					<input type="checkbox" class="toggle toggle-primary" checked/>
-					<span class="label-text">Primary tone</span>
+					<input type="checkbox" class="toggle" checked/>
+					<span class="label-text">Green by default</span>
 				</label>
 				<label class="label cursor-pointer gap-2">
 					<input type="radio" name="ds-radio-1" class="radio" checked/>
@@ -486,8 +480,52 @@ templ SectionFormControls() {
 	</div>
 }
 
-// ─── Tables ────────────────────────────────────────────────────────────
+// ─── Cron field ────────────────────────────────────────────────────────
+templ SectionCronField() {
+	<div class="flex flex-col gap-6">
+		@designExample("Sync schedule (full catalog, instance timezone)", "components.CronField — preset shortcut chips, an always-visible 5-field custom input, and a one-line live preview (English description, fetched from /-/cron/preview). The active chip is derived from the cron value, so an unmatched expression lights no chip and shows the raw cron in the input — never a wrong preset label.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:       "ds_cron_a",
+					PresetName: "ds_preset_a",
+					Value:      "0 6,18 * * *",
+					Presets:    cronspec.Presets,
+				})
+			</div>
+		}
+		@designExample("Workflow schedule (curated chips, viewer-local)", "The same component the workflow setup/reconfigure drawers use: the short WorkflowSchedulePresets catalog with LocalizePresets — each chip is a friendly hour in the viewer's timezone (Daily = 9 AM your time), converted to the server-local cron the scheduler fires. Preview from /-/workflows/cron-preview.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:               "ds_cron_wf",
+					Value:              "0 9 * * 1",
+					Presets:            cronspec.WorkflowSchedulePresets,
+					PreviewURL:         "/-/workflows/cron-preview",
+					LocalizePresets:    true,
+					ServerUTCOffsetMin: serverUTCOffsetMinInt(),
+				})
+			</div>
+		}
+		@designExample("Custom expression (no matching chip)", "An expression with no catalog match lights no chip and shows the raw cron in the input — the case that previously mis-rendered as 'Every 15 minutes'.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:    "ds_cron_b",
+					Value:   "0 */12 * * *",
+					Presets: cronspec.Presets,
+				})
+			</div>
+		}
+		@designExample("Empty (new schedule)", "No initial value — chips and an empty input, the preview prompting 'Enter a schedule' until a cadence is chosen or typed.") {
+			<div class="max-w-md">
+				@components.CronField(components.CronFieldProps{
+					Name:    "ds_cron_c",
+					Presets: cronspec.Presets,
+				})
+			</div>
+		}
+	</div>
+}
 
+// ─── Tables ────────────────────────────────────────────────────────────
 templ SectionTables() {
 	<div class="flex flex-col gap-6">
 		@designExample("Standard (table-sm table-zebra)", "Default for most list pages. Use hover:bg-base-200 on <tr>.") {
@@ -545,7 +583,6 @@ templ SectionTables() {
 }
 
 // ─── Tags ──────────────────────────────────────────────────────────────
-
 templ SectionTags() {
 	<div class="flex flex-col gap-6">
 		@designExample("Tag sizes", "Pill-shaped, colored via --tag-color CSS variable. Size variants are modifiers — always pair with the base .bb-tag class.") {
@@ -676,23 +713,33 @@ templ SectionTagPicker() {
 		@designExample("Chip states", "Each chip in the picker grid carries one of five states. Click cycles a chip through the right column.") {
 			<div class="flex flex-wrap items-center gap-2 max-w-xl">
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("plus", "")
+					</span>
 					<span class="truncate">absent</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("check", "")</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("check", "")
+					</span>
 					<span class="truncate">present</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("minus", "")</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("minus", "")
+					</span>
 					<span class="truncate">mixed</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("plus", "")
+					</span>
 					<span class="truncate">pending-add</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("x", "")</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("x", "")
+					</span>
 					<span class="truncate">pending-remove</span>
 				</span>
 			</div>
@@ -714,23 +761,33 @@ templ SectionTagPicker() {
 				<div class="bb-tagpicker-body">
 					<div class="bb-tagpicker-grid">
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("check", "")</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("check", "")
+							</span>
 							<span class="truncate">recurring</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("minus", "")</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("minus", "")
+							</span>
 							<span class="truncate">needs-review</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("plus", "")
+							</span>
 							<span class="truncate">subscription</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("plus", "")
+							</span>
 							<span class="truncate">business</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("x", "")</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("x", "")
+							</span>
 							<span class="truncate">refund</span>
 						</button>
 					</div>
@@ -818,7 +875,6 @@ templ SectionTagPicker() {
 }
 
 // ─── Menus & dropdowns ─────────────────────────────────────────────────
-
 templ SectionMenusDropdowns() {
 	<div class="flex flex-col gap-6">
 		@designExample("Overflow action menu", "When a card has ≥2 secondary actions, prefer one ellipsis dropdown over a cluster of icon buttons. Use the shared components.OverflowMenu — same shape, native popover that escapes overflow-clipped ancestors.") {
@@ -842,16 +898,30 @@ templ SectionMenusDropdowns() {
 		@designExample("Menu (vertical nav list)", "menu-md / menu-sm.") {
 			<ul class="menu bg-base-100 rounded-xl border border-base-300 w-56">
 				<li class="menu-title">Settings</li>
-				<li><a class="menu-active">@components.LucideIcon("key", "w-4 h-4") API keys</a></li>
-				<li><a>@components.LucideIcon("users", "w-4 h-4") Household</a></li>
-				<li><a>@components.LucideIcon("bot", "w-4 h-4") MCP</a></li>
+				<li>
+					<a class="menu-active">
+						@components.LucideIcon("key", "w-4 h-4")
+						API keys
+					</a>
+				</li>
+				<li>
+					<a>
+						@components.LucideIcon("users", "w-4 h-4")
+						Household
+					</a>
+				</li>
+				<li>
+					<a>
+						@components.LucideIcon("bot", "w-4 h-4")
+						MCP
+					</a>
+				</li>
 			</ul>
 		}
 	</div>
 }
 
 // ─── Modals ────────────────────────────────────────────────────────────
-
 templ SectionModals() {
 	<div class="flex flex-col gap-6">
 		@designExample("Standard modal trigger", "modal-bottom on mobile, modal-middle on sm+. rounded-xl modal-box.") {
@@ -956,7 +1026,6 @@ templ designDrawerSizeBody(label, width string) {
 }
 
 // ─── Loading & skeletons ───────────────────────────────────────────────
-
 templ SectionLoading() {
 	<div class="flex flex-col gap-6">
 		@designExample("Spinners", "DaisyUI loading variants in xs/sm/md.") {
@@ -1010,16 +1079,6 @@ templ SectionLoading() {
 				@components.CategoriesSkeleton()
 			</div>
 		}
-		@designExample("Agents list skeleton", "Placeholder mirroring /agents/definitions — count + 'Prompt library' header strip and the agent definitions table (Name + optional sync badge + description, Schedule cron + pretty subline, Last run pill + relative time, Next run, 30d cost, Enabled toggle, kebab). Primitive is exposed here for future AJAX swaps (toggleEnabled / runNow without a full page reload); the page is full-SSR today.") {
-			<div class="max-w-4xl">
-				@components.AgentsListSkeleton()
-			</div>
-		}
-		@designExample("Agent runs list skeleton", "Placeholder mirroring the /agents runs landing — 4-up 30d stat row (Runs / Errors / Cost / Avg duration), collapsed filter bar (icon + label + chip slots), and the divided card of rich run rows (icon tile + agent name + short-ID + status badge + trigger pill + meta line + trailing cost). Rows vary widths and toggle the optional error/note slots so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents is full-SSR today.") {
-			<div class="max-w-5xl">
-				@components.AgentRunsListSkeleton()
-			</div>
-		}
 		@designExample("Reports inbox skeleton", "Placeholder mirroring /reports — page header, filter tabs (All / Unread / Read + count + mark-all-read), and a divided card of inbox rows (bot avatar, meta line with optional priority dot + tag chips, title message bubble, mark-read + chevron actions). Primitive is exposed here for future AJAX swaps and adjacent agent-report panels (e.g. dashboard inbox preview); /reports is full-SSR today.") {
 			<div class="max-w-3xl">
 				@components.ReportsSkeleton()
@@ -1035,7 +1094,6 @@ templ SectionLoading() {
 }
 
 // ─── Icons & tiles ─────────────────────────────────────────────────────
-
 templ SectionIcons() {
 	<div class="flex flex-col gap-6">
 		@designExample("Lucide sizes", "Buttons → w-4 h-4 (sm) / w-3.5 h-3.5 (xs). Section headers → w-5 h-5. Empty states → w-8 h-8.") {
@@ -1070,7 +1128,6 @@ templ SectionIcons() {
 }
 
 // ─── Page header ───────────────────────────────────────────────────────
-
 templ SectionPageHeader() {
 	<div class="flex flex-col gap-6">
 		@designExample("Title only", "Just the page title. Use for pages whose section is named by its breadcrumb.") {
@@ -1117,7 +1174,6 @@ templ SectionPageHeader() {
 }
 
 // ─── Entity header ─────────────────────────────────────────────────────
-
 templ SectionEntityHeader() {
 	<div class="flex flex-col gap-6">
 		@designExample("Default — neutral tile", "Icon tile + title + bullet-separated meta.") {
@@ -1139,12 +1195,12 @@ templ SectionEntityHeader() {
 		@designExample("Error tone + actions", "Trailing slot supports one secondary + one primary action.") {
 			@components.EntityHeader(components.EntityHeaderProps{
 				Title:           "Bank of America",
-				Icon:             "building-2",
-				IconTone:         components.IconToneError,
-				Badges:           designEntityHeaderBadgesError(),
-				Meta:             components.EntityHeaderMeta("plaid", "Jane", "Last sync failed 1h ago"),
-				SecondaryAction:  components.PageHeaderSecondaryAction("#", "refresh-cw", "Sync"),
-				Action:           components.PageHeaderAction("#", "key-round", "Re-authenticate"),
+				Icon:            "building-2",
+				IconTone:        components.IconToneError,
+				Badges:          designEntityHeaderBadgesError(),
+				Meta:            components.EntityHeaderMeta("plaid", "Jane", "Last sync failed 1h ago"),
+				SecondaryAction: components.PageHeaderSecondaryAction("#", "refresh-cw", "Sync"),
+				Action:          components.PageHeaderAction("#", "key-round", "Re-authenticate"),
 			})
 		}
 		@designExample("Long title — truncates", "Pass TitleClass=\"truncate\" or \"break-words\" for long provider strings.") {
@@ -1169,7 +1225,6 @@ templ designEntityHeaderBadgesError() {
 }
 
 // ─── Empty states ──────────────────────────────────────────────────────
-
 templ SectionEmptyStates() {
 	<div class="flex flex-col gap-6">
 		@designExample("Standard (no data yet)", "Card-wrapped, icon + title + description + CTA.") {
@@ -1227,7 +1282,6 @@ templ SectionEmptyStates() {
 }
 
 // ─── Stat tiles ────────────────────────────────────────────────────────
-
 templ SectionStatTiles() {
 	<div class="flex flex-col gap-6">
 		@designExample("4-up tile row (canonical dashboard pattern)", "StatTileRow lays out the 2-up / 4-up grid. Tones drive the icon-tile color.") {
@@ -1271,7 +1325,6 @@ templ SectionStatTiles() {
 }
 
 // ─── Tabs ──────────────────────────────────────────────────────────────
-
 templ SectionTabs() {
 	<div class="flex flex-col gap-6">
 		@designExample("Navigation tabs (tabs-border)", "Top-of-page tab navigation. Use Variant=\"border\" or omit (default).") {
@@ -1310,7 +1363,6 @@ templ SectionTabs() {
 }
 
 // ─── Overflow menu ─────────────────────────────────────────────────────
-
 templ SectionOverflowMenu() {
 	<div class="flex flex-col gap-6">
 		@designExample("Standard kebab", "Mix link items (Href) and button items (OnClick). Mark destructive items with Destructive: true.") {
@@ -1387,7 +1439,6 @@ templ SectionOverflowMenu() {
 }
 
 // ─── Topbar breadcrumb ─────────────────────────────────────────────────
-
 templ SectionTopbarBreadcrumb() {
 	<div class="flex flex-col gap-6">
 		@designExample("Section + navigable trail", "The common detail-page shape. The section group (muted) is non-link; ancestor crumbs link; the last crumb is the bold current page.") {
@@ -1439,7 +1490,6 @@ templ SectionTopbarBreadcrumb() {
 }
 
 // ─── Sidebar user menu ─────────────────────────────────────────────────
-
 templ SectionSidebarUserMenu() {
 	<div class="flex flex-col gap-6">
 		@designExample("Linked household member (editor)", "Avatar comes from the linked household user. Editor role unlocks the `/design` shortcut. Click the trigger to open the popover — Settings, the external links, and the destructive Sign out (below an `<hr>`) live inside.") {
@@ -1488,7 +1538,6 @@ templ SectionSidebarUserMenu() {
 }
 
 // ─── Section header ────────────────────────────────────────────────────
-
 templ SectionSectionHeader() {
 	<div class="flex flex-col gap-6">
 		@designExample("Bare (icon + title)", "For section dividers inside a card.") {
@@ -1580,7 +1629,6 @@ func kbdGlyphRefs() []kbdGlyphRef {
 }
 
 // ─── Keyboard shortcut badges ──────────────────────────────────────────
-
 templ SectionRadioCard() {
 	<div class="flex flex-col gap-6">
 		@designExample("Trigger selector (2-up)", "The Workflows drawer's \"When should the workflow run?\" choice. Native radios share a name, so selection + the lit state work with no JS — click a card, tab between them, and watch the border / fill / icon flip to primary and the check appear.") {
@@ -1861,7 +1909,6 @@ templ SectionKbd() {
 }
 
 // ─── Toast ─────────────────────────────────────────────────────────────
-
 templ SectionToast() {
 	<div class="flex flex-col gap-6">
 		@designExample("Trigger via bb-toast event", "Every admin page mounts one global Toast container (see internal/templates/components/toast.templ — also inlined in base.html). Dispatch the event from anywhere; no per-page wiring.") {
@@ -1925,7 +1972,6 @@ templ SectionToast() {
 }
 
 // ─── Multi-select toolbar ──────────────────────────────────────────────
-
 templ SectionMultiSelectToolbar() {
 	<div x-data="{ open: false, count: 3 }" class="flex flex-col gap-6">
 		@designExample("Live demo", "Toggle the floating toolbar. Narrow the viewport to see the mobile collapse: ghost actions go icon-only, the primary action stays expanded, and the count chip is hidden when CountHideOnMobile is true. Real-world wiring listens for `multi-select-close` and `multi-select-toggle-all` events to clear / select-all.") {
@@ -2220,7 +2266,6 @@ templ SectionCategoryPicker() {
 }
 
 // ─── Amounts ───────────────────────────────────────────────────────────
-
 templ SectionAmounts() {
 	<div class="flex flex-col gap-6">
 		@designExample("Transaction intent (default)", "Income (negative in our convention) renders as '+$X' in success green. Expense renders as '$X' with NO sign in the default text color. Use for transaction rows, day totals, transaction detail, activity feed.") {
@@ -2536,7 +2581,6 @@ templ amountAntiPatternRow(legacy string, p components.AmountProps) {
 // examples below mirror the shapes those callers compose, so a reviewer
 // can pin one variant on /design/c/timeline and compare side-by-side with
 // the live pages without booting both.
-
 templ SectionTimeline() {
 	<div class="flex flex-col gap-6">
 		@designExample("Prominent variant", "Variant: \"prominent\" — used on /feed and /transactions/{id}. Larger heading, top divider, scaled-up tiles via .bb-timeline-prominent in input.css.") {
@@ -2585,7 +2629,7 @@ templ SectionTimeline() {
 					Now:       designTimelineNow(),
 				}) {
 					<span class="font-medium text-base-content">12 new transactions</span>
-					<span class="text-base-content/55"> from Chase</span>
+					<span class="text-base-content/55">from Chase</span>
 				}
 			}
 		}
@@ -2824,7 +2868,9 @@ templ SectionCommandPalette() {
 						<div class="bb-cmdk-group-label">Overview</div>
 						<div class="bb-cmdk-item">
 							<div class="bb-cmdk-generic">
-								<div class="bb-cmdk-item-icon">@components.LucideIcon("rss", "")</div>
+								<div class="bb-cmdk-item-icon">
+									@components.LucideIcon("rss", "")
+								</div>
 								<div class="bb-cmdk-item-label">
 									<div class="bb-cmdk-item-title">Feed</div>
 									<div class="bb-cmdk-item-desc">Activity feed across the household</div>
@@ -2836,7 +2882,9 @@ templ SectionCommandPalette() {
 						</div>
 						<div class="bb-cmdk-item" data-active="true">
 							<div class="bb-cmdk-generic">
-								<div class="bb-cmdk-item-icon">@components.LucideIcon("receipt", "")</div>
+								<div class="bb-cmdk-item-icon">
+									@components.LucideIcon("receipt", "")
+								</div>
 								<div class="bb-cmdk-item-label">
 									<div class="bb-cmdk-item-title">Transactions</div>
 									<div class="bb-cmdk-item-desc">View all transactions</div>
@@ -2880,7 +2928,9 @@ templ SectionCommandPalette() {
 			<div class="border border-base-300 rounded-xl bg-base-100 max-w-[560px] mx-auto py-2">
 				<div class="bb-cmdk-item">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon">@components.LucideIcon("rss", "")</div>
+						<div class="bb-cmdk-item-icon">
+							@components.LucideIcon("rss", "")
+						</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Feed</div>
 							<div class="bb-cmdk-item-desc">Default — neutral icon tile</div>
@@ -2892,7 +2942,9 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="bb-cmdk-item" data-active="true">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon">@components.LucideIcon("receipt", "")</div>
+						<div class="bb-cmdk-item-icon">
+							@components.LucideIcon("receipt", "")
+						</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Transactions</div>
 							<div class="bb-cmdk-item-desc">Active — primary tint on tile + bg-primary/8 on row</div>
@@ -2904,7 +2956,9 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="bb-cmdk-item">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon">@components.LucideIcon("plus-circle", "")</div>
+						<div class="bb-cmdk-item-icon">
+							@components.LucideIcon("plus-circle", "")
+						</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Connect a Bank</div>
 						</div>
@@ -2963,7 +3017,6 @@ templ SectionCommandPalette() {
 }
 
 // ─── User avatar ───────────────────────────────────────────────────────
-
 templ SectionUserAvatar() {
 	<div class="flex flex-col gap-6">
 		@designExample("Size scale", "Seven sizes cover every surface that renders a person/agent identity. Pick the one that matches the call site, not the largest that fits. The component threads the pixel size through to /avatars/{id}?size=N so the backend fetches a pre-sized SVG.") {
@@ -3183,14 +3236,14 @@ templ SectionUserAvatar() {
 	</div>
 }
 
-// SectionEditableAvatar showcases components.EditableAvatar — the avatar +
-// shuffle/regenerate affordance from the Workflows reconfigure-drawer header.
-// Each example wraps the component in a tiny Alpine scope so the shuffle button
-// is live: clicking it mints a new seed and the avatar reseeds. SrcExpr /
-// OnShuffle are Alpine expressions, so the component is state-agnostic.
+// SectionEditableAvatar showcases components.EditableAvatar in both shapes —
+// the shuffle-only agent affordance (whole surface reseeds) and the full
+// user-identity editor (upload / shuffle / remove). Each example wraps the
+// component in a tiny Alpine scope so the controls are live. SrcExpr / OnShuffle
+// and the Upload expressions are all Alpine, so the component is state-agnostic.
 templ SectionEditableAvatar() {
 	<div class="flex flex-col gap-6">
-		@designExample("Shuffle to reseed — tap the avatar", "The entire avatar is the shuffle control (one button): pointer cursor, and on hover it lifts slightly while the corner badge's glyph tints primary. Tap anywhere and the state change is animated — the current avatar dims, scales down and blurs under a spinner while the new DiceBear SVG fetches, then the fresh avatar springs back in (overshoot ease) as the spinner fades. Hover/press/loading motion is transform/filter/opacity only, so flipping the theme never flashes a stroke. The chip shows the current seed.") {
+		@designExample("Shuffle to reseed — tap the avatar (agent shape)", "Upload == nil: the entire avatar is the shuffle control (one button): pointer cursor, and on hover it lifts slightly while the corner badge's glyph tints primary. Tap anywhere and the state change is animated — the current avatar dims, scales down and blurs under a spinner while the new DiceBear SVG fetches, then the fresh avatar springs back in (overshoot ease) as the spinner fades. Hover/press/loading motion is transform/filter/opacity only, so flipping the theme never flashes a stroke. The chip shows the current seed.") {
 			<div x-data="{ s: 'editable-demo' }" class="flex items-center gap-4">
 				@components.EditableAvatar(components.EditableAvatarProps{
 					SrcExpr:   "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'",
@@ -3200,19 +3253,37 @@ templ SectionEditableAvatar() {
 				<code class="text-xs text-base-content/50 px-2 py-1 rounded bg-base-200" x-text="s"></code>
 			</div>
 		}
-		@designExample("Sizes", "SizeClass overrides the tile dimensions; the whole avatar stays the tap target at every size, with a 20px corner badge as the cue. Default is w-11 h-11 (44px) — the reconfigure-drawer header size. All three share one seed here, so a shuffle reseeds them together.") {
+		@designExample("Full editor — upload, shuffle, remove (user shape)", "Upload != nil: the avatar surface becomes click-to-upload (camera hover overlay + a persistent corner camera cue so it's discoverable on touch), and a control row renders beneath — Upload, Shuffle, and Remove (the last gated on hasCustomAvatar). An inline error renders below the controls when ErrorExpr is truthy. This is the identity editor on /settings/account and /household/{id}/edit; live pages pair it with the avatarEditor factory. The demo scope mocks that contract so shuffle reseeds, Upload flags a custom image, and Remove resets.") {
+			<div
+				x-data="{ avatarSrc: '/avatars/preview/editable-user?size=112', avatarUploading: false, hasCustomAvatar: true, avatarError: '', onFileSelect() { this.hasCustomAvatar = true }, regenerate() { this.avatarSrc = '/avatars/preview/eu-' + Math.floor(Math.random() * 1e9).toString(36) + '?size=112'; this.hasCustomAvatar = false }, removeAvatar() { this.avatarSrc = '/avatars/preview/editable-user?size=112'; this.hasCustomAvatar = false } }"
+			>
+				@components.EditableAvatar(components.EditableAvatarProps{
+					SrcExpr:   "avatarSrc",
+					OnShuffle: "regenerate()",
+					Alt:       "Demo user avatar",
+					Upload: &components.EditableAvatarUpload{
+						OnFileSelect:  "onFileSelect",
+						OnRemove:      "removeAvatar()",
+						HasCustomExpr: "hasCustomAvatar",
+						LoadingExpr:   "avatarUploading",
+						ErrorExpr:     "avatarError",
+					},
+				})
+			</div>
+		}
+		@designExample("Sizes", "SizeClass overrides the tile dimensions; the whole avatar stays the tap target at every size, with a 20px corner badge as the cue. Default is w-14 h-14 (56px) — shared by both shapes so an un-overridden agent and user avatar match. All three share one seed here, so a shuffle reseeds them together.") {
 			<div x-data="{ s: 'editable-sizes' }" class="flex items-end gap-6">
 				<div class="flex flex-col items-center gap-2">
 					<span class="text-xs text-base-content/40">40px</span>
 					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=80'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-10 h-10"})
 				</div>
 				<div class="flex flex-col items-center gap-2">
-					<span class="text-xs text-base-content/40">44px · default</span>
-					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=88'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar"})
+					<span class="text-xs text-base-content/40">56px · default</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=112'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar"})
 				</div>
 				<div class="flex flex-col items-center gap-2">
-					<span class="text-xs text-base-content/40">56px</span>
-					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=112'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-14 h-14"})
+					<span class="text-xs text-base-content/40">64px</span>
+					@components.EditableAvatar(components.EditableAvatarProps{SrcExpr: "'/avatars/' + encodeURIComponent(s) + '?type=agent&size=128'", OnShuffle: "s = 'sz-' + Math.floor(Math.random() * 1e9).toString(36)", Alt: "Demo avatar", SizeClass: "w-16 h-16"})
 				</div>
 			</div>
 		}
@@ -3241,7 +3312,6 @@ func designSampleColor() *string {
 // ─── Settings primitives ───────────────────────────────────────────────
 // Live reference for SettingsSection / SettingsRow / SettingsAutoSaveForm.
 // See .claude/rules/settings.md for the design language.
-
 templ SectionSettings() {
 	<div class="flex flex-col gap-6">
 		@designExample("Section + rows (inline controls)", "The default shape — label/caption left, control right. Used by General > Sync and Backups > Schedule.") {
@@ -3316,8 +3386,8 @@ templ SectionSettings() {
 		@designExample("Stacked row (Stack: true)", "Use when the control is too wide for inline — textareas, file inputs, code blocks, credential editors.") {
 			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
-					Icon:    "plug",
-					Title:   "Connection",
+					Icon:  "plug",
+					Title: "Connection",
 				}) {
 					@components.SettingsRow(components.SettingsRowProps{
 						Label: "HTTP endpoint",
@@ -3381,8 +3451,8 @@ templ SectionSettings() {
 		@designExample("Link-style row (SettingsRowLink)", "The whole row is a link/button. Use for action lists — Help > Resources, Backups > Restore From Upload. Icon on the LEFT because the row IS the affordance.") {
 			<div>
 				@components.SettingsSection(components.SettingsSectionProps{
-					Icon:    "life-buoy",
-					Title:   "Resources",
+					Icon:  "life-buoy",
+					Title: "Resources",
 				}) {
 					@components.SettingsRowLink(components.SettingsRowLinkProps{
 						Href:    "/design",

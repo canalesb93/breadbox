@@ -74,12 +74,15 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		return nil, err
 	}
 
+	initSimpleFINProvider(cfg, providers, logger)
+
 	csvProv := csvprovider.NewProvider()
 	providers["csv"] = csvProv
 	logger.Info("csv provider registered")
 
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
 	svc := service.New(queries, pool, syncEngine, logger)
+	svc.EncryptionKey = cfg.EncryptionKey
 
 	return &App{
 		DB:         pool,

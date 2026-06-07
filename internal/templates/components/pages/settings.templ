@@ -3,7 +3,9 @@ package pages
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
+	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
 
@@ -26,6 +28,7 @@ templ SettingsGeneral(p SettingsProps) {
 			@settingsSyncSection(p)
 			@settingsAppearanceSection()
 			@settingsAvatarsSection(p)
+			@settingsSyncLogsSection(p)
 		</div>
 	</div>
 }
@@ -90,35 +93,64 @@ templ SettingsHelp(p SettingsProps) {
 // ---------------------------------------------------------------------
 // General — Sync
 // ---------------------------------------------------------------------
-
 templ settingsSyncSection(p SettingsProps) {
 	<div id="sync">
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:    "refresh-cw",
-			Title:   "Sync",
+			Title:   "Sync schedules",
 			Caption: settingsSyncCaption(p),
+			Right:   newScheduleButton(),
 		}) {
 			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Sync interval",
-				Caption: settingsNextSyncCaption(p),
-				For:     "sync_interval_minutes",
+				Label:   "Timezone",
+				Caption: "Schedules are evaluated in this zone",
+				For:     "instance_timezone",
 			}) {
 				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
-					Action:    "/settings/sync",
+					Action:    "/settings/timezone",
 					CSRFToken: p.CSRFToken,
-					Label:     "Sync schedule saved",
+					Label:     "Timezone saved",
 				}) {
-					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm bg-base-200">
-						@syncIntervalOption(15, p.SyncIntervalMinutes, "Every 15 minutes")
-						@syncIntervalOption(30, p.SyncIntervalMinutes, "Every 30 minutes")
-						@syncIntervalOption(60, p.SyncIntervalMinutes, "Every hour")
-						@syncIntervalOption(240, p.SyncIntervalMinutes, "Every 4 hours")
-						@syncIntervalOption(480, p.SyncIntervalMinutes, "Every 8 hours")
-						@syncIntervalOption(720, p.SyncIntervalMinutes, "Every 12 hours")
-						@syncIntervalOption(1440, p.SyncIntervalMinutes, "Every 24 hours")
+					<select id="instance_timezone" name="instance_timezone" class="select select-sm bg-base-200">
+						@tzOption("", p.InstanceTimezone, serverDefaultTZLabel(p.ServerZoneLabel))
+						for _, tz := range commonTimezones() {
+							@tzOption(tz, p.InstanceTimezone, tz)
+						}
+						if p.InstanceTimezone != "" && !isCommonTimezone(p.InstanceTimezone) {
+							@tzOption(p.InstanceTimezone, p.InstanceTimezone, p.InstanceTimezone)
+						}
 					</select>
 				}
 			}
+			if len(p.SyncSchedules) == 0 {
+				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+					<p class="text-sm text-base-content/55 leading-snug">
+						No sync schedules. Connections will not auto-sync until you add one.
+					</p>
+				}
+			}
+			for _, sched := range p.SyncSchedules {
+				@settingsScheduleRow(p, sched)
+			}
+		}
+		<!-- Create + per-schedule edit drawers (slide-over from the right) -->
+		@ScheduleDrawer(p.NewScheduleForm)
+		for _, f := range p.EditScheduleForms {
+			@ScheduleDrawer(f)
+		}
+	</div>
+}
+
+// settingsSyncLogsSection is the log-retention control. It lives at the
+// bottom of the General tab — below Avatars — because retention is a
+// low-touch maintenance setting, not part of the day-to-day schedule
+// configuration above.
+templ settingsSyncLogsSection(p SettingsProps) {
+	<div id="retention">
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:  "scroll",
+			Title: "Sync logs",
+		}) {
 			@components.SettingsRow(components.SettingsRowProps{
 				Label:   "Log retention",
 				Caption: fmt.Sprintf("%d logs stored · cleanup runs daily at 3:00 AM", p.SyncLogCount),
@@ -145,74 +177,167 @@ templ settingsSyncSection(p SettingsProps) {
 	</div>
 }
 
-func settingsSyncCaption(p SettingsProps) string {
-	return "Every " + components.FormatIntervalMinutes(p.SyncIntervalMinutes)
+// newScheduleButton is the section's primary action — opens the create drawer.
+templ newScheduleButton() {
+	<button type="button" @click="$store.drawers.open('schedule-new')" class="btn btn-primary btn-sm gap-2">
+		@components.LucideIcon("plus", "w-4 h-4")
+		New schedule
+	</button>
 }
 
-func settingsNextSyncCaption(p SettingsProps) string {
-	if p.NextSyncTime == "" {
-		return ""
+// settingsScheduleRow renders one schedule: its name + human cadence and
+// target on the left, an enabled toggle plus edit/delete actions on the right.
+templ settingsScheduleRow(p SettingsProps, sched service.SyncScheduleView) {
+	@components.SettingsRow(components.SettingsRowProps{
+		Label:   sched.Name,
+		Caption: scheduleRowCaption(sched),
+	}) {
+		<div class="flex items-center gap-2">
+			@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+				Action:    "/settings/sync/schedules/" + sched.ShortID + "/toggle",
+				CSRFToken: p.CSRFToken,
+				Label:     "Schedule updated",
+			}) {
+				if sched.Enabled {
+					<input type="checkbox" name="enabled" class="toggle toggle-sm" checked aria-label="Enabled"/>
+				} else {
+					<input type="checkbox" name="enabled" class="toggle toggle-sm" aria-label="Enabled"/>
+				}
+			}
+			<button type="button" @click={ "$store.drawers.open('schedule-" + sched.ShortID + "')" } class="btn btn-ghost btn-sm btn-square" aria-label="Edit schedule">
+				@components.LucideIcon("pencil", "w-4 h-4")
+			</button>
+			<form method="POST" action={ scheduleDeleteURL(sched.ShortID) } onsubmit="return confirm('Delete this schedule?')">
+				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Delete schedule">
+					@components.LucideIcon("trash-2", "w-4 h-4")
+				</button>
+			</form>
+		</div>
 	}
-	return "Next sync: " + p.NextSyncTime
+}
+
+// scheduleRowCaption combines the human cadence with the target summary and a
+// disabled marker.
+func scheduleRowCaption(sched service.SyncScheduleView) string {
+	caption := sched.CronHuman + " · " + scheduleTargetSummary(sched)
+	if !sched.Enabled {
+		caption += " · paused"
+	}
+	return caption
+}
+
+// scheduleTargetSummary describes which connections a schedule covers.
+func scheduleTargetSummary(sched service.SyncScheduleView) string {
+	if sched.AppliesToAll {
+		return "All connections"
+	}
+	switch sched.ConnectionCount {
+	case 0:
+		return "No connections"
+	case 1:
+		return "1 connection"
+	default:
+		return fmt.Sprintf("%d connections", sched.ConnectionCount)
+	}
+}
+
+func settingsSyncCaption(p SettingsProps) string {
+	n := len(p.SyncSchedules)
+	if n == 0 {
+		return "No schedules configured"
+	}
+	next := ""
+	if p.NextSyncTime != "" {
+		next = " · next sync " + p.NextSyncTime
+	}
+	if n == 1 {
+		return "1 schedule" + next
+	}
+	return fmt.Sprintf("%d schedules%s", n, next)
 }
 
 // ---------------------------------------------------------------------
 // General — Avatars
 // ---------------------------------------------------------------------
-
 templ settingsAvatarsSection(p SettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
-		Icon:    "user-circle",
-		Title:   "Avatars",
-		Caption: "DiceBear styles for auto-generated identicons — uploaded avatars are unaffected",
+		Icon:           "user-circle",
+		Title:          "Avatars",
+		CaptionContent: settingsAvatarsCaption(),
 	}) {
-		@settingsAvatarPickerRow(p, "user", "Users", p.AvatarUserStyle, userPreviewSeeds())
-		@settingsAvatarPickerRow(p, "agent", "Agents", p.AvatarAgentStyle, agentPreviewSeeds())
 		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-			<p class="text-xs text-base-content/45 leading-snug">
-				Browsers cache avatars for 24h — hard-refresh after changing a style.
+			<div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+				@settingsAvatarPicker(p, "user", "Users", "Household members", p.AvatarUserStyle, userPreviewSeeds())
+				@settingsAvatarPicker(p, "agent", "Agents", "AI workflow runners", p.AvatarAgentStyle, agentPreviewSeeds())
+			</div>
+		}
+		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+			<p class="flex items-start gap-1.5 text-xs text-base-content/45 leading-snug">
+				@components.LucideIcon("info", "w-3.5 h-3.5 shrink-0 mt-px opacity-80")
+				<span>Browsers cache avatars for 24h — hard-refresh after changing a style.</span>
 			</p>
 		}
 	}
 }
 
-// settingsAvatarPickerRow renders one actor-bucket picker (User or
-// Agent). actor matches the form field the POST handler dispatches
-// on; both POSTs go to /settings/avatar-style.
-templ settingsAvatarPickerRow(p SettingsProps, actor, label, current string, seeds []string) {
-	<div x-data={ "{ style: $el.dataset.style }" } data-style={ current } class="contents">
-		@components.SettingsRow(components.SettingsRowProps{
-			Label: label,
-			For:   "avatar_style_" + actor,
-			Stack: true,
+// settingsAvatarsCaption is the section subtitle for Avatars, with an
+// inline link to DiceBear's full style gallery so operators can browse
+// every available style at the source before picking one below.
+templ settingsAvatarsCaption() {
+	DiceBear styles for auto-generated identicons — uploaded avatars are unaffected.
+	<a
+		href="https://www.dicebear.com/styles/"
+		target="_blank"
+		rel="noopener noreferrer"
+		class="link"
+	>Browse all styles</a>.
+}
+
+// settingsAvatarPicker renders one actor-bucket picker (User or Agent)
+// as a self-contained panel: label + caption, a live preview strip,
+// and the style <select>. Two of these sit side-by-side in a responsive
+// grid (one column on mobile, two from `sm` up) so the section fills the
+// width instead of leaving the right half empty. actor matches the form
+// field the POST handler dispatches on; both POSTs go to
+// /settings/avatar-style. The preview tiles re-render as the <select>
+// changes (Alpine `style` x-model), so the operator sees the chosen
+// style before the auto-save toast confirms.
+templ settingsAvatarPicker(p SettingsProps, actor, label, caption, current string, seeds []string) {
+	<div
+		x-data={ "{ style: $el.dataset.style }" }
+		data-style={ current }
+		class="flex flex-col gap-3 rounded-lg border border-base-200 bg-base-100 p-4"
+	>
+		<div class="min-w-0">
+			<label for={ "avatar_style_" + actor } class="bb-settings-row__label">{ label }</label>
+			<p class="bb-settings-row__caption">{ caption }</p>
+		</div>
+		<div class="flex items-center gap-2">
+			for _, seed := range seeds {
+				<img
+					class="w-9 h-9 rounded-full bg-base-200 ring-1 ring-base-300/60"
+					loading="lazy"
+					alt={ "Preview " + seed }
+					:src={ avatarPreviewExpr(seed) }
+				/>
+			}
+		</div>
+		@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+			Action:    "/settings/avatar-style",
+			CSRFToken: p.CSRFToken,
+			Label:     label + " avatar style saved",
 		}) {
-			<div class="flex flex-wrap items-center gap-3">
-				@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
-					Action:    "/settings/avatar-style",
-					CSRFToken: p.CSRFToken,
-					Label:     label + " avatar style saved",
-				}) {
-					<input type="hidden" name="actor" value={ actor }/>
-					<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200" x-model="style">
-						for _, opt := range p.AvatarStyles {
-							if opt.ID == current {
-								<option value={ opt.ID } selected>{ opt.Label }</option>
-							} else {
-								<option value={ opt.ID }>{ opt.Label }</option>
-							}
-						}
-					</select>
-				}
-				<div class="flex items-center gap-2">
-					for _, seed := range seeds {
-						<img
-							class="w-9 h-9 rounded-full bg-base-200"
-							alt={ "Preview " + seed }
-							:src={ avatarPreviewExpr(seed) }
-						/>
+			<input type="hidden" name="actor" value={ actor }/>
+			<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200 w-44" x-model="style">
+				for _, opt := range p.AvatarStyles {
+					if opt.ID == current {
+						<option value={ opt.ID } selected>{ opt.Label }</option>
+					} else {
+						<option value={ opt.ID }>{ opt.Label }</option>
 					}
-				</div>
-			</div>
+				}
+			</select>
 		}
 	</div>
 }
@@ -220,7 +345,6 @@ templ settingsAvatarPickerRow(p SettingsProps, actor, label, current string, see
 // ---------------------------------------------------------------------
 // System — Security
 // ---------------------------------------------------------------------
-
 templ settingsSecuritySection(p SettingsProps) {
 	<div id="security">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -268,7 +392,6 @@ func settingsEncryptionCaption(p SettingsProps) string {
 // ---------------------------------------------------------------------
 // System — Runtime
 // ---------------------------------------------------------------------
-
 templ settingsRuntimeSection(p SettingsProps) {
 	<div id="system">
 		@components.SettingsSection(components.SettingsSectionProps{
@@ -323,7 +446,6 @@ templ settingsRuntimeUpdateBadge(p SettingsProps) {
 // ---------------------------------------------------------------------
 // Help
 // ---------------------------------------------------------------------
-
 templ settingsResourcesSection(p SettingsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "life-buoy",
@@ -384,13 +506,54 @@ templ settingsDeveloperSection() {
 // ---------------------------------------------------------------------
 // Helpers reused by handlers + by other settings tabs
 // ---------------------------------------------------------------------
-
-templ syncIntervalOption(value, current int, label string) {
+templ tzOption(value, current, label string) {
 	if value == current {
-		<option value={ strconv.Itoa(value) } selected>{ label }</option>
+		<option value={ value } selected>{ label }</option>
 	} else {
-		<option value={ strconv.Itoa(value) }>{ label }</option>
+		<option value={ value }>{ label }</option>
 	}
+}
+
+// serverDefaultTZLabel labels the empty "Server default" option with the
+// resolved server zone (e.g. "Server default (PDT · UTC-07:00)") so the
+// picker reveals what cron evaluates in when no instance zone is set. Falls
+// back to the bare label if the handler couldn't resolve a zone.
+func serverDefaultTZLabel(serverZone string) string {
+	if strings.TrimSpace(serverZone) == "" {
+		return "Server default"
+	}
+	return "Server default (" + serverZone + ")"
+}
+
+// commonTimezones is a curated shortlist for the instance-timezone picker —
+// enough to cover most self-hosters without shipping the full IANA database in
+// a select. A configured zone outside this list is appended as its own option.
+func commonTimezones() []string {
+	return []string{
+		"UTC",
+		"America/Los_Angeles",
+		"America/Denver",
+		"America/Chicago",
+		"America/New_York",
+		"America/Sao_Paulo",
+		"Europe/London",
+		"Europe/Paris",
+		"Europe/Berlin",
+		"Europe/Madrid",
+		"Asia/Kolkata",
+		"Asia/Singapore",
+		"Asia/Tokyo",
+		"Australia/Sydney",
+	}
+}
+
+func isCommonTimezone(tz string) bool {
+	for _, t := range commonTimezones() {
+		if t == tz {
+			return true
+		}
+	}
+	return false
 }
 
 templ retentionOption(value, current int, label string) {

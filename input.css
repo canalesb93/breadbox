@@ -669,7 +669,7 @@
     @apply opacity-100;
   }
   .bb-settings-content {
-    @apply flex-1 min-w-0 lg:max-w-5xl;
+    @apply flex-1 min-w-0;
   }
 
   /* lg+: the rail is a sticky, full-height column — the in-flow peer of the
@@ -1391,53 +1391,12 @@
     word-break: break-word;
     overflow-wrap: anywhere;
   }
-  /* Markdown element styling inside a comment bubble. Tuned to the
-     bubble's compact scale — paragraph margins are tighter than the
-     report body, headings are de-emphasized (comments shouldn't shout
-     section titles), and code blocks fit inside the bubble's inline-block
-     width without breaking the chat-row rhythm. Mirrors the shared
-     marked + DOMPurify pipeline used by .bb-report-body. */
-  .bb-comment-bubble > :first-child { @apply mt-0; }
-  .bb-comment-bubble p { @apply mb-2; }
-  .bb-comment-bubble h1,
-  .bb-comment-bubble h2,
-  .bb-comment-bubble h3,
-  .bb-comment-bubble h4 { @apply text-sm font-semibold text-base-content mt-3 mb-1; }
-  .bb-comment-bubble ul { @apply list-disc pl-5 my-1.5 space-y-0.5; }
-  .bb-comment-bubble ol { @apply list-decimal pl-5 my-1.5 space-y-0.5; }
-  .bb-comment-bubble li { @apply marker:text-base-content/50; }
-  .bb-comment-bubble strong { @apply font-semibold text-base-content; }
-  .bb-comment-bubble em { @apply italic; }
-  .bb-comment-bubble a {
-    @apply text-primary underline decoration-primary/30 hover:decoration-primary underline-offset-2;
-  }
-  .bb-comment-bubble a[href^="/transactions/"] {
-    @apply rounded bg-primary/5 px-1 py-px no-underline hover:bg-primary/10;
-  }
-  .bb-comment-bubble code:not(pre code) {
-    @apply bg-base-300/40 text-[0.85em] px-1 py-px rounded font-mono;
-  }
-  .bb-comment-bubble pre {
-    @apply bg-base-300/40 rounded-lg p-2 my-2 overflow-x-auto text-xs font-mono border border-base-300/60;
-  }
-  .bb-comment-bubble pre code { @apply bg-transparent p-0; }
-  .bb-comment-bubble blockquote {
-    @apply border-l-2 border-base-300 pl-2 my-2 text-base-content/60;
-  }
-  .bb-comment-bubble hr { @apply hidden; }
-  .bb-comment-bubble .bb-report-table-wrap {
-    @apply my-2 overflow-x-auto rounded-lg;
-  }
-  .bb-comment-bubble table {
-    @apply w-full text-xs border-collapse;
-  }
-  .bb-comment-bubble thead th {
-    @apply text-left font-semibold text-[0.65rem] uppercase tracking-wider text-base-content/50 px-2 py-1 border-b border-base-300 whitespace-nowrap;
-  }
-  .bb-comment-bubble tbody td {
-    @apply px-2 py-1 border-b border-base-200 whitespace-nowrap sm:whitespace-normal;
-  }
-  .bb-comment-bubble tbody tr:last-child td { @apply border-b-0; }
+  /* Markdown inside a comment bubble is rendered server-side via
+     @components.MarkdownBreaks into a nested .bb-prose, which owns all
+     element styling (headings, lists, code, tables, task lists). The bubble
+     only supplies the chat-tail chrome above. The one comment-specific tweak
+     kept: trim the leading top margin so the bubble doesn't open with a gap. */
+  .bb-comment-bubble .bb-prose > :first-child { margin-top: 0; }
 
   /* Dark-mode lift: in dark theme base-200 sits *below* the body bg
    * (body = base-100 = oklch 0.205, base-200 = oklch 0.145), so the
@@ -1527,10 +1486,13 @@
      vertical position and matches the visual of password-reveal patterns
      elsewhere (GitHub recovery codes, Auth0 client secrets, etc). */
   .bb-key-display {
-    @apply bg-base-200/60 border border-base-300 rounded-lg
-           px-3.5 py-3 font-mono text-xs leading-relaxed
+    @apply flex items-center min-h-13 bg-base-200/50 border border-base-300 rounded-xl
+           px-4 py-3.5 font-mono text-sm leading-relaxed
            text-base-content/85
            whitespace-nowrap overflow-x-auto overscroll-x-contain;
+    /* Space the glyphs out so the 64 dots/chars read as a key rather than
+       a packed block — the masked bullets especially look cramped at 0. */
+    letter-spacing: 0.12em;
     /* Thin, theme-aware scrollbar so it doesn't dominate the field. */
     scrollbar-width: thin;
   }
@@ -3248,52 +3210,9 @@
     background: var(--color-base-200);
   }
 
-  /* Agent report markdown body — lean, design-system-aligned rendering.
-     No separator lines under headings; rely on weight + spacing. */
-  .bb-report-body {
-    @apply text-sm text-base-content/85 leading-relaxed;
-  }
-  .bb-report-body > :first-child { @apply mt-0; }
-  .bb-report-body h1 { @apply text-xl font-semibold text-base-content mt-6 mb-2; }
-  .bb-report-body h2 { @apply text-lg font-semibold text-base-content mt-5 mb-2; }
-  .bb-report-body h3 { @apply text-base font-semibold text-base-content mt-5 mb-1.5; }
-  .bb-report-body h4 {
-    @apply text-sm font-semibold uppercase tracking-wider text-base-content/60 mt-4 mb-1;
-  }
-  .bb-report-body p  { @apply mb-3; }
-  .bb-report-body ul { @apply list-disc pl-5 space-y-1 my-2; }
-  .bb-report-body ol { @apply list-decimal pl-5 space-y-1 my-2; }
-  .bb-report-body li { @apply marker:text-base-content/60; }
-  .bb-report-body strong { @apply font-semibold text-base-content; }
-  .bb-report-body em { @apply italic; }
-  .bb-report-body a  { @apply text-primary underline decoration-primary/30 hover:decoration-primary underline-offset-2; }
-  .bb-report-body a[href^="/transactions/"] {
-    @apply rounded bg-primary/5 px-1 py-px no-underline hover:bg-primary/10;
-  }
-  .bb-report-body code:not(pre code) {
-    @apply bg-base-200/70 text-[0.8em] px-1 py-px rounded font-mono;
-  }
-  .bb-report-body pre {
-    @apply bg-base-200/60 rounded-xl p-3 my-3 overflow-x-auto text-xs font-mono border border-base-300/60;
-  }
-  .bb-report-body pre code { @apply bg-transparent p-0; }
-  .bb-report-body blockquote {
-    @apply border-l-2 border-base-300 pl-3 my-3 text-base-content/60;
-  }
-  .bb-report-body hr { @apply hidden; } /* discourage HR as decorative separator */
-  .bb-report-body .bb-report-table-wrap {
-    @apply -mx-2 sm:mx-0 my-3 overflow-x-auto rounded-xl;
-  }
-  .bb-report-body table {
-    @apply w-full text-sm border-collapse;
-  }
-  .bb-report-body thead th {
-    @apply text-left font-semibold text-[0.7rem] uppercase tracking-wider text-base-content/50 px-3 py-2 border-b border-base-300 whitespace-nowrap;
-  }
-  .bb-report-body tbody td {
-    @apply px-3 py-2 border-b border-base-200 whitespace-nowrap sm:whitespace-normal;
-  }
-  .bb-report-body tbody tr:last-child td { @apply border-b-0; }
+  /* Agent report bodies render via @components.MarkdownLarge into
+     .bb-prose.bb-prose-lg — see the unified .bb-prose rules. The old
+     .bb-report-body ruleset was retired when markdown moved server-side. */
 
 }
 
@@ -3805,103 +3724,14 @@
   word-wrap: break-word;
 }
 .bb-prose > * + * { margin-top: 0.5rem; }
-.bb-prose .bb-prose-p { margin: 0; }
-.bb-prose .bb-prose-h {
-  font-weight: 600;
-  margin-top: 0.75rem;
-  letter-spacing: -0.005em;
-}
-.bb-prose h3.bb-prose-h { font-size: 0.95rem; }
-.bb-prose h4.bb-prose-h { font-size: 0.875rem; opacity: 0.8; }
-.bb-prose .bb-prose-strong { font-weight: 600; /* inherit color so dark bubbles get light bold */ }
-.bb-prose .bb-prose-em { font-style: italic; }
-.bb-prose .bb-prose-strike { opacity: 0.55; text-decoration: line-through; }
-.bb-prose .bb-prose-link {
-  color: var(--color-primary);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in oklch, var(--color-primary) 40%, transparent);
-  text-underline-offset: 2px;
-}
-.bb-prose .bb-prose-link:hover {
-  text-decoration-color: var(--color-primary);
-}
-.bb-prose .bb-prose-icode {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8125rem;
-  padding: 0.0625rem 0.3125rem;
-  border-radius: 0.25rem;
-  background: color-mix(in oklch, var(--color-base-200) 90%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 70%, transparent);
-}
-.bb-prose .bb-prose-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  background: color-mix(in oklch, var(--color-base-200) 70%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  border-radius: 0.5rem;
-  padding: 0.625rem 0.75rem;
-  overflow-x: auto;
-  white-space: pre;
-}
-.bb-prose .bb-prose-code code { background: transparent; padding: 0; border: 0; }
-.bb-prose .bb-prose-ul, .bb-prose .bb-prose-ol {
-  margin: 0;
-  padding-inline-start: 1.25rem;
-}
-.bb-prose .bb-prose-ul { list-style-type: disc; }
-.bb-prose .bb-prose-ol { list-style-type: decimal; }
-.bb-prose .bb-prose-li { margin: 0.125rem 0; }
-.bb-prose .bb-prose-li::marker { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
-.bb-prose .bb-prose-li-cont { margin: 0.125rem 0 0.25rem 0; color: color-mix(in oklch, var(--color-base-content) 80%, transparent); }
-.bb-prose .bb-prose-quote {
-  margin: 0;
-  padding: 0.25rem 0 0.25rem 0.75rem;
-  border-inline-start: 3px solid color-mix(in oklch, var(--color-primary) 35%, transparent);
-  color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
-  font-style: italic;
-}
-.bb-prose .bb-prose-hr {
-  border: 0;
-  border-top: 1px solid color-mix(in oklch, var(--color-base-300) 80%, transparent);
-  margin: 0.875rem 0;
-}
-.bb-prose .bb-prose-table-wrap { overflow-x: auto; }
-.bb-prose .bb-prose-table {
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-  min-width: 100%;
-}
-.bb-prose .bb-prose-table th,
-.bb-prose .bb-prose-table td {
-  padding: 0.375rem 0.625rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
-  text-align: start;
-  vertical-align: top;
-}
-.bb-prose .bb-prose-table thead th {
-  font-weight: 600;
-  background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
-  border-bottom: 1px solid var(--color-base-300);
-}
-.bb-prose .bb-prose-table .text-right { text-align: right; }
-.bb-prose .bb-prose-table .text-center { text-align: center; }
-.bb-prose .bb-prose-table .text-left { text-align: left; }
 
-/* ── Plain-tag prose — the marked.js (bbRenderMarkdown) path emits UNclassed
- * HTML (<h2>, <p>, <ul>, <code>, <table>…), not the .bb-prose-* classed tags
- * the Go components.Markdown renderer emits. Every production markdown surface
- * actually runs through marked (reports, agent-run prompts + transcript, the
- * workflows prompt preview); the ones wrapped in .bb-prose previously fell
- * through almost entirely unstyled (only the generic sibling-margin rule
- * applied) — that's the "broken" prompt preview. These rules mirror the
- * .bb-prose-* values above on bare tags so marked output renders identically.
- *
- * Purely additive: where both match (the Go-rendered /design sandbox) the
- * classed selectors above win by specificity, so the sandbox is untouched.
- * Colors inherit (never hard-set base-content) so a .bb-prose on a colored
- * chat bubble in the run-detail thread stays legible. */
-.bb-prose h1, .bb-prose h2, .bb-prose h3, .bb-prose h4 {
+/* The renderer (internal/markdown via goldmark) emits semantic, UNclassed
+ * HTML — <h2>, <p>, <ul>, <code>, <table>, GFM task-list checkboxes, and
+ * chroma-highlighted code blocks. These descendant selectors style those
+ * bare tags. Colors inherit (never hard-set base-content) so .bb-prose on a
+ * colored chat bubble in the run-detail thread stays legible. */
+.bb-prose h1, .bb-prose h2, .bb-prose h3,
+.bb-prose h4, .bb-prose h5, .bb-prose h6 {
   font-weight: 600;
   margin-top: 0.75rem;
   line-height: 1.3;
@@ -3910,7 +3740,7 @@
 .bb-prose h1 { font-size: 1.05rem; }
 .bb-prose h2 { font-size: 1rem; }
 .bb-prose h3 { font-size: 0.95rem; }
-.bb-prose h4 { font-size: 0.875rem; opacity: 0.8; }
+.bb-prose h4, .bb-prose h5, .bb-prose h6 { font-size: 0.875rem; opacity: 0.8; }
 .bb-prose p { margin: 0; }
 .bb-prose strong { font-weight: 600; }
 .bb-prose em { font-style: italic; }
@@ -3922,6 +3752,17 @@
   text-underline-offset: 2px;
 }
 .bb-prose a:hover { text-decoration-color: var(--color-primary); }
+/* Transaction cross-reference links render as a subtle chip (carried over
+ * from the report/comment styling) so "see <tx>" reads as an affordance. */
+.bb-prose a[href^="/transactions/"] {
+  border-radius: 0.25rem;
+  background: color-mix(in oklch, var(--color-primary) 5%, transparent);
+  padding: 0 0.25rem;
+  text-decoration: none;
+}
+.bb-prose a[href^="/transactions/"]:hover {
+  background: color-mix(in oklch, var(--color-primary) 10%, transparent);
+}
 .bb-prose code:not(pre code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8125rem;
@@ -3947,6 +3788,14 @@
 .bb-prose ol { list-style-type: decimal; }
 .bb-prose li { margin: 0.125rem 0; }
 .bb-prose li::marker { color: color-mix(in oklch, var(--color-base-content) 45%, transparent); }
+/* GFM task lists (extension.TaskList) emit <li><input type=checkbox disabled>.
+ * Drop the bullet on those items and align the (read-only) checkbox inline. */
+.bb-prose li:has(> input[type="checkbox"]) { list-style: none; margin-inline-start: -1.25rem; }
+.bb-prose input[type="checkbox"] {
+  margin-inline-end: 0.4rem;
+  vertical-align: middle;
+  accent-color: var(--color-primary);
+}
 .bb-prose blockquote {
   margin: 0;
   padding: 0.25rem 0 0.25rem 0.75rem;
@@ -3959,18 +3808,35 @@
   border-top: 1px solid color-mix(in oklch, var(--color-base-300) 80%, transparent);
   margin: 0.875rem 0;
 }
-.bb-prose .bb-report-table-wrap { overflow-x: auto; }
-.bb-prose table { border-collapse: collapse; font-size: 0.8125rem; min-width: 100%; }
+/* Tables scroll horizontally on narrow viewports rather than overflowing
+ * the page. display:block + width:max-content lets the table size to its
+ * content and scroll inside the prose container when it exceeds it (goldmark
+ * emits a bare <table>, so the table itself is the scroll container). */
+.bb-prose table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
+}
 .bb-prose th, .bb-prose td {
   padding: 0.375rem 0.625rem;
-  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 60%, transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
   text-align: start;
   vertical-align: top;
+}
+.bb-prose tbody tr:last-child td { border-bottom: 0; }
+.bb-prose tbody tr:nth-child(even) {
+  background: color-mix(in oklch, var(--color-base-200) 35%, transparent);
 }
 .bb-prose thead th {
   font-weight: 600;
   background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
   border-bottom: 1px solid var(--color-base-300);
+  white-space: nowrap;
 }
 
 /* ── bb-json: server-rendered JSON viewer with collapsible objects +
@@ -4434,3 +4300,262 @@
   border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
   background: var(--color-base-100);
 }
+
+
+/* ── .bb-prose-lg: more generous spacing/size for full-page report bodies ── */
+.bb-prose-lg { font-size: 0.95rem; line-height: 1.65; }
+.bb-prose-lg.bb-prose > * + * { margin-top: 0.75rem; }
+.bb-prose-lg h1 { font-size: 1.35rem; margin-top: 1.25rem; }
+.bb-prose-lg h2 { font-size: 1.15rem; margin-top: 1rem; }
+.bb-prose-lg h3 { font-size: 1.02rem; margin-top: 0.9rem; }
+.bb-prose-lg p, .bb-prose-lg ul, .bb-prose-lg ol, .bb-prose-lg blockquote { margin-block: 0; }
+
+/* ── chroma syntax highlighting (class-based; generated via internal/markdown
+ * ChromaCSS — github + github-dark). Backgrounds are neutralized so the
+ * themed .bb-prose pre surface shows through; chroma supplies token colors
+ * (and the dark-mode text color). Regenerate by running ChromaCSS and
+ * re-applying the .bb-prose .chroma scoping + transparent backgrounds. */
+/* PreWrapper */ .bb-prose .chroma { -webkit-text-size-adjust: none; }
+/* Error */ .bb-prose .chroma .err { color: #f6f8fa; background-color: #82071e }
+/* LineLink */ .bb-prose .chroma .lnlinks { outline: none; text-decoration: none; color: inherit }
+/* LineTableTD */ .bb-prose .chroma .lntd { vertical-align: top; padding: 0; margin: 0; border: 0; }
+/* LineTable */ .bb-prose .chroma .lntable { border-spacing: 0; padding: 0; margin: 0; border: 0; }
+/* LineHighlight */ .bb-prose .chroma .hl { background-color: #dedede }
+/* LineNumbersTable */ .bb-prose .chroma .lnt { white-space: pre; -webkit-user-select: none; user-select: none; margin-right: 0.4em; padding: 0 0.4em 0 0.4em;color: #7f7f7f }
+/* LineNumbers */ .bb-prose .chroma .ln { white-space: pre; -webkit-user-select: none; user-select: none; margin-right: 0.4em; padding: 0 0.4em 0 0.4em;color: #7f7f7f }
+/* Line */ .bb-prose .chroma .line { display: flex; }
+/* Keyword */ .bb-prose .chroma .k { color: #cf222e }
+/* KeywordConstant */ .bb-prose .chroma .kc { color: #cf222e }
+/* KeywordDeclaration */ .bb-prose .chroma .kd { color: #cf222e }
+/* KeywordNamespace */ .bb-prose .chroma .kn { color: #cf222e }
+/* KeywordPseudo */ .bb-prose .chroma .kp { color: #cf222e }
+/* KeywordReserved */ .bb-prose .chroma .kr { color: #cf222e }
+/* KeywordType */ .bb-prose .chroma .kt { color: #cf222e }
+/* NameAttribute */ .bb-prose .chroma .na { color: #1f2328 }
+/* NameClass */ .bb-prose .chroma .nc { color: #1f2328 }
+/* NameConstant */ .bb-prose .chroma .no { color: #0550ae }
+/* NameDecorator */ .bb-prose .chroma .nd { color: #0550ae }
+/* NameEntity */ .bb-prose .chroma .ni { color: #6639ba }
+/* NameLabel */ .bb-prose .chroma .nl { color: #990000; font-weight: bold }
+/* NameNamespace */ .bb-prose .chroma .nn { color: #24292e }
+/* NameOther */ .bb-prose .chroma .nx { color: #1f2328 }
+/* NameTag */ .bb-prose .chroma .nt { color: #0550ae }
+/* NameBuiltin */ .bb-prose .chroma .nb { color: #6639ba }
+/* NameBuiltinPseudo */ .bb-prose .chroma .bp { color: #6a737d }
+/* NameVariable */ .bb-prose .chroma .nv { color: #953800 }
+/* NameVariableClass */ .bb-prose .chroma .vc { color: #953800 }
+/* NameVariableGlobal */ .bb-prose .chroma .vg { color: #953800 }
+/* NameVariableInstance */ .bb-prose .chroma .vi { color: #953800 }
+/* NameVariableMagic */ .bb-prose .chroma .vm { color: #953800 }
+/* NameFunction */ .bb-prose .chroma .nf { color: #6639ba }
+/* NameFunctionMagic */ .bb-prose .chroma .fm { color: #6639ba }
+/* LiteralString */ .bb-prose .chroma .s { color: #0a3069 }
+/* LiteralStringAffix */ .bb-prose .chroma .sa { color: #0a3069 }
+/* LiteralStringBacktick */ .bb-prose .chroma .sb { color: #0a3069 }
+/* LiteralStringChar */ .bb-prose .chroma .sc { color: #0a3069 }
+/* LiteralStringDelimiter */ .bb-prose .chroma .dl { color: #0a3069 }
+/* LiteralStringDoc */ .bb-prose .chroma .sd { color: #0a3069 }
+/* LiteralStringDouble */ .bb-prose .chroma .s2 { color: #0a3069 }
+/* LiteralStringEscape */ .bb-prose .chroma .se { color: #0a3069 }
+/* LiteralStringHeredoc */ .bb-prose .chroma .sh { color: #0a3069 }
+/* LiteralStringInterpol */ .bb-prose .chroma .si { color: #0a3069 }
+/* LiteralStringOther */ .bb-prose .chroma .sx { color: #0a3069 }
+/* LiteralStringRegex */ .bb-prose .chroma .sr { color: #0a3069 }
+/* LiteralStringSingle */ .bb-prose .chroma .s1 { color: #0a3069 }
+/* LiteralStringSymbol */ .bb-prose .chroma .ss { color: #032f62 }
+/* LiteralNumber */ .bb-prose .chroma .m { color: #0550ae }
+/* LiteralNumberBin */ .bb-prose .chroma .mb { color: #0550ae }
+/* LiteralNumberFloat */ .bb-prose .chroma .mf { color: #0550ae }
+/* LiteralNumberHex */ .bb-prose .chroma .mh { color: #0550ae }
+/* LiteralNumberInteger */ .bb-prose .chroma .mi { color: #0550ae }
+/* LiteralNumberIntegerLong */ .bb-prose .chroma .il { color: #0550ae }
+/* LiteralNumberOct */ .bb-prose .chroma .mo { color: #0550ae }
+/* Operator */ .bb-prose .chroma .o { color: #0550ae }
+/* OperatorWord */ .bb-prose .chroma .ow { color: #0550ae }
+/* OperatorReserved */ .bb-prose .chroma .or { color: #0550ae }
+/* Punctuation */ .bb-prose .chroma .p { color: #1f2328 }
+/* Comment */ .bb-prose .chroma .c { color: #57606a }
+/* CommentHashbang */ .bb-prose .chroma .ch { color: #57606a }
+/* CommentMultiline */ .bb-prose .chroma .cm { color: #57606a }
+/* CommentSingle */ .bb-prose .chroma .c1 { color: #57606a }
+/* CommentSpecial */ .bb-prose .chroma .cs { color: #57606a }
+/* CommentPreproc */ .bb-prose .chroma .cp { color: #57606a }
+/* CommentPreprocFile */ .bb-prose .chroma .cpf { color: #57606a }
+/* GenericDeleted */ .bb-prose .chroma .gd { color: #82071e; background-color: #ffebe9 }
+/* GenericEmph */ .bb-prose .chroma .ge { color: #1f2328 }
+/* GenericInserted */ .bb-prose .chroma .gi { color: #116329; background-color: #dafbe1 }
+/* GenericOutput */ .bb-prose .chroma .go { color: #1f2328 }
+/* GenericUnderline */ .bb-prose .chroma .gl { text-decoration: underline }
+/* TextWhitespace */ .bb-prose .chroma .w { color: #ffffff }
+
+@media (prefers-color-scheme: dark) {
+  /* PreWrapper */ .bb-prose .chroma { color: #e6edf3; -webkit-text-size-adjust: none; }
+  /* Error */ .bb-prose .chroma .err { color: #f85149 }
+  /* LineLink */ .bb-prose .chroma .lnlinks { outline: none; text-decoration: none; color: inherit }
+  /* LineTableTD */ .bb-prose .chroma .lntd { vertical-align: top; padding: 0; margin: 0; border: 0; }
+  /* LineTable */ .bb-prose .chroma .lntable { border-spacing: 0; padding: 0; margin: 0; border: 0; }
+  /* LineHighlight */ .bb-prose .chroma .hl { background-color: #6e7681 }
+  /* LineNumbersTable */ .bb-prose .chroma .lnt { white-space: pre; -webkit-user-select: none; user-select: none; margin-right: 0.4em; padding: 0 0.4em 0 0.4em;color: #737679 }
+  /* LineNumbers */ .bb-prose .chroma .ln { white-space: pre; -webkit-user-select: none; user-select: none; margin-right: 0.4em; padding: 0 0.4em 0 0.4em;color: #6e7681 }
+  /* Line */ .bb-prose .chroma .line { display: flex; }
+  /* Keyword */ .bb-prose .chroma .k { color: #ff7b72 }
+  /* KeywordConstant */ .bb-prose .chroma .kc { color: #79c0ff }
+  /* KeywordDeclaration */ .bb-prose .chroma .kd { color: #ff7b72 }
+  /* KeywordNamespace */ .bb-prose .chroma .kn { color: #ff7b72 }
+  /* KeywordPseudo */ .bb-prose .chroma .kp { color: #79c0ff }
+  /* KeywordReserved */ .bb-prose .chroma .kr { color: #ff7b72 }
+  /* KeywordType */ .bb-prose .chroma .kt { color: #ff7b72 }
+  /* NameClass */ .bb-prose .chroma .nc { color: #f0883e; font-weight: bold }
+  /* NameConstant */ .bb-prose .chroma .no { color: #79c0ff; font-weight: bold }
+  /* NameDecorator */ .bb-prose .chroma .nd { color: #d2a8ff; font-weight: bold }
+  /* NameEntity */ .bb-prose .chroma .ni { color: #ffa657 }
+  /* NameException */ .bb-prose .chroma .ne { color: #f0883e; font-weight: bold }
+  /* NameLabel */ .bb-prose .chroma .nl { color: #79c0ff; font-weight: bold }
+  /* NameNamespace */ .bb-prose .chroma .nn { color: #ff7b72 }
+  /* NameProperty */ .bb-prose .chroma .py { color: #79c0ff }
+  /* NameTag */ .bb-prose .chroma .nt { color: #7ee787 }
+  /* NameVariable */ .bb-prose .chroma .nv { color: #79c0ff }
+  /* NameVariableClass */ .bb-prose .chroma .vc { color: #79c0ff }
+  /* NameVariableGlobal */ .bb-prose .chroma .vg { color: #79c0ff }
+  /* NameVariableInstance */ .bb-prose .chroma .vi { color: #79c0ff }
+  /* NameVariableMagic */ .bb-prose .chroma .vm { color: #79c0ff }
+  /* NameFunction */ .bb-prose .chroma .nf { color: #d2a8ff; font-weight: bold }
+  /* NameFunctionMagic */ .bb-prose .chroma .fm { color: #d2a8ff; font-weight: bold }
+  /* Literal */ .bb-prose .chroma .l { color: #a5d6ff }
+  /* LiteralDate */ .bb-prose .chroma .ld { color: #79c0ff }
+  /* LiteralString */ .bb-prose .chroma .s { color: #a5d6ff }
+  /* LiteralStringAffix */ .bb-prose .chroma .sa { color: #79c0ff }
+  /* LiteralStringBacktick */ .bb-prose .chroma .sb { color: #a5d6ff }
+  /* LiteralStringChar */ .bb-prose .chroma .sc { color: #a5d6ff }
+  /* LiteralStringDelimiter */ .bb-prose .chroma .dl { color: #79c0ff }
+  /* LiteralStringDoc */ .bb-prose .chroma .sd { color: #a5d6ff }
+  /* LiteralStringDouble */ .bb-prose .chroma .s2 { color: #a5d6ff }
+  /* LiteralStringEscape */ .bb-prose .chroma .se { color: #79c0ff }
+  /* LiteralStringHeredoc */ .bb-prose .chroma .sh { color: #79c0ff }
+  /* LiteralStringInterpol */ .bb-prose .chroma .si { color: #a5d6ff }
+  /* LiteralStringOther */ .bb-prose .chroma .sx { color: #a5d6ff }
+  /* LiteralStringRegex */ .bb-prose .chroma .sr { color: #79c0ff }
+  /* LiteralStringSingle */ .bb-prose .chroma .s1 { color: #a5d6ff }
+  /* LiteralStringSymbol */ .bb-prose .chroma .ss { color: #a5d6ff }
+  /* LiteralNumber */ .bb-prose .chroma .m { color: #a5d6ff }
+  /* LiteralNumberBin */ .bb-prose .chroma .mb { color: #a5d6ff }
+  /* LiteralNumberFloat */ .bb-prose .chroma .mf { color: #a5d6ff }
+  /* LiteralNumberHex */ .bb-prose .chroma .mh { color: #a5d6ff }
+  /* LiteralNumberInteger */ .bb-prose .chroma .mi { color: #a5d6ff }
+  /* LiteralNumberIntegerLong */ .bb-prose .chroma .il { color: #a5d6ff }
+  /* LiteralNumberOct */ .bb-prose .chroma .mo { color: #a5d6ff }
+  /* Operator */ .bb-prose .chroma .o { color: #ff7b72; font-weight: bold }
+  /* OperatorWord */ .bb-prose .chroma .ow { color: #ff7b72; font-weight: bold }
+  /* OperatorReserved */ .bb-prose .chroma .or { color: #ff7b72; font-weight: bold }
+  /* Comment */ .bb-prose .chroma .c { color: #8b949e; font-style: italic }
+  /* CommentHashbang */ .bb-prose .chroma .ch { color: #8b949e; font-style: italic }
+  /* CommentMultiline */ .bb-prose .chroma .cm { color: #8b949e; font-style: italic }
+  /* CommentSingle */ .bb-prose .chroma .c1 { color: #8b949e; font-style: italic }
+  /* CommentSpecial */ .bb-prose .chroma .cs { color: #8b949e; font-weight: bold; font-style: italic }
+  /* CommentPreproc */ .bb-prose .chroma .cp { color: #8b949e; font-weight: bold; font-style: italic }
+  /* CommentPreprocFile */ .bb-prose .chroma .cpf { color: #8b949e; font-weight: bold; font-style: italic }
+  /* GenericDeleted */ .bb-prose .chroma .gd { color: #ffa198; background-color: #490202 }
+  /* GenericEmph */ .bb-prose .chroma .ge { font-style: italic }
+  /* GenericError */ .bb-prose .chroma .gr { color: #ffa198 }
+  /* GenericHeading */ .bb-prose .chroma .gh { color: #79c0ff; font-weight: bold }
+  /* GenericInserted */ .bb-prose .chroma .gi { color: #56d364; background-color: #0f5323 }
+  /* GenericOutput */ .bb-prose .chroma .go { color: #8b949e }
+  /* GenericPrompt */ .bb-prose .chroma .gp { color: #8b949e }
+  /* GenericStrong */ .bb-prose .chroma .gs { font-weight: bold }
+  /* GenericSubheading */ .bb-prose .chroma .gu { color: #79c0ff }
+  /* GenericTraceback */ .bb-prose .chroma .gt { color: #ff7b72 }
+  /* GenericUnderline */ .bb-prose .chroma .gl { text-decoration: underline }
+  /* TextWhitespace */ .bb-prose .chroma .w { color: #6e7681 }
+}
+
+/* ── Markdown "fancy" chrome: callouts, code-block bar, heading anchors ── */
+
+/* GitHub-style callouts (> [\!NOTE] etc.) — rendered by internal/markdown.
+ * --cl is the accent color per type; box uses soft tints of it. */
+.bb-prose .bb-callout {
+  --cl: var(--color-info);
+  border: 1px solid color-mix(in oklch, var(--cl) 35%, transparent);
+  background: color-mix(in oklch, var(--cl) 8%, transparent);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.85rem;
+}
+.bb-prose .bb-callout-note { --cl: var(--color-info); }
+.bb-prose .bb-callout-tip { --cl: var(--color-success); }
+.bb-prose .bb-callout-important { --cl: oklch(0.62 0.19 295); }
+.bb-prose .bb-callout-warning { --cl: var(--color-warning); }
+.bb-prose .bb-callout-caution { --cl: var(--color-error); }
+.bb-prose .bb-callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--cl);
+  margin-bottom: 0.3rem;
+}
+.bb-prose .bb-callout-icon { width: 1rem; height: 1rem; }
+.bb-prose .bb-callout-body > :first-child { margin-top: 0; }
+.bb-prose .bb-callout-body > :last-child { margin-bottom: 0; }
+
+/* Code block chrome — a header bar (language pill + copy) over the <pre>.
+ * .bb-code owns the surface + border; the inner <pre> goes flush. */
+.bb-prose .bb-code {
+  border: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--color-base-200) 70%, transparent);
+}
+.bb-prose .bb-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0.4rem 0.2rem 0.75rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 40%, transparent);
+  background: color-mix(in oklch, var(--color-base-300) 22%, transparent);
+}
+.bb-prose .bb-code-lang {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+}
+.bb-prose .bb-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: color-mix(in oklch, var(--color-base-content) 58%, transparent);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bb-prose .bb-code-copy:hover {
+  background: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  color: var(--color-base-content);
+}
+.bb-prose .bb-code-copy.is-copied { color: var(--color-success); }
+.bb-prose .bb-code-copy-icon { width: 0.85rem; height: 0.85rem; }
+/* Inner <pre> goes flush — .bb-code provides surface + border. */
+.bb-prose .bb-code pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Heading hover-anchor — a "#" deep-link in the left gutter, shown on hover. */
+.bb-prose .bb-heading-anchor {
+  margin-inline-start: -1.1em;
+  padding-inline-end: 0.25em;
+  opacity: 0;
+  font-weight: 400;
+  text-decoration: none;
+  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+  transition: opacity 0.12s ease;
+}
+.bb-prose :is(h1, h2, h3, h4, h5, h6):hover .bb-heading-anchor,
+.bb-prose .bb-heading-anchor:focus { opacity: 1; }

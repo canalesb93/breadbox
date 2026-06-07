@@ -43,18 +43,21 @@ Click → Railway provisions, in one flow:
 
 ## Updating
 
-The template pulls `:latest`, so Railway doesn't auto-redeploy on
-every upstream commit by design — self-hosters of a financial app
-generally want explicit control over upgrade timing.
+The template pulls `:latest`, which tracks the **newest stable
+release** (not every commit to `main`). Railway doesn't auto-redeploy
+on a new release — a manual redeploy is required, which suits a
+financial app where you want explicit control over upgrade timing.
 
 To pull a newer image, go to the breadbox service in Railway →
 **Deployments** → **Redeploy**. The admin dashboard also surfaces an
 "update available" badge in the sidebar when a newer GitHub release
 exists.
 
-To pin a specific tag, change the image source under **Service
-Settings** → **Source** to `ghcr.io/canalesb93/breadbox:v0.1.0` (or
-whatever tag).
+To pin a specific release (recommended for full reproducibility),
+change the image source under **Service Settings** → **Source** to
+`ghcr.io/canalesb93/breadbox:v0.1.0` (or whatever tag). To instead
+track the unreleased tip of `main`, use
+`ghcr.io/canalesb93/breadbox:edge`.
 
 ## Alternative: deploy without the button
 

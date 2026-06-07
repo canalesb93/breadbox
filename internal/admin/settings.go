@@ -32,6 +32,29 @@ func formatNextSync(nextRun time.Time) string {
 	return "in " + formatUptime(d)
 }
 
+// serverZoneLabel describes the server process's local zone for the
+// "Server default" timezone option, so a self-hoster who hasn't set an
+// instance zone can still see what cron evaluates in. Format: the zone
+// abbreviation plus its current UTC offset (e.g. "PDT · UTC-07:00"), or just
+// the offset when the runtime only knows a numeric zone (e.g. "UTC+05:30").
+// Read at the current instant, so it reflects the active DST offset.
+func serverZoneLabel() string {
+	name, offsetSec := time.Now().Zone()
+	sign := "+"
+	if offsetSec < 0 {
+		sign = "-"
+		offsetSec = -offsetSec
+	}
+	off := fmt.Sprintf("UTC%s%02d:%02d", sign, offsetSec/3600, (offsetSec%3600)/60)
+	name = strings.TrimSpace(name)
+	// A nameless zone surfaces as a numeric abbreviation like "+0530"; don't
+	// pair that with the offset (redundant). Show the offset alone.
+	if name == "" || strings.HasPrefix(name, "+") || strings.HasPrefix(name, "-") {
+		return off
+	}
+	return name + " · " + off
+}
+
 // buildSettingsProps assembles the typed SettingsProps shared by every
 // /settings/* General-family tab (General, System, Help). Each
 // tab handler builds full props (cheap — a few DB lookups + version
@@ -65,6 +88,9 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		nextSyncTime = formatNextSync(a.Scheduler.NextRun())
 	}
 
+	syncSchedules, _ := a.Service.ListSyncSchedules(ctx)
+	newScheduleForm, editScheduleForms := buildScheduleDrawerForms(a, r, syncSchedules)
+
 	props := pages.SettingsProps{
 		CSRFToken:            GetCSRFToken(r),
 		SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
@@ -78,6 +104,11 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
 		OnboardingDismissed:  onboardingDismissed,
 		NextSyncTime:         nextSyncTime,
+		SyncSchedules:        syncSchedules,
+		NewScheduleForm:      newScheduleForm,
+		EditScheduleForms:    editScheduleForms,
+		InstanceTimezone:     appconfig.String(ctx, a.Queries, appconfig.KeyInstanceTimezone, ""),
+		ServerZoneLabel:      serverZoneLabel(),
 		ConfigSources:        a.Config.ConfigSources,
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,
@@ -134,34 +165,6 @@ func HelpSettingsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 	}
 }
 
-// SettingsSyncPostHandler serves POST /admin/settings/sync.
-func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		syncIntervalStr := r.FormValue("sync_interval_minutes")
-
-		syncInterval, err := strconv.Atoi(syncIntervalStr)
-		if err != nil || !isValidSyncInterval(syncInterval) {
-			FlashRedirect(w, r, sm, "error", "Invalid sync interval.", "/settings")
-			return
-		}
-
-		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "sync_interval_minutes",
-			Value: pgconv.Text(strconv.Itoa(syncInterval)),
-		}); err != nil {
-			a.Logger.Error("save sync interval", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to save sync interval.", "/settings")
-			return
-		}
-		a.Config.SyncIntervalMinutes = syncInterval
-
-		SetFlash(ctx, sm, "success", "Sync settings saved.")
-		http.Redirect(w, r, "/settings", http.StatusSeeOther)
-	}
-}
-
 // ChangePasswordHandler serves POST /admin/settings/password.
 // Works for all account types via the unified auth_accounts table.
 func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
@@ -203,6 +206,30 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			SetFlash(ctx, sm, "success", fmt.Sprintf("Sync log retention set to %d days.", retentionDays))
 		}
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	}
+}
+
+// SettingsTimezonePostHandler serves POST /settings/timezone — sets the
+// instance IANA timezone all cron schedules (sync + workflows) are evaluated
+// in. Empty clears it (back to the server's local zone). Auto-save: 204 on ok.
+func SettingsTimezonePostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tz := strings.TrimSpace(r.FormValue("instance_timezone"))
+		if tz != "" {
+			if _, err := time.LoadLocation(tz); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+			Key:   appconfig.KeyInstanceTimezone,
+			Value: pgconv.Text(tz),
+		}); err != nil {
+			a.Logger.Error("save instance timezone", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
@@ -280,4 +307,3 @@ func formatUptime(d time.Duration) string {
 	}
 	return fmt.Sprintf("%dm", minutes)
 }
-

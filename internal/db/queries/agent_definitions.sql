@@ -2,9 +2,11 @@
 INSERT INTO workflows (
     name, slug, prompt, system_prompt, schedule_cron,
     tool_scope, allowed_tools, model, max_turns, max_budget_usd, enabled,
-    quiet_hours_start, quiet_hours_end, trigger_on_sync_complete, source_template
+    quiet_hours_start, quiet_hours_end, trigger_on_sync_complete, source_template,
+    connectors
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+    COALESCE(sqlc.narg('connectors'), '[]'::jsonb))
 RETURNING *;
 
 -- name: GetAgentDefinition :one
@@ -48,6 +50,7 @@ SET name                     = $2,
     quiet_hours_end          = $14,
     trigger_on_sync_complete = $15,
     avatar_seed              = $16,
+    connectors               = COALESCE(sqlc.narg('connectors'), '[]'::jsonb),
     updated_at               = NOW()
 WHERE id = $1
 RETURNING *;

@@ -2,7 +2,10 @@
 
 package pages
 
-import "breadbox/internal/avatar"
+import (
+	"breadbox/internal/avatar"
+	"breadbox/internal/service"
+)
 
 // avatarPreviewExpr builds the Alpine `:src` expression for an
 // avatar-style preview tile. The seed is a fixed literal supplied by
@@ -47,6 +50,22 @@ type SettingsProps struct {
 	HasEncryptionKey     bool
 	OnboardingDismissed  bool
 	NextSyncTime         string
+	// SyncSchedules is the household's wall-clock sync schedules (the
+	// replacement for the single global interval). Rendered as a list in
+	// the General → Sync section.
+	SyncSchedules []service.SyncScheduleView
+	// NewScheduleForm + EditScheduleForms drive the create/edit drawers
+	// rendered server-side in the Sync section (one per schedule + a create
+	// drawer), so the nested CronField hydrates with correct values.
+	NewScheduleForm   ScheduleFormProps
+	EditScheduleForms []ScheduleFormProps
+	// InstanceTimezone is the configured IANA zone cron is evaluated in
+	// (empty = server local). Surfaced as the Sync-section timezone picker.
+	InstanceTimezone string
+	// ServerZoneLabel describes the server process's local zone (abbreviation +
+	// UTC offset, e.g. "PDT · UTC-07:00"), so the "Server default" picker option
+	// reveals what cron actually evaluates in when no instance zone is set.
+	ServerZoneLabel string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
 

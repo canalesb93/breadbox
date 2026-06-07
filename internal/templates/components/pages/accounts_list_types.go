@@ -23,24 +23,26 @@ type AccountsListProps struct {
 // AccountsListUserFilter mirrors ConnectionsUserFilter — one chip in the
 // "filter by household member" strip.
 type AccountsListUserFilter struct {
-	ID    string // formatted UUID — drives the x-show filter value
-	Name  string
-	First string // first letter for the avatar circle
+	ID            string // short_id — drives the x-show filter value
+	Name          string
+	First         string // first letter for the avatar circle fallback
+	AvatarVersion string // user updated_at unix timestamp for cache-busting
 }
 
 // AccountsListRow is one table row. Fields are pre-formatted (display_name
 // applied, balance sign adjusted for liabilities, currency carried alongside).
 type AccountsListRow struct {
 	ID          string // formatted UUID
-	UserID      string // formatted UUID — used by the x-show filter
+	UserID      string // short_id — used by the x-show filter and avatar URL
 	DisplayName string // display_name with fallback to name
 	Type        string // canonical account type ("depository", "credit", ...)
 	SubtypeValid bool
 	Subtype     string
 	MaskValid   bool
 	Mask        string
-	OwnerName   string // empty when no linked household member
-	OwnerFirst  string // first letter for the avatar dot
+	OwnerName          string // empty when no linked household member
+	OwnerFirst         string // first letter for the avatar dot fallback
+	OwnerAvatarVersion string // user updated_at unix timestamp for cache-busting
 	InstitutionName string
 
 	// Connection context — lets the row pill out reauth/disconnected state

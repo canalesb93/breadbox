@@ -3,10 +3,10 @@ name: github-image-hosting
 description: >
   Upload an image or an HTML/text snapshot and get a public URL suitable for
   embedding in PRs, issues, and comments, or for sharing a rendered debug page.
-  Defaults to the self-hosted host at bb-artifacts.exe.xyz (token-gated upload,
-  public read, ~180-day retention, 25MB cap). Falls back to img402.dev (tokenless,
-  ephemeral — good for cloud sessions with no token), then to a GitHub release-asset
-  CDN (permanent) when both are unavailable.
+  Defaults to the self-hosted host at bb-artifacts.exe.xyz — authenticated upload
+  via your GitHub token (`gh auth token`, works in local AND cloud sessions);
+  public read; ~180-day retention; 25MB cap. Falls back to img402.dev only if the
+  host is unreachable.
   Triggers: "screenshot this", "attach an image", "add a screenshot to the PR",
   "upload this mockup", "host this HTML", "share a debug snapshot", or any task
   producing an image or HTML page that needs a shareable URL.
@@ -23,37 +23,39 @@ metadata:
 Upload a screenshot, image, or HTML/text snapshot and get back a public URL —
 embed it in a PR/issue or open it directly to view a rendered debug page.
 
-Host: **bb-artifacts.exe.xyz** (self-hosted on exe.dev). Uploads are token-gated;
-reads are fully public (GitHub's camo proxy and anyone with the link can fetch).
+**Always use bb-artifacts first.** img402 is only a fallback for when bb-artifacts
+is unreachable — never reach for it (or anything else) while bb-artifacts is up.
+
+Host: **bb-artifacts.exe.xyz** (self-hosted on exe.dev). **Reads are public**
+(GitHub's camo proxy and anyone with the link can fetch). **Uploads are
+authenticated** by either of two means:
+
+- **Static upload token** — send a secret as the Bearer. Set `IMGHOST_UPLOAD_TOKEN`
+  in the environment and it's used automatically. This is how cloud/remote sessions
+  and CI authenticate.
+- **GitHub identity** — if `IMGHOST_UPLOAD_TOKEN` isn't set, send your GitHub token
+  (`gh auth token`); the server allows it if it resolves to login `canalesb93`. This
+  is the zero-config path for local sessions.
 
 ## Primary: bb-artifacts.exe.xyz
 
-The upload token lives in `.local.env` as `IMGHOST_TOKEN` (gitignored — never
-commit it). Read it from there:
-
 ```bash
-# Load host + token from the gitignored .local.env (run from repo root)
-IMGHOST_URL=$(grep -E '^IMGHOST_URL=' .local.env | cut -d= -f2- 2>/dev/null)
-IMGHOST_URL=${IMGHOST_URL:-https://bb-artifacts.exe.xyz}
-IMGHOST_TOKEN=$(grep -E '^IMGHOST_TOKEN=' .local.env | cut -d= -f2- 2>/dev/null)
-
-if [ -n "$IMGHOST_TOKEN" ]; then
-  URL=$(curl -sf -H "Authorization: Bearer $IMGHOST_TOKEN" \
-            -F file=@/tmp/screenshot.jpg "$IMGHOST_URL/upload" \
-        | jq -r .url)
-  echo "$URL"   # -> https://bb-artifacts.exe.xyz/f/<id>.jpg
-else
-  echo "no IMGHOST_TOKEN (e.g. cloud session) — use the GitHub release fallback below"
-fi
+# Prefer a configured upload token (cloud/remote export IMGHOST_UPLOAD_TOKEN);
+# otherwise fall back to your GitHub identity via gh (local sessions).
+AUTH="${IMGHOST_UPLOAD_TOKEN:-$(gh auth token 2>/dev/null)}"
+URL=$(curl -sf -H "Authorization: Bearer $AUTH" \
+          -F file=@/tmp/screenshot.jpg https://bb-artifacts.exe.xyz/upload | jq -r .url)
+echo "$URL"   # -> https://bb-artifacts.exe.xyz/f/<id>.jpg
 ```
 
-No `jq`? Parse with python: `python3 -c "import sys,json;print(json.load(sys.stdin)['url'])"`.
+Both `gh` and `IMGHOST_UPLOAD_TOKEN` are available across local and cloud sessions,
+so this path works everywhere. No `jq`? Parse with python:
+`python3 -c "import sys,json;print(json.load(sys.stdin)['url'])"`.
 
 **Accepted**: images (`png/jpg/jpeg/gif/webp/svg/bmp/ico`), `html/htm`, `txt/md/log`,
-`css`, `json`, `pdf`. **Cap**: 25MB per file. **Retention**: files auto-delete after
-~180 days (configurable on the VM), so stale PR screenshots disappear on their own.
-Requires `bb-artifacts.exe.xyz` in the sandbox network allowlist — it is, in this
-project's `.claude/settings.json`.
+`css`, `json`, `pdf`. **Limits**: 25MB/file, per-IP rate limit, total-store cap;
+files auto-delete after ~180 days. Requires `bb-artifacts.exe.xyz` in the sandbox
+network allowlist — it is, in this project's `.claude/settings.json`.
 
 If an image exceeds the cap (or you just want it smaller): re-encode with
 `cwebp -q 75` or `jpegoptim --max=85 --strip-all`. Chrome DevTools MCP
@@ -66,44 +68,36 @@ returned URL renders in a browser. Handy for capturing a rendered page, a failin
 template, or a large log to share without pasting it inline.
 
 ```bash
-URL=$(curl -sf -H "Authorization: Bearer $IMGHOST_TOKEN" \
-          -F file=@/tmp/debug-snapshot.html "$IMGHOST_URL/upload" | jq -r .url)
+AUTH="${IMGHOST_UPLOAD_TOKEN:-$(gh auth token 2>/dev/null)}"
+URL=$(curl -sf -H "Authorization: Bearer $AUTH" \
+          -F file=@/tmp/debug-snapshot.html https://bb-artifacts.exe.xyz/upload | jq -r .url)
 echo "$URL"   # open in a browser to view the rendered page
 ```
 
-## Fallbacks
+### The `IMGHOST_UPLOAD_TOKEN` secret (cloud/remote sessions + CI)
 
-Try these in order when the primary host fails or its token is unavailable.
+Cloud/remote Claude sessions export `IMGHOST_UPLOAD_TOKEN` in their environment —
+the snippets above pick it up automatically. For GitHub Actions the ambient token
+is a bot, not you, so store the same secret as a repo secret
+(`IMGHOST_UPLOAD_TOKEN`) and send it as the Bearer:
 
-### Fallback 1: img402.dev (tokenless, ephemeral)
+```yaml
+- name: Upload screenshot to bb-artifacts
+  run: |
+    URL=$(curl -sf -H "Authorization: Bearer ${{ secrets.IMGHOST_UPLOAD_TOKEN }}" \
+              -F file=@artifact.png https://bb-artifacts.exe.xyz/upload | jq -r .url)
+    echo "ARTIFACT_URL=$URL" >> "$GITHUB_ENV"
+```
 
-Good for cloud sessions (no `IMGHOST_TOKEN` needed) and quick ephemeral shots.
-Constraints: 1MB max, 7-day expiry, shared 1,000 uploads/day global cap, and
-occasional outages (the reason it's no longer primary). Requires `img402.dev` in the
+## Fallback: img402.dev (ephemeral)
+
+Only if bb-artifacts is unreachable. Constraints: 1MB max, 7-day expiry, shared
+1,000 uploads/day global cap, and occasional outages. Requires `img402.dev` in the
 sandbox allowlist — it is.
 
 ```bash
 URL=$(curl -s -X POST https://img402.dev/api/free -F image=@"$FILE" | jq -r .url)
 # -> https://i.img402.dev/<id>.jpg   (images only, <1MB — re-encode if larger)
-```
-
-### Fallback 2: GitHub release asset CDN (permanent)
-
-Last resort when both hosts are unavailable. `gh` is sandbox-exempt, so it needs no
-network allowlist. GitHub-hosted URLs are permanent (they live in the repo's release
-assets) — fine as a safety net, but they clutter releases, so prefer the ephemeral
-options above.
-
-```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-gh release view screenshots-cdn --repo "$REPO" >/dev/null 2>&1 || \
-  gh release create screenshots-cdn --repo "$REPO" --prerelease \
-    --title "Screenshots CDN" --notes "Auto-uploaded PR validation screenshots."
-
-FNAME="$(date +%Y%m%d-%H%M%S)-$(basename "$FILE")"
-cp "$FILE" "/tmp/$FNAME"
-gh release upload screenshots-cdn "/tmp/$FNAME" --clobber --repo "$REPO"
-IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
 ```
 
 ## Embed formats
@@ -134,4 +128,4 @@ IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
 - Do NOT use `![alt](url)` — GitHub renders the native pixel size and tall captures become painful to review. Inline `<img width="…">` is the only format that renders sensibly.
 - `{width=…}` kramdown syntax and `style="…"` attributes are silently stripped by GitHub's sanitizer. Use the `width` attribute.
 - For quick local sanity checks (not PR evidence), skip uploading entirely.
-- Migrating the host off exe.dev later: the store is plain files under `~/imghost/data` on the VM — `rsync` it to any static host and repoint `IMGHOST_URL`. Server source + deploy notes live at `~/dev/bb-artifacts-host/`.
+- Auth model + ops: the host accepts your GitHub identity (`GITHUB_ALLOWED_LOGINS`) or static tokens (`IMGHOST_TOKENS=label:secret`). Server source, deploy, and migration notes live at `~/dev/bb-artifacts-host/`; the store is plain files under `~/imghost/data` on the VM (`rsync` to migrate).

@@ -280,10 +280,24 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/canalesb93/breadbox
+          # `:edge` is the rolling tip-of-main image — every merge to main
+          # republishes it. This is what the production dev box
+          # (breadbox.exe.xyz) tracks. The released, stable `:latest` and
+          # `:vX.Y.Z` tags are owned exclusively by release.yml (cut on a
+          # `v*` tag) — ci.yml must NOT push `:latest`, or it would clobber
+          # the last release with an arbitrary main commit. `type=sha`
+          # publishes an immutable `sha-<short>` tag per commit so a bad
+          # edge can be rolled back to a precise previous build.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern=v{{version}}
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,enable={{is_default_branch}}
+          # metadata-action auto-derives the standard OCI labels from the repo
+          # (notably org.opencontainers.image.{source,revision,version,created,
+          # licenses,title,description}). source is what links the GHCR package
+          # to this repo so it inherits the README + visibility. We add the
+          # docs URL on top; the build step below applies the merged set.
+          labels: |
+            org.opencontainers.image.documentation=https://docs.breadbox.sh
 
       - name: Determine VERSION build arg
         id: version

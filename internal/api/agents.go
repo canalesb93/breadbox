@@ -37,6 +37,9 @@ type createAgentRequest struct {
 	QuietHoursStart       *string  `json:"quiet_hours_start"`
 	QuietHoursEnd         *string  `json:"quiet_hours_end"`
 	TriggerOnSyncComplete bool     `json:"trigger_on_sync_complete"`
+	// Connectors lists library connector names to enable on this workflow.
+	// Manage the connector definitions + credentials via the connector library.
+	Connectors []string `json:"connectors"`
 }
 
 type updateAgentRequest struct {
@@ -54,6 +57,9 @@ type updateAgentRequest struct {
 	QuietHoursStart       *string   `json:"quiet_hours_start"`
 	QuietHoursEnd         *string   `json:"quiet_hours_end"`
 	TriggerOnSyncComplete *bool     `json:"trigger_on_sync_complete"`
+	// Connectors replaces the enabled-connector-name set when present; omit the
+	// key to leave it untouched.
+	Connectors *[]string `json:"connectors"`
 }
 
 type updateAgentSettingsRequest struct {
@@ -115,6 +121,7 @@ func CreateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			QuietHoursStart:       req.QuietHoursStart,
 			QuietHoursEnd:         req.QuietHoursEnd,
 			TriggerOnSyncComplete: req.TriggerOnSyncComplete,
+			Connectors:            req.Connectors,
 		})
 		if err != nil {
 			if writeAgentDefinitionMutationError(w, err, "Failed to create agent") {
@@ -149,6 +156,7 @@ func UpdateAgentDefinitionHandler(svc *service.Service) http.HandlerFunc {
 			QuietHoursStart:       req.QuietHoursStart,
 			QuietHoursEnd:         req.QuietHoursEnd,
 			TriggerOnSyncComplete: req.TriggerOnSyncComplete,
+			Connectors:            req.Connectors,
 		})
 		if err != nil {
 			// Try not-found / validation first, then mutation-shaped errors

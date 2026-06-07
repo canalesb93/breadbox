@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strings"
 
 	"breadbox/internal/templates/components"
 )
@@ -25,7 +26,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 	<script src="/static/js/admin/components/connection_detail.js"></script>
 	<div class="max-w-full overflow-x-hidden" x-data="connectionDetail" data-conn-id={ p.ConnID }>
 		if p.Status == "error" || p.Status == "pending_reauth" {
-			<div role="alert" class="alert alert-error rounded-xl mb-6">
+			<div role="alert" class="alert alert-warning alert-soft items-start rounded-xl mb-6">
 				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">This connection needs re-authentication</p>
@@ -35,7 +36,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 						<p class="text-xs opacity-80 mt-0.5 truncate">{ p.ErrorMessage }</p>
 					}
 				</div>
-				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-error shrink-0">Re-authenticate</a>
+				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-warning shrink-0">Re-authenticate</a>
 			</div>
 		}
 		if p.ConsecutiveFailures >= 3 && !(p.Status == "error" || p.Status == "pending_reauth") {
@@ -125,8 +126,10 @@ templ connDetailBadges(p ConnectionDetailProps) {
 				<span class="badge badge-soft badge-error badge-sm cursor-help">Sync Error</span>
 				if p.LastSyncErrorMessageValid {
 					<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-						<span class="flex items-center gap-1.5 text-error font-medium mb-1">@components.LucideIcon("alert-circle", "w-3 h-3")
-Last sync failed</span>
+						<span class="flex items-center gap-1.5 text-error font-medium mb-1">
+							@components.LucideIcon("alert-circle", "w-3 h-3")
+							Last sync failed
+						</span>
 						<span class="text-base-content/70">{ p.LastSyncErrorMessageString }</span>
 					</span>
 				}
@@ -174,9 +177,6 @@ templ connDetailMeta(p ConnectionDetailProps) {
 // to the "one primary + one secondary" PageHeader rule — collapsing to
 // an OverflowMenu is tracked as follow-up work for connection_detail.
 templ connDetailActions(p ConnectionDetailProps) {
-	if p.Status == "error" || p.Status == "pending_reauth" {
-		<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline">Re-authenticate</a>
-	}
 	if p.Provider == "csv" {
 		<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline">
 			@components.LucideIcon("upload", "w-3.5 h-3.5")
@@ -241,8 +241,8 @@ templ connDetailSyncHealth(p ConnectionDetailProps) {
 						{ p.NextSync.Label }
 					}
 				</div>
-				if !p.NextSync.IsDisconnected && !p.NextSync.IsPaused {
-					<div class="text-[0.6rem] text-base-content/30 mt-0.5 tabular-nums">{ "every " + components.FormatIntervalMinutes(p.NextSync.EffectiveIntervalMinutes) }</div>
+				if !p.NextSync.IsDisconnected && !p.NextSync.IsPaused && len(p.NextSync.ScheduleNames) > 0 {
+					<div class="text-[0.6rem] text-base-content/30 mt-0.5 truncate">{ "Syncs on: " + strings.Join(p.NextSync.ScheduleNames, ", ") }</div>
 				}
 			</div>
 			<div class="p-4">
@@ -351,20 +351,17 @@ templ connDetailInfoGrid(p ConnectionDetailProps) {
 				</div>
 			</div>
 			<div class="p-4">
-				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Sync Interval</div>
-				<div>
-					<select id="sync-interval" @change="updateSyncInterval($event.target.value)" class="select select-xs w-full">
-						@connDetailIntervalOption("", "Global default", !p.SyncIntervalOverrideMinutesValid, false, false)
-						@connDetailIntervalOption("15", "Every 15 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 15)
-						@connDetailIntervalOption("30", "Every 30 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 30)
-						@connDetailIntervalOption("60", "Every hour", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 60)
-						@connDetailIntervalOption("120", "Every 2 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 120)
-						@connDetailIntervalOption("240", "Every 4 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 240)
-						@connDetailIntervalOption("720", "Every 12 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 720)
-						@connDetailIntervalOption("1440", "Every 24 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 1440)
-					</select>
-					<span id="interval-status" class="text-[0.6rem] text-base-content/30 mt-0.5 block"></span>
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Sync Schedule</div>
+				<div class="text-sm font-semibold">
+					if len(p.NextSync.ScheduleNames) > 0 {
+						{ strings.Join(p.NextSync.ScheduleNames, ", ") }
+					} else if p.NextSync.IsDisconnected {
+						<span class="text-base-content/30">N/A</span>
+					} else {
+						<span class="text-base-content/30">No schedule</span>
+					}
 				</div>
+				<a href="/settings/general#sync" class="text-[0.6rem] text-info/80 hover:text-info mt-0.5 inline-block">Manage schedules</a>
 			</div>
 		</div>
 		if p.ConsecutiveFailures > 0 {
@@ -386,16 +383,6 @@ templ connDetailInfoGrid(p ConnectionDetailProps) {
 			</div>
 		}
 	</div>
-}
-
-templ connDetailIntervalOption(value, label string, defaultSelected, overrideValid, match bool) {
-	if defaultSelected {
-		<option value={ value } selected>{ label }</option>
-	} else if overrideValid && match {
-		<option value={ value } selected>{ label }</option>
-	} else {
-		<option value={ value }>{ label }</option>
-	}
 }
 
 templ connDetailAccounts(p ConnectionDetailProps) {

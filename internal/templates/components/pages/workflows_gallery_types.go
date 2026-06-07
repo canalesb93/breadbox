@@ -18,10 +18,7 @@ func workflowConfigDrawerData(p WorkflowPresetCardProps) string {
 	if p.TriggerOnSync {
 		trigger = "true"
 	}
-	cron := strings.TrimSpace(p.ScheduleCron)
-	if cron == "" {
-		cron = "0 8 * * *"
-	}
+	cron := workflowSeededCron(p)
 	// max_turns: 0/unset means unlimited (budget is the ceiling), so seed the
 	// field BLANK rather than a number — the Advanced summary + placeholder then
 	// render it as ∞ / unlimited.
@@ -39,17 +36,27 @@ func workflowConfigDrawerData(p WorkflowPresetCardProps) string {
 	)
 }
 
-// serverUTCOffsetMin returns the server's current UTC offset in minutes (east
-// of UTC, matching time.Zone's sign), as a decimal string for a data-* attr.
-// The workflows gallery embeds it on its root element so the cron shortcut
-// pills can translate a friendly hour in the VIEWER's timezone (e.g. 9 AM
-// "your time") into the SERVER-local cron the scheduler actually fires — the
+// workflowSeededCron is the cron the setup drawer starts on: the preset's
+// configured schedule, or a sensible daily default when it has none. Shared by
+// the drawer's Alpine x-data seed and the CronField Value so they agree.
+func workflowSeededCron(p WorkflowPresetCardProps) string {
+	cron := strings.TrimSpace(p.ScheduleCron)
+	if cron == "" {
+		cron = "0 8 * * *"
+	}
+	return cron
+}
+
+// serverUTCOffsetMinInt returns the server's current UTC offset in minutes
+// (east of UTC, matching time.Zone's sign). Passed to the shared CronField as
+// ServerUTCOffsetMin so its viewer-local schedule chips (e.g. 9 AM "your time")
+// translate into the SERVER-local cron the scheduler actually fires — the
 // inverse of the shift service.DescribeCronInTZ applies for the live preview,
-// so a pill round-trips. Read at the current instant, so it tracks the active
+// so a chip round-trips. Read at the current instant, so it tracks the active
 // DST offset for the near-term schedule being edited.
-func serverUTCOffsetMin() string {
+func serverUTCOffsetMinInt() int {
 	_, off := time.Now().Zone()
-	return fmt.Sprintf("%d", off/60)
+	return off / 60
 }
 
 // workflowSetupCTALabel / workflowSetupCTAIcon pick the setup drawer's submit
@@ -79,19 +86,11 @@ func workflowBoolJS(b bool) string {
 }
 
 // workflowOpenConfigJS builds the @click for a not-set-up card's Set-up
-// controls: open the per-preset config drawer and, for a custom-schedule
-// preset, seed the live cron preview so it's populated before the first
-// interaction. Post-sync presets skip the preview (no schedule shown).
+// controls: open the per-preset config drawer. The embedded CronField seeds its
+// own live preview from the drawer's server-seeded cron, so no preview priming
+// is needed here.
 func workflowOpenConfigJS(p WorkflowPresetCardProps) string {
-	open := "$store.drawers.open('wf-config-" + p.Slug + "')"
-	if p.TriggerOnSync {
-		return open
-	}
-	cron := strings.TrimSpace(p.ScheduleCron)
-	if cron == "" {
-		cron = "0 8 * * *"
-	}
-	return open + "; describeCron('" + cron + "')"
+	return "$store.drawers.open('wf-config-" + p.Slug + "')"
 }
 
 // presetTileClasses returns the classes for a preset card's leading
@@ -109,10 +108,20 @@ func presetTileClasses(enabled bool) string {
 	return base + "bg-base-200 text-base-content/55"
 }
 
+// AgentSubsystemStatusProps is the readiness banner state. Mirrors
+// service.AgentSubsystemStatus but lives in the pages package so the
+// templ doesn't import the service tree.
+type AgentSubsystemStatusProps struct {
+	Ready          bool
+	AuthConfigured bool
+	BinaryPresent  bool
+	BinaryPath     string
+}
+
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.
 type WorkflowsGalleryProps struct {
 	Categories []WorkflowCategoryProps
-	// Status mirrors the agent runtime readiness (reused from agents_list_types).
+	// Status mirrors the agent runtime readiness.
 	Status    AgentSubsystemStatusProps
 	CSRFToken string
 	// ConsentAcknowledged is true once the household has acknowledged that
@@ -124,6 +133,23 @@ type WorkflowsGalleryProps struct {
 	// IsAdmin gates the "Set up" action: instantiating a workflow from a
 	// preset is admin-only. Non-admins see a disabled control + hint.
 	IsAdmin bool
+	// Custom holds the household's hand-authored workflows (source_template
+	// IS NULL) — rendered in their own section with a "Create custom
+	// workflow" affordance. Empty for non-admins (they can't create them).
+	Custom []WorkflowCustomCardProps
+}
+
+// WorkflowCustomCardProps is one hand-authored (non-preset) workflow card
+// in the gallery's "Custom" section. Unlike a preset card it carries no
+// template options — the operator authored the whole prompt — and is
+// edited via the shared custom-workflow drawer (openCustom).
+type WorkflowCustomCardProps struct {
+	Slug         string
+	Name         string
+	Description  string // first line of the prompt
+	Enabled      bool   // run-state (the card toggle flips it immediately)
+	AvatarSeed   string // DiceBear seed; empty = slug-seeded
+	LastRunError bool   // most recent run failed → red status dot
 }
 
 // WorkflowSpendBanner is the gallery's spend-ceiling state: shown when a

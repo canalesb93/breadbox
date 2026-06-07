@@ -51,7 +51,7 @@ templ Rules(p RulesProps) {
 				}
 				{ fmt.Sprintf("%d rule%s", p.Total, components.PluralS(p.Total)) }
 				if p.FiltersActive {
-					<span class="text-base-content/30"> match your filters</span>
+					<span class="text-base-content/30">match your filters</span>
 				}
 			</div>
 			if len(p.Rules) > 0 {
@@ -76,11 +76,11 @@ templ Rules(p RulesProps) {
 						<tr class="text-xs text-base-content/50">
 							<th class="font-medium text-center w-14">Enabled</th>
 							<th class="font-medium">Rule</th>
-							<th class="font-medium hidden md:table-cell">Category</th>
+							<th class="font-medium hidden md:table-cell w-64">Action</th>
 							<th class="font-medium hidden lg:table-cell text-center w-16">Stage</th>
 							<th class="font-medium hidden sm:table-cell text-right w-20">Hits</th>
 							<th class="font-medium hidden md:table-cell w-28">Last hit</th>
-							<th class="w-10"></th>
+							<th class="w-12"></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -251,6 +251,10 @@ templ rulesEmpty(filtered bool) {
 // smaller viewports via `hidden md:table-cell` etc. Anything we hide on
 // mobile is folded into the second line under the name so no signal is
 // lost — only the column density changes.
+// rulesRow renders one rule. Clicking anywhere on the row toggles the
+// rule's enablement; the name link, toggle cell, and overflow cell stop
+// propagation so they keep their own behavior (open detail / toggle /
+// open the actions menu).
 templ rulesRow(r RulesRow) {
 	<tr
 		class={ "hover:bg-base-200/40 cursor-pointer", templ.KV("opacity-60", !r.Enabled) }
@@ -261,10 +265,11 @@ templ rulesRow(r RulesRow) {
 		if !r.IsSystem {
 			data-can-delete="true"
 		}
-		@click={ "window.location.href='/rules/" + r.ID + "'" }
+		@click={ "toggleRule('" + r.ID + "')" }
 	>
 		<!-- Toggle column. Click is scoped to the cell so the row's
-		     navigate-on-click doesn't fire. -->
+		     toggle-on-click doesn't double-fire against the explicit
+		     control (which would net out to no change). -->
 		<td class="align-middle text-center" @click.stop>
 			<input
 				type="checkbox"
@@ -321,7 +326,7 @@ templ rulesRow(r RulesRow) {
 			</div>
 		</td>
 		<td class="align-middle text-xs hidden md:table-cell">
-			@rulesCategoryChip(r)
+			@rulesActionChip(r)
 		</td>
 		<td class="align-middle text-xs text-center hidden lg:table-cell tabular-nums text-base-content/60">
 			{ fmt.Sprintf("%d", r.Priority) }
@@ -339,29 +344,27 @@ templ rulesRow(r RulesRow) {
 		<td class="align-middle text-right" @click.stop>
 			@components.OverflowMenu(components.OverflowMenuProps{
 				AriaLabel: "Rule " + r.Name + " actions",
-				Size:      "xs",
+				Size:      "sm",
 				Items:     rulesOverflowItems(r),
 			})
 		</td>
 	</tr>
 }
 
-// rulesCategoryChip renders the "what this rule sets" column. If the
-// rule has a target category we show its colored avatar; otherwise we
-// fall back to a soft action-type label so the column is never blank.
-templ rulesCategoryChip(r RulesRow) {
-	if r.CategoryIcon != nil && *r.CategoryIcon != "" {
-		<span class="inline-flex items-center gap-2">
-			<span class="bb-tx-avatar bb-tx-avatar-sm" style={ rulesAvatarStyle(r.CategoryColor) }>
-				@components.LucideIcon(*r.CategoryIcon, "w-3.5 h-3.5")
-			</span>
-			<span class="truncate max-w-[18ch]">{ r.ActionsSummary }</span>
+// rulesActionChip renders the "what this rule does" column. Rules are no
+// longer category-only — they can set a category, add/remove a tag, add a
+// comment, or assign a series — so every row gets an icon that reflects
+// its action. A set_category rule keeps its colored category avatar; other
+// actions get a neutral icon in the same avatar shape so the column reads
+// as one consistent surface. The label fills the column and only truncates
+// when it has to, fixing the old cramped max-w cap.
+templ rulesActionChip(r RulesRow) {
+	<span class="inline-flex items-center gap-2 min-w-0">
+		<span class="bb-tx-avatar bb-tx-avatar-sm shrink-0" style={ rulesActionAvatarStyle(r) }>
+			@components.LucideIcon(rulesActionIcon(r), "w-3.5 h-3.5")
 		</span>
-	} else {
-		<span class="text-base-content/50 truncate inline-block max-w-[20ch]" title={ r.ActionsSummary }>
-			{ r.ActionsSummary }
-		</span>
-	}
+		<span class="truncate" title={ r.ActionsSummary }>{ r.ActionsSummary }</span>
+	</span>
 }
 
 templ rulesPaginator(p RulesProps) {
@@ -426,6 +429,39 @@ func rulesAvatarStyle(color *string) string {
 		return "--avatar-color: " + *color
 	}
 	return "--avatar-color: oklch(0.65 0 0)"
+}
+
+// rulesActionAvatarStyle tints the action avatar. A set_category rule with
+// a known color uses the category color; every other action (tags,
+// comments, series, multi-action) gets the neutral gray so the icon, not
+// the color, carries the meaning.
+func rulesActionAvatarStyle(r RulesRow) string {
+	if r.PrimaryActionType == "set_category" {
+		return rulesAvatarStyle(r.CategoryColor)
+	}
+	return rulesAvatarStyle(nil)
+}
+
+// rulesActionIcon picks the lucide icon for the rule's primary action.
+// A single-action rule maps to a per-type icon; a multi-action rule (or
+// one with no actions) falls back to a generic "layers" stack so the
+// column always shows what the rule does at a glance.
+func rulesActionIcon(r RulesRow) string {
+	switch r.PrimaryActionType {
+	case "set_category":
+		if r.CategoryIcon != nil && *r.CategoryIcon != "" {
+			return *r.CategoryIcon
+		}
+		return "folder"
+	case "add_tag", "remove_tag":
+		return "tag"
+	case "add_comment":
+		return "message-square"
+	case "assign_series":
+		return "repeat"
+	default:
+		return "layers"
+	}
 }
 
 func rulesToggleLabel(r RulesRow) string {

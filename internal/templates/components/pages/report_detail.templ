@@ -10,19 +10,15 @@ import "breadbox/internal/templates/components"
 // The header is a purpose-built report header: a priority/unread badge
 // row, the report title as the page H1, and an `agent · time` meta line,
 // with the mark-read/unread toggle + an overflow menu (copy link, manage
-// format) trailing. The body is rendered client-side as Markdown by the
-// shared static/js/admin/markdown.js scanner (marked + DOMPurify) into
-// .bb-report-body — the two CDN deps load synchronously (no defer) so
-// Alpine.data() registration runs before alpine:init.
+// format) trailing. The body is rendered server-side as Markdown via
+// @components.MarkdownLarge (goldmark + chroma + bluemonday) into .bb-prose
+// — no client-side markdown parser, no CDN deps.
 //
 // The reportDetail Alpine factory (static/js/admin/components/report_detail.js)
 // owns the toolbar: mark-read/unread, copy-link, and the success toast.
 // Scalar state (report id + is-read flag) flows in via data-* attributes
 // on the x-data root.
 templ ReportDetail(p ReportDetailProps) {
-	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
-	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
-	<script src="/static/js/admin/markdown.js"></script>
 	<script src="/static/js/admin/components/report_detail.js"></script>
 	<div class="max-w-4xl mx-auto">
 		<div
@@ -66,10 +62,10 @@ templ ReportDetail(p ReportDetailProps) {
 					})
 				</div>
 			</div>
-			<!-- Body card — Markdown rendered client-side into .bb-report-body -->
+			<!-- Body card — Markdown rendered server-side into .bb-prose -->
 			<div class="bb-card">
 				<div class="px-5 sm:px-7 py-5 sm:py-6">
-					<div class="bb-report-body" data-markdown={ p.Report.Body }></div>
+					@components.MarkdownLarge(p.Report.Body)
 				</div>
 			</div>
 		</div>

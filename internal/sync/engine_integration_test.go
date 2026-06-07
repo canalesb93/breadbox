@@ -22,11 +22,12 @@ import (
 
 // mockProvider implements provider.Provider for testing the sync engine.
 type mockProvider struct {
-	syncResult  provider.SyncResult
-	syncErr     error
-	balances    []provider.AccountBalance
-	balancesErr error
-	syncCalls   int
+	syncResult        provider.SyncResult
+	syncErr           error
+	balances          []provider.AccountBalance
+	balancesErr       error
+	syncCalls         int
+	reconcilesPending bool
 }
 
 func (m *mockProvider) CreateLinkSession(ctx context.Context, userID string) (provider.LinkSession, error) {
@@ -64,6 +65,8 @@ func (m *mockProvider) RemoveConnection(ctx context.Context, conn provider.Conne
 	return nil
 }
 
+func (m *mockProvider) ReconcilesPendingByPolling() bool { return m.reconcilesPending }
+
 // paginatingMockProvider returns HasMore=true on first call, then results on second call.
 type paginatingMockProvider struct {
 	pages     []provider.SyncResult
@@ -97,6 +100,7 @@ func (m *paginatingMockProvider) CreateReauthSession(ctx context.Context, conn p
 func (m *paginatingMockProvider) RemoveConnection(ctx context.Context, conn provider.Connection) error {
 	return nil
 }
+func (m *paginatingMockProvider) ReconcilesPendingByPolling() bool { return false }
 
 // retryMockProvider returns ErrSyncRetryable on first call, then succeeds.
 type retryMockProvider struct {
@@ -130,6 +134,7 @@ func (m *retryMockProvider) CreateReauthSession(ctx context.Context, conn provid
 func (m *retryMockProvider) RemoveConnection(ctx context.Context, conn provider.Connection) error {
 	return nil
 }
+func (m *retryMockProvider) ReconcilesPendingByPolling() bool { return false }
 
 func newEngine(t *testing.T, pool *pgxpool.Pool, queries *db.Queries, providers map[string]provider.Provider) *sync.Engine {
 	t.Helper()
@@ -995,6 +1000,7 @@ func TestSync_TellerStalePendingCleanup(t *testing.T) {
 	_ = postedTxn
 
 	mock := &mockProvider{
+		reconcilesPending: true,
 		syncResult: provider.SyncResult{
 			Added: []provider.Transaction{
 				{

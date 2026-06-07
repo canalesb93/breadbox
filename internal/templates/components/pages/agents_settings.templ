@@ -308,9 +308,9 @@ templ mcpToolsDrawer(p AgentsSettingsProps) {
 templ agentsSettingsToolRow(t AgentsSettingsTool) {
 	<label class="flex items-start gap-3 p-2 rounded-xl hover:bg-base-200/50 transition-colors cursor-pointer">
 		if t.Enabled {
-			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" checked/>
+			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm mt-0.5 flex-shrink-0" checked/>
 		} else {
-			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0"/>
+			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm mt-0.5 flex-shrink-0"/>
 		}
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-2 flex-wrap">
@@ -354,12 +354,16 @@ templ mcpConnectionDrawer() {
 							@click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
 						>
 							<template x-if="!copiedConfig">
-								<span class="flex items-center gap-1">@components.LucideIcon("copy", "w-4 h-4")
-Copy</span>
+								<span class="flex items-center gap-1">
+									@components.LucideIcon("copy", "w-4 h-4")
+									Copy
+								</span>
 							</template>
 							<template x-if="copiedConfig">
-								<span class="flex items-center gap-1 text-success">@components.LucideIcon("check", "w-4 h-4")
-Copied!</span>
+								<span class="flex items-center gap-1 text-success">
+									@components.LucideIcon("check", "w-4 h-4")
+									Copied!
+								</span>
 							</template>
 						</button>
 					</div>

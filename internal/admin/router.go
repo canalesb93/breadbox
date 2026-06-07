@@ -178,6 +178,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// plaintext inline (no /new form or /created subpage).
 		r.Get("/settings/api-keys", AccessPageHandler(svc, sm, tr))
 		r.Post("/settings/api-keys/new", APIKeyCreatePageHandler(svc, sm, tr))
+		r.Post("/settings/api-keys/{id}/rename", APIKeyRenamePageHandler(svc, sm, tr))
 
 		r.Get("/settings/oauth-clients", redirectGET("/settings/api-keys"))
 		r.Post("/settings/oauth-clients/new", OAuthClientCreatePageHandler(svc, sm, tr))
@@ -199,22 +200,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/oauth-clients/new", redirectGET("/settings/api-keys"))
 		r.Get("/settings/oauth-clients/{id}/created", redirectGET("/settings/api-keys"))
 
-		// Legacy /agents → Workflows redirects + hand-authored agent form
-		// pages (kept reachable by direct URL until the custom-workflow
-		// builder lands).
+		// Workflows is the single home for automations. The hand-authored
+		// agent form, per-agent detail page, and prompt library were
+		// removed in favor of the custom-workflow drawer on /workflows;
+		// legacy /agents* URLs 301 to the gallery so bookmarks resolve.
 		r.Get("/agents", redirectGET("/workflows/runs"))
 		r.Get("/agents/definitions", redirectGET("/workflows"))
+		r.Get("/agents/new", redirectGET("/workflows"))
 		r.Get("/workflows", WorkflowsGalleryPageHandler(svc, sm, tr))
 		r.Get("/workflows/runs", WorkflowRunsPageHandler(svc, sm, tr))
-		// Run detail lives under the Workflows surface; the legacy
-		// /agents/runs/{shortId} route below still resolves the same handler.
 		r.Get("/workflows/runs/{shortId}", AgentRunDetailPageHandler(svc, sm, tr, a.Config.DataDir))
-		r.Get("/agents/new", AgentFormPageHandler(svc, sm, tr))
-		// /agents/{slug} is the per-agent landing page (lifetime stats +
-		// last 10 runs); /agents/{slug}/edit remains the form, reachable
-		// from the detail page's Edit button.
-		r.Get("/agents/{slug}", AgentDetailPageHandler(svc, sm, tr))
-		r.Get("/agents/{slug}/edit", AgentFormPageHandler(svc, sm, tr))
 		// A run detail is a workflow run — 301 to the canonical Workflows URL.
 		r.Get("/agents/runs/{shortId}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/workflows/runs/"+chi.URLParam(r, "shortId"), http.StatusMovedPermanently)
@@ -235,12 +230,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			}
 			http.Redirect(w, r, target, http.StatusMovedPermanently)
 		})
-
-		// Prompt library — the v1 wizard. Authors a starter prompt that
-		// gets pasted into the SDK agent form.
-		r.Get("/agent-prompts", AgentsPageHandler(svc, sm, tr))
-		r.Get("/agent-prompts/builder/{type}", PromptBuilderHandler(sm, tr))
-		r.Get("/agent-prompts/builder/{type}/copy", PromptCopyHandler())
+		// Former per-agent detail (/agents/{slug}) and edit form
+		// (/agents/{slug}/edit) → the gallery.
+		r.Get("/agents/{slug}", redirectGET("/workflows"))
+		r.Get("/agents/{slug}/edit", redirectGET("/workflows"))
 
 		r.Get("/logs/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 
@@ -251,12 +244,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/activity/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/logs/sessions/"+chi.URLParam(r, "id"), http.StatusMovedPermanently)
 		})
-		// /agent-wizard/{type} legacy → /agent-prompts/builder/{type}.
-		r.Get("/agent-wizard/{type}", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type"), http.StatusMovedPermanently)
+		// Legacy prompt-library / wizard URLs → the Workflows gallery.
+		r.Get("/agent-prompts", redirectGET("/workflows"))
+		r.Get("/agent-prompts/builder/{type}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/workflows", http.StatusMovedPermanently)
 		})
-		r.Get("/agent-wizard/{type}/copy", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/agent-prompts/builder/"+chi.URLParam(r, "type")+"/copy", http.StatusMovedPermanently)
+		r.Get("/agent-wizard/{type}", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/workflows", http.StatusMovedPermanently)
 		})
 	})
 
@@ -357,11 +351,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Workflow runtime settings — Claude Agent SDK auth, sidecar, and run
 		// ceilings. Admin-only because tokens are sensitive and runs cost.
 		r.Get("/settings/workflows", AgentSDKSettingsPageHandler(a, svc, sm, tr))
+			r.Get("/settings/connectors", ConnectorsSettingsPageHandler(a, svc, sm, tr))
 		// Back-compat: the tab used to live at /settings/agents.
 		r.Get("/settings/agents", redirectGET("/settings/workflows"))
 		r.Get("/agents-settings", redirectGET("/settings/mcp"))
-		r.Get("/mcp-getting-started", redirectGET("/agent-prompts"))
-		r.Get("/agent-wizard", redirectGET("/agent-prompts"))
+		r.Get("/mcp-getting-started", redirectGET("/workflows"))
+		r.Get("/agent-wizard", redirectGET("/workflows"))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 		r.Get("/rules/new", RuleFormPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
@@ -392,6 +387,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/providers", ProvidersGetHandler(a, svc, sm, tr))
 		r.Post("/settings/providers/plaid", ProvidersSavePlaidHandler(a, sm))
 		r.Post("/settings/providers/teller", ProvidersSaveTellerHandler(a, sm))
+		r.Post("/settings/providers/simplefin", ProvidersSaveSimpleFINHandler(a, sm))
 		r.Get("/providers", redirectGET("/settings/providers"))
 		r.Post("/providers/plaid", redirectPreserveMethod("/settings/providers/plaid"))
 		r.Post("/providers/teller", redirectPreserveMethod("/settings/providers/teller"))
@@ -423,8 +419,18 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings/developer", DeveloperSettingsHandler(a, svc, sm, tr))
 		r.Post("/settings/developer", DeveloperSettingsPostHandler(a, svc, sm))
 
-		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
+		r.Post("/settings/timezone", SettingsTimezonePostHandler(a, sm))
+
+		// Sync schedules — wall-clock cron schedules that replace the single
+		// global interval. List lives in Settings → Sync; create/edit is a
+		// standalone form page.
+		r.Get("/settings/sync/schedules/new", ScheduleFormPageHandler(a, svc, sm, tr))
+		r.Post("/settings/sync/schedules", ScheduleCreateHandler(a, svc, sm))
+		r.Get("/settings/sync/schedules/{shortID}/edit", ScheduleFormPageHandler(a, svc, sm, tr))
+		r.Post("/settings/sync/schedules/{shortID}", ScheduleUpdateHandler(a, svc, sm))
+		r.Post("/settings/sync/schedules/{shortID}/toggle", ScheduleToggleHandler(a, svc, sm))
+		r.Post("/settings/sync/schedules/{shortID}/delete", ScheduleDeleteHandler(a, svc, sm))
 		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
 	})
 
@@ -491,13 +497,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
 			r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
 
-			// Agent definitions — editors can CRUD definitions and trigger
-			// manual runs. Settings (auth tokens, smoke test, cleanup) are
-			// admin-only and registered in the admin-scope group below.
-			r.Post("/agents", CreateAgentDefinitionAdminHandler(svc, sm))
-			r.Post("/agents/{slug}/update", UpdateAgentDefinitionAdminHandler(svc, sm))
-			r.Post("/agents/{slug}/delete", DeleteAgentDefinitionAdminHandler(svc, sm))
-			r.Post("/agents/{slug}/enable", EnableAgentAdminHandler(svc))
 			// Instantiating a NEW autonomous workflow from a preset is the
 			// high-authority act (it authorizes recurring AI spend on shared
 			// household data), so it's admin-only — RequireAdmin upgrades this
@@ -508,15 +507,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// first use, then dispatches a run. Admin-only for the same reason as
 			// enable — it authorizes AI spend over household data.
 			r.With(RequireAdmin(sm)).Post("/workflow-presets/{slug}/run", RunWorkflowPresetAdminHandler(a, svc))
-			r.Post("/agents/{slug}/disable", DisableAgentAdminHandler(svc))
-			r.Post("/agents/{slug}/run", RunAgentNowAdminHandler(a, svc))
-			r.Post("/agents/runs/{shortId}/note", UpdateAgentRunNoteAdminHandler(svc, sm))
 
-			// Workflows-surface action aliases (canonical). The Workflows
-			// gallery (run toggle), runs tab (re-run), and run-detail page
-			// POST to these; the legacy /-/agents/* routes above resolve the
-			// same handlers and stay for the deferred hand-authored agent
-			// pages. Both sets collapse to one when that surface is removed.
+			// Workflows-surface action routes. The gallery (run toggle), runs
+			// tab (re-run), and run-detail page POST to these. Editors can
+			// manage an already-instantiated workflow's run state.
 			r.Post("/workflows/{slug}/enable", EnableAgentAdminHandler(svc))
 			r.Post("/workflows/{slug}/disable", DisableAgentAdminHandler(svc))
 			r.Post("/workflows/{slug}/run", RunAgentNowAdminHandler(a, svc))
@@ -524,7 +518,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Abort an in-progress run mid-flight (run-detail "Cancel run" button).
 			// Editor-level, like run/enable/disable above.
 			r.Post("/workflows/runs/{shortId}/cancel", CancelWorkflowRunAdminHandler(a, svc))
-			r.Post("/agents/runs/{shortId}/cancel", CancelWorkflowRunAdminHandler(a, svc))
 			// Lightweight JSON status poll (short_id + status) for the gallery's
 			// one-off Run button spinner. Static "runs" segment never shadows
 			// the {slug}/* routes above.
@@ -532,6 +525,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 			// Preview the composed internal base prompt for a preset (read-only JSON).
 			r.Get("/workflows/{slug}/prompt", WorkflowPromptPreviewAdminHandler(svc))
+			// Shared cron live-preview for the cron-field component (description
+			// + next fires, in the instance timezone). Read-only JSON.
+			r.Get("/cron/preview", CronPreviewAdminHandler(svc))
 			// Human-readable preview of a cron expression for the schedule field
 			// (read-only JSON). Single-segment path — never shadows {slug}/*.
 			r.Get("/workflows/cron-preview", WorkflowCronPreviewAdminHandler(svc))
@@ -543,6 +539,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// because a reconfigure re-authorizes recurring AI spend behavior.
 			r.With(RequireAdmin(sm)).Get("/workflows/{slug}/config", WorkflowConfigAdminHandler(svc))
 			r.With(RequireAdmin(sm)).Post("/workflows/{slug}/reconfigure", ReconfigureWorkflowAdminHandler(svc))
+			// Custom (hand-authored, source_template IS NULL) workflows: the
+			// drawer authors the whole prompt. Distinct /-/custom-workflows
+			// prefix so it never overlaps the /-/workflows/{slug} param space.
+			// Admin-only, like preset enable/reconfigure.
+			r.With(RequireAdmin(sm)).Post("/custom-workflows", CreateCustomWorkflowAdminHandler(svc))
+			r.With(RequireAdmin(sm)).Get("/custom-workflows/{slug}", CustomWorkflowConfigAdminHandler(svc))
+			r.With(RequireAdmin(sm)).Post("/custom-workflows/{slug}", UpdateCustomWorkflowAdminHandler(svc))
 			// Remove an instantiated workflow, resetting the preset card back to
 			// "Set up". Admin-only — deleting de-authorizes the recurring spend the
 			// enable gesture authorized, mirroring the enable/reconfigure guard.
@@ -561,7 +564,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/connections/{id}/sync-status", SyncConnectionStatusHandler(a))
 			r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
 			r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
-			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
 			r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm, svc))
 			r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
 			r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))
@@ -652,6 +654,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/workflows/test", SmokeTestAgentAdminHandler(a, svc))
 			r.Post("/workflows/notify-test", NotifyTestAdminHandler(svc))
 			r.Post("/workflows/cleanup", AgentCleanupAdminHandler(a, svc))
+
+			// Connector library CRUD (admin-only — connector secrets are
+			// sensitive). Posts come from the Connectors settings page.
+			r.Post("/connectors", CreateConnectorAdminHandler(svc, sm))
+			r.Post("/connectors/import", ImportConnectorsAdminHandler(svc, sm))
+			r.Post("/connectors/{id}/update", UpdateConnectorAdminHandler(svc, sm))
+			r.Post("/connectors/{id}/delete", DeleteConnectorAdminHandler(svc, sm))
 
 			// Notifications tab "Send test" button. Canonical home for the
 			// test-delivery endpoint now that the sink lives on its own page;

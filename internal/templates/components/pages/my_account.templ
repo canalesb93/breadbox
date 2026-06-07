@@ -105,76 +105,28 @@ templ myAccountProfileSection(p MyAccountProps) {
 		}) {
 			// Stack=true so the avatar+actions render below the label on
 			// mobile — sharing one flex row caused the caption to wrap into
-			// many narrow lines at ~400px viewport width.
+			// many narrow lines at ~400px viewport width. The shared
+			// EditableAvatar (full shape) renders the upload/shuffle/remove
+			// controls + the inline error; the surrounding avatarEditor
+			// factory supplies the bound state and handlers.
 			@components.SettingsRow(components.SettingsRowProps{
 				Label:   "Avatar",
-				Caption: "Upload a photo or regenerate",
+				Caption: "Upload a photo or shuffle",
 				Stack:   true,
 			}) {
-				<div class="flex items-center gap-4">
-					// Avatar: click-to-upload overlay on hover/focus, inline
-					// loading spinner while the upload is in flight (matches
-					// the EditableAvatar animation pattern).
-					<div class="relative group shrink-0">
-						<img
-							:src="avatarSrc"
-							alt=""
-							x-bind:class="avatarUploading ? 'opacity-40 scale-90' : 'scale-100'"
-							class="w-14 h-14 rounded-full object-cover ring-2 ring-base-300 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-						/>
-						<button
-							type="button"
-							@click="$refs.fileInput.click()"
-							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity cursor-pointer"
-							title="Upload photo"
-							aria-label="Upload photo"
-						>
-							@components.LucideIcon("camera", "w-5 h-5 text-white")
-						</button>
-						<span
-							x-show="avatarUploading"
-							x-cloak
-							x-transition:enter="transition-opacity ease-out duration-200"
-							x-transition:enter-start="opacity-0"
-							x-transition:enter-end="opacity-100"
-							x-transition:leave="transition-opacity ease-in duration-150"
-							x-transition:leave-start="opacity-100"
-							x-transition:leave-end="opacity-0"
-							class="absolute inset-0 flex items-center justify-center"
-							aria-hidden="true"
-						>
-							<span class="loading loading-spinner loading-sm text-primary"></span>
-						</span>
-						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
-					</div>
-					// Action buttons — btn-xs gives proper touch targets on
-					// mobile; flex-wrap handles narrow viewports gracefully.
-					<div class="flex flex-wrap gap-2">
-						<button type="button" @click="$refs.fileInput.click()" class="btn btn-ghost btn-xs gap-1.5">
-							@components.LucideIcon("upload", "w-3.5 h-3.5")
-							Upload
-						</button>
-						<button type="button" @click="regenerate()" class="btn btn-ghost btn-xs gap-1.5">
-							@components.LucideIcon("refresh-cw", "w-3.5 h-3.5")
-							Regenerate
-						</button>
-						<template x-if="hasCustomAvatar">
-							<button type="button" @click="removeAvatar()" class="btn btn-ghost btn-xs gap-1.5 text-error/80 hover:text-error">
-								@components.LucideIcon("x", "w-3.5 h-3.5")
-								Remove
-							</button>
-						</template>
-					</div>
-				</div>
+				@components.EditableAvatar(components.EditableAvatarProps{
+					SrcExpr:   "avatarSrc",
+					OnShuffle: "regenerate()",
+					Alt:       "Your avatar",
+					Upload: &components.EditableAvatarUpload{
+						OnFileSelect:  "onFileSelect",
+						OnRemove:      "removeAvatar()",
+						HasCustomExpr: "hasCustomAvatar",
+						LoadingExpr:   "avatarUploading",
+						ErrorExpr:     "avatarError",
+					},
+				})
 			}
-			<template x-if="avatarError">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div role="alert" class="bb-form-error">
-						@components.LucideIcon("alert-circle", "w-4 h-4 shrink-0")
-						<span x-text="avatarError"></span>
-					</div>
-				}
-			</template>
 			@components.SettingsRow(components.SettingsRowProps{
 				Label: "Name",
 				Stack: true,

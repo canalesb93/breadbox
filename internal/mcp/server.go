@@ -525,6 +525,10 @@ func (s *MCPServer) buildToolRegistry() {
 			Name: "preview_rule", Title: "Preview Rule", Classification: ToolRead,
 			Description: "Dry-run a condition tree against existing transactions without any writes. Returns match_count + total_scanned + a sample of matching transactions. IMPORTANT: this evaluates only the supplied condition in isolation — it does NOT simulate the full rule pipeline, so tags or categories that other rules would have added mid-pass aren't visible. Use this to answer 'what does this condition match today' before creating a rule.",
 		}, s.handlePreviewRule, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "find_matching_rules", Title: "Find Matching Rules", Classification: ToolRead,
+			Description: "Find which existing active rules already match a transaction — the inverse of preview_rule. Pass transaction_id to evaluate the full rule set against a real row (all condition fields checked), or merchant to check name-based coverage for free text. Returns only the matching rules (short_id, name, sets_category, trigger, priority, hit_count, match_all), ordered priority-ASC like the sync pipeline. USE THIS BEFORE creating a rule: ask 'is this merchant already covered?' with one call instead of listing all rules and scanning them. A returned rule with sets_category already handling the merchant means you should NOT create a duplicate. match_all=true flags broad conditionless rules (e.g. the needs-review tagger) that match everything — not merchant coverage.",
+		}, s.handleFindMatchingRules, s),
 
 		// --- Tag admin ---
 		// Most agents won't need these — add_tag-on-transaction implicitly

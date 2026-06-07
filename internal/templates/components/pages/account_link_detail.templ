@@ -25,7 +25,8 @@ templ AccountLinkDetail(p AccountLinkDetailProps) {
 		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/account-links/%s/reconcile", p.LinkID)) } class="inline">
 			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			<button type="submit" class="btn btn-primary btn-sm">
-				@components.LucideIcon("refresh-cw", "w-4 h-4") <span class="hidden sm:inline">Reconcile Now</span><span class="sm:hidden">Reconcile</span>
+				@components.LucideIcon("refresh-cw", "w-4 h-4")
+				<span class="hidden sm:inline">Reconcile Now</span><span class="sm:hidden">Reconcile</span>
 			</button>
 		</form>
 	</div>
@@ -151,13 +152,15 @@ templ accountLinkDetailMobileCard(m AccountLinkDetailMatchRow, csrfToken string)
 				<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/confirm", m.ID)) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
 					<button type="submit" class="btn btn-success btn-xs btn-soft">
-						@components.LucideIcon("check", "w-3.5 h-3.5") Confirm
+						@components.LucideIcon("check", "w-3.5 h-3.5")
+						Confirm
 					</button>
 				</form>
 				<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/reject", m.ID)) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
 					<button type="submit" class="btn btn-error btn-xs btn-soft">
-						@components.LucideIcon("x", "w-3.5 h-3.5") Reject
+						@components.LucideIcon("x", "w-3.5 h-3.5")
+						Reject
 					</button>
 				</form>
 			</div>

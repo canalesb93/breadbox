@@ -16,14 +16,14 @@ import (
 // DesignGalleryProps is the prop bag for the /design page — the full
 // component gallery rendered on one scrollable page with section anchors.
 type DesignGalleryProps struct {
-	Sections    []DesignSection
+	Sections []DesignSection
 }
 
 // DesignComponentProps is the prop bag for /design/c/{slug} — a single
 // component rendered in isolation so agents (and humans) can focus
 // screenshots on one piece at a time.
 type DesignComponentProps struct {
-	Section     DesignSection
+	Section DesignSection
 }
 
 // DesignSection describes one entry in the design system gallery.
@@ -227,6 +227,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionFormControls() },
 		},
 		{
+			Slug:        "cron-field",
+			Title:       "Cron field",
+			Description: "components.CronField — the shared cron input: timezone-aware preset chips, a custom 5-field expression, and a live preview (English description + next runs in the instance timezone). The active preset is derived from the cron value, so unmatched expressions show Custom rather than a wrong preset. Powers sync schedules and workflows.",
+			Group:       "forms",
+			Render:      func() templ.Component { return SectionCronField() },
+		},
+		{
 			Slug:        "radio-card",
 			Title:       "Radio card",
 			Description: "components.RadioCard — a radio styled as a selectable icon+title+subtitle tile. The \"pick one of a few, each worth a sentence\" control (roomier than a bare radio list, lighter than a wizard step). Powers the Workflows drawer trigger choice (Custom schedule vs After each sync). Hover lifts the surface, keyboard focus rings the card, the chosen tile flips to primary with a check; native or Alpine-bound.",
@@ -315,7 +322,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "editable-avatar",
 			Title:       "Editable avatar",
-			Description: "components.EditableAvatar — a live avatar whose entire surface is a shuffle/regenerate control (corner badge as the cue). The \"change this identity's picture\" affordance used by the Workflows reconfigure-drawer header. SrcExpr/OnShuffle are Alpine expressions so it drops into any seed-owning scope; the ring + badge tint primary and the glyph spins on hover.",
+			Description: "components.EditableAvatar — a live, editable avatar in two shapes. Shuffle-only (Upload nil): the whole surface is a shuffle/regenerate control with a corner badge cue — the agent/Workflows reconfigure-drawer header. Full editor (Upload set): click-to-upload avatar + an Upload/Shuffle/Remove control row + inline error — the user-identity editor on /settings/account and /household/{id}/edit. Every action is an Alpine expression, so it drops into any seed/upload-owning scope.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionEditableAvatar() },
 		},
@@ -357,7 +364,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "markdown-prose",
 			Title:       "Markdown prose",
-			Description: "components.Markdown renders agent-emitted text as a safe HTML fragment wrapped in .bb-prose. Supports paragraphs, headers (##/###), emphasis, inline + fenced code, lists (one nest level), GFM tables, blockquotes, and http/https/mailto links. Drives the assistant chat bubble on the run-detail page and will land in the reports body next.",
+			Description: "The single server-side markdown renderer (internal/markdown: goldmark + chroma + bluemonday) behind components.Markdown / MarkdownLarge / MarkdownBreaks. Renders headings (+auto anchors), lists, GFM task-lists + tables, syntax-highlighted code, blockquotes, smart-typography, and http/https/mailto links into .bb-prose — sanitized so raw HTML and javascript:/data: links never survive. Drives agent transcripts, agent prompts, report bodies, transaction comments, and the workflow prompt preview.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionMarkdownProse() },
 		},

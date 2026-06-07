@@ -30,8 +30,7 @@ var validWorkflowRunStatus = map[string]bool{
 // WorkflowRunsPageHandler renders GET /workflows/runs — the run history
 // scoped to preset-instantiated workflows. Reuses the cross-agent runs
 // query with WorkflowsOnly set, the shared AgentRunRow shape, and the
-// existing admin run-now endpoint for retrigger. Mirrors the layering
-// of AgentRunsListPageHandler but trimmed to the Workflows surface.
+// existing admin run-now endpoint for retrigger.
 func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

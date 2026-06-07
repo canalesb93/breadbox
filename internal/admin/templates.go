@@ -480,12 +480,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// pages/oauth_client_new.html and pages/oauth_client_created.html removed —
 		// both render via RenderWithTempl using the _templ_shell template
 		// key (see pages.OAuthClientNew and pages.OAuthClientCreated).
-		// pages/agents.html, pages/mcp_guide.html, pages/agent_wizard.html, and
-		// pages/mcp_settings.html removed — agent prompts now render via
-		// RenderWithTempl using pages.AgentWizard. MCP Settings moved to the
-		// unified Settings shell at /settings/mcp.
-		// pages/prompt_builder.html removed — renders via RenderWithTempl using
-		// the _templ_shell template key (see pages.PromptBuilder).
+		// pages/mcp_guide.html, pages/mcp_settings.html removed — MCP Settings
+		// moved to the unified Settings shell at /settings/mcp. The legacy
+		// agent prompt-library / wizard / form pages were removed entirely
+		// in favor of the Workflows surface (/workflows).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.SessionDetail).
 		// pages/getting_started.html removed — renders via RenderWithTempl

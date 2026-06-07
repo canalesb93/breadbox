@@ -150,7 +150,7 @@ templ agentRunRowAvatar(status string) {
 		if status == "in_progress" {
 			<span class="loading loading-spinner loading-sm text-info"></span>
 		} else {
-			@LucideIcon(agentRunAvatarIcon(status), "w-4 h-4 " + agentRunAvatarIconColor(status))
+			@LucideIcon(agentRunAvatarIcon(status), "w-4 h-4 "+agentRunAvatarIconColor(status))
 		}
 	</div>
 }

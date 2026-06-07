@@ -56,46 +56,80 @@
       toggleBtn.addEventListener('click', function () { setRevealed(!revealed); });
     }
 
+    // Copy text to the clipboard with a fallback for insecure contexts.
+    // navigator.clipboard only exists on HTTPS or localhost — a Breadbox
+    // reached over a plain-HTTP LAN IP (http://192.168.x.x:8080) has no
+    // clipboard API, so the modern path silently no-ops there. Fall back
+    // to a hidden-textarea + execCommand('copy'), which still works over
+    // plain HTTP. Returns true on success.
+    function copyToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).catch(function () { legacyCopy(text); });
+        return true;
+      }
+      return legacyCopy(text);
+    }
+
+    function legacyCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      // Keep it out of view and off the layout, but still selectable.
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      return ok;
+    }
+
     // Copy.
     var copyBtn = root.querySelector('[data-action="copy"]');
     var copyResetTimer = null;
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
-        if (!navigator.clipboard) return;
-        navigator.clipboard.writeText(key).then(function () {
-          copyBtn.classList.add('btn-success');
-          copyBtn.classList.remove('btn-primary', 'btn-soft');
-          var ic = copyBtn.querySelector('[data-copy-icon]');
-          var ok = copyBtn.querySelector('[data-copy-done]');
-          var lbl = copyBtn.querySelector('[data-copy-label]');
-          if (ic) ic.classList.add('hidden');
-          if (ok) ok.classList.remove('hidden');
-          if (lbl) lbl.textContent = 'Copied';
-          if (copyResetTimer) clearTimeout(copyResetTimer);
-          copyResetTimer = setTimeout(function () {
-            copyBtn.classList.remove('btn-success');
-            copyBtn.classList.add('btn-primary', 'btn-soft');
-            if (ic) ic.classList.remove('hidden');
-            if (ok) ok.classList.add('hidden');
-            if (lbl) lbl.textContent = 'Copy';
-          }, 2000);
-        });
+        var ok = copyToClipboard(key);
+        var ic = copyBtn.querySelector('[data-copy-icon]');
+        var done = copyBtn.querySelector('[data-copy-done]');
+        var lbl = copyBtn.querySelector('[data-copy-label]');
+        if (!ok) {
+          // Last-resort graceful degradation: reveal the key and select it
+          // so the user can copy it by hand (the original complaint).
+          setRevealed(true);
+          selectKeyText();
+          if (lbl) lbl.textContent = 'Press ⌘/Ctrl+C to copy';
+          return;
+        }
+        copyBtn.classList.add('btn-success');
+        copyBtn.classList.remove('btn-primary', 'btn-soft');
+        if (ic) ic.classList.add('hidden');
+        if (done) done.classList.remove('hidden');
+        if (lbl) lbl.textContent = 'Copied';
+        if (copyResetTimer) clearTimeout(copyResetTimer);
+        copyResetTimer = setTimeout(function () {
+          copyBtn.classList.remove('btn-success');
+          copyBtn.classList.add('btn-primary', 'btn-soft');
+          if (ic) ic.classList.remove('hidden');
+          if (done) done.classList.add('hidden');
+          if (lbl) lbl.textContent = 'Copy to clipboard';
+        }, 2000);
       });
     }
 
-    // Save in 1Password — forwards the click to the hidden web
-    // component's internal button, which is what the 1Password browser
-    // extension hooks into. The component lives off-screen so we get to
-    // render our own daisy-styled button instead of fighting its
-    // shadow-DOM styling. Without the extension, this is a no-op.
-    var op1pBtn = root.querySelector('[data-action="save-1password"]');
-    if (op1pBtn) {
-      op1pBtn.addEventListener('click', function () {
-        var opEl = document.querySelector('onepassword-save-button');
-        if (!opEl) return;
-        var inner = opEl.shadowRoot && opEl.shadowRoot.querySelector('button.onepasswordSaveBtn');
-        if (inner) inner.click();
-      });
+    // Select the visible key text so a manual copy picks up exactly the
+    // 64-char value (used by the copy fallback path).
+    function selectKeyText() {
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(keyText);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) { /* selection is best-effort */ }
     }
   }
 
