@@ -629,7 +629,14 @@
        right edge; the column-gap puts the breathing room back. It's a
        column-gap, so it only applies to the lg+ row layout — on the mobile
        flex-col stack it's the cross axis and has no effect. */
-    @apply flex flex-col lg:flex-row lg:gap-x-6 lg:min-h-[calc(100vh-3rem)];
+    /* min-h fills the viewport so the sticky rail has a full-height column and
+       short settings pages don't float the rail short. Subtract BOTH main's
+       3rem (sm:p-6 top+bottom) AND the 3.5rem in-flow sticky topbar (.bb-topbar
+       is h-14) — omitting the topbar makes main a full 100dvh that stacks below
+       the topbar and overscrolls the page by 3.5rem. The 6.5rem total mirrors
+       the rail's -6.5rem of negative margin (-(3.5rem+1.5rem) top, -1.5rem
+       bottom) so rail height (100dvh) minus its margins equals this box. */
+    @apply flex flex-col lg:flex-row lg:gap-x-6 lg:min-h-[calc(100dvh-6.5rem)];
   }
   /* Mobile default: an in-flow strip above the content. The lg+ block
      below lifts it out into the fixed sidebar-extension column. */
