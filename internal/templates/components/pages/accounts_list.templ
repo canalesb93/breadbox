@@ -88,12 +88,10 @@ templ AccountsList(p AccountsListProps) {
 				@accountsListTable(p)
 			} else {
 				@components.EmptyState(components.EmptyStateProps{
-					Icon:     "wallet",
-					Title:    "No accounts yet",
-					Body:     "Once you connect a bank, every account synced from it shows up here.",
-					CTAHref:  templ.SafeURL("/connections/new"),
-					CTAIcon:  "plus",
-					CTALabel: "Connect a Bank",
+					Icon:      "wallet",
+					Title:     "No accounts yet",
+					Body:      "Once you connect a bank, every account synced from it shows up here.",
+					CustomCTA: connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect a Bank"),
 				})
 			}
 		</div>

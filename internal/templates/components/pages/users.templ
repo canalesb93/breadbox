@@ -24,7 +24,7 @@ templ Users(p UsersProps) {
 	if p.Created {
 		<div role="alert" class="alert alert-success mb-6">
 			@components.LucideIcon("check-circle", "w-5 h-5")
-			<span>Member created. <a href="/connections/new" class="link font-medium">Connect a bank for them</a></span>
+			<span>Member created. <button type="button" x-data @click="$store.drawers.open('connect-bank')" class="link font-medium">Connect a bank for them</button></span>
 		</div>
 	}
 	if p.IsUnlinked {
@@ -174,10 +174,10 @@ templ usersMemberCard(u UsersEnrichedRow) {
 					{ usersAccountsSummary(u.AccountCount, u.ConnectionCount) }
 				</span>
 			} else {
-				<a href="/connections/new" class="flex items-center gap-1 text-xs text-base-content/40 hover:text-primary transition-colors">
+				<button type="button" x-data @click="$store.drawers.open('connect-bank')" class="flex items-center gap-1 text-xs text-base-content/40 hover:text-primary transition-colors">
 					@components.LucideIcon("plus", "w-3.5 h-3.5")
 					Connect a bank
-				</a>
+				</button>
 			}
 			if u.HasCreatedAt {
 				<span class="text-xs text-base-content/30 shrink-0">Since { u.CreatedAtLabel }</span>

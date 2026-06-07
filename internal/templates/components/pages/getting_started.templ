@@ -138,7 +138,11 @@ templ gsStep3(p GettingStartedProps) {
 		CTAHref:      gsStepCTAHref(p.HasConnection, "/connections", "/connections/new"),
 		CTAIcon:      gsStepCTAIcon(p.HasConnection, "plus"),
 		CTALabel:     gsStepCTALabel(p.HasConnection, "View connections", "Connect bank"),
-		CTADisabled:  gsStepPendingDisabled(p.HasConnection, 3, p.ActiveStep),
+		// Not yet connected → open the global connect-bank drawer in place
+		// rather than navigating to /connections/new. Once connected the CTA
+		// becomes a plain "View connections" link (CTAHref above).
+		CTAOnClick:  gsConnectDrawerOnClick(p.HasConnection),
+		CTADisabled: gsStepPendingDisabled(p.HasConnection, 3, p.ActiveStep),
 	})
 }
 
@@ -245,6 +249,17 @@ func gsStepCTAIcon(complete bool, todoIcon string) string {
 		return ""
 	}
 	return todoIcon
+}
+
+// gsConnectDrawerOnClick returns the Alpine @click expression that opens the
+// global connect-bank drawer for the not-yet-connected "Connect bank" CTA,
+// and "" once a connection exists (so the CTA falls back to its "View
+// connections" link).
+func gsConnectDrawerOnClick(complete bool) string {
+	if complete {
+		return ""
+	}
+	return "$store.drawers.open('connect-bank')"
 }
 
 // gsStat formats a step's inline metric value, returning "" for zero/empty so

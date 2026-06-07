@@ -78,6 +78,12 @@ templ connectWizard(p ConnectionNewProps) {
 						}
 						@connectProviderRow("csv", "", "file-spreadsheet", "CSV", "Import a statement file manually", false)
 					</div>
+					if !p.HasPlaid || !p.HasTeller || !p.HasSimpleFin {
+						<a href="/settings/providers" class="inline-flex items-center gap-1 mt-2 text-xs text-base-content/50 hover:text-primary transition-colors">
+							@components.LucideIcon("settings", "w-3 h-3")
+							Don't see your bank? Configure another provider
+						</a>
+					}
 				</div>
 				if len(p.Users) == 1 {
 					<!-- Single household member: auto-selected, field hidden for a cleaner flow. -->
@@ -183,4 +189,43 @@ templ connectProviderRow(value, brand, icon, name, desc string, checked bool) {
 			</span>
 		</div>
 	</label>
+}
+
+// ConnectBankDrawer is the app-wide "Connect a bank" slide-over. It is
+// rendered ONCE globally (layout/base.html via the renderComponent bridge,
+// keyed "ConnectBankDrawer") so every "Connect a bank" entry point across
+// the app — feed, accounts, getting-started, the household toast, the
+// connections list — opens the same drawer via $store.drawers.open('connect-bank')
+// rather than navigating to the standalone /connections/new page. The props
+// are resolved at render time (see admin.connectDrawerProps): provider
+// availability + the household members the wizard's member-select needs.
+templ ConnectBankDrawer(p ConnectionNewProps) {
+	@components.Drawer(components.DrawerProps{ID: "connect-bank", Title: "Connect a bank", Size: "md"}) {
+		@components.DrawerHeader(components.DrawerHeaderProps{
+			Icon:     "building-2",
+			Title:    "Connect a bank",
+			Subtitle: "Sync transactions automatically",
+		})
+		<div class="flex-1 overflow-y-auto p-5">
+			if !p.HasPlaid && !p.HasTeller && !p.HasSimpleFin {
+				@connectNoProviders()
+			} else {
+				@connectWizard(p)
+			}
+		</div>
+	}
+}
+
+// connectBankButton renders a button that opens the global connect-bank
+// drawer. Shared by the page-level entry points (feed header + empty state,
+// accounts empty state) so they all open the same slide-over with one
+// consistent affordance. classes is the full daisy button class string;
+// icon is an optional leading Lucide name.
+templ connectBankButton(classes, icon, label string) {
+	<button type="button" x-data @click="$store.drawers.open('connect-bank')" class={ classes }>
+		if icon != "" {
+			@components.LucideIcon(icon, "w-4 h-4")
+		}
+		{ label }
+	</button>
 }
