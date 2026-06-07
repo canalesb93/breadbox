@@ -96,11 +96,11 @@ type TranscriptEvent struct {
 	ToolResultAt time.Time
 
 	// CostUSD / token counts are populated for type=="result".
-	CostUSD     float64
-	TokensIn    int64
-	TokensOut   int64
-	CacheRead   int64
-	CacheWrite  int64
+	CostUSD    float64
+	TokensIn   int64
+	TokensOut  int64
+	CacheRead  int64
+	CacheWrite int64
 
 	// RawJSON is the un-parsed original line. Always set so callers can
 	// always render something readable when the parser doesn't recognise

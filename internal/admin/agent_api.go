@@ -389,4 +389,3 @@ func AgentCleanupAdminHandler(a *app.App, svc *service.Service) http.HandlerFunc
 		writeJSON(w, http.StatusOK, result)
 	}
 }
-

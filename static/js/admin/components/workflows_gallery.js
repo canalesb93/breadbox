@@ -63,6 +63,28 @@ document.addEventListener('alpine:init', function () {
       },
       // -------------------------------------------------------------------
 
+      // --- Custom (hand-authored) workflow drawer ------------------------
+      // One drawer for both create (openCustom('')) and edit
+      // (openCustom(slug), hydrated from GET /-/custom-workflows/{slug}).
+      // The operator authors the whole prompt; there's no preset template.
+      // triggerOnSync is a STRING ('true' | 'false') so the trigger radios
+      // bind via x-model; the CronField two-way binds custom.scheduleCron.
+      custom: {
+        loading: false,
+        isEdit: false,
+        slug: '',
+        name: '',
+        prompt: '',
+        triggerOnSync: 'false',
+        scheduleCron: '',
+        model: 'claude-sonnet-4-6',
+        toolScope: 'read_write',
+        maxTurns: '',
+        maxBudget: '',
+        enabled: true, // create-only "Activate" toggle
+      },
+      // -------------------------------------------------------------------
+
       // runningOneOff[slug] is true while a one-off's Run-now request is in
       // flight, so each card's inline Run button can show a spinner + disable
       // itself (preventing a double-dispatch). Keyed by preset slug since two
@@ -490,6 +512,81 @@ document.addEventListener('alpine:init', function () {
           })
           .catch(function (e) {
             console.error('submitReconfigure failed', e);
+            if (btn) btn.disabled = false;
+            self.restorePageState();
+          });
+      },
+
+      // Open the shared custom-workflow drawer. With no slug it opens blank
+      // for a create; with a slug it hydrates from GET /-/custom-workflows/{slug}
+      // for an edit. Resets to create defaults first so a prior edit's values
+      // don't bleed in.
+      openCustom: function (slug) {
+        var self = this;
+        self.custom.isEdit = !!slug;
+        self.custom.slug = slug || '';
+        self.custom.name = '';
+        self.custom.prompt = '';
+        self.custom.triggerOnSync = 'false';
+        self.custom.scheduleCron = '';
+        self.custom.model = 'claude-sonnet-4-6';
+        self.custom.toolScope = 'read_write';
+        self.custom.maxTurns = '';
+        self.custom.maxBudget = '';
+        self.custom.enabled = true;
+        self.custom.loading = !!slug;
+        Alpine.store('drawers').open('wf-custom');
+        if (!slug) return;
+        fetch('/-/custom-workflows/' + encodeURIComponent(slug), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            self.custom.name = data.name || '';
+            self.custom.prompt = data.prompt || '';
+            self.custom.triggerOnSync = data.trigger_on_sync ? 'true' : 'false';
+            self.custom.scheduleCron = data.schedule_cron || '';
+            self.custom.model = data.model || 'claude-sonnet-4-6';
+            self.custom.toolScope = data.tool_scope || 'read_write';
+            self.custom.maxTurns = data.max_turns ? String(data.max_turns) : '';
+            self.custom.maxBudget = data.max_budget_usd ? String(data.max_budget_usd) : '';
+            self.custom.enabled = !!data.enabled;
+          })
+          .catch(function (e) {
+            console.error('openCustom failed', e);
+            Alpine.store('drawers').close();
+            self.restorePageState();
+          })
+          .finally(function () {
+            self.custom.loading = false;
+          });
+      },
+
+      // Submit the custom-workflow drawer: POST to /-/custom-workflows (create)
+      // or /-/custom-workflows/{slug} (edit), then reload so the card reflects
+      // the new state.
+      submitCustom: function (form) {
+        var self = this;
+        var fd = new FormData(form);
+        // The create "Activate" checkbox is omitted by FormData when unchecked.
+        var box = form.querySelector('input[name="enabled"]');
+        if (box && !box.checked) fd.set('enabled', 'false');
+        var url = self.custom.isEdit
+          ? '/-/custom-workflows/' + encodeURIComponent(self.custom.slug)
+          : '/-/custom-workflows';
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        self._post(url, new URLSearchParams(fd).toString())
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            window.location.reload();
+          })
+          .catch(function (e) {
+            console.error('submitCustom failed', e);
             if (btn) btn.disabled = false;
             self.restorePageState();
           });

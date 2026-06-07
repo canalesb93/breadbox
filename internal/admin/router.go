@@ -539,6 +539,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// because a reconfigure re-authorizes recurring AI spend behavior.
 			r.With(RequireAdmin(sm)).Get("/workflows/{slug}/config", WorkflowConfigAdminHandler(svc))
 			r.With(RequireAdmin(sm)).Post("/workflows/{slug}/reconfigure", ReconfigureWorkflowAdminHandler(svc))
+			// Custom (hand-authored, source_template IS NULL) workflows: the
+			// drawer authors the whole prompt. Distinct /-/custom-workflows
+			// prefix so it never overlaps the /-/workflows/{slug} param space.
+			// Admin-only, like preset enable/reconfigure.
+			r.With(RequireAdmin(sm)).Post("/custom-workflows", CreateCustomWorkflowAdminHandler(svc))
+			r.With(RequireAdmin(sm)).Get("/custom-workflows/{slug}", CustomWorkflowConfigAdminHandler(svc))
+			r.With(RequireAdmin(sm)).Post("/custom-workflows/{slug}", UpdateCustomWorkflowAdminHandler(svc))
 			// Remove an instantiated workflow, resetting the preset card back to
 			// "Set up". Admin-only — deleting de-authorizes the recurring spend the
 			// enable gesture authorized, mirroring the enable/reconfigure guard.

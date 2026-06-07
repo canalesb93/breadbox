@@ -73,6 +73,42 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 				</section>
 			}
 		</div>
+		// Custom workflows — hand-authored automations (source_template IS
+		// NULL). Rendered in their own section with a "Create" affordance so
+		// the operator can author a free-form prompt + schedule. Shown when
+		// any exist, or to admins (who can create the first one).
+		if len(p.Custom) > 0 || p.IsAdmin {
+			<section class="mt-8">
+				<div class="flex items-center justify-between gap-2 mb-3 px-0.5">
+					<div class="flex items-center gap-2">
+						@components.LucideIcon("wand-sparkles", "w-4 h-4 text-base-content/55")
+						<h2 class="text-sm font-semibold">Custom workflows</h2>
+					</div>
+					if p.IsAdmin {
+						<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="openCustom('')">
+							@components.LucideIcon("plus", "w-4 h-4")
+							Create custom workflow
+						</button>
+					}
+				</div>
+				if len(p.Custom) > 0 {
+					<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+						for _, c := range p.Custom {
+							@workflowCustomCard(c, p.IsAdmin)
+						}
+					</div>
+				} else {
+					<button
+						type="button"
+						class="bb-card w-full px-4 py-6 flex items-center justify-center gap-2 text-sm text-base-content/55 hover:text-base-content hover:border-base-content/20 transition-colors"
+						@click="openCustom('')"
+					>
+						@components.LucideIcon("plus", "w-4 h-4")
+						Author your own workflow — write a prompt, pick a schedule, and let it run.
+					</button>
+				}
+			</section>
+		}
 		<!-- Configure drawer: one components.Drawer slide-over per available preset. -->
 		<!-- Each Drawer renders its own backdrop + panel via the shared $store.drawers store. -->
 		// Drawers exist only for the admin who can actually submit them; a
@@ -92,6 +128,9 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 		// GET /-/workflows/{slug}/config. Admin-only (the link that opens it is).
 		if p.IsAdmin {
 			@workflowReconfigureDrawer()
+			// One shared custom-workflow drawer, used for both create (blank)
+			// and edit (hydrated by openCustom from GET /-/custom-workflows/{slug}).
+			@workflowCustomDrawer()
 		}
 	</div>
 }
@@ -690,6 +729,147 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 						{ workflowSetupCTALabel(preset.OneOff) }
 					</button>
 				}
+			}
+		</form>
+	}
+}
+
+// workflowCustomCard is one hand-authored workflow row in the Custom section.
+// It leads with the workflow's DiceBear avatar (its visual identity) and a
+// trigger summary, then the run toggle + an edit gear that opens the shared
+// custom drawer prefilled via openCustom(slug).
+templ workflowCustomCard(c WorkflowCustomCardProps, isAdmin bool) {
+	<div class="bb-card px-4 py-3 h-full flex items-center gap-3">
+		<div class="relative shrink-0">
+			<img
+				src={ customWorkflowAvatarSrc(c) }
+				alt={ c.Name + " avatar" }
+				class="w-9 h-9 rounded-lg bg-base-200"
+				loading="lazy"
+			/>
+			if c.LastRunError {
+				<span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-base-100" title="Last run failed"></span>
+			}
+		</div>
+		<div class="flex-1 min-w-0">
+			<div class="font-medium text-sm leading-tight truncate">{ c.Name }</div>
+			<div class="text-xs text-base-content/60 mt-0.5 line-clamp-1">{ c.Description }</div>
+			<div class="text-[11px] text-base-content/40 mt-0.5 inline-flex items-center gap-1">
+				@components.LucideIcon("clock", "w-3 h-3")
+				{ c.TriggerLabel }
+			</div>
+		</div>
+		<div class="flex items-center gap-1 shrink-0">
+			<input
+				type="checkbox"
+				class="toggle toggle-sm"
+				if c.Enabled {
+					checked
+				}
+				aria-label={ "Toggle " + c.Name }
+				@change={ "toggleWorkflow('" + c.Slug + "', $event.target)" }
+			/>
+			if isAdmin {
+				<button
+					type="button"
+					class="btn btn-ghost btn-sm btn-square text-base-content/55"
+					@click={ "openCustom('" + c.Slug + "')" }
+					aria-label={ "Edit " + c.Name }
+				>
+					@components.LucideIcon("settings", "w-4 h-4")
+				</button>
+			}
+		</div>
+	</div>
+}
+
+// customWorkflowAvatarSrc builds the server-rendered DiceBear URL for a custom
+// workflow card, preferring the stored seed and falling back to the slug (the
+// server maps slug → stored seed too, so both resolve to the same mark).
+func customWorkflowAvatarSrc(c WorkflowCustomCardProps) string {
+	seed := c.AvatarSeed
+	if seed == "" {
+		seed = c.Slug
+	}
+	return "/avatars/" + seed + "?type=agent&size=72"
+}
+
+// workflowCustomDrawer is the single create+edit slide-over for hand-authored
+// workflows. openCustom('') opens it blank (create); openCustom(slug) hydrates
+// it from GET /-/custom-workflows/{slug} (edit). It reuses the shared trigger /
+// model / advanced field sub-templs, adding the custom-only prompt textarea and
+// tool-scope picker. Submits to POST /-/custom-workflows (create) or
+// /-/custom-workflows/{slug} (edit) via submitCustom().
+templ workflowCustomDrawer() {
+	@components.Drawer(components.DrawerProps{
+		ID:    "wf-custom",
+		Title: "Custom workflow",
+	}) {
+		<form class="flex flex-col h-full" @submit.prevent="submitCustom($event.target)">
+			<div class="flex items-center justify-between gap-4 p-5 border-b border-base-300 shrink-0">
+				<div class="flex items-center gap-3 min-w-0 flex-1">
+					@components.LucideIcon("wand-sparkles", "w-5 h-5 text-base-content/60 shrink-0")
+					<div class="text-lg font-semibold leading-tight" x-text="custom.isEdit ? 'Edit workflow' : 'New custom workflow'"></div>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					<!-- Activate toggle (create only): set up + activate in one gesture.
+					     On edit, run-state is the card toggle's job. -->
+					<label class="flex items-center gap-2 cursor-pointer" x-show="!custom.isEdit">
+						<span class="text-xs text-base-content/55 hidden sm:inline">Activate</span>
+						<input type="checkbox" name="enabled" value="true" x-model="custom.enabled" class="toggle toggle-sm"/>
+					</label>
+					<button type="button" class="btn btn-ghost btn-sm btn-square" @click="$store.drawers.close()" aria-label="Close">
+						@components.LucideIcon("x", "w-4 h-4")
+					</button>
+				</div>
+			</div>
+			<div x-show="custom.loading" class="flex items-center gap-2 text-sm text-base-content/60 p-5">
+				<span class="loading loading-spinner loading-sm"></span>
+				Loading…
+			</div>
+			<div x-show="!custom.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
+				<div>
+					<div class="text-sm font-medium mb-1.5">Name</div>
+					<input
+						type="text"
+						name="name"
+						x-model="custom.name"
+						maxlength="80"
+						required
+						placeholder="e.g. Weekly anomaly sweep"
+						class="input input-sm w-full"
+					/>
+				</div>
+				<div>
+					<div class="text-sm font-medium mb-1.5">Prompt</div>
+					<textarea
+						name="prompt"
+						x-model="custom.prompt"
+						rows="10"
+						required
+						class="textarea textarea-bordered w-full text-sm font-mono leading-relaxed"
+						placeholder="The full instructions sent on every run. Describe the goal, what to look at, and how to act — e.g. &#34;Review new transactions, flag anything over $200 that isn't a known merchant, and write a short report.&#34;"
+					></textarea>
+					<div class="text-xs text-base-content/40 mt-1">This is the entire workflow prompt — there's no template behind it.</div>
+				</div>
+				@workflowTriggerFields("custom.triggerOnSync", "custom.scheduleCron", "")
+				@workflowModelField("custom.model")
+				<div>
+					<div class="text-sm font-medium mb-1.5">Tool access</div>
+					<div class="join w-full rounded-lg overflow-hidden">
+						<input type="radio" name="tool_scope" value="read_write" x-model="custom.toolScope" aria-label="Read &amp; write" class="join-item btn btn-sm flex-1 checked:btn-primary"/>
+						<input type="radio" name="tool_scope" value="read_only" x-model="custom.toolScope" aria-label="Read only" class="join-item btn btn-sm flex-1 checked:btn-primary"/>
+					</div>
+					<div class="text-xs text-base-content/40 mt-1">Read &amp; write lets the workflow categorize, tag, and create rules; read-only restricts it to reporting.</div>
+				</div>
+				@workflowAdvancedFields("custom.maxTurns", "custom.maxBudget")
+			</div>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5" x-bind:disabled="custom.loading">
+					@components.LucideIcon("save", "w-4 h-4")
+					<span x-text="custom.isEdit ? 'Save changes' : 'Create workflow'"></span>
+				</button>
 			}
 		</form>
 	}
