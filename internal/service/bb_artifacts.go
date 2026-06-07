@@ -15,9 +15,11 @@ import (
 )
 
 // bbArtifactsUploadURL is the upload endpoint for the self-hosted artifact
-// store (bb-artifacts.exe.xyz) — anonymous upload, public read, ~180-day
-// retention, 25 MB cap, hosts both images and HTML. Overridable via env for
-// staging/self-host. A public URL, not a secret.
+// store (bb-artifacts.exe.xyz) — public read, ~180-day retention, 25 MB cap,
+// hosts both images and HTML. Uploads require auth: set BB_ARTIFACTS_UPLOAD_TOKEN
+// (sent as a Bearer token, kept server-side — never exposed to the browser).
+// Endpoint overridable via BB_ARTIFACTS_UPLOAD_URL for staging/self-host. The
+// URL is public; the token is a secret.
 const bbArtifactsUploadURL = "https://bb-artifacts.exe.xyz/upload"
 
 // bbArtifactsMaxBytes mirrors the store's per-file cap.
@@ -60,6 +62,11 @@ func uploadArtifact(ctx context.Context, data []byte, filename string) (string, 
 		return "", err
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
+	// Auth is kept server-side: the browser POSTs to /-/dev-reports (session +
+	// CSRF), and the server attaches the upload token here. Never sent to clients.
+	if tok := os.Getenv("BB_ARTIFACTS_UPLOAD_TOKEN"); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -68,6 +75,9 @@ func uploadArtifact(ctx context.Context, data []byte, filename string) (string, 
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if resp.StatusCode == http.StatusUnauthorized {
+		return "", fmt.Errorf("artifact: upload unauthorized (401) — set BB_ARTIFACTS_UPLOAD_TOKEN on the server")
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("artifact: upload returned %d", resp.StatusCode)
 	}
