@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"breadbox/internal/avatar"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -33,6 +34,7 @@ type customWorkflowInput struct {
 	maxTurns      int      // 0 = unset (leave default / untouched)
 	maxBudget     *float64 // nil = unset
 	enabled       bool     // create only — edit manages run-state via the card toggle
+	avatarSeed    string   // empty = slug-seeded default
 }
 
 // readCustomWorkflowInput pulls the drawer fields out of the form, validating
@@ -46,12 +48,16 @@ func readCustomWorkflowInput(r *http.Request) (customWorkflowInput, error) {
 		triggerOnSync: r.FormValue("trigger_on_sync") == "true",
 		scheduleCron:  strings.TrimSpace(r.FormValue("schedule_cron")),
 		enabled:       r.FormValue("enabled") == "true" || r.FormValue("enabled") == "on",
+		avatarSeed:    strings.TrimSpace(r.FormValue("avatar_seed")),
 	}
 	if in.name == "" {
 		return in, fmt.Errorf("name is required")
 	}
 	if in.prompt == "" {
 		return in, fmt.Errorf("prompt is required")
+	}
+	if in.avatarSeed != "" && !avatar.IsValidSeed(in.avatarSeed) {
+		return in, fmt.Errorf("invalid avatar seed")
 	}
 	if v := strings.TrimSpace(r.FormValue("max_turns")); v != "" {
 		n, err := strconv.Atoi(v)
@@ -117,6 +123,13 @@ func CreateCustomWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 			writeError(w, http.StatusUnprocessableEntity, "WORKFLOW_CREATE_FAILED", err.Error())
 			return
 		}
+		// CreateAgentDefinitionParams carries no avatar seed, so persist a
+		// chosen one in a follow-up update (best-effort: a failure here just
+		// leaves the workflow slug-seeded, which is a valid default).
+		if in.avatarSeed != "" {
+			seed := in.avatarSeed
+			_, _ = svc.UpdateAgentDefinition(r.Context(), def.Slug, service.UpdateAgentDefinitionParams{AvatarSeed: &seed})
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"slug": def.Slug})
 	}
 }
@@ -160,6 +173,8 @@ func UpdateCustomWorkflowAdminHandler(svc *service.Service) http.HandlerFunc {
 			ToolScope:             &scope,
 			TriggerOnSyncComplete: &trigger,
 			ScheduleCron:          &cron,
+			// Empty seed clears back to slug-seeded (service emptyToNil).
+			AvatarSeed: &in.avatarSeed,
 		}
 		if in.maxTurns > 0 {
 			mt := in.maxTurns
@@ -207,6 +222,10 @@ func CustomWorkflowConfigAdminHandler(svc *service.Service) http.HandlerFunc {
 		if def.MaxBudgetUSD != nil {
 			budget = *def.MaxBudgetUSD
 		}
+		var avatarSeed string
+		if def.AvatarSeed != nil {
+			avatarSeed = *def.AvatarSeed
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"name":            def.Name,
 			"prompt":          def.Prompt,
@@ -216,6 +235,7 @@ func CustomWorkflowConfigAdminHandler(svc *service.Service) http.HandlerFunc {
 			"schedule_cron":   cron,
 			"max_turns":       def.MaxTurns,
 			"max_budget_usd":  budget,
+			"avatar_seed":     avatarSeed,
 			"enabled":         def.Enabled,
 		})
 	}

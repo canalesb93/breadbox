@@ -52,6 +52,7 @@ func TestCustomWorkflowCreateConfigUpdate(t *testing.T) {
 		"model":           {"claude-sonnet-4-6"},
 		"tool_scope":      {"read_only"},
 		"max_budget_usd":  {"3.00"},
+		"avatar_seed":     {"abc123seed"},
 		"enabled":         {"true"},
 	})
 	if w.Code != http.StatusOK {
@@ -80,6 +81,9 @@ func TestCustomWorkflowCreateConfigUpdate(t *testing.T) {
 	}
 	if def.ScheduleCron == nil || *def.ScheduleCron != "0 8 * * *" {
 		t.Errorf("schedule_cron = %v, want 0 8 * * *", def.ScheduleCron)
+	}
+	if def.AvatarSeed == nil || *def.AvatarSeed != "abc123seed" {
+		t.Errorf("avatar_seed = %v, want abc123seed", def.AvatarSeed)
 	}
 
 	// --- Config (edit prefill) ---

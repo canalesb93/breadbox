@@ -75,6 +75,9 @@ document.addEventListener('alpine:init', function () {
         slug: '',
         name: '',
         prompt: '',
+        // avatarSeed drives the header EditableAvatar preview + posts as the
+        // hidden avatar_seed field. Empty = slug-seeded (the default).
+        avatarSeed: '',
         triggerOnSync: 'false',
         scheduleCron: '',
         model: 'claude-sonnet-4-6',
@@ -576,6 +579,7 @@ document.addEventListener('alpine:init', function () {
         self.custom.slug = slug || '';
         self.custom.name = '';
         self.custom.prompt = '';
+        self.custom.avatarSeed = '';
         self.custom.triggerOnSync = 'false';
         self.custom.scheduleCron = '';
         self.custom.model = 'claude-sonnet-4-6';
@@ -603,6 +607,7 @@ document.addEventListener('alpine:init', function () {
             self.custom.toolScope = data.tool_scope || 'read_write';
             self.custom.maxTurns = data.max_turns ? String(data.max_turns) : '';
             self.custom.maxBudget = data.max_budget_usd ? String(data.max_budget_usd) : '';
+            self.custom.avatarSeed = data.avatar_seed || '';
             self.custom.enabled = !!data.enabled;
           })
           .catch(function (e) {
@@ -639,6 +644,30 @@ document.addEventListener('alpine:init', function () {
             if (btn) btn.disabled = false;
             self.restorePageState();
           });
+      },
+
+      // customAvatarSrc builds the header avatar URL for the custom drawer,
+      // preferring the chosen seed and falling back to the slug (on edit) or a
+      // generic seed (on create, before a slug exists). Mirrors
+      // reconfigureAvatarSrc.
+      customAvatarSrc: function () {
+        var seed = this.custom.avatarSeed || this.custom.slug || 'workflow';
+        return '/avatars/' + encodeURIComponent(seed) + '?type=agent&size=88';
+      },
+
+      // shuffleCustomAvatar mints a fresh random seed so the operator can cycle
+      // to a different DiceBear mark; the preview updates reactively and the
+      // seed posts as avatar_seed on save. Mirrors shuffleAvatar.
+      shuffleCustomAvatar: function () {
+        var bytes = new Uint8Array(8);
+        if (window.crypto && window.crypto.getRandomValues) {
+          window.crypto.getRandomValues(bytes);
+        } else {
+          for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+        }
+        var hex = '';
+        for (var j = 0; j < bytes.length; j++) hex += ('0' + bytes[j].toString(16)).slice(-2);
+        this.custom.avatarSeed = hex;
       },
 
       // Remove a configured workflow — deletes its agent_definition, resetting
