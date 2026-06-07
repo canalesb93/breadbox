@@ -46,12 +46,12 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		}
 
 		var (
-			presets   []service.WorkflowPresetView
+			defs      []service.AgentDefinitionResponse
 			subStatus *service.AgentSubsystemStatus
 			wg        sync.WaitGroup
 		)
 		wg.Add(2)
-		go func() { defer wg.Done(); presets, _ = svc.ListWorkflowPresets(ctx) }()
+		go func() { defer wg.Done(); defs, _ = svc.ListAgentDefinitions(ctx) }()
 		go func() { defer wg.Done(); subStatus = svc.GetAgentSubsystemStatus(ctx) }()
 		wg.Wait()
 
@@ -60,7 +60,10 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			Offset:        offset,
 			Status:        status,
 			AgentSlugOrID: workflowSlug,
-			WorkflowsOnly: true,
+			// Show runs for EVERY workflow — preset-instantiated AND custom
+			// (source_template NULL). /agents is retired and this is the only
+			// runs surface, so the legacy WorkflowsOnly gate (source_template
+			// IS NOT NULL) would wrongly hide all custom-workflow runs.
 		}
 		result, err := svc.ListAllAgentRuns(ctx, params)
 		if err != nil {
@@ -87,7 +90,7 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		props := pages.WorkflowRunsProps{
 			StatusFilter:   status,
 			WorkflowSlug:   workflowSlug,
-			Options:        workflowRunFilterOptions(presets),
+			Options:        workflowRunFilterOptions(defs),
 			Limit:          workflowRunsPageLimit,
 			Offset:         offset,
 			HasMore:        result.HasMore,
@@ -136,18 +139,20 @@ func WorkflowRunsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 	}
 }
 
-// workflowRunFilterOptions builds the workflow dropdown from the enabled
-// presets — each instantiated workflow's slug + name. Disabled presets
-// (never instantiated) can't have runs, so they're omitted.
-func workflowRunFilterOptions(presets []service.WorkflowPresetView) []pages.WorkflowRunFilterOption {
-	opts := make([]pages.WorkflowRunFilterOption, 0, len(presets))
-	for _, v := range presets {
-		if !v.Enabled || v.WorkflowSlug == nil {
+// workflowRunFilterOptions builds the workflow filter dropdown from every
+// workflow definition — preset-instantiated and custom alike — so the run
+// history can be narrowed to any workflow that has runs. Disabled
+// workflows are kept too: they may be disabled now but still have past
+// runs worth filtering to.
+func workflowRunFilterOptions(defs []service.AgentDefinitionResponse) []pages.WorkflowRunFilterOption {
+	opts := make([]pages.WorkflowRunFilterOption, 0, len(defs))
+	for _, d := range defs {
+		if d.Slug == "" {
 			continue
 		}
 		opts = append(opts, pages.WorkflowRunFilterOption{
-			Slug: *v.WorkflowSlug,
-			Name: v.Name,
+			Slug: d.Slug,
+			Name: d.Name,
 		})
 	}
 	return opts

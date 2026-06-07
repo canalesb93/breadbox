@@ -27,28 +27,31 @@ func TestT7WorkflowRunStatusCounts_EmptyDB(t *testing.T) {
 	}
 }
 
-// TestT7WorkflowRunStatusCounts_PlainAgentExcluded confirms that runs belonging
-// to a hand-authored agent (source_template IS NULL) are not counted even when
-// they share the same status values as a workflow run.
-func TestT7WorkflowRunStatusCounts_PlainAgentExcluded(t *testing.T) {
+// TestT7WorkflowRunStatusCounts_CustomWorkflowIncluded confirms that runs
+// belonging to a custom/hand-authored workflow (source_template IS NULL) ARE
+// counted. /workflows/runs is the single runs surface now (/agents is
+// retired), so every workflow's runs must appear — the legacy
+// source_template IS NOT NULL gate wrongly hid custom workflows added via the
+// custom-workflow drawer.
+func TestT7WorkflowRunStatusCounts_CustomWorkflowIncluded(t *testing.T) {
 	svc, _, pool := newService(t)
 	ctx := context.Background()
 
-	plain := mustCreateAgentDefinition(t, svc, "t7-plain-excluded", true)
+	custom := mustCreateAgentDefinition(t, svc, "t7-custom-included", true)
 
-	// Insert a run for the plain agent only — no preset-backed workflow exists.
+	// Insert a run for the custom workflow (no preset backing).
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'manual','success')`,
-		plain.ID); err != nil {
-		t.Fatalf("insert plain run: %v", err)
+		custom.ID); err != nil {
+		t.Fatalf("insert custom run: %v", err)
 	}
 
 	counts, err := svc.WorkflowRunStatusCounts(ctx, "")
 	if err != nil {
 		t.Fatalf("WorkflowRunStatusCounts: %v", err)
 	}
-	if len(counts) != 0 {
-		t.Fatalf("expected empty counts (plain agent excluded), got %v", counts)
+	if counts["success"] != 1 {
+		t.Fatalf("expected custom workflow run counted (success=1), got %v", counts)
 	}
 }
 
@@ -286,18 +289,20 @@ func TestT7WorkflowRunStatusCounts_MultiPreset(t *testing.T) {
 	ins(wfB.ID, "skipped")
 	ins(wfC.ID, "timeout")
 
-	// Also insert a plain agent run to confirm it stays excluded.
-	plain := mustCreateAgentDefinition(t, svc, "t7-multi-plain", true)
-	ins(plain.ID, "success")
+	// Also insert a custom-workflow run (source_template NULL) to confirm it
+	// is now INCLUDED — every workflow's runs surface on /workflows/runs.
+	custom := mustCreateAgentDefinition(t, svc, "t7-multi-custom", true)
+	ins(custom.ID, "success")
 
 	counts, err := svc.WorkflowRunStatusCounts(ctx, "")
 	if err != nil {
 		t.Fatalf("WorkflowRunStatusCounts: %v", err)
 	}
 
-	// Workflow-backed: 2 success, 1 error, 1 skipped, 1 timeout. Plain excluded.
-	if counts["success"] != 2 {
-		t.Errorf("success = %d, want 2", counts["success"])
+	// Preset-backed: 2 success, 1 error, 1 skipped, 1 timeout — plus the custom
+	// workflow's 1 success = 3 success total.
+	if counts["success"] != 3 {
+		t.Errorf("success = %d, want 3 (2 preset + 1 custom)", counts["success"])
 	}
 	if counts["error"] != 1 {
 		t.Errorf("error = %d, want 1", counts["error"])
@@ -312,7 +317,7 @@ func TestT7WorkflowRunStatusCounts_MultiPreset(t *testing.T) {
 		t.Errorf("in_progress should be absent, got %d", counts["in_progress"])
 	}
 	total := counts["success"] + counts["error"] + counts["skipped"] + counts["timeout"]
-	if total != 5 {
-		t.Errorf("total workflow runs = %d, want 5 (plain excluded)", total)
+	if total != 6 {
+		t.Errorf("total workflow runs = %d, want 6 (5 preset + 1 custom)", total)
 	}
 }
