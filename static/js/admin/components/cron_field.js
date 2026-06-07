@@ -80,7 +80,10 @@ document.addEventListener('alpine:init', function () {
       // server's UTC offset in minutes east of UTC (0 = no shift).
       localizePresets: false,
       serverUtcOffsetMin: 0,
-      preview: { invalid: false, description: '', loading: false },
+      // tzLabel is the zone the times are anchored to (instance timezone for the
+      // sync endpoint; absent on the workflow endpoint, which bakes "(your time)"
+      // into the description instead).
+      preview: { invalid: false, description: '', loading: false, tzLabel: '' },
       _debounce: null,
 
       init: function () {
@@ -149,7 +152,15 @@ document.addEventListener('alpine:init', function () {
       previewText: function () {
         if (!String(this.cron || '').trim()) return 'Enter a schedule';
         if (this.preview.invalid) return this.preview.description || 'Not a valid cron expression';
-        return this.preview.description || '…';
+        var desc = this.preview.description || '…';
+        // Stamp the anchor zone when the endpoint provides one AND the schedule
+        // has a wall-clock time (AM/PM) — answers "whose 3 AM?" without noising
+        // up pure intervals ("Every 15 minutes") or the workflow path, which
+        // sends no label and already says "(your time)".
+        if (this.preview.tzLabel && /\b(AM|PM)\b/.test(desc)) {
+          desc += ' · ' + this.preview.tzLabel;
+        }
+        return desc;
       },
 
       refresh: function () {
@@ -162,7 +173,7 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         var expr = (this.cron || '').trim();
         if (!expr) {
-          self.preview = { invalid: false, description: '', loading: false };
+          self.preview = { invalid: false, description: '', loading: false, tzLabel: '' };
           return;
         }
         self.preview.loading = true;
@@ -179,11 +190,12 @@ document.addEventListener('alpine:init', function () {
             self.preview = {
               invalid: !(data && data.valid),
               description: (data && data.description) || '',
+              tzLabel: (data && data.tz_label) || '',
               loading: false,
             };
           })
           .catch(function () {
-            self.preview = { invalid: false, description: 'Preview unavailable', loading: false };
+            self.preview = { invalid: false, description: 'Preview unavailable', loading: false, tzLabel: '' };
           });
       },
     };

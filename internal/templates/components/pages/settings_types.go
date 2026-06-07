@@ -62,6 +62,10 @@ type SettingsProps struct {
 	// InstanceTimezone is the configured IANA zone cron is evaluated in
 	// (empty = server local). Surfaced as the Sync-section timezone picker.
 	InstanceTimezone string
+	// ServerZoneLabel describes the server process's local zone (abbreviation +
+	// UTC offset, e.g. "PDT · UTC-07:00"), so the "Server default" picker option
+	// reveals what cron actually evaluates in when no instance zone is set.
+	ServerZoneLabel string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
 

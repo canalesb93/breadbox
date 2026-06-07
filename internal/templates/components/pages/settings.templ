@@ -3,6 +3,7 @@ package pages
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -110,7 +111,7 @@ templ settingsSyncSection(p SettingsProps) {
 					Label:     "Timezone saved",
 				}) {
 					<select id="instance_timezone" name="instance_timezone" class="select select-sm bg-base-200">
-						@tzOption("", p.InstanceTimezone, "Server default")
+						@tzOption("", p.InstanceTimezone, serverDefaultTZLabel(p.ServerZoneLabel))
 						for _, tz := range commonTimezones() {
 							@tzOption(tz, p.InstanceTimezone, tz)
 						}
@@ -481,6 +482,17 @@ templ tzOption(value, current, label string) {
 	} else {
 		<option value={ value }>{ label }</option>
 	}
+}
+
+// serverDefaultTZLabel labels the empty "Server default" option with the
+// resolved server zone (e.g. "Server default (PDT · UTC-07:00)") so the
+// picker reveals what cron evaluates in when no instance zone is set. Falls
+// back to the bare label if the handler couldn't resolve a zone.
+func serverDefaultTZLabel(serverZone string) string {
+	if strings.TrimSpace(serverZone) == "" {
+		return "Server default"
+	}
+	return "Server default (" + serverZone + ")"
 }
 
 // commonTimezones is a curated shortlist for the instance-timezone picker —
