@@ -1,0 +1,20 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// agentRunCost renders an agent-run cost cell via the canonical Amount
+// component (Intent: AmountCost, Precision: 4 for sub-cent values).
+// Zero/negative costs render an em-dash placeholder. Used by the
+// per-run detail page (transcript result rows + the stats sidebar).
+templ agentRunCost(v float64, extraClass string) {
+	if v > 0 {
+		@components.Amount(components.AmountProps{
+			Value:     v,
+			Intent:    components.AmountCost,
+			Precision: 4,
+			Class:     extraClass,
+		})
+	} else {
+		<span class="text-base-content/40">—</span>
+	}
+}

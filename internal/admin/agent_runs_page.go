@@ -4,13 +4,11 @@ package admin
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"breadbox/internal/agent"
@@ -28,143 +26,6 @@ import (
 // blows up page weight and CPU. Beyond this we render a banner pointing
 // at the raw file on disk.
 const agentRunTranscriptMaxEvents = 500
-
-// AgentRunsListPageHandler serves GET /agents — the unified runs
-// landing page. ?agent=<slug> filters to a single agent (the link from
-// the Agents-tab table and the per-agent edit page passes it through);
-// without it, the page renders the cross-agent feed.
-//
-// Filter params: agent, status, trigger, hit_cap, start, end, limit,
-// offset. Invalid enum values are silently dropped (admin convention).
-//
-// The handler loads the run feed, the agent definition list (used by
-// the filter dropdown + the "Run an agent" modal picker), and the
-// 30-day stats rollup. Definitions + runs are fetched in parallel
-// since they're independent reads.
-func AgentRunsListPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer, dataDir string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		filters, limit, offset := parseAgentRunFilters(r)
-
-		props := pages.AgentRunsListProps{
-			Filters:   filters,
-			Limit:     limit,
-			Offset:    offset,
-			CSRFToken: GetCSRFToken(r),
-		}
-
-		params := service.AllAgentRunListParams{
-			Limit:         limit,
-			Offset:        offset,
-			AgentSlugOrID: filters.AgentSlug,
-			Status:        filters.Status,
-			Trigger:       filters.Trigger,
-			HitCap:        filters.HitCap,
-			Start:         parseDateParam(r, "start"),
-			End:           parseInclusiveDateParam(r, "end"),
-		}
-		result, err := svc.ListAllAgentRuns(ctx, params)
-		if err != nil {
-			// Bad agent filter slug → silently drop the filter rather
-			// than erroring the whole page; matches the "silently drop
-			// invalid filters" admin convention.
-			params.AgentSlugOrID = ""
-			filters.AgentSlug = ""
-			props.Filters = filters
-			result, err = svc.ListAllAgentRuns(ctx, params)
-			if err != nil {
-				tr.RenderError(w, r)
-				return
-			}
-		}
-		props.Rows = make([]pages.AgentRunRowProps, 0, len(result.Runs))
-		runIDs := make([]string, 0, len(result.Runs))
-		for _, run := range result.Runs {
-			row := agentRunRowFromResponse(run.AgentRunResponse)
-			row.AgentSlug = run.AgentSlug
-			row.AgentName = run.AgentName
-			props.Rows = append(props.Rows, row)
-			runIDs = append(runIDs, run.AgentRunResponse.ID)
-		}
-		props.Total = len(result.Runs)
-
-		// Fetch report summaries for every row in one batched query so
-		// the runs list can render "[file-text] Title →" chips inline.
-		// Failure here just degrades to no chips — the row still renders.
-		if reportMap, rerr := svc.ListReportSummariesForRunIDs(ctx, runIDs); rerr == nil {
-			for i := range props.Rows {
-				reps, ok := reportMap[runIDs[i]]
-				if !ok {
-					continue
-				}
-				props.Rows[i].Reports = make([]components.AgentRunReportRef, 0, len(reps))
-				for _, rep := range reps {
-					props.Rows[i].Reports = append(props.Rows[i].Reports, components.AgentRunReportRef{
-						ShortID:  rep.ShortID,
-						Title:    rep.Title,
-						Priority: rep.Priority,
-					})
-				}
-			}
-		}
-
-		// Definitions populate the filter dropdown + the "Run an agent"
-		// modal picker. Failing here just degrades both — keep rendering.
-		defs, derr := svc.ListAgentDefinitions(ctx)
-		if derr == nil {
-			props.AgentOptions = make([]pages.AgentRunsAgentOption, 0, len(defs))
-			props.LastPromptPrefixes = make(map[string]string, len(defs))
-			for _, d := range defs {
-				opt := pages.AgentRunsAgentOption{
-					Slug:        d.Slug,
-					Name:        d.Name,
-					Description: firstLine(d.Prompt, 120),
-					Enabled:     d.Enabled,
-				}
-				if d.CostStats30d != nil {
-					opt.Cost30dUSD = d.CostStats30d.TotalCostUSD
-					opt.RunCount30 = d.CostStats30d.RunCount
-				}
-				props.AgentOptions = append(props.AgentOptions, opt)
-				if d.LastPromptPrefix != nil && *d.LastPromptPrefix != "" {
-					props.LastPromptPrefixes[d.Slug] = *d.LastPromptPrefix
-				}
-			}
-		}
-
-		// 30-day stats roll up across every agent (CostStats30d on each
-		// definition) for the header tiles. We compute on the read side
-		// rather than adding a new aggregate query — small N (one row
-		// per agent), so the loop is cheap and keeps the SQL surface
-		// flat. Avg duration + error count come from the agent_runs
-		// table directly via a small helper.
-		props.Stats = computeAgentRunsStats(ctx, svc, defs)
-
-		data := BaseTemplateData(r, sm, "agents", "Agents")
-		tr.RenderWithTempl(w, r, data, pages.AgentRunsList(props))
-	}
-}
-
-// computeAgentRunsStats rolls up the four StatTile numbers from the
-// per-agent CostStats30d (already populated by ListAgentDefinitions) +
-// a 30-day error + avg-duration query. Best-effort: a failure on the
-// extra query just leaves error_count + avg_duration zeroed.
-func computeAgentRunsStats(ctx context.Context, svc *service.Service, defs []service.AgentDefinitionResponse) pages.AgentRunsStatsProps {
-	stats := pages.AgentRunsStatsProps{}
-	for _, d := range defs {
-		if d.CostStats30d == nil {
-			continue
-		}
-		stats.RunCount30d += d.CostStats30d.RunCount
-		stats.TotalCostUSD30d += d.CostStats30d.TotalCostUSD
-	}
-	if extra, err := svc.GetAgentRunsExtraStats30d(ctx); err == nil {
-		stats.ErrorCount30d = extra.ErrorCount
-		stats.AvgDurationSeconds = extra.AvgDurationSeconds
-	}
-	return stats
-}
 
 // AgentRunDetailPageHandler serves GET /agents/runs/{shortId}. Resolves the
 // run, parses the NDJSON transcript file (best-effort; missing file just
@@ -283,72 +144,6 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 		data["Breadcrumbs"] = pages.AgentRunDetailBreadcrumbs(props)
 		tr.RenderWithTempl(w, r, data, pages.AgentRunDetail(props))
 	}
-}
-
-// parseAgentRunFilters extracts the shared filter param set out of the
-// query string. Unknown enum values are silently dropped (admin handler
-// convention: render an empty filter rather than a 400).
-func parseAgentRunFilters(r *http.Request) (pages.AgentRunsFilterProps, int, int) {
-	q := r.URL.Query()
-
-	limit := 50
-	if v := q.Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			if n > 200 {
-				n = 200
-			}
-			limit = n
-		}
-	}
-	offset := 0
-	if v := q.Get("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			offset = n
-		}
-	}
-
-	f := pages.AgentRunsFilterProps{
-		Status:    q.Get("status"),
-		Trigger:   q.Get("trigger"),
-		HitCap:    q.Get("hit_cap"),
-		AgentSlug: q.Get("agent"),
-		Start:     q.Get("start"),
-		End:       q.Get("end"),
-	}
-	if !isAllowedAgentRunStatus(f.Status) {
-		f.Status = ""
-	}
-	if !isAllowedAgentRunTrigger(f.Trigger) {
-		f.Trigger = ""
-	}
-	if !isAllowedAgentRunHitCap(f.HitCap) {
-		f.HitCap = ""
-	}
-	return f, limit, offset
-}
-
-func isAllowedAgentRunStatus(s string) bool {
-	switch s {
-	case "", "success", "error", "in_progress", "skipped", "timeout":
-		return true
-	}
-	return false
-}
-
-func isAllowedAgentRunTrigger(s string) bool {
-	switch s {
-	case "", "cron", "manual", "webhook":
-		return true
-	}
-	return false
-}
-
-func isAllowedAgentRunHitCap(s string) bool {
-	switch s {
-	case "", "max_turns", "max_budget", "any":
-		return true
-	}
-	return false
 }
 
 // agentRunRowFromResponse expands a service.AgentRunResponse (lots of

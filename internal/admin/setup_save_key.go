@@ -3,10 +3,7 @@
 package admin
 
 import (
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -59,14 +56,10 @@ func SaveKeyHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer) htt
 			return
 		}
 
-		keyHex := hex.EncodeToString(a.Config.EncryptionKey)
-		title := saveKeyItemTitle(r.Host)
 		props := pages.SaveKeyProps{
-			PageTitle:        "Save encryption key",
-			CSRFToken:        GetCSRFToken(r),
-			EncryptionKey:    keyHex,
-			OnePasswordValue: encodeOnePasswordLogin(title, keyHex),
-			ItemTitle:        title,
+			PageTitle:     "Save encryption key",
+			CSRFToken:     GetCSRFToken(r),
+			EncryptionKey: hex.EncodeToString(a.Config.EncryptionKey),
 		}
 		if f := GetFlash(ctx, sm); f != nil {
 			props.FlashType = f.Type
@@ -77,42 +70,4 @@ func SaveKeyHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer) htt
 			http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 		}
 	}
-}
-
-// saveKeyItemTitle picks the title used for the 1Password item and the
-// .env download filename. Defaults to "Breadbox encryption key
-// (<host>)" so admins running multiple Breadbox installs can tell the
-// vault entries apart.
-func saveKeyItemTitle(host string) string {
-	if host == "" {
-		return "Breadbox encryption key"
-	}
-	return fmt.Sprintf("Breadbox encryption key (%s)", host)
-}
-
-// encodeOnePasswordLogin builds the base64-encoded JSON payload the
-// <onepassword-save-button> consumes. The save-button package itself
-// ships an encodeOPSaveRequest() helper, but doing it server-side
-// keeps the page logic-free and saves a JS module roundtrip.
-//
-// Format reference: https://www.1password.dev/web/add-1password-button-website
-func encodeOnePasswordLogin(title, key string) string {
-	payload := struct {
-		Title  string                   `json:"title"`
-		Fields []map[string]interface{} `json:"fields"`
-	}{
-		Title: title,
-		Fields: []map[string]interface{}{
-			{"autocomplete": "username", "value": "ENCRYPTION_KEY"},
-			{"autocomplete": "current-password", "value": key},
-		},
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		// Marshal failure on a value this simple would be a programming
-		// error, not a runtime case. Empty value renders the button as
-		// inert which is the safest degradation.
-		return ""
-	}
-	return base64.StdEncoding.EncodeToString(raw)
 }

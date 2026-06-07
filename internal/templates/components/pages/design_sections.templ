@@ -713,28 +713,33 @@ templ SectionTagPicker() {
 		@designExample("Chip states", "Each chip in the picker grid carries one of five states. Click cycles a chip through the right column.") {
 			<div class="flex flex-wrap items-center gap-2 max-w-xl">
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")
-</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("plus", "")
+					</span>
 					<span class="truncate">absent</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("check", "")
-</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("check", "")
+					</span>
 					<span class="truncate">present</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("minus", "")
-</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("minus", "")
+					</span>
 					<span class="truncate">mixed</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")
-</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("plus", "")
+					</span>
 					<span class="truncate">pending-add</span>
 				</span>
 				<span class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
-					<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("x", "")
-</span>
+					<span class="bb-tagpicker-chip-glyph">
+						@components.LucideIcon("x", "")
+					</span>
 					<span class="truncate">pending-remove</span>
 				</span>
 			</div>
@@ -756,28 +761,33 @@ templ SectionTagPicker() {
 				<div class="bb-tagpicker-body">
 					<div class="bb-tagpicker-grid">
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--present" style="--tag-color:#10b981">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("check", "")
-</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("check", "")
+							</span>
 							<span class="truncate">recurring</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--mixed" style="--tag-color:#f59e0b">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("minus", "")
-</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("minus", "")
+							</span>
 							<span class="truncate">needs-review</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-add" style="--tag-color:#6366f1">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")
-</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("plus", "")
+							</span>
 							<span class="truncate">subscription</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--absent" style="--tag-color:#0ea5e9">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("plus", "")
-</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("plus", "")
+							</span>
 							<span class="truncate">business</span>
 						</button>
 						<button type="button" class="bb-tag bb-tag-interactive bb-tagpicker-chip bb-tagpicker-chip--pending-remove" style="--tag-color:#ef4444">
-							<span class="bb-tagpicker-chip-glyph">@components.LucideIcon("x", "")
-</span>
+							<span class="bb-tagpicker-chip-glyph">
+								@components.LucideIcon("x", "")
+							</span>
 							<span class="truncate">refund</span>
 						</button>
 					</div>
@@ -888,12 +898,24 @@ templ SectionMenusDropdowns() {
 		@designExample("Menu (vertical nav list)", "menu-md / menu-sm.") {
 			<ul class="menu bg-base-100 rounded-xl border border-base-300 w-56">
 				<li class="menu-title">Settings</li>
-				<li><a class="menu-active">@components.LucideIcon("key", "w-4 h-4")
-API keys</a></li>
-				<li><a>@components.LucideIcon("users", "w-4 h-4")
-Household</a></li>
-				<li><a>@components.LucideIcon("bot", "w-4 h-4")
-MCP</a></li>
+				<li>
+					<a class="menu-active">
+						@components.LucideIcon("key", "w-4 h-4")
+						API keys
+					</a>
+				</li>
+				<li>
+					<a>
+						@components.LucideIcon("users", "w-4 h-4")
+						Household
+					</a>
+				</li>
+				<li>
+					<a>
+						@components.LucideIcon("bot", "w-4 h-4")
+						MCP
+					</a>
+				</li>
 			</ul>
 		}
 	</div>
@@ -1055,16 +1077,6 @@ templ SectionLoading() {
 		@designExample("Categories skeleton", "Placeholder mirroring /categories — filter input, helper line, and a divided card with parent rows plus expanded subcategory groups. Primitive is exposed here for future AJAX swaps and adjacent category-centric panels (e.g. category picker); /categories is full-SSR today.") {
 			<div class="max-w-3xl">
 				@components.CategoriesSkeleton()
-			</div>
-		}
-		@designExample("Agents list skeleton", "Placeholder mirroring /agents/definitions — count + 'Prompt library' header strip and the agent definitions table (Name + optional sync badge + description, Schedule cron + pretty subline, Last run pill + relative time, Next run, 30d cost, Enabled toggle, kebab). Primitive is exposed here for future AJAX swaps (toggleEnabled / runNow without a full page reload); the page is full-SSR today.") {
-			<div class="max-w-4xl">
-				@components.AgentsListSkeleton()
-			</div>
-		}
-		@designExample("Agent runs list skeleton", "Placeholder mirroring the /agents runs landing — 4-up 30d stat row (Runs / Errors / Cost / Avg duration), collapsed filter bar (icon + label + chip slots), and the divided card of rich run rows (icon tile + agent name + short-ID + status badge + trigger pill + meta line + trailing cost). Rows vary widths and toggle the optional error/note slots so the skeleton reads as motion. Primitive is exposed here for future AJAX filter swaps; /agents is full-SSR today.") {
-			<div class="max-w-5xl">
-				@components.AgentRunsListSkeleton()
 			</div>
 		}
 		@designExample("Reports inbox skeleton", "Placeholder mirroring /reports — page header, filter tabs (All / Unread / Read + count + mark-all-read), and a divided card of inbox rows (bot avatar, meta line with optional priority dot + tag chips, title message bubble, mark-read + chevron actions). Primitive is exposed here for future AJAX swaps and adjacent agent-report panels (e.g. dashboard inbox preview); /reports is full-SSR today.") {
@@ -2856,8 +2868,9 @@ templ SectionCommandPalette() {
 						<div class="bb-cmdk-group-label">Overview</div>
 						<div class="bb-cmdk-item">
 							<div class="bb-cmdk-generic">
-								<div class="bb-cmdk-item-icon">@components.LucideIcon("rss", "")
-</div>
+								<div class="bb-cmdk-item-icon">
+									@components.LucideIcon("rss", "")
+								</div>
 								<div class="bb-cmdk-item-label">
 									<div class="bb-cmdk-item-title">Feed</div>
 									<div class="bb-cmdk-item-desc">Activity feed across the household</div>
@@ -2869,8 +2882,9 @@ templ SectionCommandPalette() {
 						</div>
 						<div class="bb-cmdk-item" data-active="true">
 							<div class="bb-cmdk-generic">
-								<div class="bb-cmdk-item-icon">@components.LucideIcon("receipt", "")
-</div>
+								<div class="bb-cmdk-item-icon">
+									@components.LucideIcon("receipt", "")
+								</div>
 								<div class="bb-cmdk-item-label">
 									<div class="bb-cmdk-item-title">Transactions</div>
 									<div class="bb-cmdk-item-desc">View all transactions</div>
@@ -2914,8 +2928,9 @@ templ SectionCommandPalette() {
 			<div class="border border-base-300 rounded-xl bg-base-100 max-w-[560px] mx-auto py-2">
 				<div class="bb-cmdk-item">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon">@components.LucideIcon("rss", "")
-</div>
+						<div class="bb-cmdk-item-icon">
+							@components.LucideIcon("rss", "")
+						</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Feed</div>
 							<div class="bb-cmdk-item-desc">Default — neutral icon tile</div>
@@ -2927,8 +2942,9 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="bb-cmdk-item" data-active="true">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon">@components.LucideIcon("receipt", "")
-</div>
+						<div class="bb-cmdk-item-icon">
+							@components.LucideIcon("receipt", "")
+						</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Transactions</div>
 							<div class="bb-cmdk-item-desc">Active — primary tint on tile + bg-primary/8 on row</div>
@@ -2940,8 +2956,9 @@ templ SectionCommandPalette() {
 				</div>
 				<div class="bb-cmdk-item">
 					<div class="bb-cmdk-generic">
-						<div class="bb-cmdk-item-icon">@components.LucideIcon("plus-circle", "")
-</div>
+						<div class="bb-cmdk-item-icon">
+							@components.LucideIcon("plus-circle", "")
+						</div>
 						<div class="bb-cmdk-item-label">
 							<div class="bb-cmdk-item-title">Connect a Bank</div>
 						</div>

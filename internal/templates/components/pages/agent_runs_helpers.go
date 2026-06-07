@@ -2,7 +2,63 @@
 
 package pages
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+// formatAgentRunStarted formats a run's start time for the run-detail
+// header. Zero times render an em-dash placeholder.
+func formatAgentRunStarted(t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+	return t.Format("Jan 02 15:04")
+}
+
+// formatAgentRunFinished formats a run's (nullable) finish time.
+func formatAgentRunFinished(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return "—"
+	}
+	return t.Format("Jan 02 15:04")
+}
+
+// formatAgentRunDuration renders a run duration (ms) as a compact
+// human string (ms / s / m). Non-positive values render an em-dash.
+func formatAgentRunDuration(ms int64) string {
+	if ms <= 0 {
+		return "—"
+	}
+	if ms < 1000 {
+		return fmt.Sprintf("%dms", ms)
+	}
+	secs := float64(ms) / 1000.0
+	if secs < 60 {
+		return fmt.Sprintf("%.1fs", secs)
+	}
+	mins := secs / 60.0
+	return fmt.Sprintf("%.1fm", mins)
+}
+
+// formatAgentRunTokens renders the "in / out" token counts. Zero on
+// both sides renders an em-dash placeholder.
+func formatAgentRunTokens(in, out int64) string {
+	if in == 0 && out == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d / %d", in, out)
+}
+
+// runDetailAgentDisplay picks the best human label for a run's agent —
+// the name when set, otherwise the slug.
+func runDetailAgentDisplay(r AgentRunRowProps) string {
+	if r.AgentName != "" {
+		return r.AgentName
+	}
+	return r.AgentSlug
+}
 
 // AgentRunFriendlyError maps known raw error_message strings on an
 // agent_run row to operator-friendly text. Returns "" when no mapping

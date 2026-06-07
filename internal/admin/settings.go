@@ -32,6 +32,29 @@ func formatNextSync(nextRun time.Time) string {
 	return "in " + formatUptime(d)
 }
 
+// serverZoneLabel describes the server process's local zone for the
+// "Server default" timezone option, so a self-hoster who hasn't set an
+// instance zone can still see what cron evaluates in. Format: the zone
+// abbreviation plus its current UTC offset (e.g. "PDT · UTC-07:00"), or just
+// the offset when the runtime only knows a numeric zone (e.g. "UTC+05:30").
+// Read at the current instant, so it reflects the active DST offset.
+func serverZoneLabel() string {
+	name, offsetSec := time.Now().Zone()
+	sign := "+"
+	if offsetSec < 0 {
+		sign = "-"
+		offsetSec = -offsetSec
+	}
+	off := fmt.Sprintf("UTC%s%02d:%02d", sign, offsetSec/3600, (offsetSec%3600)/60)
+	name = strings.TrimSpace(name)
+	// A nameless zone surfaces as a numeric abbreviation like "+0530"; don't
+	// pair that with the offset (redundant). Show the offset alone.
+	if name == "" || strings.HasPrefix(name, "+") || strings.HasPrefix(name, "-") {
+		return off
+	}
+	return name + " · " + off
+}
+
 // buildSettingsProps assembles the typed SettingsProps shared by every
 // /settings/* General-family tab (General, System, Help). Each
 // tab handler builds full props (cheap — a few DB lookups + version
@@ -85,6 +108,7 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		NewScheduleForm:      newScheduleForm,
 		EditScheduleForms:    editScheduleForms,
 		InstanceTimezone:     appconfig.String(ctx, a.Queries, appconfig.KeyInstanceTimezone, ""),
+		ServerZoneLabel:      serverZoneLabel(),
 		ConfigSources:        a.Config.ConfigSources,
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,

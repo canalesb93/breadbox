@@ -10,18 +10,6 @@ type MCPGuideProps struct {
 	HasOAuthClients bool
 }
 
-// AgentWizardStatsProps mirrors AgentWizardStats for the templ side.
-type AgentWizardStatsProps struct {
-	PendingReviews int64
-	TotalRules     int64
-	TotalAccounts  int64
-}
-
-// AgentWizardProps powers the /agent-prompts prompt-library page.
-type AgentWizardProps struct {
-	Stats AgentWizardStatsProps
-}
-
 // MCPSettingsToolInfo is one tool row in the Tools Enabled card.
 type MCPSettingsToolInfo struct {
 	Name           string

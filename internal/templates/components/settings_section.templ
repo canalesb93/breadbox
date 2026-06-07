@@ -24,8 +24,12 @@ type SettingsSectionProps struct {
 	BrandIcon string
 	Title     string
 	Caption   string
-	Right     templ.Component
-	Variant   string
+	// CaptionContent, when set, renders in place of the plain-string
+	// Caption in the left gutter — use it when the subtitle needs inline
+	// markup (a link, emphasis). Falls back to Caption when nil.
+	CaptionContent templ.Component
+	Right          templ.Component
+	Variant        string
 	// FullWidth drops the left gutter so the content spans the whole
 	// width (overview cards, stats grids, page-level alerts). When set,
 	// the content is NOT auto-carded — the caller supplies its own
@@ -143,7 +147,11 @@ templ settingsSectionMeta(p SettingsSectionProps) {
 				}
 				<h2 class="bb-settings-section__title">{ p.Title }</h2>
 			</div>
-			if p.Caption != "" {
+			if p.CaptionContent != nil {
+				<p class="bb-settings-section__caption">
+					@p.CaptionContent
+				</p>
+			} else if p.Caption != "" {
 				<p class="bb-settings-section__caption">{ p.Caption }</p>
 			}
 		}

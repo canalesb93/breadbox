@@ -108,10 +108,20 @@ func presetTileClasses(enabled bool) string {
 	return base + "bg-base-200 text-base-content/55"
 }
 
+// AgentSubsystemStatusProps is the readiness banner state. Mirrors
+// service.AgentSubsystemStatus but lives in the pages package so the
+// templ doesn't import the service tree.
+type AgentSubsystemStatusProps struct {
+	Ready          bool
+	AuthConfigured bool
+	BinaryPresent  bool
+	BinaryPath     string
+}
+
 // WorkflowsGalleryProps is the view-model for the /workflows preset gallery.
 type WorkflowsGalleryProps struct {
 	Categories []WorkflowCategoryProps
-	// Status mirrors the agent runtime readiness (reused from agents_list_types).
+	// Status mirrors the agent runtime readiness.
 	Status    AgentSubsystemStatusProps
 	CSRFToken string
 	// ConsentAcknowledged is true once the household has acknowledged that
@@ -123,6 +133,23 @@ type WorkflowsGalleryProps struct {
 	// IsAdmin gates the "Set up" action: instantiating a workflow from a
 	// preset is admin-only. Non-admins see a disabled control + hint.
 	IsAdmin bool
+	// Custom holds the household's hand-authored workflows (source_template
+	// IS NULL) — rendered in their own section with a "Create custom
+	// workflow" affordance. Empty for non-admins (they can't create them).
+	Custom []WorkflowCustomCardProps
+}
+
+// WorkflowCustomCardProps is one hand-authored (non-preset) workflow card
+// in the gallery's "Custom" section. Unlike a preset card it carries no
+// template options — the operator authored the whole prompt — and is
+// edited via the shared custom-workflow drawer (openCustom).
+type WorkflowCustomCardProps struct {
+	Slug         string
+	Name         string
+	Description  string // first line of the prompt
+	Enabled      bool   // run-state (the card toggle flips it immediately)
+	AvatarSeed   string // DiceBear seed; empty = slug-seeded
+	LastRunError bool   // most recent run failed → red status dot
 }
 
 // WorkflowSpendBanner is the gallery's spend-ceiling state: shown when a

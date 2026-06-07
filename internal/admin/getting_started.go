@@ -21,15 +21,20 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		ctx := r.Context()
 
 		// Step completion checks.
-		// Step 1: Create a family member (user).
+		// Step 1: Configure a bank provider (Plaid, Teller, or SimpleFIN).
+		// This is the first real action — admin setup already seeds the
+		// household with one member, so connecting your money is what moves
+		// onboarding forward.
+		hasProvider := a.Config.PlaidClientID != "" || a.Config.TellerAppID != "" || a.Config.SimpleFINEnabled
+
+		// Step 2 (optional): Add a household member. Admin creation already
+		// links a first member, so this is auto-complete and carries an
+		// Optional badge — it only matters when finances are shared.
 		userCount, err := a.Queries.CountUsers(ctx)
 		if err != nil {
 			a.Logger.Error("getting started: count users", "error", err)
 		}
 		hasMember := userCount > 0
-
-		// Step 2: Configure a bank provider (Plaid or Teller).
-		hasProvider := a.Config.PlaidClientID != "" || a.Config.TellerAppID != ""
 
 		// Step 3: Connect a bank.
 		connCount, err := a.Queries.CountConnections(ctx)
@@ -67,8 +72,11 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		// rough time-to-finish estimate for the hero. Step order + per-step
 		// minutes are paired so the estimate sums only the steps still
 		// outstanding.
-		stepsDone := []bool{hasMember, hasProvider, hasConnection, hasSync, hasAPIKey}
-		stepMinutes := []int{1, 2, 2, 1, 3}
+		// Order MUST match the Number/State wiring in getting_started.templ:
+		// 1 provider, 2 household member (optional), 3 connection, 4 sync,
+		// 5 agents. activeStep is a 1-based index into this slice.
+		stepsDone := []bool{hasProvider, hasMember, hasConnection, hasSync, hasAPIKey}
+		stepMinutes := []int{2, 1, 2, 1, 3}
 		completedSteps := 0
 		activeStep := 0
 		minutesLeft := 0
