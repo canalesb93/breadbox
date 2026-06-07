@@ -36,10 +36,15 @@ func DeveloperSettingsHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 			}
 		}
 
+		uploadTokenMasked := ""
+		if settings.UploadToken != nil {
+			uploadTokenMasked = *settings.UploadToken
+		}
 		props := pages.DeveloperSettingsProps{
 			Form: pages.DeveloperSettingsFormFields{
-				Enabled:    settings.Enabled,
-				GithubRepo: settings.GithubRepo,
+				Enabled:           settings.Enabled,
+				GithubRepo:        settings.GithubRepo,
+				UploadTokenMasked: uploadTokenMasked,
 			},
 			FieldErrors: map[string]string{},
 			FormError:   formError,
@@ -69,6 +74,10 @@ func DeveloperSettingsPostHandler(a *app.App, svc *service.Service, sm *scs.Sess
 		params := service.UpdateDevModeSettingsParams{
 			Enabled:    &enabled,
 			GithubRepo: &repo,
+		}
+		// Empty submit = keep the stored token; non-empty = replace it.
+		if tok := strings.TrimSpace(r.FormValue("upload_token")); tok != "" {
+			params.UploadToken = &tok
 		}
 
 		if _, err := svc.UpdateDevModeSettings(r.Context(), params); err != nil {

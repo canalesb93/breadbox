@@ -134,6 +134,12 @@ const (
 	// DevModeDefaultRepo when unset.
 	KeyDevModeGithubRepo = "devmode.github_repo"
 
+	// KeyDevModeUploadToken is the Bearer token the server uses to upload the
+	// reporter's screenshot + HTML snapshot to the artifact host
+	// (bb-artifacts.exe.xyz). Stored AES-GCM encrypted; set from
+	// Settings → Developer. The BB_ARTIFACTS_UPLOAD_TOKEN env var overrides it.
+	KeyDevModeUploadToken = "devmode.upload_token"
+
 	// KeyInstanceTimezone is the IANA timezone (e.g. "America/Los_Angeles")
 	// every cron schedule — sync schedules AND agent/workflow schedules — is
 	// evaluated in, and that schedule previews are rendered in. Unset or
