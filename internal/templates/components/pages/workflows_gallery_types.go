@@ -149,7 +149,6 @@ type WorkflowCustomCardProps struct {
 	Description  string // first line of the prompt
 	Enabled      bool   // run-state (the card toggle flips it immediately)
 	AvatarSeed   string // DiceBear seed; empty = slug-seeded
-	TriggerLabel string // "After each sync" / a cron summary / "Manual"
 	LastRunError bool   // most recent run failed → red status dot
 }
 

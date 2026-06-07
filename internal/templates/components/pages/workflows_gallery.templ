@@ -74,39 +74,23 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 			}
 		</div>
 		// Custom workflows — hand-authored automations (source_template IS
-		// NULL). Rendered in their own section with a "Create" affordance so
-		// the operator can author a free-form prompt + schedule. Shown when
-		// any exist, or to admins (who can create the first one).
+		// NULL). Rendered with the same card component as presets; a dashed
+		// "create" row sits at the end of the grid (or alone, when there are
+		// none). Shown when any exist, or to admins (who can create the first).
 		if len(p.Custom) > 0 || p.IsAdmin {
 			<section class="mt-8">
-				<div class="flex items-center justify-between gap-2 mb-3 px-0.5">
-					<div class="flex items-center gap-2">
-						@components.LucideIcon("wand-sparkles", "w-4 h-4 text-base-content/55")
-						<h2 class="text-sm font-semibold">Custom workflows</h2>
-					</div>
+				<div class="flex items-center gap-2 mb-3 px-0.5">
+					@components.LucideIcon("wand-sparkles", "w-4 h-4 text-base-content/55")
+					<h2 class="text-sm font-semibold">Custom workflows</h2>
+				</div>
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+					for _, c := range p.Custom {
+						@workflowCustomCard(c, p.IsAdmin)
+					}
 					if p.IsAdmin {
-						<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="openCustom('')">
-							@components.LucideIcon("plus", "w-4 h-4")
-							Create custom workflow
-						</button>
+						@workflowCustomCreateRow()
 					}
 				</div>
-				if len(p.Custom) > 0 {
-					<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-						for _, c := range p.Custom {
-							@workflowCustomCard(c, p.IsAdmin)
-						}
-					</div>
-				} else {
-					<button
-						type="button"
-						class="bb-card w-full px-4 py-6 flex items-center justify-center gap-2 text-sm text-base-content/55 hover:text-base-content hover:border-base-content/20 transition-colors"
-						@click="openCustom('')"
-					>
-						@components.LucideIcon("plus", "w-4 h-4")
-						Author your own workflow — write a prompt, pick a schedule, and let it run.
-					</button>
-				}
 			</section>
 		}
 		<!-- Configure drawer: one components.Drawer slide-over per available preset. -->
@@ -752,13 +736,23 @@ templ workflowConfigDrawer(preset WorkflowPresetCardProps, consentAck bool) {
 // It leads with the workflow's DiceBear avatar (its visual identity) and a
 // trigger summary, then the run toggle + an edit gear that opens the shared
 // custom drawer prefilled via openCustom(slug).
+// workflowCustomCard renders a hand-authored workflow using the same shape,
+// spacing, and interaction as workflowPresetCard — the leading slot shows the
+// workflow's DiceBear avatar instead of a preset's icon tile, and the gear
+// opens the custom drawer (openCustom) rather than reconfigure. Like a preset
+// card, the whole row toggles run-state on click for admins (cardClick).
 templ workflowCustomCard(c WorkflowCustomCardProps, isAdmin bool) {
-	<div class="bb-card px-4 py-3 h-full flex items-center gap-3">
-		<div class="relative shrink-0">
+	<div
+		class={ "bb-card px-4 py-3 h-full flex items-center gap-3", templ.KV("bb-card--interactive", isAdmin) }
+		if isAdmin {
+			@click="cardClick($event)"
+		}
+	>
+		<div class="relative w-10 h-10 shrink-0">
 			<img
 				src={ customWorkflowAvatarSrc(c) }
 				alt={ c.Name + " avatar" }
-				class="w-9 h-9 rounded-lg bg-base-200"
+				class="w-10 h-10 rounded-xl object-cover bg-base-200"
 				loading="lazy"
 			/>
 			if c.LastRunError {
@@ -766,12 +760,8 @@ templ workflowCustomCard(c WorkflowCustomCardProps, isAdmin bool) {
 			}
 		</div>
 		<div class="flex-1 min-w-0">
-			<div class="font-medium text-sm leading-tight truncate">{ c.Name }</div>
-			<div class="text-xs text-base-content/60 mt-0.5 line-clamp-1">{ c.Description }</div>
-			<div class="text-[11px] text-base-content/40 mt-0.5 inline-flex items-center gap-1">
-				@components.LucideIcon("clock", "w-3 h-3")
-				{ c.TriggerLabel }
-			</div>
+			<div class="font-medium text-sm leading-tight">{ c.Name }</div>
+			<div class="text-xs text-base-content/60 mt-0.5 line-clamp-2">{ c.Description }</div>
 		</div>
 		<div class="flex items-center gap-1 shrink-0">
 			<input
@@ -795,6 +785,28 @@ templ workflowCustomCard(c WorkflowCustomCardProps, isAdmin bool) {
 			}
 		</div>
 	</div>
+}
+
+// workflowCustomCreateRow is the dashed "add" affordance at the tail of the
+// custom-workflow grid (or standing alone when there are none). It matches a
+// card's footprint and leading-slot alignment, but swaps the solid card border
+// for a dashed outline and carries only a plus glyph — no avatar, toggle, or
+// gear. Clicking it opens the custom drawer blank (openCustom('')).
+templ workflowCustomCreateRow() {
+	<button
+		type="button"
+		class="px-4 py-3 h-full w-full flex items-center gap-3 rounded-xl border border-dashed border-base-300 text-base-content/55 hover:border-base-content/30 hover:bg-base-200/40 hover:text-base-content transition-colors text-left cursor-pointer"
+		@click="openCustom('')"
+		aria-label="Create custom workflow"
+	>
+		<div class={ presetTileClasses(false) }>
+			@components.LucideIcon("plus", "w-5 h-5")
+		</div>
+		<div class="flex-1 min-w-0">
+			<div class="font-medium text-sm leading-tight">Create custom workflow</div>
+			<div class="text-xs text-base-content/50 mt-0.5">Write a prompt, pick a schedule, and let it run.</div>
+		</div>
+	</button>
 }
 
 // customWorkflowAvatarSrc builds the server-rendered DiceBear URL for a custom

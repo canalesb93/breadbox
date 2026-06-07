@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"breadbox/internal/cronspec"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
 
@@ -42,11 +41,10 @@ func buildCustomWorkflowCards(defs []service.AgentDefinitionResponse) []pages.Wo
 			continue // preset-backed → handled by the preset gallery
 		}
 		card := pages.WorkflowCustomCardProps{
-			Slug:         d.Slug,
-			Name:         d.Name,
-			Description:  firstPromptLine(d.Prompt, 120),
-			Enabled:      d.Enabled,
-			TriggerLabel: customWorkflowTriggerLabel(d),
+			Slug:        d.Slug,
+			Name:        d.Name,
+			Description: firstPromptLine(d.Prompt, 120),
+			Enabled:     d.Enabled,
 		}
 		if d.AvatarSeed != nil {
 			card.AvatarSeed = *d.AvatarSeed
@@ -57,21 +55,6 @@ func buildCustomWorkflowCards(defs []service.AgentDefinitionResponse) []pages.Wo
 		out = append(out, card)
 	}
 	return out
-}
-
-// customWorkflowTriggerLabel renders a one-word trigger summary for a custom
-// workflow card: post-sync, scheduled, or manual.
-func customWorkflowTriggerLabel(d service.AgentDefinitionResponse) string {
-	if d.TriggerOnSyncComplete {
-		return "After each sync"
-	}
-	if d.ScheduleCron != nil && strings.TrimSpace(*d.ScheduleCron) != "" {
-		if desc := cronspec.Humanize(*d.ScheduleCron, ""); desc != "" {
-			return desc
-		}
-		return "Scheduled"
-	}
-	return "Manual"
 }
 
 // firstPromptLine returns the first non-empty line of a prompt, truncated to
