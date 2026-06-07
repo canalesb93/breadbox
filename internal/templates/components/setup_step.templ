@@ -66,6 +66,12 @@ type SetupStepProps struct {
 	CTAIcon      string
 	CTALabel     string
 	CTADisabled  bool // render as a disabled btn span (no link)
+	// CTAOnClick, when non-empty, renders the CTA as a <button> with this
+	// Alpine @click expression instead of an <a href> — e.g.
+	// "$store.drawers.open('connect-bank')" to open a global drawer rather
+	// than navigate. CTAHref is ignored when this is set. Has no effect on
+	// the disabled-pending state (which stays a non-interactive span).
+	CTAOnClick string
 
 	// Stat is an optional inline metric shown in the trailing area, left of
 	// the CTA and vertically centered with it — e.g. "3" + StatLabel
@@ -179,12 +185,7 @@ templ setupStepMetaRow(p SetupStepProps) {
 templ setupStepCTA(p SetupStepProps) {
 	switch p.State {
 		case SetupStepActive:
-			<a href={ p.CTAHref } class="btn btn-primary btn-sm gap-2">
-				if p.CTAIcon != "" {
-					@LucideIcon(p.CTAIcon, "w-4 h-4")
-				}
-				{ p.CTALabel }
-			</a>
+			@setupStepCTAControl(p, "btn btn-primary btn-sm gap-2")
 		case SetupStepPending:
 			if p.CTADisabled {
 				<span class="btn btn-sm btn-disabled gap-2" aria-disabled="true">
@@ -194,20 +195,32 @@ templ setupStepCTA(p SetupStepProps) {
 					{ p.CTALabel }
 				</span>
 			} else {
-				<a href={ p.CTAHref } class="btn btn-ghost btn-sm gap-2 text-base-content/60">
-					if p.CTAIcon != "" {
-						@LucideIcon(p.CTAIcon, "w-4 h-4")
-					}
-					{ p.CTALabel }
-				</a>
+				@setupStepCTAControl(p, "btn btn-ghost btn-sm gap-2 text-base-content/60")
 			}
 		default:
-			<a href={ p.CTAHref } class="btn btn-ghost btn-sm gap-2">
-				if p.CTAIcon != "" {
-					@LucideIcon(p.CTAIcon, "w-4 h-4")
-				}
-				{ p.CTALabel }
-			</a>
+			@setupStepCTAControl(p, "btn btn-ghost btn-sm gap-2")
+	}
+}
+
+// setupStepCTAControl renders the interactive CTA as either an Alpine
+// <button> (when CTAOnClick is set — e.g. to open a global drawer) or the
+// classic <a href> link. The class string carries the per-state styling so
+// the link/button shapes can't drift apart.
+templ setupStepCTAControl(p SetupStepProps, class string) {
+	if p.CTAOnClick != "" {
+		<button type="button" x-data @click={ p.CTAOnClick } class={ class }>
+			if p.CTAIcon != "" {
+				@LucideIcon(p.CTAIcon, "w-4 h-4")
+			}
+			{ p.CTALabel }
+		</button>
+	} else {
+		<a href={ p.CTAHref } class={ class }>
+			if p.CTAIcon != "" {
+				@LucideIcon(p.CTAIcon, "w-4 h-4")
+			}
+			{ p.CTALabel }
+		</a>
 	}
 }
 

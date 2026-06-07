@@ -100,6 +100,17 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.TopbarUserMenu(topbarUserMenuPropsFromData(m)), nil
 	},
+	// ConnectBankDrawer is the app-wide connect-a-bank slide-over rendered
+	// once in layout/base.html. Its props (provider availability + household
+	// members) are resolved at render time by the connectDrawer resolver and
+	// injected into the data map under "ConnectBankDrawer".
+	"ConnectBankDrawer": func(data any) (templ.Component, error) {
+		p, ok := data.(pages.ConnectionNewProps)
+		if !ok {
+			return nil, fmt.Errorf("ConnectBankDrawer: want pages.ConnectionNewProps, got %T", data)
+		}
+		return pages.ConnectBankDrawer(p), nil
+	},
 }
 
 // topbarUserMenuPropsFromData builds the identity props the topbar
@@ -364,6 +375,11 @@ type TemplateRenderer struct {
 	version        string
 	versionChecker *version.Checker
 	appcfg         appconfig.Reader
+	// connectDrawer resolves the props for the app-wide connect-bank drawer
+	// at render time (provider availability + household members). Returns
+	// ok=false to skip rendering (e.g. unauthenticated requests). Wired in
+	// NewAdminRouter; nil leaves the drawer unrendered.
+	connectDrawer func(r *http.Request) (pages.ConnectionNewProps, bool)
 }
 
 // NewTemplateRenderer parses all embedded templates and returns a renderer.
@@ -595,6 +611,18 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 				m["SessionUserName"] = tr.sm.GetString(r.Context(), sessionKeyUserName)
 			}
 		}
+		// Resolve the app-wide connect-bank drawer props (provider availability
+		// + household members). Rendered once globally in layout/base.html so
+		// every "Connect a bank" entry point opens the same slide-over. The
+		// resolver returns ok=false for unauthenticated requests; base.html
+		// only renders the drawer in the authenticated main-layout shell.
+		if tr.connectDrawer != nil {
+			if _, exists := m["ConnectBankDrawer"]; !exists {
+				if props, ok := tr.connectDrawer(r); ok {
+					m["ConnectBankDrawer"] = props
+				}
+			}
+		}
 		// Cache assembled NavProps so navPropsFromData can type-assert it
 		// directly rather than re-extracting each string key.
 		m["_NavProps"] = buildNavProps(m)
@@ -713,6 +741,13 @@ func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 // dismissal is not consulted and the callout shows whenever an update exists.
 func (tr *TemplateRenderer) SetAppConfigReader(r appconfig.Reader) {
 	tr.appcfg = r
+}
+
+// SetConnectDrawerResolver wires the resolver for the app-wide connect-bank
+// drawer (rendered globally in layout/base.html). It runs at render time on
+// authenticated full-page renders; returning ok=false skips the drawer.
+func (tr *TemplateRenderer) SetConnectDrawerResolver(fn func(r *http.Request) (pages.ConnectionNewProps, bool)) {
+	tr.connectDrawer = fn
 }
 
 // ruleFieldLabel maps a rule-condition field name to its human-readable

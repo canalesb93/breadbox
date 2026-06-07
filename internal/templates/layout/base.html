@@ -620,6 +620,12 @@
               instead. See issue #462. */ -}}
         {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
       </main>
+      {{- /* App-wide connect-bank slide-over. Rendered once here (not per
+            page) so every "Connect a bank" entry point across the app opens
+            the same drawer via $store.drawers.open('connect-bank'). Props
+            (provider availability + household members) are resolved at render
+            time by the connectDrawer resolver. */ -}}
+      {{if .ConnectBankDrawer}}{{renderComponent "ConnectBankDrawer" .ConnectBankDrawer}}{{end}}
     </div>
 
     <!-- Sidebar -->
