@@ -65,6 +65,14 @@ templ SectionMarkdownProse() {
 			</div>
 		}
 		@designExample(
+			"Callouts / admonitions",
+			"GitHub-style > [!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION] render as colored, icon'd boxes — ideal for agent reports flagging things. Pure server-side (goldmark blockquote transform + lucide icons).",
+		) {
+			<div class="bb-card p-4 max-w-2xl">
+				@components.Markdown(designMarkdownSampleCallouts())
+			</div>
+		}
+		@designExample(
 			"Typography",
 			"Inline `code`, **bold**, *italic*, ~~strikethrough~~, autolinked URLs, and the Typographer extension (smart quotes, en/em dashes, ellipsis).",
 		) {
@@ -153,6 +161,14 @@ func designMarkdownSampleTable() string {
 		"| Whole Foods   |   12 |   $384.12   |\n" +
 		"| Lyft          |   18 |   $192.40   |\n" +
 		"| Apple.com     |    3 |    $59.97   |"
+}
+
+func designMarkdownSampleCallouts() string {
+	return "> [!NOTE]\n> Pulled 47 transactions from the last 30 days.\n\n" +
+		"> [!TIP]\n> Create a rule for Whole Foods to auto-categorize future charges.\n\n" +
+		"> [!IMPORTANT]\n> Two accounts share the merchant \"Apple\" — totals are combined.\n\n" +
+		"> [!WARNING]\n> A charge posted twice on the same day. Flagged for review.\n\n" +
+		"> [!CAUTION]\n> This rule would re-categorize 312 historical transactions."
 }
 
 func designMarkdownSampleTypography() string {

@@ -158,6 +158,77 @@ func TestRenderEmpty(t *testing.T) {
 	}
 }
 
+func TestCallouts(t *testing.T) {
+	cases := []struct {
+		name     string
+		in       string
+		contains []string
+	}{
+		{
+			name:     "note callout",
+			in:       "> [!NOTE]\n> Heads up on this charge.",
+			contains: []string{`class="bb-callout bb-callout-note"`, "bb-callout-title", "<span>Note</span>", "Heads up on this charge."},
+		},
+		{
+			name:     "warning callout case-insensitive",
+			in:       "> [!warning]\n> Duplicate detected.",
+			contains: []string{"bb-callout-warning", "<span>Warning</span>", "Duplicate detected."},
+		},
+		{
+			name:     "marker stripped from body",
+			in:       "> [!TIP]\n> Use a rule for this.",
+			contains: []string{"bb-callout-tip", "Use a rule for this."},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := string(Render(tc.in))
+			if strings.Contains(out, "[!") {
+				t.Errorf("callout marker leaked into output: %s", out)
+			}
+			for _, want := range tc.contains {
+				if !strings.Contains(out, want) {
+					t.Errorf("missing %q\n--- got ---\n%s", want, out)
+				}
+			}
+		})
+	}
+}
+
+func TestPlainBlockquoteStillRenders(t *testing.T) {
+	out := string(Render("> just a quote"))
+	if !strings.Contains(out, "<blockquote>") || strings.Contains(out, "bb-callout") {
+		t.Errorf("plain blockquote should not be a callout: %s", out)
+	}
+}
+
+func TestHeadingAnchor(t *testing.T) {
+	out := string(Render("## Spending Review"))
+	if !strings.Contains(out, `id="spending-review"`) {
+		t.Errorf("missing heading id: %s", out)
+	}
+	if !strings.Contains(out, `class="bb-heading-anchor" href="#spending-review"`) {
+		t.Errorf("missing hover-anchor link: %s", out)
+	}
+}
+
+func TestCodeBlockChrome(t *testing.T) {
+	out := string(Render("```go\nfunc main() {}\n```"))
+	for _, want := range []string{`class="bb-code"`, "bb-code-bar", "bb-code-copy", `data-bb-copy`, `class="bb-code-lang">go<`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("code chrome missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+func TestCodeBlockChromeNoLanguage(t *testing.T) {
+	// A fenced block with no language still gets the chrome + a <pre><code>.
+	out := string(Render("```\nplain text\n```"))
+	if !strings.Contains(out, `class="bb-code"`) || !strings.Contains(out, "plain text") {
+		t.Errorf("plain fenced block missing chrome/content: %s", out)
+	}
+}
+
 func TestChromaCSSGenerates(t *testing.T) {
 	for _, style := range []string{"github", "github-dark"} {
 		css, err := ChromaCSS(style)

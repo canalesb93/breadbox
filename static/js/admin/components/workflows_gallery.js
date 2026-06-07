@@ -580,6 +580,11 @@ document.addEventListener('alpine:init', function () {
           var el = self.$refs.previewBody;
           if (!el) return;
           el.innerHTML = self.previewBodyHTML || '';
+          // Render any <i data-lucide> placeholders (code-block copy icons,
+          // callout icons) the server markdown emitted into this fragment.
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
           // The body element is reused across opens; reset its scroll so a
           // new prompt always starts at the top rather than wherever the
           // previous one was left scrolled. The element is x-show-gated on

@@ -44,6 +44,17 @@ func buildPolicy() *bluemonday.Policy {
 	p.AddTargetBlankToFullyQualifiedLinks(true)
 	p.RequireNoReferrerOnFullyQualifiedLinks(true)
 
+	// Chrome emitted by our own renderers (extensions.go): code-block copy
+	// button, lucide icon placeholders, and heading hover-anchors. goldmark
+	// drops raw HTML from the source (WithUnsafe off), so the ONLY source of
+	// these is our trusted server-side renderer — allowing them here creates
+	// no injection vector. Icons are <i data-lucide> placeholders the global
+	// lucide runtime swaps to inline SVG (bluemonday mangles raw SVG).
+	p.AllowElements("button")
+	p.AllowAttrs("type", "aria-label", "data-bb-copy").OnElements("button")
+	p.AllowAttrs("data-lucide", "aria-hidden").OnElements("i")
+	p.AllowAttrs("aria-hidden", "tabindex").OnElements("a")
+
 	return p
 }
 

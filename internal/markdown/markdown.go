@@ -28,6 +28,7 @@ import (
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	gmhtml "github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
 )
 
 // md and mdBreaks are the two goldmark instances. They differ only in
@@ -57,6 +58,9 @@ func newGoldmark(hardWraps bool) goldmark.Markdown {
 				// themed by CSS (light + dark in input.css). No JS, no inline
 				// styles, highlighted in the initial HTML.
 				highlighting.WithFormatOptions(chromahtml.WithClasses(true)),
+				// Wrap each block in .bb-code with a language pill + copy
+				// button (see extensions.go + code-copy.js).
+				highlighting.WithWrapperRenderer(codeWrapper),
 			),
 		),
 		goldmark.WithParserOptions(
@@ -65,8 +69,13 @@ func newGoldmark(hardWraps bool) goldmark.Markdown {
 			// CSS (.bb-prose h1…h6) already keeps them visually modest, and
 			// this matches the prior marked-based rendering.
 			parser.WithAutoHeadingID(),
+			// GitHub-style callouts: > [!NOTE] / [!WARNING] / … (extensions.go).
+			parser.WithASTTransformers(util.Prioritized(calloutTransformer{}, 100)),
 		),
-		goldmark.WithRendererOptions(rendererOpts...),
+		goldmark.WithRendererOptions(append(rendererOpts,
+			// Custom renderers for callout blockquotes + heading hover-anchors.
+			renderer.WithNodeRenderers(util.Prioritized(&bbNodeRenderer{}, 100)),
+		)...),
 	)
 }
 
