@@ -6,9 +6,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"breadbox/internal/agent"
@@ -326,14 +328,77 @@ func classifyTranscriptEvent(obj map[string]any, raw string) pages.TranscriptEve
 	case "cost_cap_hit", "system":
 		ev.Type = "system"
 		if data, ok := obj["data"].(map[string]any); ok {
-			if msg, ok := data["message"].(string); ok {
+			// cost_cap_hit carries a human "message"; the SDK "init"
+			// event does not — it ships session metadata (model, tools,
+			// MCP wiring). Without the init branch the first transcript
+			// row renders blank.
+			if msg, ok := data["message"].(string); ok && msg != "" {
 				ev.Text = msg
+			} else if subtype, _ := data["subtype"].(string); subtype == "init" {
+				ev.Text = summarizeSystemInit(data)
 			}
 		}
 	default:
 		ev.Type = "raw"
 	}
 	return ev
+}
+
+// summarizeSystemInit builds a one-line summary of the SDK "init" system
+// event. That event opens every transcript but carries session metadata
+// (model, available tools, MCP server wiring) rather than a human
+// message, so the generic data.message path leaves it blank. Surfacing
+// the metadata turns the first row into a useful "session initialized"
+// header instead of an empty System line.
+func summarizeSystemInit(data map[string]any) string {
+	var parts []string
+	if model, _ := data["model"].(string); model != "" {
+		parts = append(parts, "Model "+model)
+	}
+	if tools, ok := data["tools"].([]any); ok && len(tools) > 0 {
+		noun := "tools"
+		if len(tools) == 1 {
+			noun = "tool"
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", len(tools), noun))
+	}
+	if servers := mcpServerSummary(data); servers != "" {
+		parts = append(parts, "MCP: "+servers)
+	}
+	if len(parts) == 0 {
+		return "Session initialized"
+	}
+	return strings.Join(parts, " · ")
+}
+
+// mcpServerSummary renders the init event's mcp_servers array as
+// "name (status), name (status)". The SDK has shipped both snake_case
+// and camelCase for this key, so accept either.
+func mcpServerSummary(data map[string]any) string {
+	raw, ok := data["mcp_servers"].([]any)
+	if !ok {
+		raw, ok = data["mcpServers"].([]any)
+	}
+	if !ok || len(raw) == 0 {
+		return ""
+	}
+	var names []string
+	for _, s := range raw {
+		sm, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := sm["name"].(string)
+		if name == "" {
+			continue
+		}
+		if status, _ := sm["status"].(string); status != "" {
+			names = append(names, fmt.Sprintf("%s (%s)", name, status))
+		} else {
+			names = append(names, name)
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 // extractMessageText walks data.message.content[] for blocks of type
