@@ -299,10 +299,10 @@ templ settingsAvatarPicker(p SettingsProps, actor, label, caption, current strin
 			<label for={ "avatar_style_" + actor } class="bb-settings-row__label">{ label }</label>
 			<p class="bb-settings-row__caption">{ caption }</p>
 		</div>
-		<div class="flex items-center justify-between gap-2">
+		<div class="flex items-center gap-2">
 			for _, seed := range seeds {
 				<img
-					class="w-10 h-10 rounded-full bg-base-200 ring-1 ring-base-300/60"
+					class="w-9 h-9 rounded-full bg-base-200 ring-1 ring-base-300/60"
 					loading="lazy"
 					alt={ "Preview " + seed }
 					:src={ avatarPreviewExpr(seed) }
@@ -315,7 +315,7 @@ templ settingsAvatarPicker(p SettingsProps, actor, label, caption, current strin
 			Label:     label + " avatar style saved",
 		}) {
 			<input type="hidden" name="actor" value={ actor }/>
-			<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200 w-full" x-model="style">
+			<select id={ "avatar_style_" + actor } name="avatar_style" class="select select-sm bg-base-200 w-44" x-model="style">
 				for _, opt := range p.AvatarStyles {
 					if opt.ID == current {
 						<option value={ opt.ID } selected>{ opt.Label }</option>
