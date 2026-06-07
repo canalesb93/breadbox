@@ -364,7 +364,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "markdown-prose",
 			Title:       "Markdown prose",
-			Description: "components.Markdown renders agent-emitted text as a safe HTML fragment wrapped in .bb-prose. Supports paragraphs, headers (##/###), emphasis, inline + fenced code, lists (one nest level), GFM tables, blockquotes, and http/https/mailto links. Drives the assistant chat bubble on the run-detail page and will land in the reports body next.",
+			Description: "The single server-side markdown renderer (internal/markdown: goldmark + chroma + bluemonday) behind components.Markdown / MarkdownLarge / MarkdownBreaks. Renders headings (+auto anchors), lists, GFM task-lists + tables, syntax-highlighted code, blockquotes, smart-typography, and http/https/mailto links into .bb-prose — sanitized so raw HTML and javascript:/data: links never survive. Drives agent transcripts, agent prompts, report bodies, transaction comments, and the workflow prompt preview.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionMarkdownProse() },
 		},

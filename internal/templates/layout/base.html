@@ -60,6 +60,10 @@
        [data-private] nodes. Non-deferred so it exists before Alpine's
        `privacy` store inits; its own pass waits for DOMContentLoaded. -->
   <script src="/static/js/admin/privacy.js"></script>
+  <!-- Copy-to-clipboard for server-rendered markdown code blocks (.bb-code).
+       Delegated listener — covers every code block on the page incl. ones
+       injected later by live polls. -->
+  <script src="/static/js/admin/code-copy.js" defer></script>
   <!-- fetchpriority="high" hints that the app stylesheet is render-blocking and
        critical. Safari 17.2+ and Chrome 102+ honor it; older browsers ignore. -->
   <link rel="stylesheet" href="/static/css/styles.css" fetchpriority="high">
