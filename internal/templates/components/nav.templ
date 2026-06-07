@@ -82,7 +82,7 @@ templ Nav(p NavProps) {
 		// household/log admin tools are.
 		<div class="bb-sidebar-section">System</div>
 		if p.IsEditor {
-			@navLinkBadge("/connections", "link", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
+			@navLinkBadge("/connections", "cable", "Connections", navActive(p.CurrentPage, "connections"), p.ConnectionsAttention, "bb-nav-badge--warn", fmt.Sprintf("%d connections need attention", p.ConnectionsAttention))
 			if p.IsAdmin {
 				@navLink("/household", "users", "Household", navActive(p.CurrentPage, "household"))
 				// Logs is intentionally hidden from the rail for now while we decide
