@@ -4,9 +4,10 @@
 INSERT INTO csv_import_rows (
     session_id, row_index, raw, parsed_date, parsed_amount, parsed_desc,
     parsed_merchant, parsed_category, classification, match_txn_id, match_score,
-    match_reason, parse_error, content_hash, provider_txn_id, include, user_edited
+    match_reason, parse_error, content_hash, provider_txn_id, include, user_edited,
+    category_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
 );
 
 -- name: DeleteCSVImportRows :exec
@@ -28,6 +29,13 @@ SELECT classification, COUNT(*) AS count
 FROM csv_import_rows
 WHERE session_id = $1
 GROUP BY classification;
+
+-- name: CountIncludedCSVImportRows :one
+SELECT COUNT(*) FROM csv_import_rows
+WHERE session_id = $1
+  AND include = TRUE
+  AND classification <> 'error'
+  AND classification <> 'needs_account';
 
 -- name: ListIncludedCSVImportRows :many
 -- The exact set that apply will upsert: included, non-error rows in row order.
@@ -54,6 +62,7 @@ SET parsed_date     = $2,
     content_hash    = $12,
     provider_txn_id = $13,
     include         = $14,
+    category_id     = $15,
     user_edited     = TRUE
 WHERE id = $1
 RETURNING *;
@@ -69,5 +78,5 @@ WHERE session_id = $1 AND classification = $2;
 -- name: SetCSVImportRowsCategoryAll :exec
 -- Bulk "set category" across all included rows in the session.
 UPDATE csv_import_rows
-SET parsed_category = $2, user_edited = TRUE
+SET category_id = $2, user_edited = TRUE
 WHERE session_id = $1 AND include = TRUE;
