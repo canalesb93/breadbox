@@ -1016,7 +1016,7 @@
 
       <!-- footer hint (mirrors components.DrawerFooter chrome, info copy) -->
       <div class="px-5 py-3 border-t border-base-300 shrink-0 text-center text-[0.7rem] text-base-content/40">
-        Press {{renderComponent "Kbd" "?"}} anytime to open · {{renderComponent "Kbd" "esc"}} to close
+        Press {{renderComponent "Kbd" "?"}} to toggle · {{renderComponent "Kbd" "esc"}} to close
       </div>
     </div>
   </div>
@@ -2909,7 +2909,7 @@
         reg.register({
           id: 'global.help',
           keys: '?',
-          description: 'Show keyboard shortcuts',
+          description: 'Toggle keyboard shortcuts',
           group: 'Actions',
           scope: 'global',
           action: function() {
@@ -3086,6 +3086,18 @@
         // dispatcher is modifier-free.
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (isInputFocused()) return;
+
+        // `?` toggles the shortcuts drawer: when it's already the active
+        // overlay, a second `?` closes it (the open path is the normal
+        // dispatch below). Handled before the isOverlayOpen() gate, which
+        // would otherwise swallow the keystroke while the drawer is open.
+        var drawersStore = window.Alpine && Alpine.store('drawers');
+        if (e.key === '?' && drawersStore && drawersStore.active === 'shortcuts') {
+          e.preventDefault();
+          drawersStore.close();
+          return;
+        }
+
         if (isOverlayOpen()) return;
 
         var reg = (window.Alpine && Alpine.store('shortcuts')) || null;
