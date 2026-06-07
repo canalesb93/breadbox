@@ -213,6 +213,89 @@
   </script>
 
   <script>
+    // Alpine store: $store.csvImport
+    //
+    // Coordinates the drop-anywhere CSV import flow. `dragging` drives the
+    // full-window drop overlay; `active` opens the import modal. A dropped File
+    // is parked on `pendingFile` for the csvImport Alpine component to pick up.
+    // `dragDepth` is a counter so the overlay doesn't flicker as the drag
+    // crosses child elements (each dragenter/dragleave pair nets to zero).
+    document.addEventListener('alpine:init', function() {
+      Alpine.store('csvImport', {
+        active: false,
+        dragging: false,
+        dragDepth: 0,
+        pendingFile: null,
+        seq: 0, // bumped each open so the component re-reads pendingFile
+        open: function(file) {
+          this.pendingFile = file;
+          this.seq++;
+          this.active = true;
+          document.documentElement.style.overflow = 'hidden';
+        },
+        close: function() {
+          this.active = false;
+          this.pendingFile = null;
+          document.documentElement.style.overflow = '';
+        },
+      });
+    });
+
+    // Body-level drag-and-drop: show the overlay only for file drags, ignore
+    // drags over elements that opt out with [data-dropzone], and open the import
+    // flow when a CSV/TSV file is dropped anywhere on the page.
+    (function() {
+      function hasFiles(e) {
+        if (!e.dataTransfer || !e.dataTransfer.types) return false;
+        return Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
+      }
+      function store() { return window.Alpine && Alpine.store('csvImport'); }
+      function isCSV(file) {
+        if (!file) return false;
+        var n = (file.name || '').toLowerCase();
+        return n.endsWith('.csv') || n.endsWith('.tsv') || n.endsWith('.txt') ||
+               file.type === 'text/csv' || file.type === 'text/tab-separated-values';
+      }
+      document.addEventListener('dragenter', function(e) {
+        if (!hasFiles(e) || e.target.closest('[data-dropzone]')) return;
+        var s = store(); if (!s) return;
+        s.dragDepth++;
+        s.dragging = true;
+      });
+      document.addEventListener('dragover', function(e) {
+        if (!hasFiles(e) || e.target.closest('[data-dropzone]')) return;
+        e.preventDefault();
+      });
+      document.addEventListener('dragleave', function(e) {
+        if (!hasFiles(e)) return;
+        var s = store(); if (!s) return;
+        s.dragDepth = Math.max(0, s.dragDepth - 1);
+        if (s.dragDepth === 0) s.dragging = false;
+      });
+      document.addEventListener('drop', function(e) {
+        var s = store(); if (!s) return;
+        if (e.target.closest('[data-dropzone]')) { s.dragDepth = 0; s.dragging = false; return; }
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        s.dragDepth = 0;
+        s.dragging = false;
+        var files = e.dataTransfer.files;
+        if (!files || !files.length) return;
+        var csv = [];
+        for (var i = 0; i < files.length; i++) { if (isCSV(files[i])) csv.push(files[i]); }
+        if (!csv.length) {
+          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Only CSV/TSV files can be imported', type: 'warning' } }));
+          return;
+        }
+        if (csv.length > 1) {
+          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Importing the first file; drop the others after this one', type: 'info' } }));
+        }
+        s.open(csv[0]);
+      });
+    })();
+  </script>
+
+  <script>
     // Alpine store: $store.theme
     //
     // Single source of truth for the theme preference, shared by every
@@ -682,6 +765,21 @@
       </div>
     </template>
   </div>
+
+  <!-- CSV import: full-window drop overlay (visual only; document-level
+       listeners in the $store.csvImport script handle the actual drop). -->
+  <div x-show="$store.csvImport.dragging" x-cloak
+       class="fixed inset-0 z-[60] flex items-center justify-center bg-base-100/80 backdrop-blur-sm pointer-events-none"
+       x-transition.opacity>
+    <div class="m-6 flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-primary/5 px-12 py-10 text-center">
+      {{ lucide "upload-cloud" "w-10 h-10 text-primary" }}
+      <div class="text-base font-semibold">Drop your CSV to import</div>
+      <div class="text-sm text-base-content/60">We'll detect the account and preview what changes before anything is saved.</div>
+    </div>
+  </div>
+
+  <!-- CSV import flow modal -->
+  {{renderComponent "ImportModal" .}}
 
   <!-- Global toast (centered floating pill). Daisy `toast toast-center
        toast-bottom` gives us the centered-bottom placement + flex-col

@@ -415,6 +415,13 @@ func DesignSections() []DesignSection {
 
 		// ── Patterns ────────────────────────────────────────────────
 		{
+			Slug:        "csv-import",
+			Title:       "CSV import flow",
+			Description: "Drop-anywhere CSV import (components.ImportModal + $store.csvImport + the csvImport Alpine factory): the full-window drop overlay, ranked account suggestions (mask / overlap / institution / saved profile), per-row classification badges (new / maybe-dup / duplicate / error), the server-paginated preview table, and the success screen.",
+			Group:       "patterns",
+			Render:      func() templ.Component { return SectionCSVImport() },
+		},
+		{
 			Slug:        "multi-select-toolbar",
 			Title:       "Multi-select toolbar",
 			Description: "Floating bottom toolbar that surfaces bulk actions on a multi-selection. Reference: the transactions list's bulk action bar. Use components.MultiSelectToolbar.",
