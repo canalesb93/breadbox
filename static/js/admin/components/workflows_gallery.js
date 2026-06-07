@@ -70,8 +70,57 @@ document.addEventListener('alpine:init', function () {
       runningOneOff: {},
       // -------------------------------------------------------------------
 
+      // pendingSetupSlug tracks a not-yet-set-up card whose run toggle was
+      // optimistically flipped on while its setup drawer is open. If that
+      // drawer is dismissed without saving (Cancel / Esc / backdrop), the
+      // drawer-close watcher in init() reverts the toggle. A successful save
+      // reloads the page, so the optimistic state is replaced by server truth.
+      pendingSetupSlug: '',
+      // -------------------------------------------------------------------
+
       init: function () {
         this.csrfToken = this.$el.dataset.csrf || '';
+        var self = this;
+        // Revert an optimistic setup toggle when its drawer closes unsaved.
+        // submitDrawer reloads on success (no close call), so the only way the
+        // config drawer leaves the screen with a pending toggle is a dismiss.
+        this.$watch('$store.drawers.active', function (active) {
+          if (
+            self.pendingSetupSlug &&
+            active !== 'wf-config-' + self.pendingSetupSlug
+          ) {
+            self._revertPendingSetup();
+          }
+        });
+      },
+
+      // cardClick makes the whole preset row act as its run toggle. A click
+      // that lands on an actual control (the toggle, the settings gear, a link)
+      // is left to that control; anywhere else forwards to the row's toggle via
+      // a synthesized click, so the toggle's own @change / @click handler runs
+      // (toggleWorkflow for set-up cards, beginSetup for not-yet-set-up ones).
+      // Wired only on recurring (non one-off) cards for admins.
+      cardClick: function (ev) {
+        if (ev.target.closest('button, a, input, label, [role="button"]')) return;
+        var toggle = ev.currentTarget.querySelector('input.toggle:not([disabled])');
+        if (toggle) toggle.click();
+      },
+
+      // beginSetup handles a not-yet-set-up card's toggle: optimistically show
+      // it enabled and open the setup drawer. Tracked by pendingSetupSlug so a
+      // dismissed drawer reverts it (see the init() watcher).
+      beginSetup: function (slug, el) {
+        if (el) el.checked = true;
+        this.pendingSetupSlug = slug;
+        Alpine.store('drawers').open('wf-config-' + slug);
+      },
+
+      _revertPendingSetup: function () {
+        var slug = this.pendingSetupSlug;
+        this.pendingSetupSlug = '';
+        if (!slug) return;
+        var cb = document.querySelector('input.toggle[data-setup-slug="' + slug + '"]');
+        if (cb) cb.checked = false;
       },
 
       restorePageState: function () {
