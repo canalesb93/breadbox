@@ -40,11 +40,13 @@ func buildCustomWorkflowCards(defs []service.AgentDefinitionResponse) []pages.Wo
 		if d.SourceTemplate != nil {
 			continue // preset-backed → handled by the preset gallery
 		}
+		manual := !d.TriggerOnSyncComplete && (d.ScheduleCron == nil || strings.TrimSpace(*d.ScheduleCron) == "")
 		card := pages.WorkflowCustomCardProps{
 			Slug:        d.Slug,
 			Name:        d.Name,
 			Description: firstPromptLine(d.Prompt, 120),
 			Enabled:     d.Enabled,
+			Manual:      manual,
 		}
 		if d.AvatarSeed != nil {
 			card.AvatarSeed = *d.AvatarSeed

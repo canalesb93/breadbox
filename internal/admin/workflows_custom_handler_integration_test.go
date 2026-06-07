@@ -45,15 +45,15 @@ func TestCustomWorkflowCreateConfigUpdate(t *testing.T) {
 
 	// --- Create ---
 	w := postForm(t, r, "/-/custom-workflows", url.Values{
-		"name":            {"My Anomaly Sweep"},
-		"prompt":          {"Watch for unusual charges and report them."},
-		"trigger_on_sync": {"false"},
-		"schedule_cron":   {"0 8 * * *"},
-		"model":           {"claude-sonnet-4-6"},
-		"tool_scope":      {"read_only"},
-		"max_budget_usd":  {"3.00"},
-		"avatar_seed":     {"abc123seed"},
-		"enabled":         {"true"},
+		"name":           {"My Anomaly Sweep"},
+		"prompt":         {"Watch for unusual charges and report them."},
+		"trigger_mode":   {"schedule"},
+		"schedule_cron":  {"0 8 * * *"},
+		"model":          {"claude-sonnet-4-6"},
+		"tool_scope":     {"read_only"},
+		"max_budget_usd": {"3.00"},
+		"avatar_seed":    {"abc123seed"},
+		"enabled":        {"true"},
 	})
 	if w.Code != http.StatusOK {
 		t.Fatalf("create: status %d, body %s", w.Code, w.Body.String())
@@ -107,11 +107,11 @@ func TestCustomWorkflowCreateConfigUpdate(t *testing.T) {
 
 	// --- Update: rewrite prompt + switch to post-sync ---
 	uw := postForm(t, r, "/-/custom-workflows/"+created.Slug, url.Values{
-		"name":            {"My Anomaly Sweep"},
-		"prompt":          {"Updated instructions."},
-		"trigger_on_sync": {"true"},
-		"model":           {"claude-sonnet-4-6"},
-		"tool_scope":      {"read_write"},
+		"name":         {"My Anomaly Sweep"},
+		"prompt":       {"Updated instructions."},
+		"trigger_mode": {"sync"},
+		"model":        {"claude-sonnet-4-6"},
+		"tool_scope":   {"read_write"},
 	})
 	if uw.Code != http.StatusOK {
 		t.Fatalf("update: status %d, body %s", uw.Code, uw.Body.String())
