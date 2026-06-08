@@ -1,0 +1,232 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionAccountsRedesign is the Workflows-DNA-applied prototype of the
+// /accounts page: the dense sortable table reimagined as the list-row
+// surface the workflows pages use. It demonstrates the three big moves —
+// status in one leading tile (with a corner health dot), one body line by
+// priority, and a quick-manage slide-over Drawer — against real components
+// and sample data. Demo only; nothing here is wired to live accounts.
+templ SectionAccountsRedesign() {
+	<div x-data="{ filter: '' }" class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">Prototype — the DNA applied to /accounts</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Today's <code>/accounts</code> is a 5-column sortable table. This reimagines it as the workflows list-row surface: a leading <strong>type tile that carries connection health</strong> (corner dot — amber reauth, red disconnected), <strong>one body line by priority</strong> (a connection problem replaces the normal <code>Institution · ••••mask · Type</code> meta), and a trailing balance.</li>
+				<li>The filter row mirrors <code>/workflows/runs</code>: a box <code>TabBar</code> segmented by type with counts, a member dropdown, a sort dropdown, and search.</li>
+				<li>A row opens a quick-manage <code>Drawer</code> (try it) instead of a full-page detour — the full account page stays for the transaction history.</li>
+			</ul>
+		</div>
+		@designExample("The redesigned surface", "Header → type filter (box TabBar + counts) + member/sort dropdowns + search → net-worth stat strip → the account list. Click any row to open the manage drawer.") {
+			<div class="flex flex-col gap-4">
+				@components.PageHeader(components.PageHeaderProps{
+					Title:                "Accounts",
+					Subtitle:             "Every account across your connections, in one view.",
+					SubtitleHideOnMobile: true,
+				})
+				<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+					@components.TabBar(components.TabBarProps{
+						Variant:   "box",
+						AriaLabel: "Filter accounts by type (demo)",
+						Items: []components.TabBarItem{
+							{Label: "All", Href: "#", Active: true, Count: components.SectionHeaderIntPtr(6)},
+							{Label: "Cash", Href: "#", Count: components.SectionHeaderIntPtr(3)},
+							{Label: "Credit", Href: "#", Count: components.SectionHeaderIntPtr(1)},
+							{Label: "Investments", Href: "#", Count: components.SectionHeaderIntPtr(1)},
+							{Label: "Loans", Href: "#", Count: components.SectionHeaderIntPtr(1)},
+						},
+					})
+					<div class="flex items-center gap-2">
+						<select class="select select-sm w-36" aria-label="Filter by member (demo)">
+							<option>All members</option>
+							<option>Alice</option>
+							<option>Bob</option>
+						</select>
+						<select class="select select-sm w-40" aria-label="Sort accounts (demo)">
+							<option>Sort: Balance</option>
+							<option>Sort: Name</option>
+							<option>Sort: Institution</option>
+						</select>
+					</div>
+				</div>
+				@components.FilterSearchInput(components.FilterSearchInputProps{
+					Placeholder: "Filter accounts…",
+					XModel:      "filter",
+				})
+				@designAccountsStatStrip()
+				@components.AgentRunRowList() {
+					for _, d := range designAcctRows() {
+						@designAccountRow(d)
+					}
+				}
+			</div>
+			@designAccountsManageDrawer()
+		}
+	</div>
+}
+
+// designAccountsStatStrip is the net-worth / assets / liabilities summary —
+// kept as data-viz (StatTileRow), calmed to match the surface. Figures are
+// the sum of the sample rows and rendered Public so privacy mode leaves the
+// demo visible.
+templ designAccountsStatStrip() {
+	@components.StatTileRow() {
+		@components.StatTile(components.StatTileProps{Label: "Net worth", Value: "$48,010.55", Tone: components.StatTonePrimary})
+		@components.StatTile(components.StatTileProps{Label: "Assets", Value: "$52,577.10", Tone: components.StatToneSuccess})
+		@components.StatTile(components.StatTileProps{Label: "Liabilities", Value: "−$4,566.55", Tone: components.StatToneError})
+	}
+}
+
+// designAccountRow renders one account as a list-row modelled on AgentRunRow:
+// a leading type tile with a connection-health corner dot, a title row (name
+// + badge + owner avatar), one priority-ordered body line, a trailing
+// balance, and an overflow menu outside the row's click target.
+templ designAccountRow(d designAcctRow) {
+	<li class="list-row transition-colors hover:bg-base-200/40 items-center">
+		<div class="contents cursor-pointer" @click="$store.drawers.open('acct-manage')">
+			<div class="relative w-10 h-10 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+				@components.LucideIcon(d.Icon, "w-4 h-4 text-base-content/70")
+				if d.Status != "" {
+					<span
+						class={ "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-base-100", designAcctDotClass(d.Status) }
+						title={ "Connection: " + d.Status }
+					></span>
+				}
+			</div>
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="font-medium text-sm text-base-content truncate">{ d.Name }</span>
+					if d.Badge != "" {
+						<span class={ "badge badge-soft badge-xs shrink-0", designAcctBadgeTone(d.Badge) }>{ d.Badge }</span>
+					}
+					if d.OwnerName != "" {
+						@components.UserAvatar(components.UserAvatarProps{
+							ID:         d.OwnerID,
+							Name:       d.OwnerName,
+							Version:    designAcctOwnerVersion(d),
+							Size:       components.UserAvatarXS,
+							Decorative: true,
+							Lazy:       true,
+							Class:      "shrink-0",
+						})
+					}
+				</div>
+				@designAccountRowBody(d)
+			</div>
+			<div class="shrink-0 self-center text-right">
+				if d.HasBalance {
+					@components.Amount(components.AmountProps{
+						Value:  d.Balance,
+						Intent: components.AmountBalance,
+						Public: true,
+						Class:  designAcctAmountClass(d.IsLiability),
+					})
+				} else {
+					<span class="text-sm text-base-content/30">—</span>
+				}
+			</div>
+		</div>
+		<div class="shrink-0 self-center">
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: d.Name + " actions",
+				Size:      "sm",
+				Items: []components.OverflowMenuItem{
+					{Label: "Manage account", Icon: "settings-2", OnClick: "$store.drawers.open('acct-manage')"},
+					{Label: "View all transactions", Icon: "external-link", Href: "#"},
+					{Label: "Exclude from totals", Icon: "eye-off", OnClick: ""},
+				},
+			})
+		</div>
+	</li>
+}
+
+// designAccountRowBody is the single body line, priority-ordered: a
+// connection problem shouts (amber reauth / red disconnected); otherwise the
+// quiet Institution · ••••mask · Type meta. Mirrors AgentRunRow's body stack.
+templ designAccountRowBody(d designAcctRow) {
+	if d.Status == "pending_reauth" {
+		<div class="mt-0.5 text-xs text-warning/90 min-w-0">
+			<span class="line-clamp-1">Reauthentication needed</span>
+		</div>
+	} else if d.Status == "disconnected" {
+		<div class="mt-0.5 text-xs text-error/90 min-w-0">
+			<span class="line-clamp-1">Disconnected — reconnect to resume syncing</span>
+		</div>
+	} else {
+		<div class="mt-0.5 text-xs text-base-content/60 min-w-0">
+			<span class="line-clamp-1">{ designAcctMeta(d) }</span>
+		</div>
+	}
+}
+
+// designAccountsManageDrawer is the quick-manage slide-over a row opens — the
+// workflows configure/reconfigure pattern applied: header with an Exclude
+// toggle in the Right slot, a balance summary + a reauth callout + quick
+// fields, and a footer that links out to the full transaction page.
+templ designAccountsManageDrawer() {
+	@components.Drawer(components.DrawerProps{ID: "acct-manage", Title: "Manage Sapphire Card"}) {
+		<form class="flex flex-col h-full" @submit.prevent="$store.drawers.close()">
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "credit-card",
+				Title:    "Sapphire Card",
+				Subtitle: "Chase · Credit card",
+				Right:    designAcctExcludeToggle(),
+			})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				<div class="grid grid-cols-3 gap-3">
+					@designAcctStatlet("Current", "−$1,204.55", "text-error")
+					@designAcctStatlet("Available", "$3,795.45", "")
+					@designAcctStatlet("Limit", "$5,000.00", "")
+				</div>
+				<div class="rounded-xl border border-warning/30 bg-warning/5 px-4 py-3 flex items-center justify-between gap-3">
+					<div class="flex items-center gap-2 text-sm text-warning min-w-0">
+						@components.LucideIcon("triangle-alert", "w-4 h-4 shrink-0")
+						<span class="truncate">Reauthentication needed</span>
+					</div>
+					<button type="button" class="btn btn-warning btn-sm shrink-0">Reauthenticate</button>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="acct-name">Display name</label>
+					<input id="acct-name" type="text" class="input w-full" value="Sapphire Card"/>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="acct-owner">Owner</label>
+					<select id="acct-owner" class="select w-full">
+						<option selected>Bob</option>
+						<option>Alice</option>
+						<option>No owner</option>
+					</select>
+				</div>
+			</div>
+			@components.DrawerFooter() {
+				<a href="#" class="btn btn-ghost btn-sm gap-1.5 mr-auto">
+					@components.LucideIcon("external-link", "w-4 h-4")
+					View all transactions
+				</a>
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("save", "w-4 h-4")
+					Save
+				</button>
+			}
+		</form>
+	}
+}
+
+// designAcctStatlet is one cell in the drawer's balance summary.
+templ designAcctStatlet(label, value, valueClass string) {
+	<div class="rounded-lg bg-base-200/60 px-3 py-2">
+		<div class="text-[0.65rem] uppercase tracking-wide text-base-content/50">{ label }</div>
+		<div class={ "text-sm font-semibold tabular-nums mt-0.5", valueClass }>{ value }</div>
+	</div>
+}
+
+// designAcctExcludeToggle is the exclude-from-totals control in the manage
+// drawer's header Right slot.
+templ designAcctExcludeToggle() {
+	<label class="flex items-center gap-2 text-xs text-base-content/60 cursor-pointer">
+		<span>Exclude</span>
+		<input type="checkbox" class="toggle toggle-sm" aria-label="Exclude from totals (demo)"/>
+	</label>
+}

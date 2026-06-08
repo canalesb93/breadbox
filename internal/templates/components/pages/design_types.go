@@ -536,6 +536,13 @@ func DesignSections() []DesignSection {
 			Group:       "workflows-dna",
 			Render:      func() templ.Component { return SectionWFDNADrawer() },
 		},
+		{
+			Slug:        "wf-dna-accounts",
+			Title:       "Applied — /accounts redesign (prototype)",
+			Description: "The DNA reapplied to a real page: /accounts' dense sortable table reimagined as the workflows list-row surface — status in one leading tile (corner health dot), one body line by priority, a type-segment filter row, and a quick-manage slide-over Drawer. Prototype with sample data; not wired to live accounts.",
+			Group:       "workflows-dna",
+			Render:      func() templ.Component { return SectionAccountsRedesign() },
+		},
 	}
 }
 
