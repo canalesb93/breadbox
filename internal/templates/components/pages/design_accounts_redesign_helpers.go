@@ -2,18 +2,20 @@
 
 package pages
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // design_accounts_redesign_helpers.go holds the sample data + small class
 // helpers for SectionAccountsRedesign — the Workflows-DNA-applied prototype
 // of the /accounts page. Demo only; figures are illustrative (rendered
 // Public so privacy mode leaves them visible in the sandbox).
 
-// designAcctRow is one sample account in the redesign prototype.
+// designAcctRow is one sample account within a connection group.
 type designAcctRow struct {
 	Icon        string  // lucide type icon (wallet / credit-card / trending-up / landmark)
 	Name        string  // display name
-	Institution string  // bank
 	Mask        string  // last-4, "" when none
 	TypeLabel   string  // human type ("Checking", "Credit card", …)
 	OwnerName   string  // "" when no linked member
@@ -21,45 +23,80 @@ type designAcctRow struct {
 	Balance     float64 // sign reflects asset(+)/liability(−)
 	HasBalance  bool
 	IsLiability bool
-	Status      string // "" healthy | "pending_reauth" | "disconnected"
 	Badge       string // "" | "Linked" | "Excluded"
 }
 
-// designAcctRows is the fixed sample set: a mix of types, owners, balances,
-// and connection-health states so every row variant is visible.
-func designAcctRows() []designAcctRow {
-	return []designAcctRow{
-		{Icon: "wallet", Name: "Everyday Checking", Institution: "Chase", Mask: "1234", TypeLabel: "Checking", OwnerName: "Alice", OwnerID: "alice", Balance: 12340.18, HasBalance: true},
-		{Icon: "credit-card", Name: "Sapphire Card", Institution: "Chase", Mask: "8021", TypeLabel: "Credit card", OwnerName: "Bob", OwnerID: "bob", Balance: -1204.55, HasBalance: true, IsLiability: true, Status: "pending_reauth"},
-		{Icon: "trending-up", Name: "Brokerage", Institution: "Fidelity", TypeLabel: "Investment", Balance: 34120.00, HasBalance: true},
-		{Icon: "landmark", Name: "Auto Loan", Institution: "Ally", Mask: "5567", TypeLabel: "Loan", OwnerName: "Alice", OwnerID: "alice", Balance: -3362.00, HasBalance: true, IsLiability: true},
-		{Icon: "wallet", Name: "High-Yield Savings", Institution: "Ally", Mask: "9930", TypeLabel: "Savings", OwnerName: "Alice", OwnerID: "alice", Balance: 6116.92, HasBalance: true, Badge: "Linked"},
-		{Icon: "wallet", Name: "Old Savings", Institution: "Ally", Mask: "2231", TypeLabel: "Savings", HasBalance: false, Status: "disconnected"},
+// designAcctConn is one connection (institution) — the grouping unit.
+// Connection health lives here (one status per connection), so individual
+// rows don't repeat it.
+type designAcctConn struct {
+	Institution string
+	Status      string // "active" | "pending_reauth" | "disconnected"
+	Accounts    []designAcctRow
+}
+
+// designAcctConns is the fixed sample set, grouped by connection: a mix of
+// sizes, owners, balances, and connection-health states.
+func designAcctConns() []designAcctConn {
+	return []designAcctConn{
+		{Institution: "Chase", Status: "active", Accounts: []designAcctRow{
+			{Icon: "wallet", Name: "Everyday Checking", Mask: "1234", TypeLabel: "Checking", OwnerName: "Alice", OwnerID: "alice", Balance: 12340.18, HasBalance: true},
+			{Icon: "credit-card", Name: "Sapphire Card", Mask: "8021", TypeLabel: "Credit card", OwnerName: "Bob", OwnerID: "bob", Balance: -1204.55, HasBalance: true, IsLiability: true},
+		}},
+		{Institution: "American Express", Status: "pending_reauth", Accounts: []designAcctRow{
+			{Icon: "credit-card", Name: "Platinum Card", Mask: "3007", TypeLabel: "Credit card", OwnerName: "Alice", OwnerID: "alice", Balance: -842.30, HasBalance: true, IsLiability: true},
+		}},
+		{Institution: "Fidelity", Status: "active", Accounts: []designAcctRow{
+			{Icon: "trending-up", Name: "Brokerage", TypeLabel: "Investment", Balance: 34120.00, HasBalance: true},
+		}},
+		{Institution: "Ally", Status: "active", Accounts: []designAcctRow{
+			{Icon: "wallet", Name: "High-Yield Savings", Mask: "9930", TypeLabel: "Savings", OwnerName: "Alice", OwnerID: "alice", Balance: 6116.92, HasBalance: true, Badge: "Linked"},
+			{Icon: "landmark", Name: "Auto Loan", Mask: "5567", TypeLabel: "Loan", OwnerName: "Alice", OwnerID: "alice", Balance: -3362.00, HasBalance: true, IsLiability: true},
+		}},
+		{Institution: "Old National", Status: "disconnected", Accounts: []designAcctRow{
+			{Icon: "wallet", Name: "Legacy Savings", Mask: "2231", TypeLabel: "Savings", HasBalance: false},
+		}},
 	}
 }
 
-// designAcctMeta is the healthy-state body line: "Institution · ••••mask · Type".
+// designAcctMeta is the per-row body line — "••••mask · Type". Institution
+// is omitted: the connection group header already names it.
 func designAcctMeta(d designAcctRow) string {
-	s := d.Institution
+	parts := make([]string, 0, 2)
 	if d.Mask != "" {
-		s += " · ••••" + d.Mask
+		parts = append(parts, "••••"+d.Mask)
 	}
 	if d.TypeLabel != "" {
-		s += " · " + d.TypeLabel
+		parts = append(parts, d.TypeLabel)
 	}
-	return s
+	return strings.Join(parts, " · ")
 }
 
-// designAcctDotClass maps connection health to the leading-tile corner dot.
-func designAcctDotClass(status string) string {
-	switch status {
-	case "pending_reauth":
-		return "bg-warning"
-	case "disconnected", "error":
-		return "bg-error"
-	default:
-		return "bg-base-300"
+// designAcctConnSubtotal sums the balances of a connection's accounts.
+func designAcctConnSubtotal(c designAcctConn) float64 {
+	var t float64
+	for _, a := range c.Accounts {
+		if a.HasBalance {
+			t += a.Balance
+		}
 	}
+	return t
+}
+
+// designAcctConnCount is the dimmed "N accounts" label under the institution.
+func designAcctConnCount(c designAcctConn) string {
+	if len(c.Accounts) == 1 {
+		return "1 account"
+	}
+	return fmt.Sprintf("%d accounts", len(c.Accounts))
+}
+
+// designAcctMonogram is the connection tile's letter fallback.
+func designAcctMonogram(institution string) string {
+	if institution == "" {
+		return "?"
+	}
+	return strings.ToUpper(institution[:1])
 }
 
 // designAcctBadgeTone maps an inline row badge to its daisy soft tone.
@@ -82,5 +119,5 @@ func designAcctAmountClass(isLiability bool) string {
 
 // designAcctOwnerVersion is a stable cache-bust stub for sample avatars.
 func designAcctOwnerVersion(d designAcctRow) string {
-	return fmt.Sprintf("demo-%s", d.OwnerID)
+	return "demo-" + d.OwnerID
 }

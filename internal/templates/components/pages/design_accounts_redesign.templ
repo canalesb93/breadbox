@@ -3,96 +3,119 @@ package pages
 import "breadbox/internal/templates/components"
 
 // SectionAccountsRedesign is the Workflows-DNA-applied prototype of the
-// /accounts page: the dense sortable table reimagined as the list-row
-// surface the workflows pages use. It demonstrates the three big moves —
-// status in one leading tile (with a corner health dot), one body line by
-// priority, and a quick-manage slide-over Drawer — against real components
-// and sample data. Demo only; nothing here is wired to live accounts.
+// /accounts page: the dense sortable table reimagined as the workflows
+// list-row surface, now grouped by connection. Connection health lives on
+// the group header (one status per connection); each account is a clean
+// list-row; a row opens a quick-manage slide-over Drawer. Demo only.
 templ SectionAccountsRedesign() {
-	<div x-data="{ filter: '' }" class="flex flex-col gap-6">
+	<div class="flex flex-col gap-6">
 		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
 			<p class="font-semibold text-base-content/80 mb-1">Prototype — the DNA applied to /accounts</p>
 			<ul class="space-y-1 list-disc pl-4">
-				<li>Today's <code>/accounts</code> is a 5-column sortable table. This reimagines it as the workflows list-row surface: a leading <strong>type tile that carries connection health</strong> (corner dot — amber reauth, red disconnected), <strong>one body line by priority</strong> (a connection problem replaces the normal <code>Institution · ••••mask · Type</code> meta), and a trailing balance.</li>
-				<li>The filter row mirrors <code>/workflows/runs</code>: a box <code>TabBar</code> segmented by type with counts, a member dropdown, a sort dropdown, and search.</li>
-				<li>A row opens a quick-manage <code>Drawer</code> (try it) instead of a full-page detour — the full account page stays for the transaction history.</li>
+				<li>Today's <code>/accounts</code> is a 5-column sortable table. This reimagines it as the workflows list-row surface, <strong>grouped by connection</strong> — each institution is a card whose header carries the connection health (one status per connection) and a balance subtotal.</li>
+				<li>Rows stay minimal: a type tile, the account name (+ owner avatar), a quiet <code>••••mask · Type</code> line, and the balance. No per-row search or filter tabs — with a household's handful of accounts, grouping is enough.</li>
+				<li>A row opens a quick-manage <code>Drawer</code> (try it) instead of a full-page detour; the full account page stays for transaction history.</li>
 			</ul>
 		</div>
-		@designExample("The redesigned surface", "Header → type filter (box TabBar + counts) + member/sort dropdowns + search → net-worth stat strip → the account list. Click any row to open the manage drawer.") {
+		@designExample("The redesigned surface", "Header → a slim Group-by / member control (dropdowns, never full-width tabs) → net-worth stat strip → connection groups. Click any row to open the manage drawer.") {
 			<div class="flex flex-col gap-4">
 				@components.PageHeader(components.PageHeaderProps{
 					Title:                "Accounts",
 					Subtitle:             "Every account across your connections, in one view.",
 					SubtitleHideOnMobile: true,
 				})
-				<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-					@components.TabBar(components.TabBarProps{
-						Variant:   "box",
-						AriaLabel: "Filter accounts by type (demo)",
-						Items: []components.TabBarItem{
-							{Label: "All", Href: "#", Active: true, Count: components.SectionHeaderIntPtr(6)},
-							{Label: "Cash", Href: "#", Count: components.SectionHeaderIntPtr(3)},
-							{Label: "Credit", Href: "#", Count: components.SectionHeaderIntPtr(1)},
-							{Label: "Investments", Href: "#", Count: components.SectionHeaderIntPtr(1)},
-							{Label: "Loans", Href: "#", Count: components.SectionHeaderIntPtr(1)},
-						},
-					})
-					<div class="flex items-center gap-2">
-						<select class="select select-sm w-36" aria-label="Filter by member (demo)">
-							<option>All members</option>
-							<option>Alice</option>
-							<option>Bob</option>
-						</select>
-						<select class="select select-sm w-40" aria-label="Sort accounts (demo)">
-							<option>Sort: Balance</option>
-							<option>Sort: Name</option>
-							<option>Sort: Institution</option>
-						</select>
-					</div>
+				<div class="flex items-center justify-between gap-2">
+					<select class="select select-sm w-52" aria-label="Group accounts (demo)">
+						<option>Group by: Connection</option>
+						<option>Group by: Type</option>
+						<option>No grouping</option>
+					</select>
+					<select class="select select-sm w-36" aria-label="Filter by member (demo)">
+						<option>All members</option>
+						<option>Alice</option>
+						<option>Bob</option>
+					</select>
 				</div>
-				@components.FilterSearchInput(components.FilterSearchInputProps{
-					Placeholder: "Filter accounts…",
-					XModel:      "filter",
-				})
 				@designAccountsStatStrip()
-				@components.AgentRunRowList() {
-					for _, d := range designAcctRows() {
-						@designAccountRow(d)
+				<div class="flex flex-col gap-3">
+					for _, c := range designAcctConns() {
+						@designAccountConnGroup(c)
 					}
-				}
+				</div>
 			</div>
 			@designAccountsManageDrawer()
 		}
 	</div>
 }
 
-// designAccountsStatStrip is the net-worth / assets / liabilities summary —
-// kept as data-viz (StatTileRow), calmed to match the surface. Figures are
-// the sum of the sample rows and rendered Public so privacy mode leaves the
-// demo visible.
+// designAccountsStatStrip is the net-worth / assets / liabilities summary,
+// kept as data-viz (StatTileRow). Figures are the sum of the sample rows,
+// Public so privacy mode leaves the demo visible.
 templ designAccountsStatStrip() {
 	@components.StatTileRow() {
-		@components.StatTile(components.StatTileProps{Label: "Net worth", Value: "$48,010.55", Tone: components.StatTonePrimary})
+		@components.StatTile(components.StatTileProps{Label: "Net worth", Value: "$47,168.25", Tone: components.StatTonePrimary})
 		@components.StatTile(components.StatTileProps{Label: "Assets", Value: "$52,577.10", Tone: components.StatToneSuccess})
-		@components.StatTile(components.StatTileProps{Label: "Liabilities", Value: "−$4,566.55", Tone: components.StatToneError})
+		@components.StatTile(components.StatTileProps{Label: "Liabilities", Value: "−$5,408.85", Tone: components.StatToneError})
+	}
+}
+
+// designAccountConnGroup renders one connection as a card: a header naming
+// the institution + account count, its health (badge + reauth/reconnect
+// action when not active), and a balance subtotal on the right — then the
+// account list-rows beneath.
+templ designAccountConnGroup(c designAcctConn) {
+	<div class="bb-card overflow-hidden">
+		<div class="flex items-center gap-3 px-4 py-3 border-b border-base-200">
+			<div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0 text-sm font-semibold text-base-content/70">
+				{ designAcctMonogram(c.Institution) }
+			</div>
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="font-medium text-sm truncate">{ c.Institution }</span>
+					@designAccountConnStatus(c.Status)
+				</div>
+				<div class="text-xs text-base-content/50">{ designAcctConnCount(c) }</div>
+			</div>
+			<div class="ml-auto text-right shrink-0">
+				@components.Amount(components.AmountProps{
+					Value:  designAcctConnSubtotal(c),
+					Intent: components.AmountBalance,
+					Public: true,
+					Class:  "text-sm font-semibold",
+				})
+				<div class="text-xs text-base-content/50">balance</div>
+			</div>
+		</div>
+		<ul class="list">
+			for _, a := range c.Accounts {
+				@designAccountRow(a)
+			}
+		</ul>
+	</div>
+}
+
+// designAccountConnStatus surfaces connection health on the group header —
+// a soft badge + an inline recovery action, only when not active.
+templ designAccountConnStatus(status string) {
+	if status == "pending_reauth" {
+		<span class="badge badge-soft badge-warning badge-xs shrink-0">Reauth needed</span>
+		<button type="button" class="text-xs text-warning hover:underline shrink-0" @click="$store.drawers.open('acct-manage')">Reauthenticate</button>
+	} else if status == "disconnected" {
+		<span class="badge badge-soft badge-error badge-xs shrink-0">Disconnected</span>
+		<button type="button" class="text-xs text-error hover:underline shrink-0">Reconnect</button>
 	}
 }
 
 // designAccountRow renders one account as a list-row modelled on AgentRunRow:
-// a leading type tile with a connection-health corner dot, a title row (name
-// + badge + owner avatar), one priority-ordered body line, a trailing
-// balance, and an overflow menu outside the row's click target.
+// a leading type tile, a title row (name + badge + owner avatar), a quiet
+// mask·type line, a trailing balance, and an overflow menu outside the row's
+// click target. Connection health is NOT repeated here — it lives on the
+// group header.
 templ designAccountRow(d designAcctRow) {
 	<li class="list-row transition-colors hover:bg-base-200/40 items-center">
 		<div class="contents cursor-pointer" @click="$store.drawers.open('acct-manage')">
-			<div class="relative w-10 h-10 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+			<div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
 				@components.LucideIcon(d.Icon, "w-4 h-4 text-base-content/70")
-				if d.Status != "" {
-					<span
-						class={ "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-base-100", designAcctDotClass(d.Status) }
-						title={ "Connection: " + d.Status }
-					></span>
-				}
 			</div>
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 min-w-0">
@@ -112,7 +135,9 @@ templ designAccountRow(d designAcctRow) {
 						})
 					}
 				</div>
-				@designAccountRowBody(d)
+				<div class="mt-0.5 text-xs text-base-content/60 min-w-0">
+					<span class="line-clamp-1">{ designAcctMeta(d) }</span>
+				</div>
 			</div>
 			<div class="shrink-0 self-center text-right">
 				if d.HasBalance {
@@ -141,43 +166,24 @@ templ designAccountRow(d designAcctRow) {
 	</li>
 }
 
-// designAccountRowBody is the single body line, priority-ordered: a
-// connection problem shouts (amber reauth / red disconnected); otherwise the
-// quiet Institution · ••••mask · Type meta. Mirrors AgentRunRow's body stack.
-templ designAccountRowBody(d designAcctRow) {
-	if d.Status == "pending_reauth" {
-		<div class="mt-0.5 text-xs text-warning/90 min-w-0">
-			<span class="line-clamp-1">Reauthentication needed</span>
-		</div>
-	} else if d.Status == "disconnected" {
-		<div class="mt-0.5 text-xs text-error/90 min-w-0">
-			<span class="line-clamp-1">Disconnected — reconnect to resume syncing</span>
-		</div>
-	} else {
-		<div class="mt-0.5 text-xs text-base-content/60 min-w-0">
-			<span class="line-clamp-1">{ designAcctMeta(d) }</span>
-		</div>
-	}
-}
-
 // designAccountsManageDrawer is the quick-manage slide-over a row opens — the
 // workflows configure/reconfigure pattern applied: header with an Exclude
 // toggle in the Right slot, a balance summary + a reauth callout + quick
 // fields, and a footer that links out to the full transaction page.
 templ designAccountsManageDrawer() {
-	@components.Drawer(components.DrawerProps{ID: "acct-manage", Title: "Manage Sapphire Card"}) {
+	@components.Drawer(components.DrawerProps{ID: "acct-manage", Title: "Manage Platinum Card"}) {
 		<form class="flex flex-col h-full" @submit.prevent="$store.drawers.close()">
 			@components.DrawerHeader(components.DrawerHeaderProps{
 				Icon:     "credit-card",
-				Title:    "Sapphire Card",
-				Subtitle: "Chase · Credit card",
+				Title:    "Platinum Card",
+				Subtitle: "American Express · Credit card",
 				Right:    designAcctExcludeToggle(),
 			})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
 				<div class="grid grid-cols-3 gap-3">
-					@designAcctStatlet("Current", "−$1,204.55", "text-error")
-					@designAcctStatlet("Available", "$3,795.45", "")
-					@designAcctStatlet("Limit", "$5,000.00", "")
+					@designAcctStatlet("Current", "−$842.30", "text-error")
+					@designAcctStatlet("Available", "$24,157.70", "")
+					@designAcctStatlet("Limit", "$25,000.00", "")
 				</div>
 				<div class="rounded-xl border border-warning/30 bg-warning/5 px-4 py-3 flex items-center justify-between gap-3">
 					<div class="flex items-center gap-2 text-sm text-warning min-w-0">
@@ -188,13 +194,13 @@ templ designAccountsManageDrawer() {
 				</div>
 				<div>
 					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="acct-name">Display name</label>
-					<input id="acct-name" type="text" class="input w-full" value="Sapphire Card"/>
+					<input id="acct-name" type="text" class="input w-full" value="Platinum Card"/>
 				</div>
 				<div>
 					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="acct-owner">Owner</label>
 					<select id="acct-owner" class="select w-full">
-						<option selected>Bob</option>
-						<option>Alice</option>
+						<option selected>Alice</option>
+						<option>Bob</option>
 						<option>No owner</option>
 					</select>
 				</div>
