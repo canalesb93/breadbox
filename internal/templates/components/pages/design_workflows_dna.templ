@@ -1,0 +1,191 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// design_workflows_dna.templ holds the "Workflows DNA" sandbox group — a
+// curated north-star tab that extracts the handful of top-level patterns
+// that make the /workflows and /workflows/runs surfaces (and their side
+// drawers) the cleanest in the app. The goal is reuse: these are the
+// shapes to reach for when polishing other pages toward the same feel.
+//
+// Some sections here intentionally re-render components that also appear
+// under "Data display" (the preset card, the run row) — clustering them
+// next to the principles + page chrome tells the whole story in one place.
+// New, page-anatomy-only sections (the manifesto, the page scaffold, the
+// workflows-flavored drawer) live in this file.
+
+// SectionWFDNAPrinciples states the design DNA in words — the operating
+// principles a reviewer should internalize before reusing these shapes.
+templ SectionWFDNAPrinciples() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">What this tab is</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>The <code>/workflows</code> gallery, the <code>/workflows/runs</code> list, and their side drawers are the reference for the style we want everywhere — simple, easy on the eyes, space used well on desktop and mobile, and a flow that makes sense.</li>
+				<li>This group extracts the <em>top-level</em> patterns that give those surfaces their soul, so they can be reapplied to other pages. It deliberately skips low-level primitives (those live in Foundations / Data display).</li>
+			</ul>
+		</div>
+		@designExample("The seven principles", "The DNA. Each is a small, reusable decision — together they're why these surfaces feel calm and legible.") {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+				@wfdnaPrinciple("layout-grid", "One consistent chrome", "Every surface opens with the same PageHeader (title + subtitle) and a TabBar. Switching tabs feels like moving through one surface — not landing on differently-shaped pages.")
+				@wfdnaPrinciple("circle-check-big", "Status lives in one tile", "A single color-coded icon tile on the left carries the row's state — success, error, running. No parallel \"Success\" text badge. Less ink, faster scan.")
+				@wfdnaPrinciple("text-quote", "One body line, by priority", "A row says at most one thing: error → top report → note → silence. Success rows stay quiet and let the title carry them.")
+				@wfdnaPrinciple("ellipsis", "Minimal icon clusters", "Actions are bare icons with tooltips — run toggle, settings gear, overflow kebab. No button text crowding the row.")
+				@wfdnaPrinciple("panel-right", "Edit in a slide-over", "Create / configure / reconfigure happen in a right-side Drawer (header · scrollable body · sticky footer). Context stays put — no full-page detour, no cramped modal.")
+				@wfdnaPrinciple("scan", "Generous, honest spacing", "The daisy list-row grid inside a bb-card, hairline dividers, real breathing room. Calm on desktop; it stacks cleanly on mobile without a second layout.")
+				@wfdnaPrinciple("bot", "Identity via avatar", "Workflows and people get a stable DiceBear avatar (UserAvatar). The feed always reads as \"who did this,\" the same way on every surface.")
+			</div>
+		}
+	</div>
+}
+
+// wfdnaPrinciple is one card in the principles grid: a quiet icon tile, a
+// title, and a one-line rationale.
+templ wfdnaPrinciple(icon, title, body string) {
+	<div class="bb-card p-4 flex items-start gap-3 h-full">
+		<div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0 text-base-content/70">
+			@components.LucideIcon(icon, "w-4 h-4")
+		</div>
+		<div class="min-w-0">
+			<div class="font-medium text-sm leading-tight">{ title }</div>
+			<p class="text-xs text-base-content/60 mt-1 leading-relaxed">{ body }</p>
+		</div>
+	</div>
+}
+
+// SectionWFDNAScaffold shows the shared page chrome both workflows tabs
+// wear: a PageHeader, the top-level TabBar (border) for Gallery/Runs, and
+// the box-variant TabBar with count badges + a workflow dropdown used as
+// the runs filter row.
+templ SectionWFDNAScaffold() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Open every multi-tab section with <code>PageHeader</code> (title + subtitle, subtitle hidden on mobile) followed by a <code>TabBar</code>. This is the chrome that makes tabs feel like one surface.</li>
+				<li>For in-page filtering, drop to the <code>box</code> TabBar variant with a <code>Count</code> on each item, paired with a quiet dropdown for the secondary axis (here: which workflow).</li>
+			</ul>
+		</div>
+		@designExample("Page header + section tabs", "PageHeader (title · subtitle) + TabBar Variant=\"border\". The same two-line header and Gallery/Runs tabs render on both /workflows and /workflows/runs, so the tabs read as one surface.") {
+			<div class="space-y-4">
+				@components.PageHeader(components.PageHeaderProps{
+					Title:                "Workflows",
+					Subtitle:             "One-click AI automations that run on your Breadbox.",
+					SubtitleHideOnMobile: true,
+				})
+				@components.TabBar(components.TabBarProps{
+					Variant:   "border",
+					AriaLabel: "Workflows sections (demo)",
+					Items: []components.TabBarItem{
+						{Label: "Gallery", Href: "#", Icon: "layout-grid", Active: true},
+						{Label: "Runs", Href: "#", Icon: "history"},
+					},
+				})
+			</div>
+		}
+		@designExample("Status filter + workflow dropdown", "The /workflows/runs filter row: a box TabBar with live Count badges per status, and a quiet select for the workflow axis. Counts respect the workflow filter; the active status drives the rows below.") {
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				@components.TabBar(components.TabBarProps{
+					Variant:   "box",
+					AriaLabel: "Filter runs by status (demo)",
+					Items: []components.TabBarItem{
+						{Label: "All", Href: "#", Active: true, Count: components.SectionHeaderIntPtr(66)},
+						{Label: "Success", Href: "#", Count: components.SectionHeaderIntPtr(29)},
+						{Label: "Error", Href: "#", Count: components.SectionHeaderIntPtr(37)},
+						{Label: "In progress", Href: "#"},
+						{Label: "Skipped", Href: "#"},
+					},
+				})
+				<select class="select select-sm w-full sm:w-52" aria-label="Filter by workflow (demo)">
+					<option>All workflows</option>
+					<option>Manual Review</option>
+					<option>Routine Reviewer</option>
+				</select>
+			</div>
+		}
+	</div>
+}
+
+// SectionWFDNADrawer renders the workflows-flavored slide-over: a setup
+// drawer whose header carries an enable toggle (DrawerHeader.Right), a body
+// of RadioCard trigger choices + a model select + a free-form note, and a
+// sticky Cancel/Save footer. Drawer ids are namespaced `wfdna-*` so they
+// never collide with the generic "drawers" section on the same page.
+templ SectionWFDNADrawer() {
+	<div x-data class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Configure / reconfigure flows that would otherwise be a full page or a cramped modal. The right-side <code>Drawer</code> keeps the gallery visible behind it — opened via <code>$store.drawers.open('&lt;id&gt;')</code>, closed by Escape or a backdrop click.</li>
+				<li>Anatomy: <code>DrawerHeader</code> (icon · title · subtitle, with an optional control in the <code>Right</code> slot) → a scrollable body → a sticky <code>DrawerFooter</code> with the action pair. Keep the primary action on the right.</li>
+			</ul>
+		</div>
+		@designExample("Set up workflow — slide-over", "The real shape of the workflows setup drawer. Header puts the enable toggle in the Right slot; the body is RadioCard trigger choices + a model select + a note; the footer pins Cancel / Save. Open it to see the slide + backdrop.") {
+			<button type="button" class="btn btn-primary btn-sm gap-1.5" @click="$store.drawers.open('wfdna-setup')">
+				@components.LucideIcon("settings-2", "w-4 h-4")
+				Set up workflow
+			</button>
+			@components.Drawer(components.DrawerProps{ID: "wfdna-setup", Title: "Set up Large Charge Sentinel"}) {
+				<form class="flex flex-col h-full" @submit.prevent="$store.drawers.close()">
+					@components.DrawerHeader(components.DrawerHeaderProps{
+						Icon:     "shield-alert",
+						Title:    "Large Charge Sentinel",
+						Subtitle: "Flags unusually large charges right after they land.",
+						Right:    wfdnaDrawerToggle(),
+					})
+					<div class="flex-1 overflow-y-auto p-5 space-y-5">
+						<div>
+							<p class="text-xs font-medium text-base-content/50 mb-2">Trigger</p>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+								@components.RadioCard(components.RadioCardProps{
+									Name:     "wfdna-trigger",
+									Value:    "cron",
+									Icon:     "calendar-clock",
+									Title:    "On a schedule",
+									Subtitle: "Runs on a cron you choose",
+									Checked:  true,
+								})
+								@components.RadioCard(components.RadioCardProps{
+									Name:     "wfdna-trigger",
+									Value:    "sync",
+									Icon:     "refresh-cw",
+									Title:    "After each sync",
+									Subtitle: "Runs when new data lands",
+								})
+							</div>
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="wfdna-model">Model</label>
+							<select id="wfdna-model" class="select w-full">
+								<option>Claude Opus 4.8</option>
+								<option selected>Claude Sonnet 4.6</option>
+								<option>Claude Haiku 4.5</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="wfdna-note">Additional instructions</label>
+							<textarea id="wfdna-note" class="textarea w-full" rows="3" placeholder="Optional — extra guidance layered on the base prompt…"></textarea>
+						</div>
+					</div>
+					@components.DrawerFooter() {
+						<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+						<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+							@components.LucideIcon("save", "w-4 h-4")
+							Save
+						</button>
+					}
+				</form>
+			}
+		}
+	</div>
+}
+
+// wfdnaDrawerToggle is the enable control rendered in the setup drawer's
+// header Right slot — a labelled toggle, mirroring the live workflow setup
+// "Activate" affordance.
+templ wfdnaDrawerToggle() {
+	<label class="flex items-center gap-2 text-xs text-base-content/60 cursor-pointer">
+		<span>Enabled</span>
+		<input type="checkbox" class="toggle toggle-sm toggle-primary" checked aria-label="Enable workflow (demo)"/>
+	</label>
+}

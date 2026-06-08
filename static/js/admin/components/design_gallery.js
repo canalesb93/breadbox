@@ -30,6 +30,7 @@ document.addEventListener('alpine:init', function () {
       // DesignSectionGroups() (design_types.go). Initialized to all open
       // so the catalog is fully visible on first load.
       open: {
+        'workflows-dna': true,
         foundations: true,
         layout: true,
         navigation: true,
@@ -37,6 +38,7 @@ document.addEventListener('alpine:init', function () {
         data: true,
         feedback: true,
         patterns: true,
+        onboarding: true,
       },
 
       init: function () {

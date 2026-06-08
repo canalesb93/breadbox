@@ -63,6 +63,7 @@ func DesignSectionGroups() []DesignSectionGroup {
 		{Slug: "feedback", Label: "Feedback"},
 		{Slug: "patterns", Label: "Patterns"},
 		{Slug: "onboarding", Label: "Onboarding"},
+		{Slug: "workflows-dna", Label: "Workflows DNA"},
 	}
 }
 
@@ -492,6 +493,48 @@ func DesignSections() []DesignSection {
 			Description: "Calm CSV-import alternative + documentation resources aside, shown while setup is in progress. Copy adapts to whether a provider is configured. Use components.OnboardingAltPath.",
 			Group:       "onboarding",
 			Render:      func() templ.Component { return SectionOnboardingAltPath() },
+		},
+
+		// ── Workflows DNA ───────────────────────────────────────────
+		// The north-star tab (sits last): the top-level patterns that
+		// make the /workflows + /workflows/runs surfaces (and their
+		// drawers) our cleanest, extracted for reuse on other pages.
+		// Some sections re-render components that also appear under
+		// Data display.
+		{
+			Slug:        "wf-dna-principles",
+			Title:       "The DNA — design principles",
+			Description: "Why these surfaces feel calm and legible: the seven reusable decisions behind the /workflows and /workflows/runs pages. Start here, then see each principle made concrete below.",
+			Group:       "workflows-dna",
+			Render:      func() templ.Component { return SectionWFDNAPrinciples() },
+		},
+		{
+			Slug:        "wf-dna-scaffold",
+			Title:       "Page scaffold — header + tabs",
+			Description: "The shared chrome both tabs wear: PageHeader (title + subtitle) over a TabBar, plus the box-variant status filter with count badges and a workflow dropdown. This is what makes switching tabs feel like one surface.",
+			Group:       "workflows-dna",
+			Render:      func() templ.Component { return SectionWFDNAScaffold() },
+		},
+		{
+			Slug:        "wf-dna-gallery-card",
+			Title:       "Gallery card",
+			Description: "The /workflows row (workflowPresetCard): a single clean line — leading status tile, name + clamped description, and a minimal icon cluster (run toggle + settings gear). Flows in a 2-up grid. (Also under Data display.)",
+			Group:       "workflows-dna",
+			Render:      func() templ.Component { return SectionWorkflowPresetCard() },
+		},
+		{
+			Slug:        "wf-dna-run-row",
+			Title:       "Run list row",
+			Description: "The /workflows/runs row (AgentRunRow + AgentRunRowList): status carried by one icon tile, an avatar-led title with a dimmed time, a single priority-ordered body line, trailing cost, and an overflow action. (Also under Data display.)",
+			Group:       "workflows-dna",
+			Render:      func() templ.Component { return SectionAgentRunRows() },
+		},
+		{
+			Slug:        "wf-dna-drawer",
+			Title:       "Side drawer (slide-over)",
+			Description: "The configure / reconfigure flow as a right-side Drawer — header (with a control in the Right slot) · scrollable body of RadioCard choices + fields · sticky Cancel/Save footer. Edit without leaving the page.",
+			Group:       "workflows-dna",
+			Render:      func() templ.Component { return SectionWFDNADrawer() },
 		},
 	}
 }
