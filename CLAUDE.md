@@ -123,6 +123,7 @@ Canonical specs in `docs/`:
 - `mcp-tools-reference.md` — MCP tools
 - `rule-dsl.md` — **canonical transaction-rule DSL**: condition grammar, actions, triggers, pipeline-stage priority, sync-vs-retroactive, chaining
 - `design-system.md` — CSS framework, components, icons
+- `markdown.md` — supported Markdown format (callouts, tables, task lists, code highlighting, sanitization); the single server-side renderer in `internal/markdown/`
 - `activity-timeline.md` — activity-timeline component contract (rendering, dedup, soft-delete tombstones, optimistic updates, how to add a new system-event kind)
 - `plaid-integration.md`, `teller-integration.md`, `simplefin-integration.md`, `csv-import.md` — provider specifics
 - `admin-dashboard.md`, `mcp-server.md`, `rest-api.md`, `backup.md` — subsystem details
