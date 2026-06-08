@@ -91,14 +91,6 @@ func designAcctConnCount(c designAcctConn) string {
 	return fmt.Sprintf("%d accounts", len(c.Accounts))
 }
 
-// designAcctMonogram is the connection tile's letter fallback.
-func designAcctMonogram(institution string) string {
-	if institution == "" {
-		return "?"
-	}
-	return strings.ToUpper(institution[:1])
-}
-
 // designAcctBadgeTone maps an inline row badge to its daisy soft tone.
 func designAcctBadgeTone(badge string) string {
 	switch badge {

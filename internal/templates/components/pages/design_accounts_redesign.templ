@@ -12,7 +12,7 @@ templ SectionAccountsRedesign() {
 		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
 			<p class="font-semibold text-base-content/80 mb-1">Prototype — the DNA applied to /accounts</p>
 			<ul class="space-y-1 list-disc pl-4">
-				<li>Today's <code>/accounts</code> is a 5-column sortable table. This reimagines it as the workflows list-row surface, <strong>grouped by connection</strong> — each institution is a card whose header carries the connection health (one status per connection) and a balance subtotal.</li>
+				<li>Today's <code>/accounts</code> is a 5-column sortable table. This reimagines it as the workflows list-row surface, <strong>grouped by connection</strong> — each institution is a quiet labelled group (name · count · subtotal, the /transactions day-group idiom) carrying the connection health (one status per connection) above its account rows.</li>
 				<li>Rows stay minimal: a type tile, the account name (+ owner avatar), a quiet <code>••••mask · Type</code> line, and the balance. No per-row search or filter tabs — with a household's handful of accounts, grouping is enough.</li>
 				<li>A row opens a quick-manage <code>Drawer</code> (try it) instead of a full-page detour; the full account page stays for transaction history.</li>
 			</ul>
@@ -37,7 +37,7 @@ templ SectionAccountsRedesign() {
 					</select>
 				</div>
 				@designAccountsStatStrip()
-				<div class="flex flex-col gap-3">
+				<div class="flex flex-col gap-5">
 					for _, c := range designAcctConns() {
 						@designAccountConnGroup(c)
 					}
@@ -59,38 +59,31 @@ templ designAccountsStatStrip() {
 	}
 }
 
-// designAccountConnGroup renders one connection as a card: a header naming
-// the institution + account count, its health (badge + reauth/reconnect
-// action when not active), and a balance subtotal on the right — then the
-// account list-rows beneath.
+// designAccountConnGroup renders one connection as a quiet labelled group
+// (the /transactions day-group idiom, not a boxed card header): a light line
+// naming the institution + account count, its health (badge + reauth action
+// when not active), and a balance subtotal on the right — then the account
+// list-rows in their own card beneath.
 templ designAccountConnGroup(c designAcctConn) {
-	<div class="bb-card overflow-hidden">
-		<div class="flex items-center gap-3 px-4 py-3 border-b border-base-200">
-			<div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0 text-sm font-semibold text-base-content/70">
-				{ designAcctMonogram(c.Institution) }
-			</div>
-			<div class="min-w-0">
-				<div class="flex items-center gap-2 min-w-0">
-					<span class="font-medium text-sm truncate">{ c.Institution }</span>
-					@designAccountConnStatus(c.Status)
-				</div>
-				<div class="text-xs text-base-content/50">{ designAcctConnCount(c) }</div>
-			</div>
-			<div class="ml-auto text-right shrink-0">
+	<div class="flex flex-col gap-2">
+		<div class="flex items-center gap-2 px-1 min-w-0">
+			<span class="text-sm font-medium text-base-content shrink-0">{ c.Institution }</span>
+			<span class="text-xs text-base-content/40 shrink-0">{ designAcctConnCount(c) }</span>
+			@designAccountConnStatus(c.Status)
+			<span class="ml-auto shrink-0">
 				@components.Amount(components.AmountProps{
 					Value:  designAcctConnSubtotal(c),
 					Intent: components.AmountBalance,
 					Public: true,
-					Class:  "text-sm font-semibold",
+					Class:  "text-sm font-semibold tabular-nums",
 				})
-				<div class="text-xs text-base-content/50">balance</div>
-			</div>
+			</span>
 		</div>
-		<ul class="list">
+		@components.AgentRunRowList() {
 			for _, a := range c.Accounts {
 				@designAccountRow(a)
 			}
-		</ul>
+		}
 	</div>
 }
 

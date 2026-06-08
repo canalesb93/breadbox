@@ -539,7 +539,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "wf-dna-accounts",
 			Title:       "Applied — /accounts redesign (prototype)",
-			Description: "The DNA reapplied to a real page: /accounts' dense sortable table reimagined as the workflows list-row surface, grouped by connection. Each institution is a card whose header carries the connection health + a balance subtotal; rows stay minimal; a quick-manage slide-over Drawer replaces the full-page detour. No search/filter-tabs — grouping is enough for a household's handful of accounts. Prototype with sample data; not wired to live accounts.",
+			Description: "The DNA reapplied to a real page: /accounts' dense sortable table reimagined as the workflows list-row surface, grouped by connection. Each institution is a quiet labelled group (name · count · subtotal — the /transactions day-group idiom) carrying connection health above its account rows; a quick-manage slide-over Drawer replaces the full-page detour. No search/filter-tabs — grouping is enough for a household's handful of accounts. Prototype with sample data; not wired to live accounts.",
 			Group:       "workflows-dna",
 			Render:      func() templ.Component { return SectionAccountsRedesign() },
 		},
