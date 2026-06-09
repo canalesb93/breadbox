@@ -62,6 +62,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 			Label:   "GitHub repository",
 			Caption: "Where issue drafts open, in owner/repo form. Defaults to the upstream Breadbox repo — point it at a fork or your own tracker.",
 			For:     "github_repo",
+			Stack:   true,
 		}) {
 			<input
 				id="github_repo"
@@ -71,7 +72,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 				placeholder="canalesb93/breadbox"
 				autocomplete="off"
 				spellcheck="false"
-				class="bb-form-input font-mono min-w-72"
+				class="bb-form-input font-mono w-full"
 			/>
 			if p.FieldErrors["github_repo"] != "" {
 				<p class="text-xs text-error mt-1">{ p.FieldErrors["github_repo"] }</p>
@@ -81,6 +82,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 			Label:   "Artifact upload token",
 			Caption: "Bearer token the server uses to upload the screenshot + HTML snapshot to the artifact host. Stored encrypted; leave blank to keep the current value.",
 			For:     "upload_token",
+			Stack:   true,
 		}) {
 			<input
 				id="upload_token"
@@ -90,7 +92,7 @@ templ developerModeSection(p DeveloperSettingsProps) {
 				placeholder="Paste an upload token"
 				autocomplete="off"
 				spellcheck="false"
-				class="bb-form-input font-mono min-w-72"
+				class="bb-form-input font-mono w-full"
 			/>
 			if p.Form.UploadTokenMasked != "" {
 				<p class="text-xs text-base-content/50 mt-1">
