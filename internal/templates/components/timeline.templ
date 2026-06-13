@@ -121,7 +121,16 @@ templ timelineCard(p TimelineProps) {
 				}
 			</header>
 		}
-		<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+		<!--
+			overflow-x-clip contains the daisy tooltip bubble (an absolutely
+			positioned, max-content `::before` on the relative-time pill). On a
+			narrow screen the last row's timestamp sits near the right edge, so
+			the centered bubble projects past the viewport and adds a few px of
+			sideways document scroll. Clip on the X axis only — Y stays visible
+			so the hover bubble still renders above the row. Desktop is
+			unaffected: timestamps sit well left of the wide list's right edge.
+		-->
+		<ol class="bb-timeline relative overflow-x-clip pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
 			<!--
 				Continuous left rail. Top/bottom anchored so it threads
 				through every 24px tile (events + day separators) and the
@@ -176,7 +185,8 @@ templ timelineProminent(p TimelineProps) {
 			more contrast-y than the card-mode 1px line so it reads against
 			the page surface (not just a card surface).
 		-->
-		<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+		<ol class="bb-timeline relative overflow-x-clip pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+			<!-- overflow-x-clip: see the card variant — contains the relative-time tooltip bubble so it can't widen the document on narrow screens. -->
 			<span class="absolute left-[29px] sm:left-[33px] top-2 bottom-14 w-[2px] bg-base-300 rounded-full" aria-hidden="true"></span>
 			{ children... }
 		</ol>
