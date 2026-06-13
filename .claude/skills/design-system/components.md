@@ -245,9 +245,34 @@ Settings tabs use a local dialect of this language. See
 
 ---
 
+## ReportRow / ReportsList — `report_table.templ`
+
+The agent-reports inbox row, a list-row sibling of `AgentRunRow` (same
+shape, so `/reports` and `/agents/runs` read as one product).
+
+```go
+ReportRowProps{
+    ID string; Title string /* summary */; Priority string /* "" | "info" | "warning" | "critical" */
+    Author string; AuthorID string /* avatar seed */; IsAgent bool
+    Time string /* pre-rendered relative */; IsRead bool
+}
+@components.ReportRowList() { for _, r := range rows { @components.ReportRow(r) } }
+@components.ReportsList(rows) // convenience: flat list in one card
+```
+
+- Leading status tile = priority → vivid `IconTile` tone (critical→error,
+  warning→warning, routine→info). No parallel priority text badge in the row.
+- Title line: `UserAvatar` (IsAgent) + agent name + an info **unread dot** + the
+  relative time; the summary is the one body line below. Read rows fade
+  (`opacity-60`) and drop the dot; unread rows keep a heavier summary.
+- `OverflowMenu` (Size `"sm"`) — mark read/unread + open — renders OUTSIDE the
+  row's `<a>` link. The `/reports` All view groups rows unread-first under quiet
+  label lines (`partitionReportsByRead`). `ReportPriorityBadge` is now
+  detail-header-only.
+
 ## Reference implementation
 
 `agent_run_row.templ` (`AgentRunRowList` + `AgentRunRow`) is the cleanest single
 example of principles 2–7: status `IconTile`, one priority body line, bare-icon
 actions, `UserAvatar` identity, list-row spacing in a `bb-card`. Read it before
-authoring a new feed/list row.
+authoring a new feed/list row. `report_table.templ` is its inbox sibling.

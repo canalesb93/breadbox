@@ -16,8 +16,9 @@ when the surface is next touched · **P3** cosmetic / low-value.
 ## Already canonical (references, don't touch)
 
 - **list-row idiom:** `pages/accounts_list.templ`, `components/agent_run_row.templ`
-  (`AgentRunRow` + `AgentRunRowList`) — the reference for status-tile · one body
-  line · value · overflow.
+  (`AgentRunRow` + `AgentRunRowList`), `components/report_table.templ`
+  (`ReportRow` + `ReportRowList` + `ReportsList`) — the reference for
+  status-tile · one body line · value · overflow.
 - **TabBar:** `reports.templ`, `workflows_runs.templ`, `subscriptions_list.templ`,
   `workflows_shell.templ` use it correctly (border=nav, box=filter).
 - **Drawer:** connect-bank, provider-config, workflow create/edit, cron-field.
@@ -69,9 +70,6 @@ name · one body line · value · overflow), grouped where there's a natural axi
   (active/paused); status tile + name + cadence line + amount.
 - `pages/account_link_detail.templ:36` — matched txn pairs. Already carries a
   mobile card fallback → unify to one list-row layout (confidence as the tile).
-- `components/report_table.templ:36` — reports. Has a desktop-table +
-  mobile-card split → collapse to a single list-row list.
-
 > These overlap with the goal-3 surface loop (e.g. `/rules`, `/subscriptions`).
 > Prefer doing the table→list-row migration *as part of* that surface's redesign
 > rather than as an isolated swap.

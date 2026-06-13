@@ -2,7 +2,31 @@
 
 package pages
 
-import "breadbox/internal/templates/components"
+import (
+	"strconv"
+
+	"breadbox/internal/templates/components"
+)
+
+// partitionReportsByRead splits the (recency-ordered) report rows into an
+// unread slice and a read slice, preserving the input order within each.
+// The All view renders unread-first so the inbox surfaces what still needs
+// attention before what's already been seen — the IA win over a flat list.
+func partitionReportsByRead(rows []components.ReportRowProps) (unread, read []components.ReportRowProps) {
+	for _, r := range rows {
+		if r.IsRead {
+			read = append(read, r)
+		} else {
+			unread = append(unread, r)
+		}
+	}
+	return unread, read
+}
+
+// reportsGroupCount renders a group's row count for the label line.
+func reportsGroupCount(n int) string {
+	return strconv.Itoa(n)
+}
 
 // ReportsProps mirrors the field set the handler (admin/reports.go)
 // builds for the agent-reports inbox. The row view-model lives in the
