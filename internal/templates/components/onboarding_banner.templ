@@ -1,0 +1,89 @@
+package components
+
+import "strconv"
+
+// OnboardingBannerProps drives the home-feed "Finish setting up" banner — a
+// compact, dismissible progress strip that surfaces incomplete onboarding in
+// context instead of behind a separate page. The handler computes it from the
+// shared onboarding progress and only renders the banner while setup is
+// incomplete and the guide hasn't been dismissed.
+type OnboardingBannerProps struct {
+	// CompletedSteps / TotalSteps drive the segmented progress bar and the
+	// "N of M" count.
+	CompletedSteps int
+	TotalSteps     int
+
+	// NextStepLabel is the short, action-first label for the first incomplete
+	// step (e.g. "Connect your bank"), shown as the headline action.
+	NextStepLabel string
+
+	// TimeRemaining is the rough estimate ("~5 min left"); empty hides it.
+	TimeRemaining string
+
+	// ContinueHref is where the primary CTA points (defaults to
+	// /getting-started when empty).
+	ContinueHref string
+
+	// CSRFToken authorizes the inline dismiss form (POST /getting-started/dismiss).
+	CSRFToken string
+}
+
+// OnboardingBanner renders the "Finish setting up" banner. Restrained,
+// Mintlify-clean chrome: a hairline card, a quiet segmented progress bar, the
+// next action as the headline, and a primary "Continue setup" CTA plus a
+// dismiss. No hero tile, no tone fills.
+templ OnboardingBanner(p OnboardingBannerProps) {
+	<div class="bb-card p-4 mb-6 flex items-center gap-4">
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2 flex-wrap">
+				<span class="text-sm font-semibold text-base-content">Finish setting up</span>
+				<span class="text-xs text-base-content/45 tabular-nums">
+					{ strconv.Itoa(p.CompletedSteps) } of { strconv.Itoa(p.TotalSteps) }
+					if p.TimeRemaining != "" {
+						{ " · " + p.TimeRemaining }
+					}
+				</span>
+			</div>
+			if p.NextStepLabel != "" {
+				<div class="mt-0.5 text-xs text-base-content/55">
+					Next: <span class="text-base-content/80 font-medium">{ p.NextStepLabel }</span>
+				</div>
+			}
+			<!-- Segmented progress: one filled bar per completed step. -->
+			<div class="mt-2 flex items-center gap-1" aria-hidden="true">
+				for i := 0; i < p.TotalSteps; i++ {
+					<span class={ "h-1 flex-1 rounded-full", onboardingSegmentClass(i < p.CompletedSteps) }></span>
+				}
+			</div>
+		</div>
+		<div class="flex items-center gap-1.5 shrink-0">
+			<a href={ onboardingContinueHref(p.ContinueHref) } class="btn btn-primary btn-sm gap-1.5">
+				Continue setup
+				@LucideIcon("arrow-right", "w-4 h-4")
+			</a>
+			<form method="POST" action="/getting-started/dismiss" class="contents">
+				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-ghost btn-sm btn-square" aria-label="Dismiss setup guide" title="Dismiss — re-open from Settings">
+					@LucideIcon("x", "w-4 h-4")
+				</button>
+			</form>
+		</div>
+	</div>
+}
+
+// onboardingSegmentClass tints a progress segment: filled segments take the
+// primary ink, the rest a quiet track.
+func onboardingSegmentClass(filled bool) string {
+	if filled {
+		return "bg-primary"
+	}
+	return "bg-base-300"
+}
+
+// onboardingContinueHref defaults the CTA target to the walkthrough page.
+func onboardingContinueHref(href string) templ.SafeURL {
+	if href == "" {
+		return templ.SafeURL("/getting-started")
+	}
+	return templ.SafeURL(href)
+}

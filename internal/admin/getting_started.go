@@ -3,11 +3,9 @@
 package admin
 
 import (
-	"fmt"
 	"net/http"
 
 	"breadbox/internal/app"
-	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/templates/components/pages"
@@ -18,106 +16,30 @@ import (
 // GettingStartedHandler serves GET /getting-started — the setup walkthrough page.
 func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		// Step completion checks.
-		// Step 1: Configure a bank provider (Plaid, Teller, or SimpleFIN).
-		// This is the first real action — admin setup already seeds the
-		// household with one member, so connecting your money is what moves
-		// onboarding forward.
-		hasProvider := a.Config.PlaidClientID != "" || a.Config.TellerAppID != "" || a.Config.SimpleFINEnabled
-
-		// Step 2 (optional): Add a household member. Admin creation already
-		// links a first member, so this is auto-complete and carries an
-		// Optional badge — it only matters when finances are shared.
-		userCount, err := a.Queries.CountUsers(ctx)
-		if err != nil {
-			a.Logger.Error("getting started: count users", "error", err)
-		}
-		hasMember := userCount > 0
-
-		// Step 3: Connect a bank.
-		connCount, err := a.Queries.CountConnections(ctx)
-		if err != nil {
-			a.Logger.Error("getting started: count connections", "error", err)
-		}
-		hasConnection := connCount > 0
-
-		// Step 4: First successful sync.
-		successfulSyncs, err := a.Queries.CountSuccessfulSyncs(ctx)
-		if err != nil {
-			a.Logger.Error("getting started: count successful syncs", "error", err)
-		}
-		hasSync := successfulSyncs > 0
-
-		// Step 5: Configure agents (at least one API key).
-		activeAPIKeys, err := a.Queries.CountActiveApiKeys(ctx)
-		if err != nil {
-			a.Logger.Error("getting started: count active api keys", "error", err)
-		}
-		hasAPIKey := activeAPIKeys > 0
-
-		// Progress metrics.
-		accountCount, err := a.Queries.CountAccounts(ctx)
-		if err != nil {
-			a.Logger.Error("getting started: count accounts", "error", err)
-		}
-
-		txCount, err := a.Queries.CountTransactions(ctx)
-		if err != nil {
-			a.Logger.Error("getting started: count transactions", "error", err)
-		}
-
-		// Resolve the active step (first incomplete), completion count, and a
-		// rough time-to-finish estimate for the hero. Step order + per-step
-		// minutes are paired so the estimate sums only the steps still
-		// outstanding.
-		// Order MUST match the Number/State wiring in getting_started.templ:
-		// 1 provider, 2 household member (optional), 3 connection, 4 sync,
-		// 5 agents. activeStep is a 1-based index into this slice.
-		stepsDone := []bool{hasProvider, hasMember, hasConnection, hasSync, hasAPIKey}
-		stepMinutes := []int{2, 1, 2, 1, 3}
-		completedSteps := 0
-		activeStep := 0
-		minutesLeft := 0
-		for i, done := range stepsDone {
-			if done {
-				completedSteps++
-				continue
-			}
-			if activeStep == 0 {
-				activeStep = i + 1 // 1-based
-			}
-			minutesLeft += stepMinutes[i]
-		}
-		allComplete := completedSteps == len(stepsDone)
-		timeRemaining := ""
-		if !allComplete && minutesLeft > 0 {
-			timeRemaining = fmt.Sprintf("~%d min left", minutesLeft)
-		}
-
-		// Check if onboarding is dismissed (for the nav badge display).
-		dismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
+		// Step completion + progress is computed by the shared helper so the
+		// /getting-started walkthrough and the home-feed "Finish setting up"
+		// banner never disagree about which step is next.
+		p := computeOnboardingProgress(r.Context(), a)
 
 		data := BaseTemplateData(r, sm, "getting-started", "Getting Started")
 		props := pages.GettingStartedProps{
-			HasMember:           hasMember,
-			HasProvider:         hasProvider,
-			HasConnection:       hasConnection,
-			HasSync:             hasSync,
-			HasAPIKey:           hasAPIKey,
-			CompletedSteps:      completedSteps,
-			TotalSteps:          len(stepsDone),
-			AllComplete:         allComplete,
-			ActiveStep:          activeStep,
-			TimeRemaining:       timeRemaining,
-			MemberCount:         userCount,
-			ConnectionCount:     connCount,
-			AccountCount:        accountCount,
-			TransactionCount:    txCount,
-			SuccessfulSyncs:     successfulSyncs,
-			ApiKeyCount:         activeAPIKeys,
-			OnboardingDismissed: dismissed,
+			HasMember:           p.HasMember,
+			HasProvider:         p.HasProvider,
+			HasConnection:       p.HasConnection,
+			HasSync:             p.HasSync,
+			HasAPIKey:           p.HasAPIKey,
+			CompletedSteps:      p.CompletedSteps,
+			TotalSteps:          p.TotalSteps,
+			AllComplete:         p.AllComplete,
+			ActiveStep:          p.ActiveStep,
+			TimeRemaining:       p.TimeRemaining,
+			MemberCount:         p.MemberCount,
+			ConnectionCount:     p.ConnectionCount,
+			AccountCount:        p.AccountCount,
+			TransactionCount:    p.TransactionCount,
+			SuccessfulSyncs:     p.SuccessfulSyncs,
+			ApiKeyCount:         p.ApiKeyCount,
+			OnboardingDismissed: p.Dismissed,
 			CSRFToken:           GetCSRFToken(r),
 		}
 		renderGettingStarted(w, r, tr, data, props)
