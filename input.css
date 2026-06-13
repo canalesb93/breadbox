@@ -2103,6 +2103,17 @@
            border-b border-base-300/50 bg-base-200/30;
   }
 
+  /* Matches the .bb-tx-checkbox visibility contract: hidden until bulk-select
+     mode is active so the "Name" header stays aligned with the tx name text. */
+  .bb-tx-header-checkbox-col {
+    display: none;
+    flex-shrink: 0;
+    width: 1.25rem; /* w-5 */
+  }
+  body.bb-tx-selecting .bb-tx-header-checkbox-col {
+    display: block;
+  }
+
   /* ── Date visibility (hidden in grouped, shown in list) ──
      `.bb-tx-date` is the desktop right-side date column.
      `.bb-tx-date-mobile` is the date in the mobile sub-line; we also hide
