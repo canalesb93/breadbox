@@ -37,6 +37,42 @@ this skill and the running app as a bug in one of them — reconcile, don't igno
 
 ---
 
+## House style — restraint over decoration (Mintlify-clean)
+
+**This is the most load-bearing aesthetic rule, learned the hard way.** Our
+north star for "state-of-the-art" is the calm, airy restraint of
+[Mintlify's dashboard](https://app.mintlify.com), Linear, and Stripe — **not**
+color, size, or decoration. Quality here = whitespace, typography, hierarchy,
+and *less*. When in doubt, remove.
+
+Concretely:
+
+- **No hero / big-stat panels.** Do **not** build a dominant headline card to
+  show a number (a giant net-worth panel, a "pulse" hero, a stat that fills a
+  third of the page). Numbers are shown **quietly and inline**, with generous
+  whitespace around them. A page's job (the list, the content) leads — a stat
+  is a quiet supporting detail, never the visual hero. (We shipped hero/stat
+  units once; they were reverted. Don't reintroduce them.)
+- **No left-accent-tinted cards.** Do **not** put a status-tinted vertical
+  accent bar / colored left rail on cards, stat tiles, or content blocks. The
+  left-edge highlight is reserved **strictly** for genuine *selection*
+  affordances (the `j/k` keyboard-focused row). Everywhere else: a plain
+  hairline-bordered `bb-card`, no tint.
+- **Status is a small icon + a quiet pill** — e.g. a green check with
+  "Connected" / "Live" — never a big tinted panel or a wash of color across a
+  card. Color is a small accent, not a fill.
+- **Airy by default.** Generous padding and margins; let things breathe. Dense
+  is fine for a *list of entities*; do not crowd headers, summaries, or chrome.
+- **Decoration earns its place or it's cut.** Gradients, glows, motion,
+  accent washes, oversized numerals — each must justify itself against "would
+  Mintlify do this?". Usually the answer is no.
+
+This section overrides any temptation toward "bold = bigger/louder." Bold here
+means **confidently restrained**. Keep referencing Mintlify; fold new learnings
+back into this skill as they surface.
+
+---
+
 ## The eight principles
 
 The DNA. Each is a small, reusable decision; together they're why our best

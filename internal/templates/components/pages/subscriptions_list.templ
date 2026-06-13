@@ -117,8 +117,8 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 					}
 				</div>
 			} else {
-				<!-- Active: upcoming-renewals hero + spend composition + the live ledger -->
-				<div class="mt-5 flex flex-col gap-6">
+				<!-- Active: the confirmed / live ledger -->
+				<div class="mt-5">
 					if len(p.Active) == 0 {
 						@components.EmptyState(components.EmptyStateProps{
 							Icon:    "repeat",
@@ -128,18 +128,14 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 							InCard:  true,
 						})
 					} else {
-						@subscriptionsUpcomingSection(p.Active)
-						@subscriptionsCompositionSection(p.Active)
-						<div>
-							@components.FilterSearchInput(components.FilterSearchInputProps{
-								Placeholder: "Filter recurring charges...",
-								XModel:      "filter",
-							})
-							<div class="mt-4 flex flex-col gap-5">
-								for _, g := range GroupSubscriptionsByStatus(p.Active) {
-									@subscriptionsStatusGroup(g)
-								}
-							</div>
+						@components.FilterSearchInput(components.FilterSearchInputProps{
+							Placeholder: "Filter recurring charges...",
+							XModel:      "filter",
+						})
+						<div class="mt-4 flex flex-col gap-5">
+							for _, g := range GroupSubscriptionsByStatus(p.Active) {
+								@subscriptionsStatusGroup(g)
+							}
 						</div>
 					}
 				</div>
@@ -162,120 +158,6 @@ templ subscriptionsTypeFilterBtn(t SubscriptionTypeFilter) {
 		:class={ fmt.Sprintf("filterType === %q ? 'btn-active' : ''", t.Value) }
 		class="join-item btn btn-xs"
 	>{ t.Label }</button>
-}
-
-// subscriptionsUpcomingSection is the Active-tab hero: a horizontal,
-// renewal-urgency-ordered rail of the active series with a live projection.
-// It makes "what's billing soon and how much" obvious and temporal instead of
-// buried as a chip mid-ledger. Renders nothing when there's nothing upcoming.
-//
-// The section x-show mirrors the status-group robustness contract (#1816 /
-// #1823): always visible on the unfiltered default view, only scanning the
-// `groupVisible($el)` rail cards once a member/type/search filter is engaged —
-// a stale subscriptions.js can never blank the default hero.
-templ subscriptionsUpcomingSection(active []SubscriptionRow) {
-	if cards := BuildUpcomingRenewals(active); len(cards) > 0 {
-		<section x-show="(filterUser === 'all' && filterType === 'all' && !filter) || groupVisible($el)" aria-label="Upcoming renewals">
-			<div class="flex items-baseline gap-2 px-1 mb-2 min-w-0">
-				<h2 class="text-sm font-medium text-base-content shrink-0">Upcoming renewals</h2>
-				<span class="text-xs text-base-content/40 truncate">soonest first</span>
-			</div>
-			<div class="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
-				for _, c := range cards {
-					@subscriptionsUpcomingCard(c)
-				}
-			</div>
-		</section>
-	}
-}
-
-// subscriptionsUpcomingCard is one renewal in the hero rail: an urgency-tinted
-// left accent + countdown badge, the series name, its amount, and the next
-// date — a calendar-entry shape that links to the series detail.
-templ subscriptionsUpcomingCard(c UpcomingRenewalCard) {
-	<a
-		href={ templ.SafeURL("/recurring/" + c.ShortID) }
-		data-series-card
-		data-filter-user={ c.UserID }
-		data-type={ c.Type }
-		data-search={ c.Search }
-		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && (filterType === 'all' || filterType === $el.dataset.type) && matches($el)"
-		class="relative shrink-0 w-44 snap-start bb-card bb-card--interactive p-3 pl-4 no-underline overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-		aria-label={ "Open recurring charge " + c.Name }
-	>
-		<span class={ "absolute left-0 top-0 bottom-0 w-1", upcomingAccentBar(c.Urgency) }></span>
-		<span class={ "badge badge-soft badge-xs gap-1", "badge-" + upcomingBadgeTone(c.Urgency) }>
-			@components.LucideIcon(upcomingBadgeIcon(c.Urgency), "w-3 h-3")
-			{ c.CountLabel }
-		</span>
-		<div data-private="merchant" class="mt-2 text-sm font-medium text-base-content truncate">{ c.Name }</div>
-		<div class="mt-0.5">
-			if c.HasAmount {
-				@components.Amount(components.AmountProps{
-					Value:  c.Amount,
-					Intent: components.AmountCost,
-					Class:  "text-base font-semibold",
-				})
-			} else {
-				<span class="text-sm text-base-content/30">—</span>
-			}
-		</div>
-		if c.NextDate != "" {
-			<div class="mt-0.5 text-xs text-base-content/45">{ c.NextDate }</div>
-		}
-	</a>
-}
-
-// subscriptionsCompositionSection turns the monthly-equivalent headline into a
-// segmented "where it goes" bar — the top active series sized by share, the
-// tail folded into "Other". Single-currency only (never sums across
-// iso_currency_code); renders nothing otherwise. An overview band, like the
-// stat tiles, so it reflects the full active set rather than the live filters.
-templ subscriptionsCompositionSection(active []SubscriptionRow) {
-	if comp := BuildMonthlyComposition(active); comp.HasData {
-		<section class="bb-card p-4">
-			<div class="flex items-baseline justify-between gap-3 mb-3 min-w-0">
-				<div class="flex items-baseline gap-2 min-w-0">
-					<h2 class="text-sm font-medium text-base-content shrink-0">Monthly spend</h2>
-					<span class="text-xs text-base-content/40 truncate">where it goes</span>
-				</div>
-				<div class="shrink-0 inline-flex items-baseline gap-1">
-					@components.Amount(components.AmountProps{
-						Value:  comp.Total,
-						Intent: components.AmountCost,
-						Class:  "text-base font-semibold tabular-nums",
-					})
-					<span class="text-xs text-base-content/40">/mo</span>
-				</div>
-			</div>
-			<div class="flex items-stretch gap-0.5 h-3 rounded-full overflow-hidden bg-base-200/40">
-				for _, seg := range comp.Segments {
-					<div
-						class={ "h-full first:rounded-l-full last:rounded-r-full", compositionSwatchClass(seg.Rank, seg.IsOther) }
-						style={ compositionWidthStyle(seg.Percent) }
-						title={ seg.Label }
-					></div>
-				}
-			</div>
-			<div class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-				for _, seg := range comp.Segments {
-					<div class="inline-flex items-center gap-1.5 min-w-0">
-						<span class={ "w-2 h-2 rounded-full shrink-0", compositionSwatchClass(seg.Rank, seg.IsOther) }></span>
-						if seg.IsOther {
-							<span class="text-xs text-base-content/70 truncate max-w-[9rem]">{ seg.Label }</span>
-						} else {
-							<span data-private="merchant" class="text-xs text-base-content/70 truncate max-w-[9rem]">{ seg.Label }</span>
-						}
-						@components.Amount(components.AmountProps{
-							Value:  seg.Amount,
-							Intent: components.AmountCost,
-							Class:  "text-xs text-base-content/45 tabular-nums",
-						})
-					</div>
-				}
-			</div>
-		</section>
-	}
 }
 
 // subscriptionCandidateCard is one auto-detected series awaiting a verdict. It
@@ -447,15 +329,9 @@ templ subscriptionsListRow(s SubscriptionRow) {
 		>
 			@subscriptionsStatusTile(s.Status)
 			<div class="min-w-0">
-				<!-- Title line: name + type only — keeps the name readable on
-				     mobile. The renewal / price chips drop to the body line so
-				     they wrap below the name instead of crushing it. -->
 				<div class="flex items-center gap-2 min-w-0">
 					<span data-private="merchant" class="font-medium text-sm text-base-content truncate">{ s.Name }</span>
 					@components.SeriesTypeChip(s.TypeLabel, "xs")
-				</div>
-				<div class="mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 min-w-0">
-					<span class="text-xs text-base-content/55 truncate">{ subscriptionsRowBodyLine(s) }</span>
 					@components.SeriesRenewalChip(s.RenewalLabel, s.RenewalTone)
 					if s.PriceChanged {
 						<span class="badge badge-soft badge-warning badge-xs gap-1 shrink-0" title="Price has been rising">
@@ -463,6 +339,9 @@ templ subscriptionsListRow(s SubscriptionRow) {
 							Price
 						</span>
 					}
+				</div>
+				<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
+					{ subscriptionsRowBodyLine(s) }
 				</div>
 			</div>
 			<div class="shrink-0 self-center text-right">

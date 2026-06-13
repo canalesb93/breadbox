@@ -50,136 +50,75 @@ templ feedActiveFilterBanner(p FeedProps) {
 
 // ── Hero band ─────────────────────────────────────────────────────────────
 //
-// The hero leads with a single insight — sync health — rendered as a live
-// "pulse" panel, then a 2×2 cluster of count-up metrics with per-metric
-// colour identity and a sparkbar "activity rhythm" built from the same
-// per-day buckets the rail below renders. On desktop the pulse takes the
-// left 5 columns and the cluster the right 7; on mobile the pulse stacks
-// on top and the cluster falls to a 2-up grid.
+// The summary strip is the canonical StatTileRow: three plain StatTiles
+// (events / new transactions / unread reports) plus a sync tile. The sync
+// tile stays bespoke because it carries two affordances StatTile doesn't
+// model — a status-toned icon tile that doubles as the health indicator,
+// and a second "next sync" sub-line — but it mirrors StatTile's
+// icon-tile-left geometry exactly so the row reads as one uniform strip.
 templ feedHero(p FeedProps) {
-	<header class="mb-7 bb-feed-rise">
+	<header class="mb-6">
 		@components.PageHeader(components.PageHeaderProps{
 			Title:    "Feed",
 			Subtitle: "Everything that happened in your breadbox · " + p.Hero.Generated,
 			Action:   connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect bank"),
 		})
-		<div class="grid grid-cols-1 lg:grid-cols-12 gap-3 bb-feed-stagger">
-			<div class="lg:col-span-5">
-				@feedPulsePanel(p)
-			</div>
-			<div class="lg:col-span-7 grid grid-cols-2 gap-3">
-				@feedMetricTile("activity", "Events today", p.Hero.EventsToday, feedHeroSubEvents(p), "primary", "")
-				@feedMetricTile("arrow-down-circle", "New transactions", p.Hero.NewTransactionsToday, "synced today", "success", "/transactions")
-				@feedMetricTile("file-text", "Unread reports", p.Hero.UnreadReports, feedHeroSubReports(p), feedReportsTone(p.Hero.UnreadReports), "/reports")
-				@feedSparkTile(p)
-			</div>
-		</div>
+		@components.StatTileRow() {
+			@components.StatTile(components.StatTileProps{
+				Icon:        "activity",
+				Label:       "Events today",
+				Value:       fmt.Sprintf("%d", p.Hero.EventsToday),
+				Description: feedHeroSubEvents(p),
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:        "download-cloud",
+				Label:       "New transactions",
+				Value:       fmt.Sprintf("%d", p.Hero.NewTransactionsToday),
+				Description: "synced today",
+			})
+			@feedHeroSyncTile(p)
+			@components.StatTile(components.StatTileProps{
+				Icon:        "file-text",
+				Label:       "Unread reports",
+				Value:       fmt.Sprintf("%d", p.Hero.UnreadReports),
+				Description: feedHeroSubReports(p),
+				Tone:        feedUnreadReportsTone(p.Hero.UnreadReports),
+			})
+		}
 	</header>
 }
 
-// feedPulsePanel is the hero's lead element — sync health rendered loud.
-// A status-tinted accent rail, a faint tonal wash, a live ping dot (when
-// healthy or syncing), the relative time as the headline, and the
-// institution / next-sync context below.
-templ feedPulsePanel(p FeedProps) {
-	<a
-		href="/logs?tab=syncs"
-		class="bb-card bb-feed-pulse bb-feed-pulse--link p-5 no-underline flex flex-col h-full min-h-[8.5rem]"
-		style={ feedAccentVar(feedPulseTone(p.Hero.LastSyncStatus)) }
-		aria-label="Last sync — view sync logs"
-	>
-		<div class="flex items-center gap-2">
-			<span class="bb-feed-chip">
-				@components.LucideIcon("refresh-cw", "w-3.5 h-3.5")
-			</span>
-			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/45 font-medium">Last sync</div>
-			<span class="ml-auto inline-flex items-center gap-1.5 text-[0.7rem] font-semibold" style="color: var(--bb-feed-accent)">
-				<span class={ "bb-feed-dot", templ.KV("bb-feed-dot--live", feedPulseLive(p.Hero.LastSyncStatus)) } aria-hidden="true"></span>
-				{ feedPulseStatusWord(p.Hero.LastSyncStatus) }
-			</span>
-		</div>
-		<div class="flex-1 flex flex-col justify-center mt-3">
-			if p.Hero.LastSyncRel != "" {
-				<div class="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight leading-none">{ p.Hero.LastSyncRel }</div>
-				<div class="text-xs text-base-content/55 mt-2.5 truncate">
-					{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }
-				</div>
-				if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
-					<div class="text-xs text-base-content/45 mt-1 truncate flex items-center gap-1">
-						@components.LucideIcon("clock", "w-3 h-3 shrink-0")
-						<span>Next sync { p.Hero.NextSyncRel }</span>
+// feedHeroSyncTile mirrors components.StatTile's icon-tile-left geometry so
+// it sits flush in the StatTileRow, but stays bespoke: the icon tile is
+// status-toned (carrying the health signal a plain StatTile can't), and a
+// second muted "Next sync" line points users at the upcoming cron fire.
+templ feedHeroSyncTile(p FeedProps) {
+	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="Last sync — view sync logs">
+		<div class="flex items-center gap-2.5 sm:gap-3">
+			<div class={ "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0", feedSyncTileBg(p.Hero.LastSyncStatus) }>
+				@components.LucideIcon("refresh-cw", "w-4 h-4 "+feedSyncTileText(p.Hero.LastSyncStatus))
+			</div>
+			<div class="min-w-0 flex-1">
+				if p.Hero.LastSyncRel != "" {
+					<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate">{ p.Hero.LastSyncRel }</div>
+					<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">Last sync</div>
+					<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">
+						{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }
 					</div>
+					if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
+						<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate flex items-center gap-1">
+							@components.LucideIcon("clock", "w-3 h-3 shrink-0")
+							<span>Next sync { p.Hero.NextSyncRel }</span>
+						</div>
+					}
+				} else {
+					<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate text-base-content/30">—</div>
+					<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">Last sync</div>
+					<div class="text-[0.65rem] text-base-content/45 mt-0.5">No syncs yet</div>
 				}
-			} else {
-				<div class="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight leading-none text-base-content/30">—</div>
-				<div class="text-xs text-base-content/45 mt-2.5">No syncs yet</div>
-			}
+			</div>
 		</div>
 	</a>
-}
-
-// feedMetricTile is one count-up metric in the hero cluster. The number
-// animates 0→value on load (feedCountUp, reduced-motion aware); the icon
-// chip + top-edge accent carry the metric's colour identity. When href is
-// set the whole tile is an interactive link that lifts on hover/focus.
-templ feedMetricTile(icon, label string, value int, sub, tone, href string) {
-	if href != "" {
-		<a href={ templ.SafeURL(href) } class="bb-card bb-feed-tile bb-feed-tile--link p-4 no-underline block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2" style={ feedAccentVar(tone) }>
-			@feedMetricInner(icon, label, value, sub)
-		</a>
-	} else {
-		<div class="bb-card bb-feed-tile p-4" style={ feedAccentVar(tone) }>
-			@feedMetricInner(icon, label, value, sub)
-		</div>
-	}
-}
-
-templ feedMetricInner(icon, label string, value int, sub string) {
-	<div class="flex items-center gap-2">
-		<span class="bb-feed-chip">
-			@components.LucideIcon(icon, "w-3.5 h-3.5")
-		</span>
-		<div class="text-[0.65rem] uppercase tracking-wider text-base-content/45 font-medium truncate">{ label }</div>
-	</div>
-	<div
-		class="text-3xl font-bold tabular-nums tracking-tight mt-2"
-		x-data="feedCountUp"
-		data-count-target={ fmt.Sprintf("%d", value) }
-	>{ fmt.Sprintf("%d", value) }</div>
-	if sub != "" {
-		<div class="text-xs text-base-content/45 mt-0.5 truncate">{ sub }</div>
-	}
-}
-
-// feedSparkTile renders the "activity rhythm" cell — a row of sparkbars
-// built from the per-day event counts already in p.Days. Pure presentation
-// off existing data; bars animate up via the height transition on load.
-templ feedSparkTile(p FeedProps) {
-	<div class="bb-card bb-feed-tile p-4 flex flex-col" style={ feedAccentVar("primary") }>
-		<div class="flex items-center gap-2">
-			<span class="bb-feed-chip">
-				@components.LucideIcon("bar-chart-3", "w-3.5 h-3.5")
-			</span>
-			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/45 font-medium">Activity</div>
-		</div>
-		if bars := feedSparkBars(p.Days); len(bars) > 0 {
-			<div class="flex items-end justify-between gap-1.5 mt-auto pt-3" style="height:2.75rem">
-				for _, b := range bars {
-					<span
-						class="bb-feed-sparkbar tooltip tooltip-top"
-						style={ fmt.Sprintf("height:%d%%", b.Height) }
-						data-tip={ fmt.Sprintf("%s · %d event%s", b.Label, b.Count, pluralFeedS(b.Count)) }
-					></span>
-				}
-			</div>
-			<div class="flex items-center justify-between text-[0.6rem] text-base-content/40 mt-1.5 tabular-nums">
-				<span>{ bars[0].Label }</span>
-				<span>{ bars[len(bars)-1].Label }</span>
-			</div>
-		} else {
-			<div class="text-xs text-base-content/40 mt-auto pt-3">No activity yet</div>
-		}
-	</div>
 }
 
 // ── Pinned alerts ─────────────────────────────────────────────────────────
@@ -218,7 +157,7 @@ templ feedAlertCard(a FeedAlert) {
 
 // ── Filters ───────────────────────────────────────────────────────────────
 templ feedFilters(p FeedProps) {
-	<nav class="flex items-center gap-1.5 mb-5 overflow-x-auto bb-feed-rise [mask-image:linear-gradient(to_right,black_85%,transparent)] sm:[mask-image:none]" aria-label="Feed filters">
+	<nav class="flex items-center gap-1.5 mb-5 overflow-x-auto [mask-image:linear-gradient(to_right,black_85%,transparent)] sm:[mask-image:none]" aria-label="Feed filters">
 		@feedFilterChip("All", "", "layers", p.Filter)
 		@feedFilterChip("Syncs", "syncs", "refresh-cw", p.Filter)
 		@feedFilterChip("Reports", "reports", "file-text", p.Filter)
@@ -234,9 +173,9 @@ templ feedFilterChip(label, slug, icon, current string) {
 		if current == slug {
 			aria-current="page"
 		}
-		class={ "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 no-underline whitespace-nowrap shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2",
-			templ.KV("bg-primary/10 border-primary/40 text-primary shadow-sm shadow-primary/10", current == slug),
-			templ.KV("border-base-300 text-base-content/65 hover:bg-base-200/70 hover:border-base-content/20 hover:-translate-y-px", current != slug) }
+		class={ "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors no-underline whitespace-nowrap shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2",
+			templ.KV("bg-primary/10 border-primary/40 text-primary", current == slug),
+			templ.KV("border-base-300 text-base-content/65 hover:bg-base-200/70", current != slug) }
 	>
 		@components.LucideIcon(icon, "w-3 h-3")
 		{ label }
@@ -254,7 +193,6 @@ templ feedTimeline(p FeedProps) {
 		     the top. data-* attrs seed the cursor + dedup anchor; the inner
 		     <a href> is the no-JS fallback. -->
 		<div
-			class="bb-feed-stream bb-feed-rise"
 			x-data="feedPagination"
 			data-feed-before={ feedPaginationCursor(p) }
 			data-feed-filter={ p.Filter }
@@ -359,36 +297,16 @@ templ feedEmptyState(p FeedProps) {
 }
 
 // feedEmptyFirstRun is shown when zero bank connections exist. The CTA is
-// the only path forward — connect a bank — so we render it as a primary
-// button rather than a quiet link.
+// the only path forward — connect a bank — so the canonical EmptyState
+// renders the primary connect-bank button (which opens the app-wide
+// connect-bank drawer) via its CustomCTA slot.
 templ feedEmptyFirstRun() {
-	<div class="bb-card bb-feed-welcome bb-feed-rise p-10 sm:p-14 text-center">
-		<span class="bb-feed-welcome__orb mx-auto mb-5">
-			@components.LucideIcon("landmark", "w-9 h-9")
-		</span>
-		<h2 class="text-2xl font-bold tracking-tight mb-2">Welcome to Breadbox</h2>
-		<p class="text-sm text-base-content/55 max-w-md mx-auto mb-7 leading-relaxed">
-			Connect your first bank to start filling your feed. Syncs, agent reports, and everything your household does land here as it happens.
-		</p>
-		@connectBankButton("btn btn-primary gap-2", "plus", "Connect a bank")
-		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-10 max-w-2xl mx-auto text-left">
-			@feedWelcomeHint("refresh-cw", "success", "Automatic syncs", "Transactions stream in as your banks post them.")
-			@feedWelcomeHint("sparkles", "primary", "Agent reports", "Your workflows summarise what changed, and why.")
-			@feedWelcomeHint("message-square", "info", "Household activity", "See who tagged, categorised, or commented.")
-		</div>
-	</div>
-}
-
-// feedWelcomeHint is one "here's what you'll see" card in the first-run
-// hero — orients a brand-new user before any data exists.
-templ feedWelcomeHint(icon, tone, title, body string) {
-	<div class="rounded-xl border border-base-200 bg-base-100 p-4" style={ feedAccentVar(tone) }>
-		<span class="bb-feed-chip">
-			@components.LucideIcon(icon, "w-3.5 h-3.5")
-		</span>
-		<div class="text-sm font-semibold mt-2.5">{ title }</div>
-		<div class="text-xs text-base-content/50 mt-1 leading-relaxed">{ body }</div>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:      "landmark",
+		Title:     "Welcome to Breadbox",
+		Body:      "Connect your first bank to start filling your feed.",
+		CustomCTA: connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect a bank"),
+	})
 }
 
 // feedEmptyFiltered is shown when a chip filter is active but produced
@@ -396,19 +314,14 @@ templ feedWelcomeHint(icon, tone, title, body string) {
 // filter banner offers, repeated here so a user landing in an empty state
 // has a clear way out without scrolling back up.
 templ feedEmptyFiltered(filter string) {
-	<div class="bb-card bb-feed-rise p-10 sm:p-12 text-center">
-		<span class="bb-feed-chip mx-auto mb-4" style="--bb-feed-accent: var(--color-base-content); width:3rem; height:3rem; border-radius:1rem">
-			@components.LucideIcon("filter", "w-6 h-6")
-		</span>
-		<h2 class="text-lg font-semibold mb-1">{ feedEmptyFilteredHeadline(filter) }</h2>
-		<p class="text-sm text-base-content/55 mb-5">
-			Nothing in this slice today.
-		</p>
-		<a href="/" class="btn btn-sm btn-ghost border border-base-300">
-			@components.LucideIcon("x", "w-3.5 h-3.5")
-			Clear filter
-		</a>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:     "filter",
+		Title:    feedEmptyFilteredHeadline(filter),
+		Body:     "Nothing in this slice today.",
+		CTAHref:  templ.SafeURL("/"),
+		CTAIcon:  "x",
+		CTALabel: "Clear filter",
+	})
 }
 
 // feedEmptyNoRecent is the "all caught up" card for households that have
@@ -417,45 +330,44 @@ templ feedEmptyFiltered(filter string) {
 // browse-history link, since sync-all is admin-only.
 templ feedEmptyNoRecent(p FeedProps) {
 	if p.IsAdmin {
-		<div class="bb-card bb-feed-rise p-10 sm:p-12 text-center" x-data="feedSyncNow">
-			<span class="bb-feed-chip mx-auto mb-4" style="--bb-feed-accent: var(--color-base-content); width:3rem; height:3rem; border-radius:1rem">
-				@components.LucideIcon("moon", "w-6 h-6")
-			</span>
-			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
-			<p class="text-sm text-base-content/55 mb-5">
-				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
-			</p>
-			<div class="flex items-center justify-center gap-2 flex-wrap">
-				<button
-					type="button"
-					class="btn btn-primary btn-sm"
-					x-bind:disabled="state !== 'idle'"
-					x-on:click="triggerSyncNow()"
-				>
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5" x-bind:class="state === 'syncing' ? 'animate-spin' : ''"></i>
-					<span x-text="state === 'syncing' ? 'Syncing…' : (state === 'done' ? 'Sync queued' : 'Sync now')"></span>
-				</button>
-				<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
-					@components.LucideIcon("receipt", "w-3.5 h-3.5")
-					Browse transactions
-				</a>
-			</div>
-		</div>
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:      "moon",
+			Title:     "Quiet around here",
+			Body:      feedEmptyNoRecentSubline(p.LastSyncAt),
+			CustomCTA: feedEmptyNoRecentAdminCTA(),
+		})
 	} else {
-		<div class="bb-card bb-feed-rise p-10 sm:p-12 text-center">
-			<span class="bb-feed-chip mx-auto mb-4" style="--bb-feed-accent: var(--color-base-content); width:3rem; height:3rem; border-radius:1rem">
-				@components.LucideIcon("moon", "w-6 h-6")
-			</span>
-			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
-			<p class="text-sm text-base-content/55 mb-5">
-				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
-			</p>
-			<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
-				@components.LucideIcon("receipt", "w-3.5 h-3.5")
-				Browse transactions
-			</a>
-		</div>
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:     "moon",
+			Title:    "Quiet around here",
+			Body:     feedEmptyNoRecentSubline(p.LastSyncAt),
+			CTAHref:  templ.SafeURL("/transactions"),
+			CTAIcon:  "receipt",
+			CTALabel: "Browse transactions",
+		})
 	}
+}
+
+// feedEmptyNoRecentAdminCTA is the admin empty-state action pair: the
+// sync-all kickoff button (wired to the feedSyncNow Alpine factory in
+// feed.js) plus a quiet link into the transaction history. Rendered into
+// the EmptyState CustomCTA slot so the card chrome stays canonical.
+templ feedEmptyNoRecentAdminCTA() {
+	<div class="flex items-center justify-center gap-2 flex-wrap" x-data="feedSyncNow">
+		<button
+			type="button"
+			class="btn btn-primary btn-sm"
+			x-bind:disabled="state !== 'idle'"
+			x-on:click="triggerSyncNow()"
+		>
+			<i data-lucide="refresh-cw" class="w-3.5 h-3.5" x-bind:class="state === 'syncing' ? 'animate-spin' : ''"></i>
+			<span x-text="state === 'syncing' ? 'Syncing…' : (state === 'done' ? 'Sync queued' : 'Sync now')"></span>
+		</button>
+		<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
+			@components.LucideIcon("receipt", "w-3.5 h-3.5")
+			Browse transactions
+		</a>
+	</div>
 }
 
 // feedEmptyFilteredHeadline maps a chip slug onto its empty-state
@@ -1114,136 +1026,14 @@ func feedNonEmpty(a, fallback string) string {
 	return fallback
 }
 
-// feedAccentVar maps a tone name onto the `--bb-feed-accent` custom
-// property the hero CSS reads for chip tint, top-edge accent, hover glow,
-// and the pulse panel's accent rail. Returns a `style` attribute value.
-func feedAccentVar(tone string) string {
-	switch tone {
-	case "primary":
-		return "--bb-feed-accent: var(--color-primary)"
-	case "success":
-		return "--bb-feed-accent: var(--color-success)"
-	case "info":
-		return "--bb-feed-accent: var(--color-info)"
-	case "warning":
-		return "--bb-feed-accent: var(--color-warning)"
-	case "error":
-		return "--bb-feed-accent: var(--color-error)"
-	}
-	return "--bb-feed-accent: var(--color-base-content)"
-}
-
-// feedReportsTone tints the Unread reports tile amber when there's
-// something to read, neutral when the inbox is clear.
-func feedReportsTone(unread int) string {
+// feedUnreadReportsTone draws the eye to the unread-reports stat tile only
+// when there's something to read — a primary-toned icon tile when unread > 0,
+// otherwise the quiet neutral default.
+func feedUnreadReportsTone(unread int) components.StatTileTone {
 	if unread > 0 {
-		return "warning"
+		return components.StatTonePrimary
 	}
-	return "primary"
-}
-
-// feedPulseTone selects the hero pulse panel's accent from sync status.
-func feedPulseTone(status string) string {
-	switch status {
-	case "success":
-		return "success"
-	case "error":
-		return "error"
-	case "in_progress":
-		return "info"
-	}
-	return "primary"
-}
-
-// feedPulseLive gates the expanding ping-ring on the status dot — only a
-// healthy or actively-syncing connection "pulses". A failing one shows a
-// solid (alarming, non-animated) dot.
-func feedPulseLive(status string) bool {
-	return status == "success" || status == "in_progress"
-}
-
-// feedPulseStatusWord is the short status pill in the pulse panel corner.
-// The lowercase "healthy"/"failing" words the tests assert live in
-// feedSyncSubLine below; this is the capitalised glance word.
-func feedPulseStatusWord(status string) string {
-	switch status {
-	case "success":
-		return "Live"
-	case "error":
-		return "Failing"
-	case "in_progress":
-		return "Syncing"
-	}
-	return "Idle"
-}
-
-// feedSparkBar is one bar in the hero "activity rhythm" strip.
-type feedSparkBar struct {
-	Label  string
-	Count  int
-	Height int // 0–100, percentage of the tallest bar in the window
-}
-
-// feedSparkBars buckets the rendered day-groups into a chronological
-// (oldest→newest) sparkline of event counts. Uses only the data already
-// on the page (p.Days is newest-first) — no new query. Caps at the last 7
-// buckets so the strip stays legible; a non-zero day always gets a visible
-// minimum height so a single event never renders as an invisible sliver.
-func feedSparkBars(days []FeedDay) []feedSparkBar {
-	if len(days) == 0 {
-		return nil
-	}
-	n := len(days)
-	if n > 7 {
-		n = 7
-	}
-	window := days[:n] // newest-first slice of the most recent n days
-	maxCount := 1
-	for _, d := range window {
-		if c := len(d.Items); c > maxCount {
-			maxCount = c
-		}
-	}
-	bars := make([]feedSparkBar, 0, n)
-	for i := n - 1; i >= 0; i-- { // reverse → chronological
-		c := len(window[i].Items)
-		h := c * 100 / maxCount
-		if c > 0 && h < 14 {
-			h = 14
-		}
-		bars = append(bars, feedSparkBar{
-			Label:  feedSparkLabel(window[i].Label),
-			Count:  c,
-			Height: h,
-		})
-	}
-	return bars
-}
-
-// feedSparkLabel shortens a day-bucket label for the tiny sparkbar axis
-// ("Today"→"Now", "Yesterday"→"Yday"); other labels (e.g. "Jun 11") pass
-// through untouched.
-func feedSparkLabel(label string) string {
-	switch label {
-	case "Today":
-		return "Now"
-	case "Yesterday":
-		return "Yday"
-	}
-	return label
-}
-
-func feedSyncDotClass(status string) string {
-	switch status {
-	case "success":
-		return "bg-success"
-	case "error":
-		return "bg-error animate-pulse"
-	case "in_progress":
-		return "bg-info animate-pulse"
-	default:
-		return "bg-base-300"
-	}
+	return components.StatToneNeutral
 }
 
 func feedSyncSubLine(status, institution string) string {
