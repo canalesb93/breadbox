@@ -1947,10 +1947,17 @@
    */
   .bb-tx-row {
     --bb-row-bg: var(--color-base-100);
+    /* Spine + bg + amount nudge are the only animated props — kept tight so
+       50 rows compositing on scroll/hover stays cheap. The spine is drawn as
+       an inset box-shadow that fades from transparent → primary on hover. */
+    position: relative;
+    box-shadow: inset 2px 0 0 transparent;
+    transition: background-color 0.12s ease, box-shadow 0.16s ease;
   }
   .bb-tx-row[data-tx-selected] {
     @apply bg-primary/5;
     --bb-row-bg: color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100));
+    box-shadow: inset 2px 0 0 color-mix(in oklab, var(--color-primary) 55%, transparent);
   }
 
   /*
@@ -1995,6 +2002,36 @@
   .bb-tx-row:hover {
     @apply bg-base-200/40;
     --bb-row-bg: color-mix(in oklab, var(--color-base-200) 40%, var(--color-base-100));
+    box-shadow: inset 2px 0 0 color-mix(in oklab, var(--color-primary) 30%, transparent);
+  }
+
+  /* On hover the amount leans into full base-content weight and the avatar
+     gains a faint ring — small tactile cues that the row is "live". The
+     income-green amounts already carry their own color so we only nudge
+     opacity, never hue. */
+  .bb-tx-row:hover .bb-tx-amount {
+    color: var(--color-base-content);
+  }
+  .bb-tx-row:hover .bb-tx-avatar {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--avatar-color) 10%, transparent);
+  }
+
+  /* The inline category picker reads as a real "add a category" affordance
+     once the row is hovered — quiet until then so the dominant uncategorised
+     case doesn't shout on every row. */
+  .bb-tx-row:hover .bb-cat-picker .btn {
+    background-color: color-mix(in oklab, var(--color-base-content) 5%, transparent);
+  }
+
+  /* Category-change flash — a brief primary wash applied imperatively by
+     updateRowCategory() (adds .bb-tx-row--flash, self-removes). Confirms the
+     edit landed without a toast hunt. */
+  @keyframes bb-tx-flash {
+    0%   { background-color: color-mix(in oklab, var(--color-primary) 22%, transparent); }
+    100% { background-color: transparent; }
+  }
+  .bb-tx-row--flash {
+    animation: bb-tx-flash 0.7s ease-out;
   }
 
   .bb-tx-row--focused {
@@ -2287,6 +2324,54 @@
   }
   body.bb-tx-selecting .bb-tx-header-checkbox-col {
     display: block;
+  }
+
+  /* ── Grouped-view day header ──
+     A sticky, high-contrast divider so the day you're scrolling through
+     stays anchored at the top of the viewport (Mercury / Copilot style).
+     It sticks just below the app chrome: the desktop topbar (h-14, 3.5rem)
+     at lg+, the mobile navbar (~4rem) below lg. z-20 sits under both
+     (z-30) so they always win, and under the floating bulk bar (z-40).
+     The blurred base-100 wash hides rows scrolling underneath. */
+  .bb-day-header {
+    position: sticky;
+    top: 4rem;            /* mobile navbar height */
+    z-index: 20;
+    border-radius: 0.5rem;
+    -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+    background: linear-gradient(
+      to bottom,
+      var(--color-base-100) 55%,
+      color-mix(in oklch, var(--color-base-100) 80%, transparent) 100%
+    );
+  }
+  @media (min-width: 1024px) {
+    .bb-day-header { top: 3.5rem; } /* desktop topbar height (h-14) */
+  }
+
+  /* Small accent tick left of the date label — a quiet rhythm marker that
+     gives each day header a visual anchor without a heavy rule/line. */
+  .bb-day-tick {
+    width: 0.25rem;
+    height: 0.85rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+    background: color-mix(in oklab, var(--color-primary) 45%, transparent);
+  }
+
+  /* Transaction-count pill — a soft chip rather than bare faint text, so
+     the count reads as metadata attached to the date, not noise. */
+  .bb-day-count {
+    @apply inline-flex items-center text-[0.65rem] font-medium leading-none px-1.5 py-0.5 rounded-full;
+    color: oklch(from var(--color-base-content) l c h / 0.45);
+    background: oklch(from var(--color-base-content) l c h / 0.05);
+  }
+
+  /* Per-day out/in totals. The directional arrow + medium weight make the
+     two numbers legible at a glance; income keeps its success tint. */
+  .bb-day-total {
+    white-space: nowrap;
   }
 
   /* ── Date visibility (hidden in grouped, shown in list) ──

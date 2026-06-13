@@ -212,7 +212,7 @@ templ TxRow(tx service.AdminTransactionRow) {
 				@Amount(AmountProps{
 					Value:   tx.Amount,
 					Pending: tx.Pending,
-					Class:   "text-sm font-semibold",
+					Class:   "bb-tx-amount text-[0.9rem] font-semibold tracking-tight",
 				})
 			</div>
 			<!-- Expand chevron. Rotation lives on the wrapper because Lucide
