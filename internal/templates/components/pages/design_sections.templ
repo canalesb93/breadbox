@@ -1069,6 +1069,11 @@ templ SectionLoading() {
 				@components.ConnectionsSkeleton()
 			</div>
 		}
+		@designExample("Household list skeleton", "Placeholder mirroring /household — member groups (a quiet label line over a card of member list-rows: round leading avatar, name + body line, trailing kebab). Primitive is exposed here for future AJAX swaps; /household is full-SSR today.") {
+			<div class="max-w-4xl">
+				@components.HouseholdSkeleton()
+			</div>
+		}
 		@designExample("Tags list skeleton", "Placeholder mirroring /tags — filter input, helper line, and a divided card of tag rows (chip preview, slug + optional description, usage count, overflow menu). Primitive is exposed here for future AJAX swaps and adjacent tag-centric panels (e.g. tag picker / tag-attach autocomplete); /tags is full-SSR today.") {
 			<div class="max-w-3xl">
 				@components.TagsSkeleton()
