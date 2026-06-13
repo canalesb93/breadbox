@@ -74,6 +74,10 @@ document.addEventListener('alpine:init', function () {
         maxTurns: '',
         maxBudget: '',
         enabled: true, // create-only "Activate" toggle
+        // promptError flips true when a save is attempted with an empty prompt.
+        // The prompt entry (workflowCustomPromptField) tints error-red and a
+        // helper line appears; editPrompt() and a fresh openCustom() clear it.
+        promptError: false,
       },
       // -------------------------------------------------------------------
 
@@ -576,6 +580,7 @@ document.addEventListener('alpine:init', function () {
         self.custom.maxTurns = '';
         self.custom.maxBudget = '';
         self.custom.enabled = true;
+        self.custom.promptError = false;
         self.custom.loading = !!slug;
         Alpine.store('drawers').open('wf-custom');
         if (!slug) return;
@@ -621,6 +626,13 @@ document.addEventListener('alpine:init', function () {
       // the new state.
       submitCustom: function (form) {
         var self = this;
+        // The prompt lives behind the modal in a hidden field (no native
+        // `required`), so guard it here. Flag the entry and bail — the operator
+        // taps it to open the editor.
+        if (!self.custom.prompt || !self.custom.prompt.trim()) {
+          self.custom.promptError = true;
+          return;
+        }
         var fd = new FormData(form);
         // The create "Activate" checkbox is omitted by FormData when unchecked.
         var box = form.querySelector('input[name="enabled"]');
@@ -796,6 +808,34 @@ document.addEventListener('alpine:init', function () {
       // (value, for the Copy action) plus the server-rendered, sanitized HTML
       // (html, so the modal skips its own /-/markdown/preview round-trip).
       // This is the single prompt-preview surface — no bespoke dialog here.
+      // editPrompt hands custom-workflow prompt authoring to the global prompt
+      // modal (#bb-prompt-modal in base.html) and its Markdown Edit/Preview
+      // flow — the inline textarea is retired. The value round-trips through
+      // custom.prompt: we seed the modal with it and write edits back via
+      // onSaved. startInEdit picks the landing view (true = editor, false =
+      // rendered preview); omit it to auto-pick — editor when empty, preview
+      // when there's already something to read.
+      editPrompt: function (startInEdit) {
+        var self = this;
+        var hasPrompt = !!(self.custom.prompt && self.custom.prompt.trim());
+        var edit = startInEdit === undefined ? !hasPrompt : !!startInEdit;
+        self.custom.promptError = false;
+        window.dispatchEvent(new CustomEvent('bb-prompt-modal', {
+          detail: {
+            mode: 'editable',
+            edit: edit,
+            title: self.custom.isEdit ? 'Edit prompt' : 'Prompt',
+            subtitle: 'Markdown — runs verbatim on every run.',
+            value: self.custom.prompt || '',
+            saveLabel: 'Save prompt',
+            onSaved: function (v) {
+              self.custom.prompt = v;
+              self.custom.promptError = false;
+            },
+          },
+        }));
+      },
+
       previewPrompt: function (slug, name) {
         var self = this;
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/prompt', {
