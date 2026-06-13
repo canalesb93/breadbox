@@ -17,12 +17,10 @@ templ Logs(p LogsProps) {
 		x-data={ fmt.Sprintf("{ tab: '%s' }", p.Tab) }
 		x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })"
 	>
-		<div class="bb-page-header">
-			<div>
-				<h1 class="bb-page-title">Logs</h1>
-				<p class="text-sm text-base-content/50 mt-1">Sync history, webhooks, and agent sessions</p>
-			</div>
-		</div>
+		@components.PageHeader(components.PageHeaderProps{
+			Title:    "Logs",
+			Subtitle: "Sync history, webhooks, and agent sessions",
+		})
 		<!-- Tab Switcher — all three tabs swap inline via Alpine. The
 		     handler eagerly fetches sessions data alongside syncs/webhooks
 		     so the client-side toggle stays consistent across tabs. -->
