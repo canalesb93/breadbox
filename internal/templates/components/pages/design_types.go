@@ -362,6 +362,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionReportsTable() },
 		},
 		{
+			Slug:        "rules-list",
+			Title:       "Rules index",
+			Description: "The /rules surface as grouped list-rows (table retired). Rules group by pipeline stage (baseline → override) via GroupRulesByStage, each stage a quiet label line over an AgentRunRowList card. The leading control is the enabled toggle (enabled/disabled IS the status — no separate tile); disabled rows dim. Name (title) + System/Expired badges + agent avatar, the action summary as the one body line, hits + last-hit as right metadata, and an OverflowMenu outside the row link.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionRulesList() },
+		},
+		{
 			Slug:        "agent-run-chat",
 			Title:       "Agent run chat thread",
 			Description: "The chat-thread variants the /agents/runs/{id} detail page composes — assistant + user bubbles (daisy chat), tool_use + tool_result rows (expand to JSON viewer), final result bubble, and the soft-alert error row. Pairs with the markdown-prose + json-viewer sections.",

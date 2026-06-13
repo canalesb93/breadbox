@@ -1,0 +1,32 @@
+package pages
+
+// SectionRulesList showcases the /rules surface's grouped list-row idiom —
+// the table→list-row migration. Rules group by pipeline stage (baseline →
+// override), each stage a quiet label line over a card of list-rows. The
+// leading control is the enabled toggle (enabled/disabled IS the status,
+// so there's no separate status tile); a disabled rule dims. Name is the
+// title, the action summary the one body line, hits + last-hit the compact
+// right metadata, and an OverflowMenu rides outside the row link.
+//
+// Wrapped in a tiny literal x-data stub so the toggle's @change resolves in
+// the sandbox without the live rulesPage factory (which reloads the page).
+templ SectionRulesList() {
+	<div class="flex flex-col gap-6">
+		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
+			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
+			<ul class="space-y-1 list-disc pl-4">
+				<li>Renders the transaction-rules index (canonical: <code>/rules</code>) as grouped daisy <code>list-row</code>s — the table is retired. Rules group by <strong>pipeline stage</strong> (the order they execute during sync) via <code>GroupRulesByStage</code>, each stage a quiet label line over an <code>AgentRunRowList</code> card.</li>
+				<li>The leading control is the <strong>enabled toggle</strong>: for a rule, enabled/disabled IS the status, so the toggle stands in for a status tile (no redundant second signal). A disabled rule dims (<code>opacity-60</code>), the same read-row treatment as <code>/reports</code>.</li>
+				<li>Each row: name (title) + <code>System</code> / <code>Expired</code> badges + an <strong>agent avatar</strong> on agent-authored rules; the <strong>action summary</strong> as the one body line; <strong>hits + last-hit</strong> as compact muted metadata on the right. The toggle and the <strong>OverflowMenu</strong> sit outside the row's <code>&lt;a&gt;</code> link.</li>
+				<li>Stage is not repeated per row — the group header names it. Within a group, rows keep the server's sort order.</li>
+			</ul>
+		</div>
+		@designExample("Rules index — grouped list-rows", "Full matrix: four pipeline stages (baseline → override), a system rule, an agent-authored rule (avatar), a disabled rule (dimmed + toggle off), and an expired rule. Hits + last-hit ride the right; the action summary is the one body line.") {
+			<div x-data="{ toggleRule() {}, deleteRule() {} }" class="flex flex-col gap-5">
+				for _, g := range designRuleGroups() {
+					@rulesStageGroup(g)
+				}
+			</div>
+		}
+	</div>
+}
