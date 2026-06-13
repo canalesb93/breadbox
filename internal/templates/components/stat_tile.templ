@@ -20,7 +20,8 @@ package components
 //   - Tone:        "neutral" (default), "primary", "success", "warning",
 //                  "error", "info". Drives icon-tile bg + icon color only.
 //   - Href:        optional. When set, the tile becomes an <a> with
-//                  bb-card--interactive hover.
+//                  bb-card--interactive hover + a keyboard focus-visible
+//                  primary ring (principle #8 — interaction states).
 
 type StatTileTone string
 
@@ -85,7 +86,7 @@ func statTileIcon(t StatTileTone) string {
 
 templ StatTile(p StatTileProps) {
 	if p.Href != "" {
-		<a href={ p.Href } class="bb-card bb-card--interactive p-4 no-underline block">
+		<a href={ p.Href } class="bb-card bb-card--interactive p-4 no-underline block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
 			@statTileBody(p)
 		</a>
 	} else {

@@ -190,6 +190,9 @@ StatTileProps{
 ```
 
 Set `ValuePrivateKind: "amount"` on money tiles so they obfuscate with privacy mode.
+When `Href` is set the tile is an `<a>` and carries both `bb-card--interactive`
+hover and a keyboard `focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`
+ring (principle #8 — every interactive element has visible hover + focus states).
 
 ## EmptyState — `empty_state.templ`
 
