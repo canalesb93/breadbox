@@ -49,6 +49,13 @@ type AccountsListConnGroup struct {
 	Subtotal          float64
 	HasSubtotal       bool
 	Accounts          []AccountsListRow
+
+	// SharePct is this connection's positive subtotal as a percentage of
+	// the summed positive subtotals across all groups — "what share of
+	// your asset balances lives here." Zero for net-liability/no-balance
+	// groups (their figure speaks for itself). Filled by
+	// AnnotateConnGroupShares; drives the header's share meter.
+	SharePct float64
 }
 
 // AccountsListRow is one account row. Fields are pre-formatted (display_name
@@ -134,6 +141,31 @@ func GroupAccountsByConnection(rows []AccountsListRow) []AccountsListConnGroup {
 		return a.Subtotal > b.Subtotal
 	})
 	return groups
+}
+
+// AnnotateConnGroupShares fills SharePct on each group: its positive
+// subtotal as a percentage of the summed positive subtotals across all
+// groups. Net-liability or no-balance groups stay at 0. Returns a copy so
+// the input slice is untouched; pure + unit-tested so the share math is
+// pinned, not vibes.
+func AnnotateConnGroupShares(groups []AccountsListConnGroup) []AccountsListConnGroup {
+	var sumPositive float64
+	for _, g := range groups {
+		if g.HasSubtotal && g.Subtotal > 0 {
+			sumPositive += g.Subtotal
+		}
+	}
+	out := make([]AccountsListConnGroup, len(groups))
+	copy(out, groups)
+	if sumPositive <= 0 {
+		return out
+	}
+	for i := range out {
+		if out[i].HasSubtotal && out[i].Subtotal > 0 {
+			out[i].SharePct = out[i].Subtotal / sumPositive * 100
+		}
+	}
+	return out
 }
 
 // accountsConnLabel is the group header's institution label, with a fallback

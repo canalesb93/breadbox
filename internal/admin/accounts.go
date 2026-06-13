@@ -154,7 +154,7 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 			TotalLiabilities: totalLiabilities,
 			HasAnyBalance:    hasAnyBalance,
 			ActiveUserID:     activeUserID,
-			Groups:           pages.GroupAccountsByConnection(rows),
+			Groups:           pages.AnnotateConnGroupShares(pages.GroupAccountsByConnection(rows)),
 			TotalAccounts:    len(rows),
 		}
 
