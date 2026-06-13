@@ -2,7 +2,11 @@
 
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // ConnectionsProps mirrors the data map the old connections.html read off
 // the layout. Kept flat so admin/connections.go can copy fields one-to-one.
@@ -172,19 +176,94 @@ func connectionStatusIcon(c ConnectionsRow) string {
 	}
 }
 
-// connectionTileTone returns the bg/text utility pair for the leading
-// status tile, mirroring the agent-run row's tone helper.
-func connectionTileTone(tone string) string {
-	switch tone {
-	case "success":
-		return "bg-success/10 text-success"
-	case "warning":
-		return "bg-warning/10 text-warning"
-	case "error":
-		return "bg-error/10 text-error"
+// connectionsShowStatusPill is true for any connection that warrants a
+// status pill — i.e. it is not a healthy active connection. Healthy rows
+// stay pill-free so the calm majority reads quietly (Mintlify-clean): the
+// quiet provider tile + "synced Nh ago" body line carry them. Attention is
+// signalled only where it is warranted.
+func connectionsShowStatusPill(c ConnectionsRow) bool {
+	return connectionHealthBucket(c) != "active"
+}
+
+// connectionStatusLabel is the short word shown in the row's status pill.
+func connectionStatusLabel(c ConnectionsRow) string {
+	switch {
+	case c.Status == "disconnected":
+		return "Disconnected"
+	case c.Status == "error":
+		return "Connection error"
+	case c.Status == "pending_reauth":
+		return "Reauth needed"
+	case c.Status == "active" && c.LastSyncStatus == "error":
+		return "Sync error"
 	default:
-		return "bg-base-200 text-base-content/50"
+		return "Connected"
 	}
+}
+
+// connectionStatusBadgeClass maps a connection's health tone to the quiet
+// daisy badge utility for its status pill. The vivid tones use badge-soft so
+// the pill stays a small accent (never a fill); disconnected falls back to
+// badge-ghost because a neutral-soft badge is invisible on the dark theme.
+func connectionStatusBadgeClass(c ConnectionsRow) string {
+	switch connectionStatusTone(c) {
+	case "warning":
+		return "badge-soft badge-warning"
+	case "error":
+		return "badge-soft badge-error"
+	case "success":
+		return "badge-soft badge-success"
+	default:
+		return "badge-ghost"
+	}
+}
+
+// connectionsRowReason is the trailing clause of the quiet body line — the
+// account count's companion. It states the connection's situation in muted
+// ink; tone lives only in the small pill, never washed across the body. It
+// doubles as the status pill's hover title so the full error detail the
+// line truncates is still reachable.
+func connectionsRowReason(c ConnectionsRow) string {
+	switch {
+	case c.ErrorMessageValid:
+		return components.ErrorMessage(c.ErrorCode)
+	case c.Status == "pending_reauth":
+		return "Reauthentication needed"
+	case c.Status == "active" && c.LastSyncStatus == "error":
+		if c.LastSyncErrorMessage != "" {
+			return "Last sync failed — " + c.LastSyncErrorMessage
+		}
+		return "Last sync failed"
+	case c.Status == "disconnected":
+		return "Disconnected"
+	case c.LastSyncedAtValid:
+		return "synced " + c.LastSyncedAtRelative
+	default:
+		return "Never synced"
+	}
+}
+
+// connectionsGroupIcon returns a small leading lucide glyph for a health
+// group header. Only the needs-attention bucket gets one (a quiet warning
+// mark, a small accent — not a tinted rail); the rest read as plain-ink
+// labels.
+func connectionsGroupIcon(key string) string {
+	if key == "needs_attention" {
+		return "alert-triangle"
+	}
+	return ""
+}
+
+// connectionsNeedsAttentionCount counts connections in the needs-attention
+// bucket, for the quiet at-a-glance subtitle line.
+func connectionsNeedsAttentionCount(rows []ConnectionsRow) int {
+	n := 0
+	for _, r := range rows {
+		if connectionHealthBucket(r) == "needs_attention" {
+			n++
+		}
+	}
+	return n
 }
 
 // connectionsAccountCountLabel renders "N accounts" for the body line,

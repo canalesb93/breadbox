@@ -44,7 +44,7 @@ templ Connections(p ConnectionsProps) {
 			Action:               connectionsAction(p),
 		})
 		<!-- Tab Switcher -->
-		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
+		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-8 w-fit">
 			<button
 				@click="tab = 'connections'"
 				:class="tab === 'connections' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
@@ -65,7 +65,7 @@ templ Connections(p ConnectionsProps) {
 		<!-- ==================== CONNECTIONS TAB ==================== -->
 		<div x-show="tab === 'connections'">
 			if len(p.Connections) > 0 {
-				<div class="flex flex-col gap-5" id="bb-connections-list">
+				<div class="flex flex-col gap-8" id="bb-connections-list">
 					for _, g := range p.Groups() {
 						@connectionsHealthGroup(g, p.CanManage)
 					}
@@ -113,13 +113,18 @@ templ Connections(p ConnectionsProps) {
 	<!-- /alpine x-data tabs -->
 }
 
-// connectionsHealthGroup renders one health bucket: a quiet label line
-// (with a count) over the bucket's connection list-rows inside a card.
+// connectionsHealthGroup renders one health bucket: a quiet plain-ink label
+// line (with a count) over the bucket's connection list-rows inside a card.
+// The needs-attention bucket earns a small warning glyph before its label —
+// a small accent, never a tinted rail or colored header.
 templ connectionsHealthGroup(g ConnectionsStatusGroup, canManage bool) {
-	<div class="flex flex-col gap-2">
-		<div class="flex items-center gap-2 px-1 min-w-0">
-			<span class={ "text-sm font-medium shrink-0", connectionsGroupLabelClass(g.Key) }>{ g.Label }</span>
-			<span class="text-xs text-base-content/40 shrink-0">{ fmt.Sprintf("%d", len(g.Rows)) }</span>
+	<div class="flex flex-col gap-3">
+		<div class="flex items-center gap-1.5 px-0.5 min-w-0">
+			if connectionsGroupIcon(g.Key) != "" {
+				@components.LucideIcon(connectionsGroupIcon(g.Key), "w-3.5 h-3.5 text-warning shrink-0")
+			}
+			<span class="text-sm font-medium text-base-content shrink-0">{ g.Label }</span>
+			<span class="text-xs text-base-content/40 shrink-0 tabular-nums">{ fmt.Sprintf("%d", len(g.Rows)) }</span>
 		</div>
 		@components.AgentRunRowList() {
 			for _, c := range g.Rows {
@@ -129,11 +134,13 @@ templ connectionsHealthGroup(g ConnectionsStatusGroup, canManage bool) {
 	</div>
 }
 
-// connectionsRow renders one connection as a daisy list-row: a leading
-// status tile (tone tracks health), the institution name with a small
-// provider mark, one priority body line, a trailing per-connection
-// balance, and — outside the row's navigation anchor — an optional
-// recovery link plus the actions overflow.
+// connectionsRow renders one connection as a daisy list-row: a leading,
+// quiet provider tile (brand identity — not a status tint), the institution
+// name beside a small status pill (shown only when action is warranted),
+// one muted body line, a trailing per-connection balance, and — outside the
+// row's navigation anchor — an optional recovery link plus the actions
+// overflow. Health tone lives in the small pill alone; no tile wash, no
+// left-accent rail.
 templ connectionsRow(c ConnectionsRow, canManage bool) {
 	<li
 		class="list-row transition-colors hover:bg-base-200/40 focus-within:bg-base-200/40 items-center"
@@ -149,12 +156,11 @@ templ connectionsRow(c ConnectionsRow, canManage bool) {
 			href={ templ.SafeURL("/connections/" + c.ID) }
 			aria-label={ "Open " + c.InstitutionName + " connection" }
 		>
-			<div class={ "w-10 h-10 rounded-lg flex items-center justify-center shrink-0", connectionTileTone(connectionStatusTone(c)) }>
-				@components.LucideIcon(connectionStatusIcon(c), "w-4 h-4")
+			<div class="w-10 h-10 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
+				@connectionsProviderMark(c.Provider)
 			</div>
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 min-w-0">
-					@connectionsProviderMark(c.Provider)
 					<span data-private="institution" class="font-medium text-sm text-base-content truncate">{ c.InstitutionName }</span>
 					if c.Paused {
 						<span class="badge badge-ghost badge-xs shrink-0">Paused</span>
@@ -183,38 +189,37 @@ templ connectionsRow(c ConnectionsRow, canManage bool) {
 	</li>
 }
 
-// connectionsRowBody renders ONE body line, in priority order: a
-// connection-level error (reauth) → a failed last sync → the quiet
-// "N accounts · synced 2h ago". Healthy rows still get the quiet line so
-// the row always says how many accounts and when it last synced.
-templ connectionsRowBody(c ConnectionsRow) {
-	if c.ErrorMessageValid {
-		<div class="mt-0.5 text-xs min-w-0 line-clamp-1 text-warning">
-			{ components.ErrorMessage(c.ErrorCode) }
-		</div>
-	} else if c.Status == "pending_reauth" {
-		<div class="mt-0.5 text-xs min-w-0 line-clamp-1 text-warning">Reauthentication needed</div>
-	} else if c.Status == "active" && c.LastSyncStatus == "error" {
-		<div class="mt-0.5 text-xs min-w-0 line-clamp-1 text-warning">
-			if c.LastSyncErrorMessage != "" {
-				{ "Last sync failed — " + c.LastSyncErrorMessage }
-			} else {
-				Last sync failed
-			}
-		</div>
-	} else {
-		<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
-			{ connectionsAccountCountLabel(c.AccountCount) }
-			<span class="text-base-content/25">&middot;</span>
-			if c.Status == "disconnected" {
-				<span>Disconnected</span>
-			} else if c.LastSyncedAtValid {
-				<span>{ "synced " + c.LastSyncedAtRelative }</span>
-			} else {
-				<span>Never synced</span>
-			}
-		</div>
+// connectionsStatusPill is the row's single health signal: a small quiet
+// icon+label badge shown only when a connection wants attention (sync error,
+// reauth, disconnected). Healthy active rows render nothing so the calm
+// majority stays decoration-free. The full error detail rides the title attr.
+templ connectionsStatusPill(c ConnectionsRow) {
+	if connectionsShowStatusPill(c) {
+		<span
+			class={ "badge badge-xs gap-1 shrink-0", connectionStatusBadgeClass(c) }
+			title={ connectionsRowReason(c) }
+		>
+			@components.LucideIcon(connectionStatusIcon(c), "w-3 h-3")
+			{ connectionStatusLabel(c) }
+		</span>
 	}
+}
+
+// connectionsRowBody renders the row's second line: the small status pill
+// (only when action is warranted) leading a quiet, muted metadata clause of
+// the same shape on every row — "N accounts · <situation>". Keeping the pill
+// here (not beside the name) lets the institution name own the full first
+// line, so it doesn't truncate to a stub on mobile. The situation clause
+// stays in muted ink; tone lives in the pill, never washed across the line.
+templ connectionsRowBody(c ConnectionsRow) {
+	<div class="mt-0.5 flex items-center gap-1.5 min-w-0">
+		@connectionsStatusPill(c)
+		<span class="text-xs text-base-content/55 min-w-0 truncate">
+			{ connectionsAccountCountLabel(c.AccountCount) }
+			<span class="text-base-content/25 mx-1">&middot;</span>
+			{ connectionsRowReason(c) }
+		</span>
+	</div>
 }
 
 // connectionsProviderMark renders the small brand glyph next to the
@@ -277,16 +282,6 @@ func connectionsRowItems(c ConnectionsRow, canManage bool) []components.Overflow
 		})
 	}
 	return items
-}
-
-// connectionsGroupLabelClass tints the needs-attention group label so the
-// bucket that wants action reads warmer than the quiet active/disconnected
-// headers.
-func connectionsGroupLabelClass(key string) string {
-	if key == "needs_attention" {
-		return "text-warning"
-	}
-	return "text-base-content"
 }
 
 templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
