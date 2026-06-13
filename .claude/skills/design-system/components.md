@@ -275,6 +275,74 @@ ReportRowProps{
   label lines (`partitionReportsByRead`). `ReportPriorityBadge` is now
   detail-header-only.
 
+## Family table — the dense matrix, wearing the family skin
+
+When the content is a genuinely dense, multi-numeric-column matrix that must
+align across rows (the Backups file list, a CSV preview, a sample-matches grid),
+keep it a **`<table>`** — do *not* shred it into list-rows. Make it read as the
+same product by wearing the family treatment:
+
+```html
+<div class="bb-card overflow-hidden">          <!-- flat border, clips the corners -->
+  <div class="overflow-x-auto">                 <!-- horizontal scroll on mobile -->
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <!-- quiet uppercase column labels -->
+          <th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Filename</th>
+          <th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Size</th>
+          <th class="text-xs font-medium uppercase tracking-wide text-base-content/50 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="hover:bg-base-200/40 transition-colors">  <!-- principle #8 hover -->
+          <td>…</td>
+          <td class="tabular-nums text-sm">…</td>            <!-- tabular-nums on every number -->
+          <td>… vivid-only badge, never badge-soft …</td>
+          <td>
+            <div class="flex items-center justify-end gap-1" x-data>
+              <a … class="btn btn-ghost btn-xs btn-square focus-visible:ring-2 focus-visible:ring-primary/40">…</a>
+              @components.OverflowMenu(components.OverflowMenuProps{ Size: "sm", … })  <!-- secondary/destructive -->
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+Rules, all load-bearing:
+
+- **`bb-card overflow-hidden`** wrapper (flat border + dark-mode lift, rounded
+  corners clipped) — never a heavy shadow or a boxed sub-header. Inside a
+  `SettingsSection`, set `Bare: true` so the table is the family-`bb-card`, not a
+  card-in-card.
+- Quiet **uppercase `text-xs … text-base-content/50`** `<th>` labels; daisy
+  `table`'s own hairline row borders are the dividers (no zebra).
+- **`hover:bg-base-200/40 transition-colors`** on every `<tr>`.
+- **`tabular-nums`** on every numeric `<td>` (size, dates, counts, money).
+- Type/state as a **vivid-only** badge (`info`/`success`/`warning`/`error`, or
+  `ghost` for a quiet neutral) — never a `badge-soft` low-contrast tone.
+- Row actions = **bare-icon button(s)** for the primary action (`btn btn-ghost
+  btn-xs btn-square` + explicit `focus-visible:ring-2 focus-visible:ring-primary/40`)
+  **plus an `OverflowMenu` (`Size: "sm"`)** for secondary/destructive actions.
+  When a menu item must POST (restore/delete), render a row-local hidden
+  `<form x-ref="…">` carrying the CSRF token and have the item's `OnClick`
+  dispatch `bb-confirm` with `onConfirm: () => $refs.<form>.requestSubmit()`.
+
+Worked example: `backups.templ` (`backupsFilesSection` / `backupsRow`).
+
+## Family card — the richer preview format
+
+Heterogeneous or visual items that need more than a row (the Workflows gallery
+tiles, onboarding step cards, recurring-candidate cards) use a **card**, not a
+list-row. Reference formats already in the language: the **Workflows gallery**
+card (`workflows_gallery.templ`) and the **`StatTile` / `StatTileRow`** strip for
+summary numbers. Reuse those shells — same `bb-card` surface, quiet uppercase
+labels, `tabular-nums` figures, `IconTile` for state — before authoring a bespoke
+card.
+
 ## Reference implementation
 
 `agent_run_row.templ` (`AgentRunRowList` + `AgentRunRow`) is the cleanest single
