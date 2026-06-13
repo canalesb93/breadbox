@@ -25,8 +25,10 @@ templ ReportsSkeleton() {
 				<div class="skeleton h-8 w-32 rounded-md"></div>
 			</div>
 		</div>
+		<!-- At-a-glance line -->
+		<div class="skeleton h-4 w-44 rounded-md mb-4"></div>
 		<!-- Filter tabs + mark-all-read -->
-		<div class="flex items-center justify-between gap-2 mb-5">
+		<div class="flex items-center justify-between gap-2 mb-6">
 			<div class="flex items-center gap-4">
 				<div class="skeleton h-5 w-12"></div>
 				<div class="skeleton h-5 w-16"></div>
@@ -36,9 +38,9 @@ templ ReportsSkeleton() {
 		</div>
 		<!-- Group label line + list-row card. Summary widths vary so the
 		     skeleton reads as motion. -->
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col gap-3">
 			<div class="flex items-center gap-2 px-1">
-				<div class="skeleton h-4 w-16 rounded-md"></div>
+				<div class="skeleton h-3 w-14 rounded-md"></div>
 				<div class="skeleton h-3 w-4 rounded-md"></div>
 			</div>
 			<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
@@ -55,12 +57,12 @@ templ ReportsSkeleton() {
 // agent identity line (small avatar + name + time), a summary line, and a
 // trailing overflow kebab placeholder.
 templ reportsSkeletonRow(summaryW string) {
-	<li class="list-row items-center">
-		<div class="skeleton w-10 h-10 rounded-lg shrink-0"></div>
+	<li class="list-row py-3.5 gap-3 items-center">
+		<div class="skeleton w-4 h-4 rounded-md shrink-0"></div>
 		<div class="min-w-0 space-y-1.5">
 			<div class="flex items-center gap-2">
-				<div class="skeleton w-4 h-4 rounded-full shrink-0"></div>
-				<div class="skeleton h-3.5 w-24 rounded-md"></div>
+				<div class="skeleton w-5 h-5 rounded-full shrink-0"></div>
+				<div class="skeleton h-3 w-24 rounded-md"></div>
 				<div class="skeleton h-3 w-12 rounded-md ml-auto"></div>
 			</div>
 			<div class={ "skeleton h-4 rounded-md max-w-full", summaryW }></div>

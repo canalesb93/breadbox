@@ -18,8 +18,8 @@ templ SectionReportsTable() {
 			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
 			<ul class="space-y-1 list-disc pl-4">
 				<li>Renders the agent-reports index (canonical: <code>/reports</code>) via <code>ReportsList</code> / <code>ReportRow</code> — a single daisy <code>list-row</code> layout inside a <code>bb-card</code>, the same shape as <code>AgentRunRow</code>. No desktop-table / mobile-card split. The full report body lives on the detail page.</li>
-				<li>Each row: a leading <strong>status tile</strong> (priority → vivid tone: error / warning / info), <strong>agent identity</strong> (UserAvatar + name), an <strong>unread dot</strong> + relative <strong>time</strong> on the title line, the <strong>summary</strong> as the one body line, and a trailing <strong>OverflowMenu</strong> (mark read/unread · open) rendered outside the row link.</li>
-				<li>Unread rows stay full-strength with a heavier summary + an info dot; read rows fade (row opacity) and drop the dot. Status lives in the tile — no parallel priority text badge in the row.</li>
+				<li>Each row leads with a <strong>small bare priority glyph</strong> (vivid ink only for critical / warning; muted for routine — no tinted tile). The <strong>summary</strong> is the prominent line; the <strong>agent identity</strong> (UserAvatar + name) + an <strong>unread dot</strong> + relative <strong>time</strong> ride above it as a quiet metadata line. A trailing <strong>OverflowMenu</strong> (mark read/unread · open) renders outside the row link.</li>
+				<li>Unread rows keep a slightly stronger summary + an info dot; read rows fade (row opacity) and drop the dot. Status is a small glyph, not a parallel priority text badge.</li>
 				<li>The whole row is a real <code>&lt;a&gt;</code> (keyboard / middle-click + the accessible name); the overflow menu sits outside it. On <code>/reports</code> the All view groups rows unread-first under quiet label lines.</li>
 				<li><code>ReportPriorityBadge</code> is the shared priority chip, reused in the detail-page header.</li>
 			</ul>

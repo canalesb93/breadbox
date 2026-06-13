@@ -29,8 +29,11 @@ templ Reports(p ReportsProps) {
 		Action:               reportsManageFormatLink(),
 	})
 	<div x-data="reportsPage">
+		if line := reportsGlance(p); line != "" {
+			<p class="text-sm text-base-content/55 mb-4 -mt-1">{ line }</p>
+		}
 		<!-- Filter tabs + mark-all-read -->
-		<div class="flex items-center justify-between gap-2 mb-5 flex-wrap">
+		<div class="flex items-center justify-between gap-2 mb-6 flex-wrap">
 			@components.TabBar(components.TabBarProps{
 				Variant:   "border",
 				AriaLabel: "Filter reports by read state",
@@ -58,7 +61,7 @@ templ Reports(p ReportsProps) {
 		if len(p.Reports) > 0 {
 			if p.FilterStatus == "" {
 				{{ unread, read := partitionReportsByRead(p.Reports) }}
-				<div class="flex flex-col gap-5">
+				<div class="flex flex-col gap-7">
 					if len(unread) > 0 {
 						@reportsGroup("Unread", len(unread)) {
 							@components.ReportsList(unread)
@@ -96,10 +99,10 @@ templ Reports(p ReportsProps) {
 // inbox so the All view reads "Unread first, then Read" without a heavy
 // boxed card-header per group.
 templ reportsGroup(label string, count int) {
-	<div class="flex flex-col gap-2">
+	<div class="flex flex-col gap-3">
 		<div class="flex items-center gap-2 px-1">
-			<span class="text-sm font-medium text-base-content">{ label }</span>
-			<span class="text-xs text-base-content/40 tabular-nums">{ reportsGroupCount(count) }</span>
+			<span class="text-xs font-medium uppercase tracking-wide text-base-content/45">{ label }</span>
+			<span class="text-xs text-base-content/35 tabular-nums">{ reportsGroupCount(count) }</span>
 		</div>
 		{ children... }
 	</div>
