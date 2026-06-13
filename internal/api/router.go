@@ -28,9 +28,12 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Use(mw.Logging(a.Logger))
 	r.Use(middleware.Recoverer)
 
-	// Static files (CSS, favicon) — embedded, no auth needed.
+	// Static files (CSS, JS, fonts, favicon) — embedded, no auth needed.
+	// NewStaticHandler stamps Cache-Control: no-cache so browsers revalidate
+	// instead of serving a heuristically-stale bundle (the desync that broke
+	// /recurring), and supplies content-hash ETags so revalidation 304s.
 	staticFS, _ := fs.Sub(static.FS, ".")
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	r.Handle("/static/*", NewStaticHandler(staticFS, static.DevReload))
 
 	r.Get("/health", HealthLiveHandler(version))
 	r.Get("/health/live", HealthLiveHandler(version))

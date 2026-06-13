@@ -17,8 +17,15 @@ var embedded embed.FS
 // BREADBOX_STATIC_DIR, or "static" if unset.
 var FS fs.FS = embedded
 
+// DevReload reports whether static assets are being served from disk
+// (BREADBOX_DEV_RELOAD=1) rather than the embedded FS. The static handler uses
+// this to decide its revalidation strategy: disk files carry real modtimes
+// (Last-Modified validators that update on edit), whereas embedded files have a
+// zero modtime and need content-hash ETags instead. See internal/api/static.go.
+var DevReload = os.Getenv("BREADBOX_DEV_RELOAD") == "1"
+
 func init() {
-	if os.Getenv("BREADBOX_DEV_RELOAD") != "1" {
+	if !DevReload {
 		return
 	}
 	dir := os.Getenv("BREADBOX_STATIC_DIR")
