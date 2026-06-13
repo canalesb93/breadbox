@@ -2,25 +2,25 @@ package pages
 
 import (
 	"fmt"
-	"strconv"
 
 	"breadbox/internal/templates/components"
 )
 
 // Connections renders the bank-connections list page (and the Account
-// Links secondary tab). Hosts inside the base layout via
-// TemplateRenderer.RenderWithTempl.
+// Links secondary tab) in the Workflows-DNA surface language: one
+// PageHeader, then the connections as health-grouped list-rows inside a
+// bb-card per group. Needs-attention connections sort to the top so a
+// broken sync or a reauth prompt is the first thing the eye lands on.
 //
-// The Alpine factories (`syncAllBtn`, `syncBtn`), keyboard-navigation
-// module (`bbConnNav`), and shortcut registrations live in
-// static/js/admin/components/connections.js — see #827 / docs/design-system.md
-// → "Alpine page components".
+// The Alpine factories (`connectionsList`, `syncAllBtn`) and the
+// keyboard-navigation module (`bbConnNav`) live in
+// static/js/admin/components/connections.js.
 templ Connections(p ConnectionsProps) {
-	<!-- Component factories for syncAllBtn / syncBtn and the j/k/Enter/s
-	     keyboard-shortcut registrations. Loaded synchronously (NOT defer)
-	     because Alpine itself is deferred from <head> and dispatches
-	     alpine:init at parse-end — a deferred page script would register
-	     its listener after the event already fired. -->
+	<!-- Component factories for connectionsList / syncAllBtn and the
+	     j/k/Enter/s keyboard-shortcut registrations. Loaded synchronously
+	     (NOT defer) because Alpine itself is deferred from <head> and
+	     dispatches alpine:init at parse-end — a deferred page script would
+	     register its listener after the event already fired. -->
 	<script src="/static/js/admin/components/connections.js"></script>
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
@@ -30,21 +30,25 @@ templ Connections(p ConnectionsProps) {
 	-->
 	<div x-data x-init="$store.shortcuts.setScope('connections')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div
-		x-data={ fmt.Sprintf("{ tab: %q, filterProvider: 'all' }", p.Tab) }
+		x-data="connectionsList"
+		@connection-sync.window="syncOne($event.detail.id, $event.detail.name)"
+		@connection-disconnect.window="disconnectOne($event.detail.id, $event.detail.name)"
 		x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })"
+		data-tab={ p.Tab }
 	>
 		@components.PageHeader(components.PageHeaderProps{
-			Title:           "Connections",
-			Subtitle:        connectionsSubtitle(p),
-			SecondaryAction: connectionsSecondaryAction(p),
-			Action:          connectionsAction(p),
+			Title:                "Connections",
+			Subtitle:             connectionsSubtitle(p),
+			SubtitleHideOnMobile: true,
+			SecondaryAction:      connectionsSecondaryAction(p),
+			Action:               connectionsAction(p),
 		})
 		<!-- Tab Switcher -->
 		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
 			<button
 				@click="tab = 'connections'"
 				:class="tab === 'connections' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
+				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 			>
 				@components.LucideIcon("link", "w-3.5 h-3.5")
 				Connections
@@ -52,79 +56,18 @@ templ Connections(p ConnectionsProps) {
 			<button
 				@click="tab = 'links'"
 				:class="tab === 'links' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
+				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 			>
 				@components.LucideIcon("link-2", "w-3.5 h-3.5")
 				Account Links
 			</button>
 		</div>
-		<!-- Provider filter — only providers actually configured show up here -->
-		if len(p.Providers) > 1 {
-			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto overflow-y-hidden" x-show="tab === 'connections'">
-				<button
-					@click="filterProvider = 'all'"
-					:class="filterProvider === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
-					class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
-				>
-					<span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
-						@components.LucideIcon("layers", "w-3 h-3")
-					</span>
-					All
-				</button>
-				for _, prov := range p.Providers {
-					@connectionsProviderFilterBtn(prov)
-				}
-			</div>
-		}
 		<!-- ==================== CONNECTIONS TAB ==================== -->
 		<div x-show="tab === 'connections'">
 			if len(p.Connections) > 0 {
-				<!-- Financial Summary Bar -->
-				if p.HasAnyBalance {
-					<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterProvider === 'all'">
-						<div class="grid grid-cols-3 divide-x divide-base-300">
-							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Net Worth</div>
-								<div class="truncate">
-									@components.Amount(components.AmountProps{
-										Value:  p.NetWorth,
-										Intent: components.AmountBalance,
-										Class:  "text-sm sm:text-2xl font-semibold tracking-tight",
-									})
-								</div>
-							</div>
-							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Assets</div>
-								<div class="truncate">
-									<!-- AmountBalance (signed): admin/connections.go sums totalAssets
-									     WITHOUT abs, so an overdrawn checking account contributes
-									     negatively. Strip-sign (AmountCost) would silently hide that. -->
-									@components.Amount(components.AmountProps{
-										Value:  p.TotalAssets,
-										Intent: components.AmountBalance,
-										Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-success",
-									})
-								</div>
-							</div>
-							<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
-								<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Liabilities</div>
-								<div class="truncate">
-									<!-- totalLiabilities is pre-abs'd in admin/connections.go, so
-									     AmountCost (always-non-negative) is safe here. -->
-									@components.Amount(components.AmountProps{
-										Value:  p.TotalLiabilities,
-										Intent: components.AmountCost,
-										Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-error",
-									})
-								</div>
-							</div>
-						</div>
-					</div>
-				}
-				<!-- Connection Cards -->
-				<div class="flex flex-col gap-4" id="bb-connections-list">
-					for _, c := range p.Connections {
-						@connectionsCard(c)
+				<div class="flex flex-col gap-5" id="bb-connections-list">
+					for _, g := range p.Groups() {
+						@connectionsHealthGroup(g, p.CanManage)
 					}
 				</div>
 			} else {
@@ -146,22 +89,12 @@ templ Connections(p ConnectionsProps) {
 					}
 				</div>
 			} else {
-				<div class="bb-card p-12 text-center">
-					<div class="flex flex-col items-center">
-						<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-							@components.LucideIcon("link-2", "w-8 h-8 text-base-content opacity-25")
-						</div>
-						<h3 class="text-lg font-semibold mb-1">No Account Links</h3>
-						<p class="text-sm text-base-content/50 mb-5 max-w-sm">
-							Account links connect authorized user accounts to primary accounts for deduplication.
-							If two family members connect the same credit card, linking prevents double-counting.
-						</p>
-						<button class="btn btn-primary btn-sm" onclick="document.getElementById('create-link-modal').showModal()">
-							@components.LucideIcon("plus", "w-4 h-4")
-							Create First Link
-						</button>
-					</div>
-				</div>
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:      "link-2",
+					Title:     "No account links",
+					Body:      "Account links connect authorized-user accounts to a primary account so a shared card isn't double-counted across household members.",
+					CustomCTA: connectionsNewLinkBtn(),
+				})
 			}
 		</div>
 		<!-- /links tab -->
@@ -172,7 +105,7 @@ templ Connections(p ConnectionsProps) {
 		     state CTA on this page open it via $store.drawers.open('connect-bank'). -->
 		<!-- Loading skeleton for the connections list, available for any future
 		     client-side refresh / pagination swap. Mirrors the SSR layout
-		     above so swap-in doesn't shift the page. Exposed in /design#loading. -->
+		     above. Exposed in /design#loading. -->
 		<template id="bb-connections-skeleton-template">
 			@components.ConnectionsSkeleton()
 		</template>
@@ -180,230 +113,180 @@ templ Connections(p ConnectionsProps) {
 	<!-- /alpine x-data tabs -->
 }
 
-templ connectionsProviderFilterBtn(prov ConnectionsProviderFilter) {
-	<button
-		@click={ fmt.Sprintf("filterProvider = %q", prov.Slug) }
-		:class={ fmt.Sprintf("filterProvider === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", prov.Slug) }
-		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
-	>
-		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-			@components.LucideIcon(prov.Icon, "w-3 h-3")
-		</span>
-		{ prov.Label }
-	</button>
-}
-
-templ connectionsCard(c ConnectionsRow) {
-	<div
-		class="bb-card overflow-hidden bb-conn-row"
-		data-connection-row
-		data-open-url={ "/connections/" + c.ID }
-		data-edit-url={ "/connections/" + c.ID }
-		data-filter-provider={ c.Provider }
-		x-show={ fmt.Sprintf("filterProvider === 'all' || filterProvider === %q", c.Provider) }
-	>
-		<!-- Connection Header — non-nested interactives (a11y: link + sibling button) -->
-		<div class="group px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
-			<a href={ templ.SafeURL("/connections/" + c.ID) } class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 no-underline" aria-label={ "Open " + c.InstitutionName + " connection" }>
-				<div class="hidden sm:flex w-10 h-10 rounded-lg bg-base-200/60 items-center justify-center shrink-0">
-					switch c.Provider {
-						case "plaid":
-							@components.BrandIcon("plaid", "w-5 h-5")
-						case "teller":
-							@components.BrandIcon("teller", "w-5 h-5")
-						case "simplefin":
-							@components.BrandIcon("simplefin", "w-5 h-5")
-						default:
-							@components.LucideIcon("file-spreadsheet", "w-5 h-5 text-base-content/50")
-					}
-				</div>
-				<div class="min-w-0">
-					<!-- Name + status badge row.
-					     Error-surfacing rule: when the connection-error banner renders
-					     below (c.ErrorMessageValid), suppress the status / sync-error
-					     chip here — the banner is canonical. Neutral badges (Stale,
-					     Paused) remain because they're orthogonal signals. -->
-					<div class="flex items-center gap-2 flex-wrap">
-						<h3 data-private="institution" class="font-semibold text-sm sm:text-base group-hover:text-primary transition-colors truncate max-w-[8rem] xs:max-w-[10rem] sm:max-w-none">{ c.InstitutionName }</h3>
-						if c.IsStale {
-							<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning shrink-0">Stale</span>
-						} else if !c.ErrorMessageValid {
-							if c.LastSyncStatus == "error" && c.Status == "active" {
-								<span class="relative group/err shrink-0">
-									<span class="badge badge-soft badge-error badge-sm cursor-help">Sync Error</span>
-									if c.LastSyncErrorMessage != "" {
-										<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-											<span class="flex items-center gap-1.5 text-error font-medium mb-1">
-												@components.LucideIcon("alert-circle", "w-3 h-3")
-												Last sync failed
-											</span>
-											<span class="text-base-content/70">{ c.LastSyncErrorMessage }</span>
-										</span>
-									}
-								</span>
-							} else {
-								@templ.Raw(components.StatusBadge(c.Status))
-							}
-						}
-						if c.Paused {
-							<span class="badge badge-ghost badge-xs shrink-0">Paused</span>
-						}
-					</div>
-					<!-- Meta row: user · provider · last sync — username truncates, rest shrink-0 to stay on one line -->
-					<div class="flex items-center gap-1.5 sm:gap-2 text-xs text-base-content/40 mt-0.5 min-w-0 overflow-hidden">
-						<span class="truncate shrink min-w-0">{ c.UserName }</span>
-						<span class="text-base-content/20 shrink-0">&middot;</span>
-						<span class="capitalize whitespace-nowrap shrink-0">{ c.Provider }</span>
-						<span class="text-base-content/20 shrink-0">&middot;</span>
-						if c.LastSyncedAtValid {
-							<span class="whitespace-nowrap shrink-0">{ c.LastSyncedAtRelative }</span>
-						} else {
-							<span class="whitespace-nowrap shrink-0">Never synced</span>
-						}
-					</div>
-				</div>
-			</a>
-			<!-- Right side: sync button + balance/count -->
-			<div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
-				<!-- Sync Now button (non-CSV active connections only) -->
-				if c.Provider != "csv" && c.Status == "active" {
-					<div x-data="syncBtn" data-conn-id={ c.ID }>
-						<button
-							type="button"
-							data-sync-btn
-							class="w-8 h-8 rounded-full flex items-center justify-center text-base-content/30 hover:text-primary hover:bg-primary/10 transition-colors"
-							:disabled="state !== 'idle'"
-							@click="triggerSync()"
-							:aria-label={ fmt.Sprintf("state === 'syncing' ? 'Syncing...' : 'Sync %s now'", c.InstitutionName) }
-							:title="state === 'syncing' ? 'Syncing...' : 'Sync Now'"
-						>
-							<i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'" :class="state === 'idle' ? '' : 'hidden'"></i>
-							<span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
-							<i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
-						</button>
-					</div>
-				}
-				<!-- Connection total balance -->
-				if c.HasBalance {
-					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
-						@components.Amount(components.AmountProps{
-							Value:  c.TotalBalance,
-							Intent: components.AmountBalance,
-							Class:  "text-sm sm:text-lg font-semibold tracking-tight",
-						})
-						<div class="text-xs text-base-content/40">
-							{ strconv.FormatInt(c.AccountCount, 10) }
-							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
-							<span class="sm:hidden">{ connectionsAccountSuffix(c.AccountCount, true) }</span>
-						</div>
-					</a>
-				} else {
-					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
-						<div class="text-xs text-base-content/40">
-							{ strconv.FormatInt(c.AccountCount, 10) }
-							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
-							<span class="sm:hidden">{ connectionsAccountSuffix(c.AccountCount, true) }</span>
-						</div>
-					</a>
-				}
-			</div>
+// connectionsHealthGroup renders one health bucket: a quiet label line
+// (with a count) over the bucket's connection list-rows inside a card.
+templ connectionsHealthGroup(g ConnectionsStatusGroup, canManage bool) {
+	<div class="flex flex-col gap-2">
+		<div class="flex items-center gap-2 px-1 min-w-0">
+			<span class={ "text-sm font-medium shrink-0", connectionsGroupLabelClass(g.Key) }>{ g.Label }</span>
+			<span class="text-xs text-base-content/40 shrink-0">{ fmt.Sprintf("%d", len(g.Rows)) }</span>
 		</div>
-		<!-- Connection-level error message (e.g. reauth needed) -->
-		if c.ErrorMessageValid {
-			<div class="mx-4 sm:mx-6 mb-4 flex items-center justify-between gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-				<div class="flex items-center gap-2 min-w-0">
-					@components.LucideIcon("alert-triangle", "w-3.5 h-3.5 shrink-0")
-					<span class="truncate">{ components.ErrorMessage(c.ErrorCode) }</span>
-				</div>
-				if c.Provider != "csv" && (c.ErrorCode == "ITEM_LOGIN_REQUIRED" || c.ErrorCode == "INSUFFICIENT_CREDENTIALS" || c.ErrorCode == "INVALID_CREDENTIALS" || c.Status == "pending_reauth") {
-					<a href={ templ.SafeURL("/connections/" + c.ID + "/reauth") } class="btn btn-warning btn-xs shrink-0" @click.stop>Re-authenticate</a>
-				} else {
-					<a href={ templ.SafeURL("/connections/" + c.ID) } class="btn btn-ghost btn-xs shrink-0" @click.stop>View Details</a>
-				}
-			</div>
-		}
-		<!-- Error message communicated via badge tooltip on hover -->
-		if c.NewAccountsAvailable {
-			<div class="mx-4 sm:mx-6 mb-4 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
-				@components.LucideIcon("plus-circle", "w-3.5 h-3.5 shrink-0")
-				<span>New accounts available to link</span>
-			</div>
-		}
-		<!-- Account List -->
-		if len(c.Accounts) > 0 {
-			<div class="border-t border-base-300">
-				for _, a := range c.Accounts {
-					@connectionsAccountRow(a)
-				}
-			</div>
+		@components.AgentRunRowList() {
+			for _, c := range g.Rows {
+				@connectionsRow(c, canManage)
+			}
 		}
 	</div>
 }
 
-templ connectionsAccountRow(a ConnectionsAccountRow) {
-	<a href={ templ.SafeURL("/accounts/" + a.ID) } class="flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-base-200/40 transition-colors no-underline border-b border-base-300 last:border-b-0 group/acct">
-		<div class="flex items-center gap-3 min-w-0">
-			<!-- Account type icon -->
-			<div class="w-7 h-7 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">
-				switch a.Type {
-					case "credit":
-						@components.LucideIcon("credit-card", "w-3.5 h-3.5 text-base-content opacity-40")
-					case "loan":
-						@components.LucideIcon("landmark", "w-3.5 h-3.5 text-base-content opacity-40")
-					case "investment":
-						@components.LucideIcon("trending-up", "w-3.5 h-3.5 text-base-content opacity-40")
-					default:
-						@components.LucideIcon("wallet", "w-3.5 h-3.5 text-base-content opacity-40")
-				}
+// connectionsRow renders one connection as a daisy list-row: a leading
+// status tile (tone tracks health), the institution name with a small
+// provider mark, one priority body line, a trailing per-connection
+// balance, and — outside the row's navigation anchor — an optional
+// recovery link plus the actions overflow.
+templ connectionsRow(c ConnectionsRow, canManage bool) {
+	<li
+		class="list-row transition-colors hover:bg-base-200/40 focus-within:bg-base-200/40 items-center"
+		data-connection-row
+		data-open-url={ "/connections/" + c.ID }
+		data-conn-id={ c.ID }
+		if c.Provider != "csv" && c.Status == "active" {
+			data-can-sync="1"
+		}
+	>
+		<a
+			class="contents no-underline"
+			href={ templ.SafeURL("/connections/" + c.ID) }
+			aria-label={ "Open " + c.InstitutionName + " connection" }
+		>
+			<div class={ "w-10 h-10 rounded-lg flex items-center justify-center shrink-0", connectionTileTone(connectionStatusTone(c)) }>
+				@components.LucideIcon(connectionStatusIcon(c), "w-4 h-4")
 			</div>
 			<div class="min-w-0">
-				<div class="flex items-center gap-1.5 flex-wrap">
-					<span data-private="account" class="text-sm font-medium truncate group-hover/acct:text-primary transition-colors">
-						if a.DisplayNameValid {
-							{ a.DisplayName }
-						} else {
-							{ a.Name }
-						}
-					</span>
-					if a.IsDependentLinked {
-						<span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance and transactions are attributed to a linked user and excluded from this user's totals">Linked</span>
+				<div class="flex items-center gap-2 min-w-0">
+					@connectionsProviderMark(c.Provider)
+					<span data-private="institution" class="font-medium text-sm text-base-content truncate">{ c.InstitutionName }</span>
+					if c.Paused {
+						<span class="badge badge-ghost badge-xs shrink-0">Paused</span>
 					}
 				</div>
-				<div class="text-xs text-base-content/40">
-					if a.SubtypeValid {
-						<span class="capitalize">{ connectionsHumanize(a.Subtype) }</span>
-					}
-					if a.MaskValid {
-						<span class="text-base-content/25">&middot;</span>
-						@components.Private("mask", " ····"+a.Mask)
-					}
-					if a.Excluded {
-						<span class="text-base-content/25">&middot;</span>
-						<span class="text-warning">Excluded</span>
-					}
-				</div>
+				@connectionsRowBody(c)
 			</div>
-		</div>
-		<div class="text-right shrink-0">
-			if a.HasBalance {
-				if a.BalanceFloat < 0 {
+			<div class="shrink-0 self-center text-right">
+				if c.HasBalance {
 					@components.Amount(components.AmountProps{
-						Value:  a.BalanceFloat,
+						Value:  c.TotalBalance,
 						Intent: components.AmountBalance,
-						Class:  "text-sm font-medium text-error",
-					})
-				} else {
-					@components.Amount(components.AmountProps{
-						Value:  a.BalanceFloat,
-						Intent: components.AmountBalance,
-						Class:  "text-sm font-medium",
+						Class:  "text-sm font-semibold tabular-nums",
 					})
 				}
+			</div>
+		</a>
+		<div class="shrink-0 self-center flex items-center gap-1">
+			@connectionsRecovery(c)
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: fmt.Sprintf("Actions for %s", c.InstitutionName),
+				Size:      "sm",
+				Items:     connectionsRowItems(c, canManage),
+			})
+		</div>
+	</li>
+}
+
+// connectionsRowBody renders ONE body line, in priority order: a
+// connection-level error (reauth) → a failed last sync → the quiet
+// "N accounts · synced 2h ago". Healthy rows still get the quiet line so
+// the row always says how many accounts and when it last synced.
+templ connectionsRowBody(c ConnectionsRow) {
+	if c.ErrorMessageValid {
+		<div class="mt-0.5 text-xs min-w-0 line-clamp-1 text-warning">
+			{ components.ErrorMessage(c.ErrorCode) }
+		</div>
+	} else if c.Status == "pending_reauth" {
+		<div class="mt-0.5 text-xs min-w-0 line-clamp-1 text-warning">Reauthentication needed</div>
+	} else if c.Status == "active" && c.LastSyncStatus == "error" {
+		<div class="mt-0.5 text-xs min-w-0 line-clamp-1 text-warning">
+			if c.LastSyncErrorMessage != "" {
+				{ "Last sync failed — " + c.LastSyncErrorMessage }
 			} else {
-				<span class="text-xs text-base-content/30">&mdash;</span>
+				Last sync failed
 			}
 		</div>
-	</a>
+	} else {
+		<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
+			{ connectionsAccountCountLabel(c.AccountCount) }
+			<span class="text-base-content/25">&middot;</span>
+			if c.Status == "disconnected" {
+				<span>Disconnected</span>
+			} else if c.LastSyncedAtValid {
+				<span>{ "synced " + c.LastSyncedAtRelative }</span>
+			} else {
+				<span>Never synced</span>
+			}
+		</div>
+	}
+}
+
+// connectionsProviderMark renders the small brand glyph next to the
+// institution name. Plaid / Teller / SimpleFIN ship vendored marks; CSV
+// (and any unknown provider) falls back to a neutral lucide glyph.
+templ connectionsProviderMark(provider string) {
+	switch provider {
+		case "plaid":
+			@components.BrandIcon("plaid", "w-4 h-4 shrink-0")
+		case "teller":
+			@components.BrandIcon("teller", "w-4 h-4 shrink-0")
+		case "simplefin":
+			@components.BrandIcon("simplefin", "w-4 h-4 shrink-0")
+		default:
+			@components.LucideIcon("file-spreadsheet", "w-4 h-4 shrink-0 text-base-content/40")
+	}
+}
+
+// connectionsRecovery renders the inline recovery affordance for a
+// connection that needs attention — a small reconnect/reauth link sitting
+// outside the row's navigation anchor. Quiet rows render nothing.
+templ connectionsRecovery(c ConnectionsRow) {
+	if c.Status == "pending_reauth" || c.Status == "error" {
+		<a
+			href={ templ.SafeURL(connectionsReauthURL(c)) }
+			class="btn btn-warning btn-xs shrink-0"
+			@click.stop
+		>
+			Reconnect
+		</a>
+	}
+}
+
+// connectionsRowItems builds the overflow-menu items for one connection.
+// Sync now (active non-CSV only) and Configure are always offered; the
+// destructive Disconnect is admin-gated.
+func connectionsRowItems(c ConnectionsRow, canManage bool) []components.OverflowMenuItem {
+	items := make([]components.OverflowMenuItem, 0, 3)
+	if c.Provider != "csv" && c.Status == "active" {
+		items = append(items, components.OverflowMenuItem{
+			Label:     "Sync now",
+			Icon:      "refresh-cw",
+			OnClick:   fmt.Sprintf("$dispatch('connection-sync', {id: %q, name: %q})", c.ID, c.InstitutionName),
+			AriaLabel: fmt.Sprintf("Sync %s now", c.InstitutionName),
+		})
+	}
+	items = append(items, components.OverflowMenuItem{
+		Label:     "Configure",
+		Icon:      "settings",
+		Href:      templ.SafeURL("/connections/" + c.ID),
+		AriaLabel: fmt.Sprintf("Configure %s", c.InstitutionName),
+	})
+	if canManage {
+		items = append(items, components.OverflowMenuItem{
+			Label:       "Disconnect",
+			Icon:        "unplug",
+			OnClick:     fmt.Sprintf("$dispatch('connection-disconnect', {id: %q, name: %q})", c.ID, c.InstitutionName),
+			Destructive: true,
+			AriaLabel:   fmt.Sprintf("Disconnect %s", c.InstitutionName),
+		})
+	}
+	return items
+}
+
+// connectionsGroupLabelClass tints the needs-attention group label so the
+// bucket that wants action reads warmer than the quiet active/disconnected
+// headers.
+func connectionsGroupLabelClass(key string) string {
+	if key == "needs_attention" {
+		return "text-warning"
+	}
+	return "text-base-content"
 }
 
 templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
@@ -532,6 +415,14 @@ templ connectFirstBankBtn() {
 	<button type="button" @click="$store.drawers.open('connect-bank')" class="btn btn-primary btn-sm gap-2">
 		@components.LucideIcon("plus", "w-4 h-4")
 		Connect your first bank
+	</button>
+}
+
+// connectionsNewLinkBtn is the Account-Links empty-state CTA.
+templ connectionsNewLinkBtn() {
+	<button type="button" class="btn btn-primary btn-sm gap-2" onclick="document.getElementById('create-link-modal').showModal()">
+		@components.LucideIcon("plus", "w-4 h-4")
+		Create your first link
 	</button>
 }
 

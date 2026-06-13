@@ -1064,7 +1064,7 @@ templ SectionLoading() {
 				@components.AccountsListSkeleton()
 			</div>
 		}
-		@designExample("Connections list skeleton", "Placeholder mirroring /connections — summary stats (Net Worth / Assets / Liabilities) plus a stack of connection cards (provider icon, institution name + status badge, meta row, sync button, balance, nested account rows). Primitive is exposed here for future AJAX swaps; /connections is full-SSR today.") {
+		@designExample("Connections list skeleton", "Placeholder mirroring /connections — health groups (a quiet label line over a card of connection list-rows: leading status tile, institution name + provider mark, one-line body, trailing balance). Primitive is exposed here for future AJAX swaps; /connections is full-SSR today.") {
 			<div class="max-w-4xl">
 				@components.ConnectionsSkeleton()
 			</div>
