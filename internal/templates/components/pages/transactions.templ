@@ -222,24 +222,45 @@ templ txFilterDrawer(p TransactionsProps) {
 			<!-- Carries the page quick-search text into this GET submit so the
 			     quick-search box stays the only visible search input. -->
 			<input type="hidden" name="search" id="bb-tx-search-hidden" value={ p.FilterSearch }/>
-			<div class="flex-1 overflow-y-auto p-5 space-y-6">
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
 				<!-- When -->
-				<section class="space-y-2">
-					@txFilterSectionLabel("calendar", "When")
+				@components.CollapsibleSection(components.CollapsibleSectionProps{
+					Icon:        "calendar",
+					Label:       "When",
+					DefaultOpen: p.WhenSectionOpen(),
+					Right:       txFilterCountIndicator(p.WhenFilterCount()),
+				}) {
 					<div class="grid grid-cols-2 gap-3">
 						<label class="bb-filter-label">
 							Start date
-							<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm w-full"/>
+							<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm w-full" x-ref="startDate"/>
 						</label>
 						<label class="bb-filter-label">
 							End date
-							<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm w-full"/>
+							<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm w-full" x-ref="endDate"/>
 						</label>
 					</div>
-				</section>
+					<div class="flex flex-wrap gap-1.5 mt-2">
+						for _, preset := range txDatePresets() {
+							<button
+								type="button"
+								class="btn btn-ghost btn-xs"
+								data-start={ preset.Start }
+								data-end={ preset.End }
+								@click="$refs.startDate.value = $el.dataset.start; $refs.endDate.value = $el.dataset.end"
+							>
+								{ preset.Label }
+							</button>
+						}
+					</div>
+				}
 				<!-- Where -->
-				<section class="space-y-2">
-					@txFilterSectionLabel("landmark", "Where")
+				@components.CollapsibleSection(components.CollapsibleSectionProps{
+					Icon:        "landmark",
+					Label:       "Where",
+					DefaultOpen: p.WhereSectionOpen(),
+					Right:       txFilterCountIndicator(p.WhereFilterCount()),
+				}) {
 					<div class="space-y-3">
 						<label class="bb-filter-label">
 							Connection
@@ -269,10 +290,14 @@ templ txFilterDrawer(p TransactionsProps) {
 							</select>
 						</label>
 					</div>
-				</section>
+				}
 				<!-- What -->
-				<section class="space-y-2">
-					@txFilterSectionLabel("shapes", "What")
+				@components.CollapsibleSection(components.CollapsibleSectionProps{
+					Icon:        "shapes",
+					Label:       "What",
+					DefaultOpen: p.WhatSectionOpen(),
+					Right:       txFilterCountIndicator(p.WhatFilterCount()),
+				}) {
 					<div class="space-y-3">
 						<label class="bb-filter-label">
 							Category
@@ -294,90 +319,119 @@ templ txFilterDrawer(p TransactionsProps) {
 								</button>
 							</div>
 						</label>
-						<div class="grid grid-cols-2 gap-3">
-							<label class="bb-filter-label">
-								Min amount
-								<input type="number" name="min_amount" step="0.01" value={ p.FilterMinAmount } placeholder="0.00" class="input input-sm w-full"/>
-							</label>
-							<label class="bb-filter-label">
-								Max amount
-								<input type="number" name="max_amount" step="0.01" value={ p.FilterMaxAmount } placeholder="0.00" class="input input-sm w-full"/>
-							</label>
+						<div class="space-y-1.5">
+							<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider">Amount range</div>
+							<div class="grid grid-cols-2 gap-3">
+								<label class="bb-filter-label">
+									Min amount
+									<input type="number" name="min_amount" step="0.01" value={ p.FilterMinAmount } placeholder="0.00" class="input input-sm w-full"/>
+								</label>
+								<label class="bb-filter-label">
+									Max amount
+									<input type="number" name="max_amount" step="0.01" value={ p.FilterMaxAmount } placeholder="0.00" class="input input-sm w-full"/>
+								</label>
+							</div>
 						</div>
-						<div class="grid grid-cols-2 gap-3">
-							<label class="bb-filter-label">
-								Pending
-								<select name="pending" class="select select-sm w-full">
-									<option value="">All</option>
-									@txSelectOption("true", "Yes", p.FilterPending)
-									@txSelectOption("false", "No", p.FilterPending)
-								</select>
-							</label>
-							<label class="bb-filter-label">
-								Flagged
-								<select name="flagged" class="select select-sm w-full">
-									<option value="">All</option>
-									@txSelectOption("true", "Flagged only", p.FilterFlagged)
-									@txSelectOption("false", "Not flagged", p.FilterFlagged)
-								</select>
-							</label>
+						<div class="space-y-1.5">
+							<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider">Status</div>
+							<div class="grid grid-cols-2 gap-3">
+								<label class="bb-filter-label">
+									Pending
+									<select name="pending" class="select select-sm w-full">
+										<option value="">All</option>
+										@txSelectOption("true", "Yes", p.FilterPending)
+										@txSelectOption("false", "No", p.FilterPending)
+									</select>
+								</label>
+								<label class="bb-filter-label">
+									Flagged
+									<select name="flagged" class="select select-sm w-full">
+										<option value="">All</option>
+										@txSelectOption("true", "Flagged only", p.FilterFlagged)
+										@txSelectOption("false", "Not flagged", p.FilterFlagged)
+									</select>
+								</label>
+							</div>
 						</div>
 					</div>
-				</section>
-				<!-- Tags -->
-				<section class="space-y-2" x-data="tagFilter">
-					<div class="flex items-center justify-between">
-						@txFilterSectionLabel("tags", "Tags")
-						<label class="flex items-center gap-1.5 text-[0.65rem] text-base-content/50 cursor-pointer">
-							<input type="checkbox" x-model="anyMode" class="checkbox checkbox-xs"/>
-							<span x-text="anyMode ? 'Match any (OR)' : 'Match all (AND)'"></span>
-						</label>
-					</div>
-					<input type="hidden" name="tags" :value="!anyMode ? selectedSlugs.join(',') : ''"/>
-					<input type="hidden" name="any_tag" :value="anyMode ? selectedSlugs.join(',') : ''"/>
-					<div class="flex flex-wrap gap-1.5">
-						<template x-for="t in availableTags" :key="t.slug">
+				}
+				<!-- Tags — tagFilter scope wraps the section so the collapsed indicator
+				     can read selectedSlugs reactively. -->
+				<div x-data="tagFilter">
+					@components.CollapsibleSection(components.CollapsibleSectionProps{
+						Icon:        "tags",
+						Label:       "Tags",
+						DefaultOpen: p.TagsSectionOpen(),
+						Right:       txTagsIndicator(),
+					}) {
+						<div class="flex items-center justify-between mb-2">
+							<label class="flex items-center gap-1.5 text-[0.65rem] text-base-content/50 cursor-pointer">
+								<input type="checkbox" x-model="anyMode" class="checkbox checkbox-xs"/>
+								<span x-text="anyMode ? 'Match any (OR)' : 'Match all (AND)'"></span>
+							</label>
 							<button
 								type="button"
-								class="bb-tag bb-tag-interactive"
-								:class="{ 'bb-tag-ghost': !isSelected(t.slug) }"
-								:title="t.display_name && t.display_name !== t.slug ? (t.display_name + ' — ' + t.slug) : t.slug"
-								:style="t.color ? ('--tag-color:' + t.color) : ''"
-								@click="toggle(t.slug)"
+								x-show="selectedSlugs.length"
+								x-cloak
+								class="text-[0.65rem] text-base-content/40 hover:text-base-content/70 transition-colors"
+								@click="selectedSlugs = []"
 							>
-								<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
-								<span x-text="t.display_name || t.slug"></span>
+								Clear (<span x-text="selectedSlugs.length"></span>)
 							</button>
-						</template>
-						<span x-show="!availableTags.length" class="text-xs text-base-content/30 italic">No tags registered yet — go to <a href="/tags" class="link">/tags</a> to create one.</span>
-					</div>
-				</section>
-				<!-- Search options (apply to the quick-search box above) -->
-				<section class="space-y-2" x-data={ txSearchModeInit(p.FilterSearchMode) }>
-					@txFilterSectionLabel("search", "Search options")
-					<p class="text-[0.65rem] text-base-content/40 -mt-1">Applies to the search box above.</p>
-					<div class="grid grid-cols-2 gap-3">
-						<label class="bb-filter-label">
-							Search in
-							<select name="search_field" class="select select-sm w-full">
-								@txSearchFieldOption("all", "Name & Merchant", p.FilterSearchField, true)
-								@txSearchFieldOption("name", "Name only", p.FilterSearchField, false)
-								@txSearchFieldOption("merchant", "Merchant only", p.FilterSearchField, false)
-							</select>
-						</label>
-						<label class="bb-filter-label">
-							Match type
-							<select name="search_mode" class="select select-sm w-full" x-model="mode">
-								<option value="contains">Contains</option>
-								<option value="words">All words</option>
-								<option value="fuzzy">Fuzzy match</option>
-							</select>
-						</label>
-					</div>
-					<p class="text-[0.65rem] text-base-content/30" x-show="mode === 'contains'" x-cloak>Substring match — finds transactions containing the exact text</p>
-					<p class="text-[0.65rem] text-base-content/30" x-show="mode === 'words'" x-cloak>Matches each word independently — "Century Link" finds "CenturyLink"</p>
-					<p class="text-[0.65rem] text-base-content/30" x-show="mode === 'fuzzy'" x-cloak>Typo-tolerant similarity — finds close matches even with misspellings</p>
-				</section>
+						</div>
+						<input type="hidden" name="tags" :value="!anyMode ? selectedSlugs.join(',') : ''"/>
+						<input type="hidden" name="any_tag" :value="anyMode ? selectedSlugs.join(',') : ''"/>
+						<div class="flex flex-wrap gap-1.5">
+							<template x-for="t in availableTags" :key="t.slug">
+								<button
+									type="button"
+									class="bb-tag bb-tag-interactive"
+									:class="{ 'bb-tag-ghost': !isSelected(t.slug) }"
+									:title="t.display_name && t.display_name !== t.slug ? (t.display_name + ' — ' + t.slug) : t.slug"
+									:style="t.color ? ('--tag-color:' + t.color) : ''"
+									@click="toggle(t.slug)"
+								>
+									<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
+									<span x-text="t.display_name || t.slug"></span>
+								</button>
+							</template>
+							<span x-show="!availableTags.length" class="text-xs text-base-content/30 italic">No tags registered yet — go to <a href="/tags" class="link">/tags</a> to create one.</span>
+						</div>
+					}
+				</div>
+				<!-- Search options (apply to the quick-search box above). txSearchMode
+				     scope wraps the section so `mode` is in scope for the body. -->
+				<div x-data={ txSearchModeInit(p.FilterSearchMode) }>
+					@components.CollapsibleSection(components.CollapsibleSectionProps{
+						Icon:        "search",
+						Label:       "Search options",
+						DefaultOpen: p.SearchSectionOpen(),
+						Right:       txSearchIndicator(p.SearchSectionOpen()),
+					}) {
+						<p class="text-[0.65rem] text-base-content/40 mb-2">Refine how the search box at the top of the page matches.</p>
+						<div class="grid grid-cols-2 gap-3">
+							<label class="bb-filter-label">
+								Search in
+								<select name="search_field" class="select select-sm w-full">
+									@txSearchFieldOption("all", "Name & merchant", p.FilterSearchField, true)
+									@txSearchFieldOption("name", "Name only", p.FilterSearchField, false)
+									@txSearchFieldOption("merchant", "Merchant only", p.FilterSearchField, false)
+								</select>
+							</label>
+							<label class="bb-filter-label">
+								Match style
+								<select name="search_mode" class="select select-sm w-full" x-model="mode">
+									<option value="contains">Contains text</option>
+									<option value="words">All words</option>
+									<option value="fuzzy">Fuzzy / typo-tolerant</option>
+								</select>
+							</label>
+						</div>
+						<p class="text-[0.65rem] text-base-content/30 mt-1" x-show="mode === 'contains'" x-cloak>Substring match — finds transactions containing the exact text.</p>
+						<p class="text-[0.65rem] text-base-content/30 mt-1" x-show="mode === 'words'" x-cloak>Matches each word independently — "Century Link" finds "CenturyLink".</p>
+						<p class="text-[0.65rem] text-base-content/30 mt-1" x-show="mode === 'fuzzy'" x-cloak>Typo-tolerant similarity — finds close matches even with misspellings.</p>
+					}
+				</div>
 			</div>
 			@components.DrawerFooter() {
 				<a href="/transactions" class="btn btn-ghost btn-sm">Reset</a>
@@ -390,14 +444,42 @@ templ txFilterDrawer(p TransactionsProps) {
 	}
 }
 
-// txFilterSectionLabel is the quiet uppercase section divider used inside the
-// filter drawer — a small lucide glyph + label, matching the section-label
-// idiom in the design system.
-templ txFilterSectionLabel(icon, label string) {
-	<div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2">
-		@components.LucideIcon(icon, "w-3.5 h-3.5 opacity-60")
-		{ label }
-	</div>
+// txFilterCountIndicator builds the collapsed-state active-filter badge for a
+// CollapsibleSection header right slot: a small count chip that shows only when
+// the section is collapsed (`x-show="!open"`, evaluated in the section's Alpine
+// scope). Returns nil when the section holds no active filter so the slot stays
+// empty. Used by the When / Where / What filter sections.
+func txFilterCountIndicator(n int) templ.Component {
+	if n <= 0 {
+		return nil
+	}
+	return txFilterCountBadge(n)
+}
+
+templ txFilterCountBadge(n int) {
+	<span x-show="!open" x-cloak class="badge badge-soft badge-info badge-xs">{ fmt.Sprintf("%d", n) }</span>
+}
+
+// txTagsIndicator is the Tags-section collapsed indicator. Unlike the static
+// count badges it reads the live `selectedSlugs` from the ancestor `tagFilter`
+// scope so the count stays correct as chips toggle. Shown only when collapsed
+// and at least one tag is selected.
+templ txTagsIndicator() {
+	<span x-show="!open && selectedSlugs.length" x-cloak class="badge badge-soft badge-info badge-xs" x-text="selectedSlugs.length"></span>
+}
+
+// txSearchIndicator is the Search-options collapsed indicator — a small dot
+// rather than a count, since "non-default field/mode" isn't a tally. Returns
+// nil when the section is at its defaults.
+func txSearchIndicator(active bool) templ.Component {
+	if !active {
+		return nil
+	}
+	return txSearchDot()
+}
+
+templ txSearchDot() {
+	<span x-show="!open" x-cloak class="inline-block w-1.5 h-1.5 rounded-full bg-info" aria-hidden="true"></span>
 }
 
 // txFilterChips renders a row of removable badges summarising each active

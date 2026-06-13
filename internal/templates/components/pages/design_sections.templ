@@ -1225,6 +1225,53 @@ templ designEntityHeaderBadgesError() {
 }
 
 // ─── Empty states ──────────────────────────────────────────────────────
+// ─── Collapsible section ───────────────────────────────────────────────
+templ SectionCollapsibleSection() {
+	<div class="flex flex-col gap-6 max-w-md">
+		@designExample("Default open", "DefaultOpen: true — the body is visible on load and the chevron points up. Click the header to collapse.") {
+			@components.CollapsibleSection(components.CollapsibleSectionProps{
+				Icon:        "calendar",
+				Label:       "When",
+				DefaultOpen: true,
+			}) {
+				<div class="grid grid-cols-2 gap-3">
+					<label class="bb-filter-label">
+						Start date
+						<input type="date" class="input input-sm w-full"/>
+					</label>
+					<label class="bb-filter-label">
+						End date
+						<input type="date" class="input input-sm w-full"/>
+					</label>
+				</div>
+			}
+		}
+		@designExample("Collapsed with active indicator", "DefaultOpen: false plus a Right-slot indicator guarded with x-show=\"!open\" — the count chip surfaces only while collapsed, cueing a hidden active filter. Inputs stay in the DOM (x-show, not <details>) so they still submit.") {
+			@components.CollapsibleSection(components.CollapsibleSectionProps{
+				Icon:        "shapes",
+				Label:       "What",
+				DefaultOpen: false,
+				Right:       designCollapsibleIndicator(),
+			}) {
+				<label class="bb-filter-label">
+					Category
+					<select class="select select-sm w-full">
+						<option>All categories</option>
+						<option>Groceries</option>
+					</select>
+				</label>
+			}
+		}
+	</div>
+}
+
+// designCollapsibleIndicator is the sandbox stand-in for a section's active
+// indicator — mirrors the live txFilterCountBadge shape (only visible while
+// the section is collapsed).
+templ designCollapsibleIndicator() {
+	<span x-show="!open" x-cloak class="badge badge-soft badge-info badge-xs">2</span>
+}
+
 templ SectionEmptyStates() {
 	<div class="flex flex-col gap-6">
 		@designExample("Standard (no data yet)", "Card-wrapped, icon + title + description + CTA.") {
