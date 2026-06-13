@@ -961,46 +961,35 @@ templ workflowCustomDrawer() {
 // value lives in custom.prompt and rides to the server in a hidden field; the
 // modal writes back through editPrompt()'s onSaved callback. Two states:
 //
-//   - empty   : an inviting dashed call-to-action that opens straight into the
-//               editor (editPrompt(true)). Tints error-red when a save was
-//               attempted with no prompt (custom.promptError).
+//   - empty   : the same framed card, but its body is a bold centered
+//               call-to-action that opens straight into the editor
+//               (editPrompt(true)). Tints error-red when a save was attempted
+//               with no prompt (custom.promptError).
 //   - filled  : a framed card with a faded monospace excerpt and Preview / Edit
-//               actions (editPrompt(false) / editPrompt(true)).
+//               actions (editPrompt(false) / editPrompt(true)); the excerpt
+//               itself is clickable, with a hover hint, and opens the editor.
+//
+// Both states share the same frame + "Prompt" header so the field reads as one
+// document that's either empty or full, never two different shapes.
 templ workflowCustomPromptField() {
 	<div>
 		// Hidden carrier — keeps `prompt` in the form's FormData. Not `required`
 		// (a hidden required control can't be focused, which silently blocks
 		// submit); submitCustom() validates non-empty in JS instead.
 		<textarea name="prompt" x-model="custom.prompt" class="hidden" aria-hidden="true" tabindex="-1"></textarea>
-		// Empty state — bold invitation.
-		<button
-			type="button"
-			x-show="!custom.prompt.trim()"
-			@click="editPrompt(true)"
-			x-bind:class="custom.promptError ? 'border-error hover:border-error' : 'border-base-300 bg-base-200/30 hover:border-primary/50 hover:bg-primary/5'"
-			class="group w-full text-left rounded-xl border-2 border-dashed transition-colors p-5 flex items-center gap-4"
+		<div
+			x-bind:class="custom.promptError ? 'border-error' : 'border-base-300'"
+			class="rounded-xl border overflow-hidden bg-base-100"
 		>
-			<span class="shrink-0 w-11 h-11 rounded-xl bg-primary text-primary-content flex items-center justify-center shadow-sm transition-transform group-hover:scale-105">
-				@components.LucideIcon("sparkles", "w-5 h-5")
-			</span>
-			<span class="min-w-0 flex-1">
-				<span class="block text-sm font-semibold">Compose the workflow prompt</span>
-				<span class="block text-xs text-base-content/55 mt-0.5">The full instructions sent on every run — author it in Markdown with live preview. This is the entire workflow; there's no template behind it.</span>
-			</span>
-			<span class="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-				Open editor
-				@components.LucideIcon("arrow-right", "w-3.5 h-3.5")
-			</span>
-		</button>
-		// Filled state — framed excerpt with Preview / Edit.
-		<div x-show="custom.prompt.trim()" x-cloak class="rounded-xl border border-base-300 overflow-hidden bg-base-100">
+			// Header — identical across states; the right slot only carries the
+			// Preview / Edit actions once there's a prompt to act on.
 			<div class="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-base-300 bg-base-200/40">
 				<span class="flex items-center gap-2 text-xs font-medium text-base-content/70 min-w-0">
 					@components.LucideIcon("file-text", "w-3.5 h-3.5 shrink-0")
-					<span class="truncate">Workflow prompt</span>
+					<span class="truncate">Prompt</span>
 					<span class="badge badge-ghost badge-xs shrink-0">Markdown</span>
 				</span>
-				<div class="flex items-center gap-1 shrink-0">
+				<div x-show="custom.prompt.trim()" class="flex items-center gap-1 shrink-0">
 					<button type="button" @click="editPrompt(false)" class="btn btn-ghost btn-xs gap-1.5">
 						@components.LucideIcon("eye", "w-3.5 h-3.5")
 						Preview
@@ -1011,14 +1000,44 @@ templ workflowCustomPromptField() {
 					</button>
 				</div>
 			</div>
+			// Empty body — bold centered invitation.
 			<button
 				type="button"
+				x-show="!custom.prompt.trim()"
 				@click="editPrompt(true)"
-				class="relative block w-full text-left max-h-44 overflow-hidden hover:bg-base-200/30 transition-colors"
-				aria-label="Edit workflow prompt"
+				class="group flex w-full flex-col items-center gap-3 px-5 py-9 text-center transition-colors hover:bg-base-200/40"
 			>
-				<pre class="text-xs font-mono leading-relaxed whitespace-pre-wrap break-words px-4 py-3.5 text-base-content/80" x-text="custom.prompt"></pre>
-				<span class="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-base-100 to-transparent"></span>
+				<span class="flex w-12 h-12 items-center justify-center rounded-xl bg-primary text-primary-content shadow-sm transition-transform group-hover:scale-105">
+					@components.LucideIcon("sparkles", "w-5 h-5")
+				</span>
+				<span class="max-w-sm">
+					<span class="block text-sm font-semibold">Compose the prompt</span>
+					<span class="block text-xs text-base-content/55 mt-1">The full instructions sent on every run — author it in Markdown with live preview. This is the entire workflow; there's no template behind it.</span>
+				</span>
+				<span class="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+					@components.LucideIcon("pencil", "w-3.5 h-3.5")
+					Open the editor
+				</span>
+			</button>
+			// Filled body — clickable monospace excerpt with a hover hint.
+			<button
+				type="button"
+				x-show="custom.prompt.trim()"
+				x-cloak
+				@click="editPrompt(true)"
+				class="group relative block w-full max-h-44 overflow-hidden text-left transition-colors hover:bg-base-200/25"
+				aria-label="Edit prompt"
+			>
+				<pre class="px-4 py-3.5 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words text-base-content/80" x-text="custom.prompt"></pre>
+				// Fade the bottom of the excerpt into the card, and float an
+				// "edit" hint there that lifts in on hover.
+				<span class="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-base-100 via-base-100/85 to-transparent"></span>
+				<span class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-3 opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0">
+					<span class="inline-flex items-center gap-1.5 rounded-full border border-base-300 bg-base-100 px-3 py-1 text-xs font-medium shadow-sm">
+						@components.LucideIcon("pencil", "w-3.5 h-3.5")
+						Click to edit
+					</span>
+				</span>
 			</button>
 		</div>
 		<p x-show="custom.promptError" x-cloak class="text-xs text-error mt-1.5">A prompt is required — open the editor and add instructions.</p>

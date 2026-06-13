@@ -824,7 +824,7 @@ document.addEventListener('alpine:init', function () {
           detail: {
             mode: 'editable',
             edit: edit,
-            title: self.custom.isEdit ? 'Edit workflow prompt' : 'Workflow prompt',
+            title: self.custom.isEdit ? 'Edit prompt' : 'Prompt',
             subtitle: 'Markdown — runs verbatim on every run.',
             value: self.custom.prompt || '',
             saveLabel: 'Save prompt',
