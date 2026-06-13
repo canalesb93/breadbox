@@ -1890,6 +1890,23 @@
     box-shadow: inset 3px 0 0 var(--color-primary);
   }
 
+  /* ── Carded list-row j/k cursor ──
+   * The persistent j/k focus cursor on the redesigned card surfaces
+   * (/categories, /rules, /recurring, /accounts, …) can't reuse the
+   * flat transactions-list left bar above: those rows live inside a
+   * `bb-card`/`.list` with rounded, `overflow-hidden` first/last-row
+   * corners, and the bar's square ends poke past the card's radius.
+   * Promote the cursor onto the SAME inset ring the tab `:focus-visible`
+   * state uses (border-radius: inherit → follows the card corner), and
+   * keep the `bg-primary/5` fill above for the persistent "you are here"
+   * emphasis that distinguishes a parked j/k cursor from momentary tab
+   * focus. Scoped to `.list-row` so the real `.bb-tx-row` ledger (no
+   * `.list-row`, full-bleed) keeps its left bar. */
+  .list-row.bb-tx-row--focused {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+    border-radius: inherit;
+  }
+
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) .bb-tx-row--focused {
       @apply bg-primary/10;
