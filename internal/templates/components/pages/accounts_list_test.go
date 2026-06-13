@@ -67,43 +67,6 @@ func TestGroupAccountsByConnection(t *testing.T) {
 	}
 }
 
-func TestAnnotateConnGroupShares(t *testing.T) {
-	groups := []AccountsListConnGroup{
-		{ConnectionShortID: "fidelity", Subtotal: 30000, HasSubtotal: true}, // 75% of 40000
-		{ConnectionShortID: "chase", Subtotal: 10000, HasSubtotal: true},    // 25% of 40000
-		{ConnectionShortID: "amex", Subtotal: -842.30, HasSubtotal: true},   // net debt → 0
-		{ConnectionShortID: "", HasSubtotal: false},                         // orphan, no balance → 0
-	}
-
-	got := AnnotateConnGroupShares(groups)
-
-	// Input slice must be untouched (pure).
-	if groups[0].SharePct != 0 {
-		t.Errorf("input mutated: SharePct = %v, want 0", groups[0].SharePct)
-	}
-
-	wants := map[string]float64{"fidelity": 75, "chase": 25, "amex": 0, "": 0}
-	for _, g := range got {
-		w := wants[g.ConnectionShortID]
-		if g.SharePct < w-0.01 || g.SharePct > w+0.01 {
-			t.Errorf("group %q SharePct = %.2f, want %.2f", g.ConnectionShortID, g.SharePct, w)
-		}
-	}
-}
-
-func TestAnnotateConnGroupSharesNoAssets(t *testing.T) {
-	// All net-debt / no-balance groups → no positive sum → all shares 0.
-	groups := []AccountsListConnGroup{
-		{ConnectionShortID: "amex", Subtotal: -500, HasSubtotal: true},
-		{ConnectionShortID: "orphan", HasSubtotal: false},
-	}
-	for _, g := range AnnotateConnGroupShares(groups) {
-		if g.SharePct != 0 {
-			t.Errorf("group %q SharePct = %v, want 0", g.ConnectionShortID, g.SharePct)
-		}
-	}
-}
-
 func TestAccountsConnCountLabel(t *testing.T) {
 	one := AccountsListConnGroup{Accounts: []AccountsListRow{{}}}
 	if got := accountsConnCountLabel(one); got != "1 account" {

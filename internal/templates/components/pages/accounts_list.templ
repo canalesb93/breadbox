@@ -43,7 +43,40 @@ templ AccountsList(p AccountsListProps) {
 			</div>
 		}
 		if p.HasAnyBalance {
-			@accountsListHero(p)
+			<div class="bb-card p-0 overflow-hidden mb-6">
+				<div class="grid grid-cols-3 divide-x divide-base-300">
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+						<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Net Worth</div>
+						<div class="truncate">
+							@components.Amount(components.AmountProps{
+								Value:  p.NetWorth,
+								Intent: components.AmountBalance,
+								Class:  "text-sm sm:text-2xl font-semibold tracking-tight",
+							})
+						</div>
+					</div>
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+						<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Assets</div>
+						<div class="truncate">
+							@components.Amount(components.AmountProps{
+								Value:  p.TotalAssets,
+								Intent: components.AmountBalance,
+								Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-success",
+							})
+						</div>
+					</div>
+					<div class="px-3 sm:px-5 py-3 sm:py-4 min-w-0">
+						<div class="text-[0.65rem] sm:text-xs font-medium text-base-content/50 mb-0.5 sm:mb-1">Liabilities</div>
+						<div class="truncate">
+							@components.Amount(components.AmountProps{
+								Value:  p.TotalLiabilities,
+								Intent: components.AmountCost,
+								Class:  "text-sm sm:text-2xl font-semibold tracking-tight text-error",
+							})
+						</div>
+					</div>
+				</div>
+			</div>
 		}
 		if p.TotalAccounts > 0 {
 			<div class="flex flex-col gap-5">
@@ -68,108 +101,23 @@ templ AccountsList(p AccountsListProps) {
 	</div>
 }
 
-// accountsListHero is the page's headline: net worth as the single dominant
-// figure, assets/liabilities as supporting satellites, and an assets-vs-debt
-// proportion bar computed entirely from existing totals. The bar grows from
-// zero on load (tasteful motion, respects prefers-reduced-motion via the
-// `motion-reduce:transition-none` utility). All money stays data-private.
-templ accountsListHero(p AccountsListProps) {
-	<div
-		class="bb-card p-5 sm:p-6 mb-6"
-		x-data="{ shown: false }"
-		x-init="$nextTick(() => { shown = true })"
-	>
-		<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-			<div class="min-w-0">
-				<div class="text-[0.7rem] font-medium uppercase tracking-wide text-base-content/50 mb-1">Net Worth</div>
-				<div class="truncate">
-					@components.Amount(components.AmountProps{
-						Value:  p.NetWorth,
-						Intent: components.AmountBalance,
-						Class:  "text-3xl sm:text-5xl font-semibold tracking-tight",
-					})
-				</div>
-				<div class="mt-1.5 text-xs text-base-content/50">{ accountsSummaryCaption(p) }</div>
-			</div>
-			<div class="flex items-center gap-6 sm:gap-8 shrink-0">
-				<div class="min-w-0">
-					<div class="flex items-center gap-1.5 mb-0.5">
-						<span class="w-2 h-2 rounded-full bg-success shrink-0"></span>
-						<span class="text-[0.7rem] font-medium uppercase tracking-wide text-base-content/50">Assets</span>
-					</div>
-					@components.Amount(components.AmountProps{
-						Value:  p.TotalAssets,
-						Intent: components.AmountBalance,
-						Class:  "text-lg sm:text-xl font-semibold tracking-tight text-success",
-					})
-				</div>
-				<div class="min-w-0">
-					<div class="flex items-center gap-1.5 mb-0.5">
-						<span class="w-2 h-2 rounded-full bg-error shrink-0"></span>
-						<span class="text-[0.7rem] font-medium uppercase tracking-wide text-base-content/50">Liabilities</span>
-					</div>
-					@components.Amount(components.AmountProps{
-						Value:  p.TotalLiabilities,
-						Intent: components.AmountCost,
-						Class:  "text-lg sm:text-xl font-semibold tracking-tight text-error",
-					})
-				</div>
-			</div>
-		</div>
-		<!-- Assets-vs-debt proportion bar: segment widths are the gross-balance
-		     split (assets + liabilities = 100%), a real at-a-glance leverage
-		     read from totals that already exist. -->
-		<div class="mt-5">
-			<div class="flex h-2 w-full overflow-hidden rounded-full bg-base-200">
-				<div
-					class="h-full bg-success rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none"
-					:style={ accountsProportionStyle(accountsGrossPct(p.TotalAssets, p)) }
-				></div>
-				if p.TotalLiabilities > 0 {
-					<div
-						class="h-full bg-error rounded-full border-l-2 border-base-100 transition-[width] duration-700 ease-out motion-reduce:transition-none"
-						:style={ accountsProportionStyle(accountsGrossPct(p.TotalLiabilities, p)) }
-					></div>
-				}
-			</div>
-			<div class="mt-2 flex items-center justify-between text-[0.7rem] text-base-content/45 tabular-nums">
-				<span>{ accountsPctLabel(accountsGrossPct(p.TotalAssets, p)) } assets</span>
-				if p.TotalLiabilities > 0 {
-					<span>{ accountsPctLabel(accountsGrossPct(p.TotalLiabilities, p)) } debt</span>
-				}
-			</div>
-		</div>
-	</div>
-}
-
 // accountsListConnGroup renders one connection: a quiet label line
 // (institution · count · subtotal, with health surfaced when the connection
-// needs attention) plus a share-of-assets meter, above the account list-rows
-// in their own card.
+// needs attention) above the account list-rows in their own card.
 templ accountsListConnGroup(g AccountsListConnGroup) {
 	<div class="flex flex-col gap-2">
-		<div class="flex flex-col gap-1.5 px-1">
-			<div class="flex items-center gap-2 min-w-0">
-				<span data-private="institution" class="text-sm font-semibold text-base-content shrink-0">{ accountsConnLabel(g) }</span>
-				<span class="text-xs text-base-content/40 shrink-0">{ accountsConnCountLabel(g) }</span>
-				@accountsListConnStatus(g)
-				if g.HasSubtotal {
-					<span class="ml-auto shrink-0">
-						@components.Amount(components.AmountProps{
-							Value:  g.Subtotal,
-							Intent: components.AmountBalance,
-							Class:  accountsSubtotalClass(g.Subtotal),
-						})
-					</span>
-				}
-			</div>
-			if g.SharePct > 0 {
-				<div class="flex items-center gap-2">
-					<div class="h-1 flex-1 max-w-[16rem] overflow-hidden rounded-full bg-base-200">
-						<div class="h-full rounded-full bg-success/55" style={ accountsShareWidth(g.SharePct) }></div>
-					</div>
-					<span class="text-[0.7rem] text-base-content/40 tabular-nums shrink-0">{ accountsPctLabel(g.SharePct) } of assets</span>
-				</div>
+		<div class="flex items-center gap-2 px-1 min-w-0">
+			<span data-private="institution" class="text-sm font-medium text-base-content shrink-0">{ accountsConnLabel(g) }</span>
+			<span class="text-xs text-base-content/40 shrink-0">{ accountsConnCountLabel(g) }</span>
+			@accountsListConnStatus(g)
+			if g.HasSubtotal {
+				<span class="ml-auto shrink-0">
+					@components.Amount(components.AmountProps{
+						Value:  g.Subtotal,
+						Intent: components.AmountBalance,
+						Class:  "text-sm font-semibold tabular-nums",
+					})
+				</span>
 			}
 		</div>
 		@components.AgentRunRowList() {
@@ -200,7 +148,7 @@ templ accountsListConnStatus(g AccountsListConnGroup) {
 templ accountsListRow(a AccountsListRow) {
 	<li class="list-row transition-colors hover:bg-base-200/40 items-center" data-account-id={ a.ID }>
 		<a class="contents no-underline" href={ templ.SafeURL("/accounts/" + a.ID) }>
-			<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", accountsTypeTileClass(a.Type, a.IsLiability) }>
+			<div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
 				@accountsListTypeIcon(a.Type)
 			</div>
 			<div class="min-w-0">
@@ -254,82 +202,17 @@ templ accountsListRow(a AccountsListRow) {
 	</li>
 }
 
-// accountsListTypeIcon picks a type glyph. Color is inherited (currentColor)
-// from the tile so accountsTypeTileClass owns the tint in one place.
 templ accountsListTypeIcon(t string) {
 	switch t {
 		case "credit":
-			@components.LucideIcon("credit-card", "w-4 h-4")
+			@components.LucideIcon("credit-card", "w-4 h-4 text-base-content/70")
 		case "loan":
-			@components.LucideIcon("landmark", "w-4 h-4")
+			@components.LucideIcon("landmark", "w-4 h-4 text-base-content/70")
 		case "investment":
-			@components.LucideIcon("trending-up", "w-4 h-4")
+			@components.LucideIcon("trending-up", "w-4 h-4 text-base-content/70")
 		default:
-			@components.LucideIcon("wallet", "w-4 h-4")
+			@components.LucideIcon("wallet", "w-4 h-4 text-base-content/70")
 	}
-}
-
-// accountsTypeTileClass tints the leading type tile by what the account IS:
-// investments read as growth (success), liabilities (credit/loan) as debt
-// (warning), everyday deposit/cash accounts stay neutral. Vivid tones so the
-// tint survives the dark theme.
-func accountsTypeTileClass(t string, isLiability bool) string {
-	switch {
-	case t == "investment":
-		return "bg-success/10 text-success"
-	case isLiability:
-		return "bg-warning/10 text-warning"
-	default:
-		return "bg-base-200 text-base-content/70"
-	}
-}
-
-// accountsSubtotalClass tints a connection's net subtotal red when the
-// connection nets to debt, default ink otherwise.
-func accountsSubtotalClass(subtotal float64) string {
-	if subtotal < 0 {
-		return "text-sm font-semibold tabular-nums text-error"
-	}
-	return "text-sm font-semibold tabular-nums"
-}
-
-// accountsSummaryCaption is the hero's "N accounts across M connections" line.
-func accountsSummaryCaption(p AccountsListProps) string {
-	acct := "accounts"
-	if p.TotalAccounts == 1 {
-		acct = "account"
-	}
-	conn := "connections"
-	if len(p.Groups) == 1 {
-		conn = "connection"
-	}
-	return fmt.Sprintf("%d %s across %d %s", p.TotalAccounts, acct, len(p.Groups), conn)
-}
-
-// accountsGrossPct returns part / (assets + liabilities) as a percentage —
-// the share of the gross balance sheet. 0 when there's nothing to divide.
-func accountsGrossPct(part float64, p AccountsListProps) float64 {
-	gross := p.TotalAssets + p.TotalLiabilities
-	if gross <= 0 {
-		return 0
-	}
-	return part / gross * 100
-}
-
-// accountsPctLabel renders a percentage as a rounded whole number, e.g. "67%".
-func accountsPctLabel(pct float64) string {
-	return fmt.Sprintf("%.0f%%", pct)
-}
-
-// accountsProportionStyle is the Alpine :style expression for a hero bar
-// segment — it grows from 0 to its target width once `shown` flips true.
-func accountsProportionStyle(pct float64) string {
-	return fmt.Sprintf("shown ? 'width:%.4f%%' : 'width:0%%'", pct)
-}
-
-// accountsShareWidth is the static width style for a connection share meter.
-func accountsShareWidth(pct float64) string {
-	return fmt.Sprintf("width:%.4f%%", pct)
 }
 
 // accountsListBalanceClass tints liabilities red; assets keep the default ink.
