@@ -19,7 +19,7 @@ Clear the backlog with high accuracy. Create rules for newly discovered patterns
    b. Group mentally by `category_primary_raw` and tackle the biggest clusters first.
    c. For each transaction in a clear pattern, call `update_transactions` with a compound op (batch up to 50 operations per call):
 
-      ```json
+      ```text
       {transaction_id, category_slug, tags_to_remove: [{slug: "needs-review", note: "<reason>"}]}
       ```
 

@@ -19,7 +19,7 @@ Clear the `needs-review` backlog with care. Create rules for new recurring patte
    a. Determine the correct category from the transaction name, merchant, amount, and raw category fields.
    b. Apply the decision via `update_transactions` with operations like:
 
-      ```json
+      ```text
       {transaction_id, category_slug, tags_to_remove: [{slug: "needs-review", note: "<short rationale>"}], comment: "<optional narrative>"}
       ```
 

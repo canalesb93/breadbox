@@ -17,7 +17,7 @@ You are performing the very first categorization setup for a user who just conne
 1. Read `breadbox://overview` and `count_transactions(tags=["needs-review"])` to understand the backlog size. If empty, check `get_sync_status` — the account may not have synced yet. Report and exit if no data.
 2. Create broad `category_primary` rules — one per raw provider category, scoped to the specific provider. Use `preview_rule` to verify each before creating. Use `apply_retroactively=true` since this is the initial cold start. Example:
 
-   ```json
+   ```text
    {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
    ```
 

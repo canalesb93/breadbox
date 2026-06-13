@@ -17,7 +17,7 @@ Clear 80%+ of the backlog with reasonable accuracy. Leave uncertain items tagged
    a. `query_transactions(tags=["needs-review"], fields=minimal, limit up to 500)` — pull a large slice.
    b. Scan the transactions — if the category mapping is clear, call `update_transactions` in batches of up to 50 operations per call:
 
-      ```json
+      ```text
       operations=[{transaction_id, category_slug, tags_to_remove: [{slug: "needs-review", note: "<reason>"}]}, ...]
       ```
 
