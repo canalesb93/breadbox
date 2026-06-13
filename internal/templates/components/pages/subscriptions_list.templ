@@ -276,8 +276,15 @@ templ seriesChargeRow(tx service.AdminTransactionRow) {
 // list-rows in their own card, mirroring the /accounts connection-group idiom.
 // The whole group hides when the active member/type/search filters leave it
 // with no visible rows, so a header never dangles over an empty card.
+//
+// The x-show is written so the group is ALWAYS visible when no filter is
+// active (the default view): the `groupVisible($el)` DOM scan is only reached
+// once a member/type/search filter is engaged. This is deliberate robustness —
+// short-circuiting before the custom Alpine method means a stale/cached
+// subscriptions.js missing `groupVisible` (newer than the row markup) can never
+// blank the default Active ledger. Regression guard (#1816 follow-up).
 templ subscriptionsStatusGroup(g SubscriptionStatusGroup) {
-	<div x-show="groupVisible($el)" class="flex flex-col gap-2">
+	<div x-show="(filterUser === 'all' && filterType === 'all' && !filter) || groupVisible($el)" class="flex flex-col gap-2">
 		<div class="flex items-center gap-2 px-1 min-w-0">
 			<span class="text-sm font-medium text-base-content shrink-0">{ g.Label }</span>
 			<span class="text-xs text-base-content/40 shrink-0">{ subscriptionsGroupCount(g) }</span>
