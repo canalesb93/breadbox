@@ -70,36 +70,68 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 			userAvatarVersionByShort[u.ShortID] = usersAvatarVersion(u.UpdatedAt)
 		}
 
-		// Build typed rows + running totals.
+		// Build typed rows.
 		var rows []pages.AccountsListRow
-		var totalAssets, totalLiabilities float64
-		var hasAnyBalance bool
-
-		appendRow := func(row pages.AccountsListRow) {
-			if row.HasBalance {
-				hasAnyBalance = true
-				if row.IsLiability {
-					totalLiabilities += math.Abs(row.BalanceFloat)
-				} else {
-					totalAssets += row.BalanceFloat
-				}
-			}
-			rows = append(rows, row)
-		}
-
 		if useUser {
 			for _, r := range userRows {
-				appendRow(accountRowFromListByUser(r, userNameByShort, userAvatarVersionByShort))
+				rows = append(rows, accountRowFromListByUser(r, userNameByShort, userAvatarVersionByShort))
 			}
 		} else {
 			for _, r := range allRows {
-				appendRow(accountRowFromListAll(r, userNameByShort, userAvatarVersionByShort))
+				rows = append(rows, accountRowFromListAll(r, userNameByShort, userAvatarVersionByShort))
 			}
 		}
 
-		// Default ordering: liabilities & no-balance at the bottom; biggest
-		// asset first. The Alpine factory re-sorts client-side when the user
-		// clicks a header.
+		// Per-owner account counts over the UNFILTERED set, so the member
+		// dropdown order is stable regardless of the active filter.
+		accountsPerUser := make(map[string]int)
+		for _, row := range rows {
+			if row.UserID != "" {
+				accountsPerUser[row.UserID]++
+			}
+		}
+
+		// Member filter (editors only — members are already scoped to their
+		// own accounts at the query layer). A ?user=<short_id> narrows the
+		// page to one owner and re-scopes the totals + groups server-side, so
+		// every subtotal stays accurate. An unknown short_id falls back to
+		// "all" rather than erroring (matches the admin filter convention).
+		activeUserID := ""
+		if IsEditor(sm, r) {
+			if u := r.URL.Query().Get("user"); u != "" {
+				if _, ok := userNameByShort[u]; ok {
+					activeUserID = u
+				}
+			}
+		}
+		if activeUserID != "" {
+			filtered := make([]pages.AccountsListRow, 0, len(rows))
+			for _, row := range rows {
+				if row.UserID == activeUserID {
+					filtered = append(filtered, row)
+				}
+			}
+			rows = filtered
+		}
+
+		// Totals over the (filtered) rows.
+		var totalAssets, totalLiabilities float64
+		var hasAnyBalance bool
+		for _, row := range rows {
+			if !row.HasBalance {
+				continue
+			}
+			hasAnyBalance = true
+			if row.IsLiability {
+				totalLiabilities += math.Abs(row.BalanceFloat)
+			} else {
+				totalAssets += row.BalanceFloat
+			}
+		}
+
+		// Within-group ordering: liabilities & no-balance at the bottom,
+		// biggest asset first. GroupAccountsByConnection preserves this order
+		// inside each connection.
 		sort.SliceStable(rows, func(i, j int) bool {
 			a, b := rows[i], rows[j]
 			if a.HasBalance != b.HasBalance {
@@ -107,8 +139,6 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 			}
 			return a.BalanceFloat > b.BalanceFloat
 		})
-
-		netWorth := totalAssets - totalLiabilities
 
 		data := map[string]any{
 			"PageTitle":   "Accounts",
@@ -119,24 +149,20 @@ func AccountsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 
 		props := pages.AccountsListProps{
 			CSRFToken:        GetCSRFToken(r),
-			NetWorth:         netWorth,
+			NetWorth:         totalAssets - totalLiabilities,
 			TotalAssets:      totalAssets,
 			TotalLiabilities: totalLiabilities,
 			HasAnyBalance:    hasAnyBalance,
-			Accounts:         rows,
+			ActiveUserID:     activeUserID,
+			Groups:           pages.GroupAccountsByConnection(rows),
+			TotalAccounts:    len(rows),
 		}
 
-		// Only editors/admins see the household filter (members are already
-		// scoped to themselves at the query layer).
+		// Only editors/admins see the household filter dropdown (members are
+		// already scoped to themselves at the query layer).
 		if IsEditor(sm, r) {
 			// Sort users by number of accounts (descending) so the most active
 			// household member surfaces first, like the connections page.
-			accountsPerUser := make(map[string]int)
-			for _, row := range rows {
-				if row.UserID != "" {
-					accountsPerUser[row.UserID]++
-				}
-			}
 			usersCopy := make([]db.User, len(users))
 			copy(usersCopy, users)
 			sort.Slice(usersCopy, func(i, j int) bool {
