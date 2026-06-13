@@ -17,8 +17,10 @@ when the surface is next touched · **P3** cosmetic / low-value.
 
 - **list-row idiom:** `pages/accounts_list.templ`, `components/agent_run_row.templ`
   (`AgentRunRow` + `AgentRunRowList`), `components/report_table.templ`
-  (`ReportRow` + `ReportRowList` + `ReportsList`) — the reference for
-  status-tile · one body line · value · overflow.
+  (`ReportRow` + `ReportRowList` + `ReportsList`), `pages/rules.templ`
+  (grouped by pipeline stage via `GroupRulesByStage`; toggle-as-status
+  leading control) — the reference for status-tile · one body line ·
+  value · overflow.
 - **TabBar:** `reports.templ`, `workflows_runs.templ`, `subscriptions_list.templ`,
   `workflows_shell.templ` use it correctly (border=nav, box=filter).
 - **Drawer:** connect-bank, provider-config, workflow create/edit, cron-field.
@@ -64,8 +66,10 @@ KEEP (justified dense/sortable/wizard matrices): `backups.templ:198`,
 
 MIGRATE — these are entity lists that read better as list-rows (status tile ·
 name · one body line · value · overflow), grouped where there's a natural axis:
-- `pages/rules.templ:74` — rules list (Enabled/Rule/Action/Stage/Hits/Last hit).
-  Group by stage or status; toggle + name + action summary, metrics in overflow.
+- ~~`pages/rules.templ:74`~~ — **DONE.** Migrated to grouped list-rows
+  (group by pipeline stage; the enabled toggle is the leading status
+  control, no separate tile; action summary the one body line, hits +
+  last-hit the right metadata). Sandbox: `/design/c/rules-list`.
 - `pages/subscriptions_list.templ:276` — recurring charges. Group by status
   (active/paused); status tile + name + cadence line + amount.
 - `pages/account_link_detail.templ:36` — matched txn pairs. Already carries a
