@@ -3969,6 +3969,7 @@
   padding: 0.5rem 0.625rem 0.625rem 0.625rem;
   border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
   background: var(--color-base-100);
+  overflow-x: auto;
 }
 
 /* Final result + empty-state */
@@ -4086,6 +4087,22 @@
   /* Hide the scrollbar gutter to avoid a phantom scroll-track on
    * sidebars that fit in the viewport. */
   scrollbar-gutter: stable;
+}
+/* On narrow viewports the grid is single-column: the aside stacks
+ * below the transcript, so sticky positioning is jarring and useless. */
+@media (max-width: 1023px) {
+  .bb-run-aside {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
+  }
+}
+/* On very small screens, hide the type label ("TOOL") and timestamps
+ * from tool-call summary rows so the tool name has room to breathe. */
+@media (max-width: 639px) {
+  .bb-tool__label { display: none; }
+  .bb-tool__time  { display: none; }
 }
 
 /* Tool call + result combined row. The body now contains two sections
