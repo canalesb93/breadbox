@@ -7,173 +7,174 @@ import (
 
 // ReportRowProps is the view-model for a single agent report in the
 // /reports index. Tags and the full body live on the detail page, not the
-// index — the index is a scannable surface: agent · time, status,
-// summary, and a trailing mark-read action.
+// index — the index is a scannable surface: a priority status tile, agent
+// identity, the summary, and a trailing overflow menu.
 type ReportRowProps struct {
 	ID       string // short_id / id; the row links to /reports/{ID}
 	Title    string // the summary line
-	Priority string // "" | "warning" | "critical"
-	Author   string // agent name
+	Priority string // "" | "info" | "warning" | "critical"
+	Author   string // agent display name
+	AuthorID string // stable avatar seed (created_by_id, falls back to name)
+	IsAgent  bool   // routes UserAvatar to the agent DiceBear style
 	Time     string // pre-rendered relative time, e.g. "2h ago"
 	IsRead   bool
 }
 
-// ReportsList renders the agent-reports index responsively: a clean daisy
-// "runs"-style table on sm+ (Agent, Status, Summary, action) and a
-// stacked list on mobile — a 4-column table can't fit a phone without
-// pushing the summary off-screen, so each report collapses to its summary
-// over an `agent · time · status` meta line. It takes the slice (not
-// children) so both breakpoints iterate the same data without the caller
-// duplicating the loop.
+// ReportRowList wraps a series of @ReportRow elements in the canonical
+// daisy `list` surface inside a card. Dividers come from the daisy list
+// primitive — no bespoke wrapper. Same shape as @AgentRunRowList so the
+// reports inbox and the agent-runs feed read as one product.
 //
-// The rows depend on the reportsPage Alpine factory
-// (static/js/admin/components/reports.js) for rowNav (full-row click) and
-// the optimistic mark-read dismiss, so wrap @ReportsList in an element
-// carrying x-data="reportsPage".
-templ ReportsList(rows []ReportRowProps) {
-	<!-- Desktop: table -->
-	<div class="bb-card p-0 overflow-hidden hidden sm:block">
-		<table class="table">
-			<thead>
-				<tr class="text-xs uppercase tracking-wider text-base-content/40 border-base-200">
-					<th class="font-medium">Agent</th>
-					<th class="font-medium">Status</th>
-					<th class="font-medium w-full">Summary</th>
-					<th class="font-medium"><span class="sr-only">Actions</span></th>
-				</tr>
-			</thead>
-			<tbody>
-				for _, r := range rows {
-					@reportTableRow(r)
-				}
-			</tbody>
-		</table>
-	</div>
-	<!-- Mobile: stacked list -->
-	<ul class="bb-card p-0 overflow-hidden sm:hidden divide-y divide-base-200">
-		for _, r := range rows {
-			@reportMobileRow(r)
-		}
+//	@components.ReportRowList() {
+//	  for _, r := range rows {
+//	    @components.ReportRow(r)
+//	  }
+//	}
+templ ReportRowList() {
+	<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+		{ children... }
 	</ul>
 }
 
-// reportTableRow renders one report as a clickable desktop table row. The
-// summary is a real <a> (keyboard / middle-click reachable + the
-// accessible name); rowNav delegates a click elsewhere on the row to it,
-// while the mark-read button stops propagation.
-templ reportTableRow(r ReportRowProps) {
-	<tr
-		x-show={ fmt.Sprintf("!dismissed['%s']", r.ID) }
-		x-transition.opacity.duration.200ms
-		class="group hover:bg-base-200/50 cursor-pointer transition-colors border-base-200"
-		@click={ fmt.Sprintf("rowNav($event, '/reports/%s')", r.ID) }
-	>
-		<td class="align-middle whitespace-nowrap">
-			<div class="flex items-center gap-2.5">
-				@reportUnreadDot(r.IsRead)
-				<div class="min-w-0">
-					<div class={ "text-sm truncate max-w-[12rem]", reportAuthorClass(r.IsRead) }>{ reportAuthorLabel(r.Author) }</div>
-					<div class="text-xs text-base-content/45 tabular-nums">{ r.Time }</div>
-				</div>
-			</div>
-		</td>
-		<td class="align-middle">
-			@reportStatusCell(r.Priority)
-		</td>
-		<td class="align-middle">
-			<a
-				href={ templ.SafeURL("/reports/" + r.ID) }
-				class={ "block no-underline line-clamp-2 leading-snug max-w-prose", reportSummaryClass(r.IsRead) }
-				aria-label={ reportRowLinkLabel(r) }
-			>{ r.Title }</a>
-		</td>
-		<td class="align-middle text-right">
-			if !r.IsRead {
-				@reportMarkReadButton(r.ID, true)
-			}
-		</td>
-	</tr>
+// ReportsList renders a flat list of report rows in one card. Used by the
+// single-filter (Unread / Read) views and the /design sandbox; the All
+// view groups unread-first by calling @ReportRowList directly. It takes
+// the slice (not children) so callers don't duplicate the loop.
+//
+// The rows depend on the reportsPage Alpine factory
+// (static/js/admin/components/reports.js) for the optimistic mark-read /
+// mark-unread actions, so wrap @ReportsList in an element carrying
+// x-data="reportsPage".
+templ ReportsList(rows []ReportRowProps) {
+	@ReportRowList() {
+		for _, r := range rows {
+			@ReportRow(r)
+		}
+	}
 }
 
-// reportMobileRow renders one report as a stacked list item: the summary
-// (the headline), then a quiet `agent · time · status` meta line, with a
-// trailing mark-read button. The whole row is a click target.
-templ reportMobileRow(r ReportRowProps) {
+// ReportRow renders one report as a daisy `list-row`: a leading
+// priority-coded status tile, the agent identity (avatar + name) with an
+// unread dot and relative time as the title line, the summary as the one
+// body line below, and an overflow menu rendered OUTSIDE the row's
+// navigation anchor. Read rows fade and drop the dot; unread rows stay
+// full-strength with a heavier summary — the two restrained unread
+// channels (the leading info dot is the third). Status lives in the tile,
+// not a parallel text badge.
+templ ReportRow(r ReportRowProps) {
 	<li
 		x-show={ fmt.Sprintf("!dismissed['%s']", r.ID) }
 		x-transition.opacity.duration.200ms
-		class="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-base-200/50 transition-colors"
-		@click={ fmt.Sprintf("rowNav($event, '/reports/%s')", r.ID) }
+		class={ "list-row transition-colors hover:bg-base-200/40 items-center",
+			templ.KV("opacity-60", r.IsRead) }
+		data-report-id={ r.ID }
 	>
-		<div class="mt-1.5">
-			@reportUnreadDot(r.IsRead)
-		</div>
-		<div class="min-w-0 flex-1">
-			<a
-				href={ templ.SafeURL("/reports/" + r.ID) }
-				class={ "block no-underline line-clamp-2 leading-snug", reportSummaryClass(r.IsRead) }
-				aria-label={ reportRowLinkLabel(r) }
-			>{ r.Title }</a>
-			<div class="mt-1.5 flex items-center gap-1.5 text-xs text-base-content/45 flex-wrap">
-				<span class="font-medium text-base-content/65 truncate max-w-[9rem]">{ reportAuthorLabel(r.Author) }</span>
-				<span class="text-base-content/25">·</span>
-				<span class="tabular-nums">{ r.Time }</span>
-				if r.Priority == "critical" || r.Priority == "warning" {
-					@ReportPriorityBadge(r.Priority)
-				}
+		<a
+			class="contents no-underline"
+			href={ templ.SafeURL("/reports/" + r.ID) }
+			aria-label={ reportRowLinkLabel(r) }
+		>
+			@IconTile(reportTileTone(r.Priority), reportTileIcon(r.Priority))
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					@UserAvatar(UserAvatarProps{
+						ID:         reportAvatarSeed(r),
+						Name:       reportAuthorLabel(r.Author),
+						IsAgent:    r.IsAgent,
+						Size:       UserAvatarXS,
+						Decorative: true,
+						Lazy:       true,
+						Class:      "shrink-0",
+					})
+					<span class={ "text-sm truncate", reportAuthorClass(r.IsRead) }>{ reportAuthorLabel(r.Author) }</span>
+					if !r.IsRead {
+						<span class="w-1.5 h-1.5 rounded-full bg-info shrink-0" title="Unread" aria-hidden="true"></span>
+					}
+					<span class="ml-auto shrink-0 text-xs text-base-content/45 tabular-nums" title="Submitted">{ r.Time }</span>
+				</div>
+				<div class="mt-0.5 min-w-0">
+					<span class={ "block text-sm line-clamp-1 leading-snug", reportSummaryClass(r.IsRead) }>{ r.Title }</span>
+				</div>
 			</div>
+		</a>
+		<div class="shrink-0 self-center">
+			@OverflowMenu(OverflowMenuProps{
+				AriaLabel: fmt.Sprintf("Actions for report by %s", reportAuthorLabel(r.Author)),
+				Size:      "sm",
+				Items:     reportRowMenuItems(r),
+			})
 		</div>
-		if !r.IsRead {
-			<div class="shrink-0 self-center">
-				@reportMarkReadButton(r.ID, false)
-			</div>
-		}
 	</li>
 }
 
-// reportUnreadDot renders the small primary dot that marks an unread row
-// (and an equal-size spacer for read rows so the columns stay aligned).
-templ reportUnreadDot(isRead bool) {
-	if !isRead {
-		<span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0" title="Unread"></span>
+// reportRowMenuItems builds the per-row overflow actions. Unread rows get
+// "Mark as read" (the optimistic dismiss); read rows get "Mark as
+// unread". Both carry an "Open report" link so the menu is never a single
+// item, and the action is reachable from the kebab as well as the row.
+func reportRowMenuItems(r ReportRowProps) []OverflowMenuItem {
+	items := make([]OverflowMenuItem, 0, 2)
+	if r.IsRead {
+		items = append(items, OverflowMenuItem{
+			Label:   "Mark as unread",
+			Icon:    "rotate-ccw",
+			OnClick: fmt.Sprintf("markUnread('%s')", r.ID),
+		})
 	} else {
-		<span class="w-1.5 h-1.5 shrink-0"></span>
+		items = append(items, OverflowMenuItem{
+			Label:   "Mark as read",
+			Icon:    "check",
+			OnClick: fmt.Sprintf("markRead('%s')", r.ID),
+		})
 	}
+	items = append(items, OverflowMenuItem{
+		Label: "Open report",
+		Icon:  "external-link",
+		Href:  templ.SafeURL("/reports/" + r.ID),
+	})
+	return items
 }
 
-// reportMarkReadButton renders the optimistic mark-read control. On
-// desktop (hoverReveal=true) it stays hidden until row-hover/focus; on
-// the mobile list it's always visible (no hover on touch).
-templ reportMarkReadButton(id string, hoverReveal bool) {
-	<button
-		type="button"
-		@click.stop={ fmt.Sprintf("markRead('%s')", id) }
-		class={ "btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-success hover:bg-success/10 transition-opacity",
-			templ.KV("sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100", hoverReveal) }
-		aria-label="Mark as read"
-		title="Mark as read"
-	>
-		@LucideIcon("check", "w-4 h-4")
-	</button>
-}
-
-// reportStatusCell renders the Status column: a soft priority badge for
-// warning/critical, and a quiet em-dash for routine ("" / "info")
-// reports so the column reads as "nothing notable" rather than blank.
-templ reportStatusCell(priority string) {
+// reportTileTone maps a report's priority to the IconTile tone — a vivid
+// status colour per the badge-tone rule (error/warning/info). Routine
+// reports ("" / "info") use the calm info tone; read rows desaturate via
+// the row-level opacity, so the tile never shouts once the report is seen.
+func reportTileTone(priority string) string {
 	switch priority {
-		case "critical":
-			@ReportPriorityBadge("critical")
-		case "warning":
-			@ReportPriorityBadge("warning")
-		default:
-			<span class="text-base-content/25" aria-hidden="true">—</span>
+	case "critical":
+		return "error"
+	case "warning":
+		return "warning"
+	default:
+		return "info"
 	}
+}
+
+// reportTileIcon picks the glyph inside the status tile — alert shapes for
+// warning/critical (matching ReportPriorityBadge), a neutral message glyph
+// for routine reports.
+func reportTileIcon(priority string) string {
+	switch priority {
+	case "critical":
+		return "alert-octagon"
+	case "warning":
+		return "alert-triangle"
+	default:
+		return "message-square-text"
+	}
+}
+
+// reportAvatarSeed returns a stable DiceBear seed for the report's author:
+// the creator's actor id when known (so every report from one agent shares
+// an avatar), falling back to the display name for operator-submitted rows.
+func reportAvatarSeed(r ReportRowProps) string {
+	if strings.TrimSpace(r.AuthorID) != "" {
+		return r.AuthorID
+	}
+	return reportAuthorLabel(r.Author)
 }
 
 // reportAuthorClass splits the agent-name weight by read state — unread
-// reports stay full-strength, read ones fade — one of the two restrained
-// unread channels (the other is the leading primary dot).
+// reports stay full-strength, read ones fade.
 func reportAuthorClass(isRead bool) string {
 	if isRead {
 		return "font-normal text-base-content/55"
@@ -182,7 +183,7 @@ func reportAuthorClass(isRead bool) string {
 }
 
 // reportAuthorLabel falls back to a neutral label when an agent didn't
-// supply a name, so the column never renders empty.
+// supply a name, so the row never renders empty.
 func reportAuthorLabel(author string) string {
 	if strings.TrimSpace(author) == "" {
 		return "Agent"
@@ -190,21 +191,20 @@ func reportAuthorLabel(author string) string {
 	return author
 }
 
-// reportSummaryClass styles the summary line by read state — bold + full
+// reportSummaryClass styles the summary line by read state — medium + full
 // strength when unread, lighter + muted when read.
 func reportSummaryClass(isRead bool) string {
 	if isRead {
-		return "font-normal text-base-content/60"
+		return "font-normal text-base-content/55"
 	}
 	return "font-medium text-base-content"
 }
 
-// reportRowLinkLabel builds the summary link's accessible name. The row's
-// visual state signals — the leading primary dot, the status badge, and
-// the summary weight — are non-textual, so the link folds them into one
-// spoken label, e.g. "Unread. Critical. <title> — <author>, <time>".
-// Routine ("" / "info") reports carry no priority word, matching
-// ReportPriorityBadge.
+// reportRowLinkLabel builds the row link's accessible name. The row's
+// visual state signals — the leading status tile, the unread dot, and the
+// summary weight — are non-textual, so the link folds them into one spoken
+// label, e.g. "Unread. Critical. <title> — <author>, <time>". Routine
+// ("" / "info") reports carry no priority word.
 func reportRowLinkLabel(r ReportRowProps) string {
 	var b strings.Builder
 	if !r.IsRead {

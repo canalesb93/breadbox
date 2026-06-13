@@ -62,11 +62,17 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 				}
 			}
 			t, _ := time.Parse(time.RFC3339, rep.CreatedAt)
+			authorID := ""
+			if rep.CreatedByID != nil {
+				authorID = *rep.CreatedByID
+			}
 			reports = append(reports, components.ReportRowProps{
 				ID:       rep.ID,
 				Title:    rep.Title,
 				Priority: rep.Priority,
 				Author:   reportDisplayAuthor(rep.CreatedByName, rep.Author),
+				AuthorID: authorID,
+				IsAgent:  rep.CreatedByType == "agent",
 				Time:     relativeTime(t),
 				IsRead:   isRead,
 			})

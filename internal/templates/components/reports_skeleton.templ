@@ -2,9 +2,10 @@ package components
 
 // ReportsSkeleton renders a placeholder mirroring the layout of the
 // /reports page — page header, filter tabs ("All / Unread / Read" +
-// "Mark all read"), and the daisy `table` of reports. Each row mirrors
-// ReportTableRow: an agent + time cell, a status cell, a summary cell,
-// and a trailing action. Sized to match the real component so a future
+// "Mark all read"), a quiet group label line, and a card of report
+// list-rows. Each row mirrors @ReportRow: a leading status tile, an
+// agent identity line (avatar + name + time), a summary line, and a
+// trailing overflow kebab. Sized to match the real component so a future
 // swap-in (filter switch, AJAX refresh) doesn't shift layout.
 //
 // /reports is a full-SSR page today; this primitive is exposed in
@@ -33,44 +34,37 @@ templ ReportsSkeleton() {
 			</div>
 			<div class="skeleton h-8 w-28 rounded-md shrink-0"></div>
 		</div>
-		<!-- Reports table. Summary widths vary so the skeleton reads as motion. -->
-		<div class="bb-card p-0 overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="table">
-					<tbody>
-						@reportsSkeletonRow("w-72 sm:w-96", true)
-						@reportsSkeletonRow("w-56 sm:w-80", false)
-						@reportsSkeletonRow("w-80 sm:w-[28rem]", true)
-						@reportsSkeletonRow("w-64 sm:w-72", false)
-						@reportsSkeletonRow("w-72 sm:w-[26rem]", true)
-						@reportsSkeletonRow("w-52 sm:w-64", false)
-					</tbody>
-				</table>
+		<!-- Group label line + list-row card. Summary widths vary so the
+		     skeleton reads as motion. -->
+		<div class="flex flex-col gap-2">
+			<div class="flex items-center gap-2 px-1">
+				<div class="skeleton h-4 w-16 rounded-md"></div>
+				<div class="skeleton h-3 w-4 rounded-md"></div>
 			</div>
+			<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+				@reportsSkeletonRow("w-72 sm:w-96")
+				@reportsSkeletonRow("w-56 sm:w-80")
+				@reportsSkeletonRow("w-80 sm:w-[28rem]")
+				@reportsSkeletonRow("w-64 sm:w-72")
+			</ul>
 		</div>
 	</div>
 }
 
-// reportsSkeletonRow mirrors one ReportTableRow: an agent (name + time)
-// cell, a status cell, a summary cell, and a trailing action slot.
-// `unread` reserves the mark-read button placeholder.
-templ reportsSkeletonRow(summaryW string, unread bool) {
-	<tr class="border-base-200">
-		<td>
-			<div class="flex items-center gap-2.5">
-				<div class="w-1.5 h-1.5"></div>
-				<div class="space-y-1.5">
-					<div class="skeleton h-3.5 w-24 rounded-md"></div>
-					<div class="skeleton h-3 w-14 rounded-md"></div>
-				</div>
+// reportsSkeletonRow mirrors one @ReportRow: a leading status tile, an
+// agent identity line (small avatar + name + time), a summary line, and a
+// trailing overflow kebab placeholder.
+templ reportsSkeletonRow(summaryW string) {
+	<li class="list-row items-center">
+		<div class="skeleton w-10 h-10 rounded-lg shrink-0"></div>
+		<div class="min-w-0 space-y-1.5">
+			<div class="flex items-center gap-2">
+				<div class="skeleton w-4 h-4 rounded-full shrink-0"></div>
+				<div class="skeleton h-3.5 w-24 rounded-md"></div>
+				<div class="skeleton h-3 w-12 rounded-md ml-auto"></div>
 			</div>
-		</td>
-		<td><div class="skeleton h-5 w-16 rounded-full"></div></td>
-		<td><div class={ "skeleton h-4 rounded-md max-w-full", summaryW }></div></td>
-		<td class="text-right">
-			if unread {
-				<div class="skeleton h-6 w-6 rounded inline-block"></div>
-			}
-		</td>
-	</tr>
+			<div class={ "skeleton h-4 rounded-md max-w-full", summaryW }></div>
+		</div>
+		<div class="skeleton w-8 h-8 rounded-md shrink-0 self-center"></div>
+	</li>
 }
