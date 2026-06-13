@@ -296,11 +296,15 @@ templ notificationChannelDrawerStatus(c NotificationChannelView) {
 	<div class="space-y-1.5 border-t border-base-200 pt-4">
 		if c.HasStatus {
 			if c.StatusOK {
-				<p class="text-xs text-success/80 inline-flex items-center gap-1.5">@components.LucideIcon("circle-check", "w-3.5 h-3.5")
-Last delivery: { c.StatusText }</p>
+				<p class="text-xs text-success/80 inline-flex items-center gap-1.5">
+					@components.LucideIcon("circle-check", "w-3.5 h-3.5")
+					Last delivery: { c.StatusText }
+				</p>
 			} else {
-				<p class="text-xs text-error/80 inline-flex items-center gap-1.5">@components.LucideIcon("circle-x", "w-3.5 h-3.5")
-Last delivery: { c.StatusText }</p>
+				<p class="text-xs text-error/80 inline-flex items-center gap-1.5">
+					@components.LucideIcon("circle-x", "w-3.5 h-3.5")
+					Last delivery: { c.StatusText }
+				</p>
 			}
 		} else {
 			<p class="text-xs text-base-content/50">No delivery yet — use Test to send a sample.</p>
