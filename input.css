@@ -449,31 +449,6 @@
     border-color: var(--color-base-300);
   }
 
-  /* ── List-row keyboard focus ──
-   * The redesigned list surfaces (/reports, /rules, /recurring,
-   * /accounts, /tags, /categories, /connections, /household, agent-run
-   * rows) wrap each row's whole-row link in an `<a class="contents">`.
-   * `display:contents` produces no box, so `:focus-visible` on the
-   * anchor has nothing to paint — keyboard users tabbing through rows
-   * got no visible focus indicator (the `hover:bg-base-200/40` mouse
-   * state already worked). Promote the keyboard-focus ring onto the
-   * `.list-row` <li> itself.
-   *   - `:has(> a.contents:focus-visible)` scopes it to rows whose
-   *     DIRECT child row-link is focused. An inner control (the
-   *     overflow kebab) is NOT a `> a.contents`, so focusing the kebab
-   *     keeps its own focus ring and never double-rings the whole row.
-   *   - `:focus-visible` keeps it keyboard-only — a mouse click on the
-   *     row doesn't trigger the ring.
-   *   - Inset `box-shadow` (not outline) so the ring never shifts
-   *     layout, never overlaps the hairline divider, and never clips
-   *     against the bb-card's rounded first/last-row corners.
-   *   `--color-primary` at 0.4 alpha matches the app's `ring-primary/40`
-   *   focus idiom (principle #8 / StatTile, CollapsibleSection). */
-  .list-row:has(> a.contents:focus-visible) {
-    box-shadow: inset 0 0 0 2px oklch(from var(--color-primary) l c h / 0.4);
-    border-radius: inherit;
-  }
-
   /* ── Form card primitives ── */
   /* Icon-header: colored tile + title + optional subtitle.
      Used at the top of sectioned form cards (bb-card p-0 overflow-hidden). */
@@ -1408,6 +1383,181 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   }
 
+  /* ════════════════════════════════════════════════════════════════════
+   * Home Feed — bold hero + alive stream  (branch design/bold-feed)
+   * --------------------------------------------------------------------
+   * The /feed surface is the product's front door. It elevates the shared
+   * timeline with an insight-forward hero (a live sync-health "pulse" + a
+   * count-up metric cluster) and tasteful load/hover motion. Everything is
+   * scoped under `.bb-feed-*` so no other surface inherits it, and every
+   * keyframe is neutralised by the global prefers-reduced-motion reset at
+   * the top of this file (it zeroes animation-duration on *, ::before,
+   * ::after with !important).
+   * ════════════════════════════════════════════════════════════════════ */
+
+  /* Load-in rise: a soft fade + lift used on the hero tiles and the
+   * section blocks. Paired with .bb-feed-stagger for a cascade. */
+  @keyframes bb-feed-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .bb-feed-rise {
+    animation: bb-feed-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  /* Cascade direct children. Delays are capped at ~7 steps so a long list
+   * never accrues a visible "still loading" tail. */
+  .bb-feed-stagger > * { animation: bb-feed-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .bb-feed-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+  .bb-feed-stagger > *:nth-child(2) { animation-delay: 0.07s; }
+  .bb-feed-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+  .bb-feed-stagger > *:nth-child(4) { animation-delay: 0.17s; }
+  .bb-feed-stagger > *:nth-child(5) { animation-delay: 0.22s; }
+  .bb-feed-stagger > *:nth-child(n+6) { animation-delay: 0.27s; }
+
+  /* Hero metric tile — flat bordered card that lifts on hover/focus and
+   * carries a hairline top-accent in the metric's own tone. */
+  .bb-feed-tile {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.18s ease, border-color 0.18s ease,
+                background-color 0.18s ease, box-shadow 0.2s ease;
+  }
+  .bb-feed-tile--link:hover,
+  .bb-feed-tile--link:focus-visible {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--bb-feed-accent, var(--color-base-content)) 38%, var(--color-base-300));
+    box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--bb-feed-accent, #000) 55%, transparent);
+  }
+  /* Tonal top-edge accent — a 2px bar the width of the card, in the
+   * tile's metric colour, that brightens on hover. */
+  .bb-feed-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: color-mix(in srgb, var(--bb-feed-accent, var(--color-base-content)) 45%, transparent);
+    opacity: 0.55;
+    transition: opacity 0.18s ease;
+  }
+  .bb-feed-tile--link:hover::before,
+  .bb-feed-tile--link:focus-visible::before { opacity: 1; }
+
+  /* The tinted icon chip inside a tile (and the pulse panel). */
+  .bb-feed-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.625rem;
+    color: var(--bb-feed-accent, var(--color-base-content));
+    background: color-mix(in srgb, var(--bb-feed-accent, var(--color-base-content)) 12%, transparent);
+  }
+
+  /* ── Sync-health pulse panel ──
+   * The hero's lead element. A slightly larger card whose left edge carries
+   * a 3px status-tinted accent rail and whose background is a faint vertical
+   * wash of the status tone — confident without shouting. */
+  .bb-feed-pulse {
+    position: relative;
+    overflow: hidden;
+    border-color: color-mix(in srgb, var(--bb-feed-accent, var(--color-base-300)) 30%, var(--color-base-300));
+    background:
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--bb-feed-accent, transparent) 7%, var(--color-base-100)) 0%,
+        var(--color-base-100) 70%);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease;
+  }
+  .bb-feed-pulse::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: color-mix(in srgb, var(--bb-feed-accent, var(--color-base-content)) 75%, transparent);
+  }
+  .bb-feed-pulse--link:hover,
+  .bb-feed-pulse--link:focus-visible {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 26px -14px color-mix(in srgb, var(--bb-feed-accent, #000) 60%, transparent);
+  }
+
+  /* Live status dot with an expanding ping ring (healthy/syncing only). */
+  .bb-feed-dot {
+    position: relative;
+    display: inline-flex;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    background: var(--bb-feed-accent, var(--color-base-content));
+  }
+  .bb-feed-dot--live::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: var(--bb-feed-accent, var(--color-base-content));
+    animation: bb-feed-ping 1.9s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  @keyframes bb-feed-ping {
+    0%   { transform: scale(1);   opacity: 0.55; }
+    75%, 100% { transform: scale(2.6); opacity: 0; }
+  }
+
+  /* Activity sparkbars — a compact "rhythm" strip built from the per-day
+   * event counts the page already renders. Pure presentation; no new data. */
+  .bb-feed-sparkbar {
+    display: block;
+    flex: 1 1 0;
+    max-width: 1.5rem;
+    align-self: flex-end;
+    border-radius: 0.3rem;
+    background: color-mix(in srgb, var(--color-primary) 60%, transparent);
+    min-height: 4px;
+    transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.15s ease;
+  }
+  .bb-feed-sparkbar:hover {
+    background: color-mix(in srgb, var(--color-primary) 90%, transparent);
+  }
+
+  /* ── Alive stream — per-row hover affordance ──
+   * Highlights the row BODY only (the column right of the rail) so the
+   * continuous timeline rail is never painted over. The negative inline
+   * margin lets the highlight breathe past the text without shifting the
+   * rail geometry. Comment-bubble rows are excluded — they own a bespoke
+   * tail treatment in the prominent-timeline overrides. */
+  .bb-feed-stream .bb-timeline > li:not([role="separator"]):not(:has(.bb-comment-bubble)) > div:last-child {
+    border-radius: 0.7rem;
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+    transition: background-color 0.15s ease;
+  }
+  .bb-feed-stream .bb-timeline > li:not([role="separator"]):not(:has(.bb-comment-bubble)):hover > div:last-child {
+    background: color-mix(in srgb, var(--color-base-200) 55%, transparent);
+  }
+
+  /* First-run hero — a confident, branded welcome on an empty front door. */
+  .bb-feed-welcome {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 140% at 50% -20%,
+        color-mix(in srgb, var(--color-primary) 12%, transparent) 0%,
+        transparent 60%),
+      var(--color-base-100);
+  }
+  .bb-feed-welcome__orb {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 1.25rem;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 14%, var(--color-base-100));
+    border: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+    box-shadow: 0 14px 40px -18px color-mix(in srgb, var(--color-primary) 70%, transparent);
+  }
+
   /* ── Comment bubble ──
    *
    * Chat-style bubble used by the transaction-detail activity timeline for
@@ -2126,6 +2276,17 @@
   .bb-table-header {
     @apply flex items-center gap-3 px-4 py-2 text-xs font-medium text-base-content/40
            border-b border-base-300/50 bg-base-200/30;
+  }
+
+  /* Matches the .bb-tx-checkbox visibility contract: hidden until bulk-select
+     mode is active so the "Name" header stays aligned with the tx name text. */
+  .bb-tx-header-checkbox-col {
+    display: none;
+    flex-shrink: 0;
+    width: 1.25rem; /* w-5 */
+  }
+  body.bb-tx-selecting .bb-tx-header-checkbox-col {
+    display: block;
   }
 
   /* ── Date visibility (hidden in grouped, shown in list) ──
