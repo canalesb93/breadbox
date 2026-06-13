@@ -54,11 +54,7 @@ templ feedHero(p FeedProps) {
 		@components.PageHeader(components.PageHeaderProps{
 			Title:    "Feed",
 			Subtitle: "Everything that happened in your breadbox · " + p.Hero.Generated,
-			Action: components.PageHeaderAction(
-				templ.SafeURL("/connections/new"),
-				"plus",
-				"Connect bank",
-			),
+			Action:   connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect bank"),
 		})
 		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
 			@feedHeroTile("activity", "Events today", fmt.Sprintf("%d", p.Hero.EventsToday), feedHeroSubEvents(p))
@@ -292,10 +288,7 @@ templ feedEmptyFirstRun() {
 		<p class="text-sm text-base-content/55 max-w-md mx-auto mb-5">
 			Connect your first bank to start filling your feed.
 		</p>
-		<a href="/connections/new" class="btn btn-primary btn-sm">
-			@components.LucideIcon("plus", "w-3.5 h-3.5")
-			Connect a bank
-		</a>
+		@connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect a bank")
 	</div>
 }
 

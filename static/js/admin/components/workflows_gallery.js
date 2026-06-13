@@ -19,20 +19,6 @@ document.addEventListener('alpine:init', function () {
       // 'wf-reconfigure'. open()/close() are called from the template
       // (Set up / Cancel / Escape / backdrop) and from openReconfigure().
 
-      // --- F2: preview internal prompt -----------------------------------
-      // State for the "Preview prompt" modal: the composed base prompt is
-      // fetched on demand from /-/workflows/{slug}/prompt, which returns
-      // server-rendered prompt_html injected into the x-ref="previewBody"
-      // element. previewLoading drives the in-modal spinner.
-      previewTitle: '',
-      previewBody: '',
-      previewBodyHTML: '',
-      previewLoading: false,
-      // previewCopied briefly flips true after a successful Copy so the
-      // button can show a "Copied" confirmation.
-      previewCopied: false,
-      // -------------------------------------------------------------------
-
       // --- F3: reconfigure an enabled workflow ---------------------------
       // The single, data-driven reconfigure drawer is opened by re-using the
       // same `open` slot with the special value 'reconfigure'. Its fields are
@@ -78,13 +64,20 @@ document.addEventListener('alpine:init', function () {
         // avatarSeed drives the header EditableAvatar preview + posts as the
         // hidden avatar_seed field. Empty = slug-seeded (the default).
         avatarSeed: '',
-        triggerOnSync: 'false',
+        // triggerMode is the 3-way trigger: 'manual' | 'schedule' | 'sync'.
+        // Posts as trigger_mode; the schedule CronField (custom.scheduleCron)
+        // only applies when 'schedule'.
+        triggerMode: 'manual',
         scheduleCron: '',
         model: 'claude-sonnet-4-6',
         toolScope: 'read_write',
         maxTurns: '',
         maxBudget: '',
         enabled: true, // create-only "Activate" toggle
+        // promptError flips true when a save is attempted with an empty prompt.
+        // The prompt entry (workflowCustomPromptField) tints error-red and a
+        // helper line appears; editPrompt() and a fresh openCustom() clear it.
+        promptError: false,
       },
       // -------------------------------------------------------------------
 
@@ -580,13 +573,14 @@ document.addEventListener('alpine:init', function () {
         self.custom.name = '';
         self.custom.prompt = '';
         self.custom.avatarSeed = '';
-        self.custom.triggerOnSync = 'false';
+        self.custom.triggerMode = 'manual';
         self.custom.scheduleCron = '';
         self.custom.model = 'claude-sonnet-4-6';
         self.custom.toolScope = 'read_write';
         self.custom.maxTurns = '';
         self.custom.maxBudget = '';
         self.custom.enabled = true;
+        self.custom.promptError = false;
         self.custom.loading = !!slug;
         Alpine.store('drawers').open('wf-custom');
         if (!slug) return;
@@ -601,8 +595,15 @@ document.addEventListener('alpine:init', function () {
           .then(function (data) {
             self.custom.name = data.name || '';
             self.custom.prompt = data.prompt || '';
-            self.custom.triggerOnSync = data.trigger_on_sync ? 'true' : 'false';
             self.custom.scheduleCron = data.schedule_cron || '';
+            // Derive the 3-way mode from the stored trigger_on_sync + cron.
+            if (data.trigger_on_sync) {
+              self.custom.triggerMode = 'sync';
+            } else if (data.schedule_cron) {
+              self.custom.triggerMode = 'schedule';
+            } else {
+              self.custom.triggerMode = 'manual';
+            }
             self.custom.model = data.model || 'claude-sonnet-4-6';
             self.custom.toolScope = data.tool_scope || 'read_write';
             self.custom.maxTurns = data.max_turns ? String(data.max_turns) : '';
@@ -625,6 +626,13 @@ document.addEventListener('alpine:init', function () {
       // the new state.
       submitCustom: function (form) {
         var self = this;
+        // The prompt lives behind the modal in a hidden field (no native
+        // `required`), so guard it here. Flag the entry and bail — the operator
+        // taps it to open the editor.
+        if (!self.custom.prompt || !self.custom.prompt.trim()) {
+          self.custom.promptError = true;
+          return;
+        }
         var fd = new FormData(form);
         // The create "Activate" checkbox is omitted by FormData when unchecked.
         var box = form.querySelector('input[name="enabled"]');
@@ -670,6 +678,90 @@ document.addEventListener('alpine:init', function () {
         this.custom.avatarSeed = hex;
       },
 
+      // copyCustomPrompt copies a custom workflow's prompt to the clipboard from
+      // its config endpoint (the preset /prompt endpoint only knows presets).
+      // Backs the copy icon on manual custom cards.
+      copyCustomPrompt: function (slug) {
+        var self = this;
+        fetch('/-/custom-workflows/' + encodeURIComponent(slug), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            var text = (data && data.prompt) || '';
+            if (!text) {
+              self.toast('No prompt to copy.', 'error');
+              return;
+            }
+            var done = function () { self.toast('Prompt copied to clipboard.', 'success'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(done).catch(function () {
+                self._copyFallback(text, done);
+              });
+            } else {
+              self._copyFallback(text, done);
+            }
+          })
+          .catch(function (e) {
+            console.error('copyCustomPrompt failed', e);
+            self.toast('Could not copy the prompt.', 'error');
+          });
+      },
+
+      // runCustomNow runs a manual custom workflow from its card's Run button,
+      // mirroring runOneOff's UX (cost-confirm gate + a spinner held for the
+      // whole run via runningOneOff[slug]). Unlike a one-off preset, the
+      // workflow already exists, so it dispatches /-/workflows/{slug}/run.
+      runCustomNow: function (slug, name) {
+        var self = this;
+        if (self.runningOneOff[slug]) return; // guard against a double-click
+        name = name || slug;
+        var go = function () { self._dispatchCustomRun(slug); };
+        if (typeof window.bbConfirm !== 'function') {
+          if (window.confirm('Run "' + name + '" now? This runs Claude over your financial data and incurs API cost.')) go();
+          return;
+        }
+        window.bbConfirm({
+          title: 'Run workflow now?',
+          message: 'Run "' + name + '" now? It runs Claude over your household’s financial data and incurs Anthropic API cost.',
+          confirmLabel: 'Run now',
+          variant: 'warning',
+        }).then(function (ok) { if (ok) go(); });
+      },
+
+      _dispatchCustomRun: function (slug) {
+        var self = this;
+        if (self.runningOneOff[slug]) return;
+        self.runningOneOff[slug] = true;
+        self._post('/-/workflows/' + encodeURIComponent(slug) + '/run')
+          .then(function (res) {
+            if (res.ok || res.status === 202) {
+              return res.json().catch(function () { return null; }).then(function (run) {
+                self.runStartedToast(run);
+                if (run && run.short_id) {
+                  self._pollOneOffRun(slug, run.short_id);
+                } else {
+                  self.runningOneOff[slug] = false;
+                }
+              });
+            }
+            return res.json().catch(function () { return null; }).then(function (body) {
+              self.runningOneOff[slug] = false;
+              self.runErrorToast(body);
+            });
+          })
+          .catch(function (e) {
+            console.error('runCustomNow failed', e);
+            self.runningOneOff[slug] = false;
+            self.toast('Network error — could not start the run.', 'error');
+            self.restorePageState();
+          });
+      },
+
       // Remove a configured workflow — deletes its agent_definition, resetting
       // the preset card back to "Set up". Confirms first via the shared
       // bbConfirm overlay (the schedule stops; run history survives the
@@ -710,17 +802,42 @@ document.addEventListener('alpine:init', function () {
       // -------------------------------------------------------------------
 
       // --- F2: preview internal prompt -----------------------------------
-      // Open the shared "Preview prompt" dialog and fetch the preset's fully
-      // composed base prompt (read-only). The <dialog id="wf-prompt-preview">
-      // lives once in the gallery template; this opens it and fills the body.
+      // Open the shared global prompt modal (#bb-prompt-modal, mounted once in
+      // base.html) in read-only preview mode. We fetch the preset's composed
+      // base prompt, then dispatch bb-prompt-modal with the raw markdown
+      // (value, for the Copy action) plus the server-rendered, sanitized HTML
+      // (html, so the modal skips its own /-/markdown/preview round-trip).
+      // This is the single prompt-preview surface — no bespoke dialog here.
+      // editPrompt hands custom-workflow prompt authoring to the global prompt
+      // modal (#bb-prompt-modal in base.html) and its Markdown Edit/Preview
+      // flow — the inline textarea is retired. The value round-trips through
+      // custom.prompt: we seed the modal with it and write edits back via
+      // onSaved. startInEdit picks the landing view (true = editor, false =
+      // rendered preview); omit it to auto-pick — editor when empty, preview
+      // when there's already something to read.
+      editPrompt: function (startInEdit) {
+        var self = this;
+        var hasPrompt = !!(self.custom.prompt && self.custom.prompt.trim());
+        var edit = startInEdit === undefined ? !hasPrompt : !!startInEdit;
+        self.custom.promptError = false;
+        window.dispatchEvent(new CustomEvent('bb-prompt-modal', {
+          detail: {
+            mode: 'editable',
+            edit: edit,
+            title: self.custom.isEdit ? 'Edit prompt' : 'Prompt',
+            subtitle: 'Markdown — runs verbatim on every run.',
+            value: self.custom.prompt || '',
+            saveLabel: 'Save prompt',
+            onSaved: function (v) {
+              self.custom.prompt = v;
+              self.custom.promptError = false;
+            },
+          },
+        }));
+      },
+
       previewPrompt: function (slug, name) {
         var self = this;
-        self.previewTitle = name || slug;
-        self.previewBody = '';
-        self.previewBodyHTML = '';
-        self.previewLoading = true;
-        var dialog = document.getElementById('wf-prompt-preview');
-        if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
         fetch('/-/workflows/' + encodeURIComponent(slug) + '/prompt', {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
@@ -730,67 +847,20 @@ document.addEventListener('alpine:init', function () {
             return res.json();
           })
           .then(function (data) {
-            self.previewTitle = data.title || self.previewTitle;
-            self.previewBody = data.prompt || '';
-            self.previewBodyHTML = data.prompt_html || '';
+            window.dispatchEvent(new CustomEvent('bb-prompt-modal', {
+              detail: {
+                mode: 'preview',
+                title: data.title || name || slug,
+                subtitle: "The built-in base prompt this workflow runs with, before any additional instructions.",
+                value: data.prompt || '',
+                html: data.prompt_html || '',
+              },
+            }));
           })
           .catch(function (e) {
             console.error('previewPrompt failed', e);
-            self.previewBody = 'Could not load the prompt for this workflow. Please try again.';
-            self.previewBodyHTML = '<p>Could not load the prompt for this workflow. Please try again.</p>';
-          })
-          .finally(function () {
-            self.previewLoading = false;
-            self.renderPreviewBody();
+            self.toast('Could not load the prompt for this workflow.', 'error');
           });
-      },
-
-      // Inject the server-rendered, sanitized prompt HTML into the preview
-      // element. The markdown is rendered server-side (goldmark + bluemonday)
-      // and arrives as prompt_html, so there's no client-side parser; we set
-      // innerHTML directly. The body arrives async and the modal is reused
-      // across opens, so this runs on each open.
-      renderPreviewBody: function () {
-        var self = this;
-        self.$nextTick(function () {
-          var el = self.$refs.previewBody;
-          if (!el) return;
-          el.innerHTML = self.previewBodyHTML || '';
-          // Render any <i data-lucide> placeholders (code-block copy icons,
-          // callout icons) the server markdown emitted into this fragment.
-          if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-          }
-          // The body element is reused across opens; reset its scroll so a
-          // new prompt always starts at the top rather than wherever the
-          // previous one was left scrolled. The element is x-show-gated on
-          // previewLoading, so a same-tick reset can land while it's still
-          // display:none (a no-op). rAF defers until after x-show flushes and
-          // the element is laid out, so the reset actually sticks.
-          el.scrollTop = 0;
-          requestAnimationFrame(function () { el.scrollTop = 0; });
-        });
-      },
-
-      // copyPrompt copies the raw (markdown source) workflow prompt to the
-      // clipboard. Bound to the modal's Copy button and the 'c' shortcut.
-      // Flashes previewCopied for confirmation. Falls back to a hidden
-      // textarea + execCommand on browsers without the async clipboard API.
-      copyPrompt: function () {
-        var self = this;
-        var text = self.previewBody || '';
-        if (!text) return;
-        var done = function () {
-          self.previewCopied = true;
-          setTimeout(function () { self.previewCopied = false; }, 1500);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(done).catch(function () {
-            self._copyFallback(text, done);
-          });
-        } else {
-          self._copyFallback(text, done);
-        }
       },
 
       _copyFallback: function (text, done) {

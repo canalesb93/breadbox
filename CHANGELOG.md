@@ -4,6 +4,37 @@ All notable changes to Breadbox will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-06-07
+
+> **Pre-1.0.** Still on `0.x` — minor releases may include breaking changes.
+> This release is additive over 0.1.2 (no schema or API breaks); the notes
+> below are relative to 0.1.2.
+
+### Added
+
+- **Custom workflows** — create and edit your own workflows from a side drawer on `/workflows`, with delete and run-now actions, a manual trigger, manual-run cards, and row-click to toggle enablement. Custom cards match the preset cards and use the shared `EditableAvatar`. (#1771, #1781, #1773, #1778, #1776)
+- **Global prompt preview/edit modal** — a single shared modal previews and edits workflow prompts, with markdown prose polish throughout. (#1787, #1789)
+- **Unified markdown rendering** — all markdown now renders through one server-side goldmark engine, retiring the client-side renderer. (#1768)
+- **DiceBear avatar gallery link** — the Avatars section links out to the DiceBear style gallery. (#1774)
+
+### Changed
+
+- **Keyboard-shortcuts help** redesigned as a right-side drawer. (#1784)
+- **Connections** nav now uses the lucide `cable` icon. (#1779)
+- **Avatar pickers** on `/settings/general` render in two columns, with the DiceBear link moved inline into the section subtitle. (#1765, #1775)
+- **Cron previews** are stamped with the anchor zone and reveal the server-default timezone. (#1766)
+- **Deprecated agent surface removed** — the old agent form, prompt builder, and dead two-tab layout are gone. (#1769)
+
+### Fixed
+
+- **Page scroll** — pages no longer overscroll by the topbar height. (#1788)
+- **Developer settings** — removed noisy banners and the double border on the save footer. (#1785)
+- **Dev-reporter uploads** are now authenticated, with the token configurable in Settings → Developer. (#1783)
+- **Design sandbox** — the embedded component iframe on `/design/c` now syncs the active theme. (#1780)
+- **Workflow name field** no longer gets autofilled by password managers. (#1777)
+- **Installer** — daemon registration no longer aborts the install before printing the setup URL. (#1770)
+- **Onboarding** — polished the encryption-key step, reordered getting-started, and refreshed provider copy. (#1772)
+
 ## [0.1.2] - 2026-06-05
 
 > **Pre-1.0.** Still on `0.x` — minor releases may include breaking changes.

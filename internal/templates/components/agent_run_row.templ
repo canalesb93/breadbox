@@ -178,8 +178,7 @@ templ agentRunAccessoryIcons(p AgentRunRowProps) {
 // stay quiet — the title row alone carries them.
 templ agentRunRowBody(p AgentRunRowProps) {
 	if p.Status == "error" && (p.ErrorMessageFriendly != "" || p.ErrorMessage != "") {
-		<div class="mt-0.5 inline-flex items-center gap-1.5 text-xs text-error/90 min-w-0">
-			@LucideIcon("triangle-alert", "w-3 h-3 shrink-0")
+		<div class="mt-0.5 text-xs text-error/90 min-w-0">
 			<span class="line-clamp-1">
 				if p.ErrorMessageFriendly != "" {
 					{ p.ErrorMessageFriendly }
@@ -190,10 +189,6 @@ templ agentRunRowBody(p AgentRunRowProps) {
 		</div>
 	} else if len(p.Reports) > 0 {
 		<div class="mt-0.5 flex items-center gap-1.5 text-xs min-w-0">
-			<i
-				data-lucide={ agentRunReportIcon(p.Reports[0].Priority) }
-				class={ "w-3 h-3 shrink-0", agentRunReportIconColor(p.Reports[0].Priority) }
-			></i>
 			<span class={ "line-clamp-1 min-w-0", agentRunReportTextColor(p.Reports[0].Priority) }>
 				{ p.Reports[0].Title }
 			</span>
@@ -291,28 +286,6 @@ func agentRunTriggerIcon(trigger string) string {
 		return "play"
 	default:
 		return "circle"
-	}
-}
-
-func agentRunReportIcon(priority string) string {
-	switch priority {
-	case "critical":
-		return "alert-octagon"
-	case "warning":
-		return "alert-triangle"
-	default:
-		return "file-text"
-	}
-}
-
-func agentRunReportIconColor(priority string) string {
-	switch priority {
-	case "critical":
-		return "text-error"
-	case "warning":
-		return "text-warning"
-	default:
-		return "text-base-content/50"
 	}
 }
 

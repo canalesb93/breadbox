@@ -150,6 +150,10 @@ type WorkflowCustomCardProps struct {
 	Enabled      bool   // run-state (the card toggle flips it immediately)
 	AvatarSeed   string // DiceBear seed; empty = slug-seeded
 	LastRunError bool   // most recent run failed → red status dot
+	// Manual is true when the workflow has no automatic trigger (no schedule,
+	// no post-sync). Manual cards show copy + run controls (like one-off
+	// presets) instead of a run toggle.
+	Manual bool
 }
 
 // WorkflowSpendBanner is the gallery's spend-ceiling state: shown when a

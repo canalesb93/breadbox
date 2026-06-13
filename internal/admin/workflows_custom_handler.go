@@ -41,14 +41,22 @@ type customWorkflowInput struct {
 // the two required fields (name, prompt) and the numeric caps.
 func readCustomWorkflowInput(r *http.Request) (customWorkflowInput, error) {
 	in := customWorkflowInput{
-		name:          strings.TrimSpace(r.FormValue("name")),
-		prompt:        strings.TrimSpace(r.FormValue("prompt")),
-		model:         strings.TrimSpace(r.FormValue("model")),
-		toolScope:     strings.TrimSpace(r.FormValue("tool_scope")),
-		triggerOnSync: r.FormValue("trigger_on_sync") == "true",
-		scheduleCron:  strings.TrimSpace(r.FormValue("schedule_cron")),
-		enabled:       r.FormValue("enabled") == "true" || r.FormValue("enabled") == "on",
-		avatarSeed:    strings.TrimSpace(r.FormValue("avatar_seed")),
+		name:       strings.TrimSpace(r.FormValue("name")),
+		prompt:     strings.TrimSpace(r.FormValue("prompt")),
+		model:      strings.TrimSpace(r.FormValue("model")),
+		toolScope:  strings.TrimSpace(r.FormValue("tool_scope")),
+		enabled:    r.FormValue("enabled") == "true" || r.FormValue("enabled") == "on",
+		avatarSeed: strings.TrimSpace(r.FormValue("avatar_seed")),
+	}
+	// trigger_mode is the 3-way custom-drawer trigger: manual (no automatic
+	// trigger), schedule (a cron), or sync (after each successful sync). It
+	// resolves to the underlying trigger_on_sync + schedule_cron pair.
+	switch r.FormValue("trigger_mode") {
+	case "sync":
+		in.triggerOnSync = true
+	case "schedule":
+		in.scheduleCron = strings.TrimSpace(r.FormValue("schedule_cron"))
+	default: // "manual" (or unset) — runs only on demand
 	}
 	if in.name == "" {
 		return in, fmt.Errorf("name is required")

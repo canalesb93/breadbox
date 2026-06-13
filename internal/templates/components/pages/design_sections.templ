@@ -2157,9 +2157,7 @@ templ SectionCategoryPicker() {
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
 	@templ.JSONScript("design-cat-picker-cats", designTxRowsCategories())
-	<script>
-		(function(){var e=document.getElementById('design-cat-picker-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
-	</script>
+	<script src="/static/js/admin/components/design_categories_seed.js"></script>
 	<div class="flex flex-col gap-6">
 		@designExample("Inline (transaction row)", "btn btn-ghost btn-xs gap-1.5 — the per-row quick-set picker shown xl+ on /transactions and /accounts/{id}. assign mode, allow-empty 'Uncategorized'. Used by tx_row.templ.") {
 			<div class="flex items-center gap-3">
@@ -2375,9 +2373,7 @@ templ SectionTransactionRows() {
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
 	@templ.JSONScript("design-tx-rows-cats", designTxRowsCategories())
-	<script>
-		(function(){var e=document.getElementById('design-tx-rows-cats');if(e){try{window.__bbCategories=JSON.parse(e.textContent);}catch(_){window.__bbCategories=[];}}})();
-	</script>
+	<script src="/static/js/admin/components/design_categories_seed.js"></script>
 	<div class="flex flex-col gap-6">
 		<!-- Variant policy: when to use which row component. The three layouts
 		     share `bb-tx-avatar`, `bb-tx-owner-badge`, the pending-clock atom,

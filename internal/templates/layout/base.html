@@ -279,6 +279,19 @@
         init: function() {
           var self = this;
           mq.addEventListener('change', function(e) { self.systemDark = e.matches; });
+          // Cross-document sync: the `storage` event fires in every OTHER
+          // same-origin document (other tabs, and — load-bearing here — the
+          // embedded component iframe on /design/c/{slug}?embed=1) when one of
+          // them writes localStorage. Without this, toggling the theme on the
+          // standalone component page updates the parent but leaves the iframe
+          // stuck on its load-time theme. e.key is null on clear(); re-read
+          // through read() either way so we stay in sync with the source.
+          window.addEventListener('storage', function(e) {
+            if (e.key !== null && e.key !== KEY) return;
+            var pref = read();
+            self.preference = pref;
+            apply(pref);
+          });
         },
       });
     });
@@ -531,7 +544,7 @@
     <!-- Mintlify-style surface flip: the content column is the bright
          surface (base-100) and the sidebar is the recessed one (base-200).
          Cards sit on white and read by their border, not a fill contrast. -->
-    <div class="drawer-content bg-base-100">
+    <div class="drawer-content bg-base-100 flex flex-col min-h-dvh">
       <!-- Desktop topbar — static across every page (hidden < lg, where the
            mobile navbar below takes over). Left: breadcrumb of the current
            section/page. Right: ⌘K search, theme toggle, profile menu. -->
@@ -592,8 +605,13 @@
         {{renderComponent "TopbarBreadcrumbMobile" .}}
       </div>
       {{end}}
-      <!-- Page content -->
-      <main class="p-4 sm:p-6 min-h-screen">
+      <!-- Page content — grows to fill the column instead of demanding its
+           own full viewport height. The column (.drawer-content) is min-h-dvh,
+           so the sticky topbar + navbar + this <main> together total exactly
+           the viewport; using min-h-screen here instead would stack a full
+           100vh BELOW the in-flow sticky topbar and overscroll the page by
+           the topbar's height. -->
+      <main class="p-4 sm:p-6 flex-1">
         {{template "flash" .}}
         {{- /* TemplContent slot — set by TemplateRenderer.RenderWithTempl to
               render a templ-generated body inside the base layout without
@@ -602,6 +620,12 @@
               instead. See issue #462. */ -}}
         {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
       </main>
+      {{- /* App-wide connect-bank slide-over. Rendered once here (not per
+            page) so every "Connect a bank" entry point across the app opens
+            the same drawer via $store.drawers.open('connect-bank'). Props
+            (provider availability + household members) are resolved at render
+            time by the connectDrawer resolver. */ -}}
+      {{if .ConnectBankDrawer}}{{renderComponent "ConnectBankDrawer" .ConnectBankDrawer}}{{end}}
     </div>
 
     <!-- Sidebar -->
@@ -682,6 +706,123 @@
       </div>
     </template>
   </div>
+
+  {{- /* Global prompt modal — preview / edit Markdown, mounted once and
+       opened from anywhere via a window event:
+         $dispatch('bb-prompt-modal', { mode, edit, title, subtitle, value, target, onSaved })
+       Logic lives in static/js/admin/components/prompt_modal.js. */ -}}
+  <dialog x-data="bbPromptModal" id="bb-prompt-modal" x-cloak
+          @bb-prompt-modal.window="open($event.detail)"
+          @keydown.enter.window="if (($event.metaKey || $event.ctrlKey) && $root.open && mode === 'editable') { $event.preventDefault(); primary(); }"
+          @keydown.c.window="if ($root.open && !$event.metaKey && !$event.ctrlKey && !$event.altKey && !['INPUT','TEXTAREA'].includes((document.activeElement || {}).tagName)) { $event.preventDefault(); copy(); }"
+          @keydown.escape.window="if ($root.open) { $event.preventDefault(); $event.stopPropagation(); requestClose(); }"
+          @cancel="$event.preventDefault()"
+          class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box relative transition-[max-width] duration-200" :class="expanded ? 'max-w-5xl' : 'max-w-2xl'">
+      {{- /* Discard-confirmation overlay (top-layer-safe; a z-index dialog
+           would render behind this native modal). Shown when dismissing with
+           unsaved edits. */ -}}
+      <div x-show="confirmingDiscard" x-cloak
+           class="absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] bg-base-100/85 backdrop-blur-sm p-6">
+        <div class="max-w-sm text-center">
+          <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-error/10">
+            {{ lucide "alert-triangle" "w-5 h-5 text-error" }}
+          </div>
+          <h3 class="text-base font-semibold mb-1">Discard changes?</h3>
+          <p class="text-sm text-base-content/60 mb-4">You have unsaved edits to this prompt. Closing will discard them.</p>
+          <div class="flex items-center justify-center gap-2">
+            <button type="button" class="btn btn-ghost btn-sm" @click="confirmingDiscard = false">Keep editing</button>
+            <button type="button" class="btn btn-error btn-sm" @click="close()">Discard</button>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="flex items-start gap-2 min-w-0">
+          {{ lucide "file-text" "w-5 h-5 mt-0.5 text-base-content/60 shrink-0" }}
+          <div class="min-w-0">
+            <h3 class="text-base font-semibold leading-tight truncate" x-text="title || 'Prompt'"></h3>
+            <p class="text-xs text-base-content/60 mt-0.5" x-show="subtitle" x-text="subtitle"></p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          {{- /* Desktop-only expand toggle — grows the modal to a larger size. */ -}}
+          <button type="button" class="btn btn-ghost btn-sm btn-square hidden sm:inline-flex"
+                  @click="expanded = !expanded"
+                  :aria-label="expanded ? 'Shrink' : 'Expand'"
+                  :data-tip="expanded ? 'Shrink' : 'Expand'">
+            <span x-show="!expanded">{{ lucide "maximize-2" "w-4 h-4" }}</span>
+            <span x-show="expanded" x-cloak>{{ lucide "minimize-2" "w-4 h-4" }}</span>
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Close" @click="requestClose()">
+            {{ lucide "x" "w-4 h-4" }}
+          </button>
+        </div>
+      </div>
+
+      {{- /* Editor */ -}}
+      <div x-show="view === 'edit'">
+        <textarea x-ref="editor" x-model="value"
+                  class="textarea textarea-bordered w-full text-sm font-mono leading-relaxed resize-none"
+                  :class="expanded ? 'h-[78vh]' : 'h-[55vh]'"
+                  placeholder="Write the prompt in Markdown…"></textarea>
+      </div>
+
+      {{- /* Preview (server-rendered into .bb-prose). In editable mode the
+           preview area is pinned to the editor's height so toggling
+           Edit↔Preview — and the brief render spinner — never changes the
+           modal height. Preview-only sizes to its content. */ -}}
+      <div x-show="view === 'preview'" :class="mode === 'editable' ? (expanded ? 'h-[78vh]' : 'h-[55vh]') : ''">
+        <div x-show="loading"
+             class="flex items-center gap-2 text-sm text-base-content/60 py-6"
+             :class="mode === 'editable' ? 'h-full justify-center' : ''">
+          <span class="loading loading-spinner loading-sm"></span>
+          Rendering…
+        </div>
+        <div x-show="!loading" x-ref="previewBody"
+             :class="mode === 'editable' ? 'h-full' : (expanded ? 'max-h-[82vh]' : 'max-h-[60vh]')"
+             class="bb-prose text-sm bg-base-200 border border-base-300 rounded-xl p-4 overflow-y-auto break-words"></div>
+      </div>
+
+      <div class="modal-action mt-4 justify-between">
+        {{- /* Bottom-left: single Edit⇄Preview toggle (editable only). The
+             label/icon reflects the target view. */ -}}
+        <div>
+          <template x-if="mode === 'editable'">
+            <button type="button" class="btn btn-soft btn-sm gap-1.5" @click="setView(view === 'edit' ? 'preview' : 'edit')">
+              <span x-show="view === 'edit'" class="inline-flex items-center gap-1.5">{{ lucide "eye" "w-4 h-4" }}Preview</span>
+              <span x-show="view === 'preview'" class="inline-flex items-center gap-1.5">{{ lucide "pencil" "w-4 h-4" }}Edit</span>
+            </button>
+          </template>
+        </div>
+        {{- /* Right: [dismiss] · copy · [save] — the dismiss button (Cancel
+             when editable, Close when preview-only) is always leftmost. */ -}}
+        <div class="flex items-center gap-2">
+          <template x-if="mode === 'editable'">
+            <button type="button" class="btn btn-ghost btn-sm" @click="requestClose()">Cancel</button>
+          </template>
+          <button type="button" class="btn btn-ghost btn-sm" x-show="mode === 'preview'" @click="requestClose()">Close</button>
+          <button type="button" class="btn btn-sm gap-2" :class="copied ? 'btn-success' : 'btn-soft'" @click="copy()">
+            <span x-show="!copied" class="inline-flex items-center gap-2">
+              {{ lucide "copy" "w-4 h-4" }}Copy
+              {{renderComponent "Kbd" "c"}}
+            </span>
+            <span x-show="copied" x-cloak class="inline-flex items-center gap-2">
+              {{ lucide "check" "w-4 h-4" }}Copied
+            </span>
+          </button>
+          <template x-if="mode === 'editable'">
+            <button type="button" class="btn btn-primary btn-sm gap-2" @click="primary()">
+              <span x-text="dirty ? saveLabel : 'Done'"></span>
+              {{renderComponent "KbdCombo" (strs "cmd" "enter")}}
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" @submit.prevent="requestClose()">
+      <button>close</button>
+    </form>
+  </dialog>
 
   <!-- Global toast (centered floating pill). Daisy `toast toast-center
        toast-bottom` gives us the centered-bottom placement + flex-col
@@ -889,81 +1030,124 @@
   <script src="/static/js/admin/components/dev_reporter.js"></script>
   {{end}}
 
-  <!-- Keyboard Shortcuts Help (?-key) — registry-driven.
-       Body is rendered from $store.shortcuts grouped by scope (Global vs Page)
-       and, within each scope, by the spec's `group` field. See seedRegistry()
-       below for the current bindings. -->
-  <div x-data="shortcutsHelp()" x-show="open" x-cloak
-       @open-shortcuts.window="openHelp()"
-       @keydown.window.escape="if (open) { closeHelp(); $event.stopPropagation(); }">
-    <div class="bb-shortcuts-backdrop" @click="closeHelp()"></div>
-    <div class="bb-shortcuts-dialog">
-      <div class="bb-shortcuts-header">
-        <span class="bb-shortcuts-title">Keyboard Shortcuts</span>
-        <button class="bb-shortcuts-close" @click="closeHelp()">
-          {{ lucide "x" "" }}
+  <!-- Global prompt modal factory (preview / edit Markdown). -->
+  <script src="/static/js/admin/components/prompt_modal.js"></script>
+
+  <!-- Keyboard Shortcuts Help (?-key) — registry-driven, rendered as a
+       right-side slide-over (the shared `drawers` store) rather than a centred
+       modal so it matches every other sheet in the app and leaves the page
+       visible behind it. Body is built from $store.shortcuts grouped by scope
+       (this-page vs everywhere) and, within each scope, by the spec's `group`
+       field. Sections are (re)built on open via the $watch in x-init below.
+       See seedRegistry() for the current bindings. -->
+  <div x-data="shortcutsHelp()" class="contents"
+       x-init="$watch('$store.drawers.active', function (id) { if (id === 'shortcuts') rebuild(); })">
+    <!-- scrim — z-[45] dims the sidebar too (matches components.Drawer) -->
+    <div
+      x-show="$store.drawers.is('shortcuts')"
+      x-cloak
+      x-transition:enter="transition-opacity ease-out duration-200"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition-opacity ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
+      class="fixed inset-0 bg-black/40 z-[45]"
+      @click="$store.drawers.close()"
+      aria-hidden="true"
+    ></div>
+    <!-- panel -->
+    <div
+      x-show="$store.drawers.is('shortcuts')"
+      x-cloak
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="translate-x-full"
+      x-transition:enter-end="translate-x-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="translate-x-0"
+      x-transition:leave-end="translate-x-full"
+      @keydown.escape.window="if ($store.drawers.is('shortcuts') && !document.querySelector('dialog[open]')) $store.drawers.close()"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+      class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 border-l border-base-300 shadow-xl flex flex-col"
+    >
+      <!-- header (mirrors components.DrawerHeader) -->
+      <div class="flex items-center justify-between gap-3 p-5 border-b border-base-300 shrink-0">
+        <div class="flex items-center gap-3 min-w-0">
+          {{ lucide "keyboard" "w-5 h-5 text-base-content/60 shrink-0" }}
+          <div class="font-semibold leading-tight">Keyboard shortcuts</div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-square" @click="$store.drawers.close()" aria-label="Close">
+          {{ lucide "x" "w-4 h-4" }}
         </button>
       </div>
-      <div class="bb-shortcuts-body">
-        <!-- Page section: shortcuts scoped to the current page. Rendered ABOVE
-             Global so the page-specific actions are the first thing users see.
-             Wrapped in a tinted card with an accent rail so it visually
-             separates from the (always-on) Global section below. Hidden when
-             the current scope is 'global' or no page-scoped shortcuts are
-             registered. -->
-        <template x-if="sections.page.length > 0">
-          <section class="bb-shortcuts-section bb-shortcuts-section--page">
-            <header class="bb-shortcuts-section-head">
-              <span class="bb-shortcuts-section-eyebrow">On this page</span>
-              <span class="bb-shortcuts-section-title" x-text="sections.pageLabel"></span>
-            </header>
-            <template x-for="group in sections.page" :key="'page-' + group.label">
-              <div class="bb-shortcuts-group">
-                <div class="bb-shortcuts-group-label" x-text="group.label"></div>
-                <template x-for="item in group.items" :key="'page-' + item.id">
-                  <div class="bb-shortcuts-row">
-                    <span class="bb-shortcuts-label" x-text="item.description"></span>
-                    <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
-                  </div>
-                </template>
+
+      <!-- body -->
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+        <!-- On this page — shown whenever a page declares a scope, so the user
+             always gets feedback (even an empty "nothing here yet"). Tinted
+             with a subtle info wash + a small dot so scoped bindings read as
+             distinct from the always-on set below. -->
+        <template x-if="sections.pageScoped">
+          <section>
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="inline-flex w-1.5 h-1.5 rounded-full bg-info shrink-0"></span>
+                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.07em] text-info shrink-0">On this page</span>
+                <span class="text-sm font-semibold text-base-content truncate" x-text="sections.pageLabel"></span>
               </div>
-            </template>
-          </section>
-        </template>
-        <!-- Global section: shortcuts available on every page. The header is
-             only shown when there's a page section above it — when only global
-             shortcuts exist, the header is redundant. -->
-        <template x-if="sections.global.length > 0">
-          <section class="bb-shortcuts-section bb-shortcuts-section--global">
-            <template x-if="sections.page.length > 0">
-              <header class="bb-shortcuts-section-head">
-                <span class="bb-shortcuts-section-eyebrow">Global</span>
-                <span class="bb-shortcuts-section-title">Available everywhere</span>
-              </header>
-            </template>
-            <template x-for="group in sections.global" :key="'global-' + group.label">
-              <div class="bb-shortcuts-group">
-                <div class="bb-shortcuts-group-label" x-text="group.label"></div>
-                <template x-for="item in group.items" :key="item.id">
-                  <div class="bb-shortcuts-row">
-                    <span class="bb-shortcuts-label" x-text="item.description"></span>
-                    <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
-                  </div>
-                </template>
-              </div>
-            </template>
-          </section>
-        </template>
-        <template x-if="sections.global.length === 0 && sections.page.length === 0">
-          <div class="bb-shortcuts-group">
-            <div class="bb-shortcuts-row">
-              <span class="bb-shortcuts-label" style="opacity:0.6;">No shortcuts registered.</span>
+              <span class="badge badge-soft badge-info badge-sm shrink-0" x-show="sections.pageCount > 0" x-text="sections.pageCount"></span>
             </div>
-          </div>
+            <div class="rounded-xl border border-info/20 px-3.5 py-1" style="background: oklch(from var(--color-info) l c h / 0.05);">
+              <template x-if="sections.page.length === 0">
+                <div class="py-2.5 text-sm text-base-content/45">No shortcuts unique to this page.</div>
+              </template>
+              <template x-for="(group, gi) in sections.page" :key="'page-' + group.label">
+                <div class="py-2.5" :class="gi > 0 ? 'border-t border-info/15' : ''">
+                  <div class="text-[0.6rem] font-semibold uppercase tracking-[0.06em] text-base-content/40 mb-1.5" x-text="group.label"></div>
+                  <template x-for="item in group.items" :key="'page-' + item.id">
+                    <div class="flex items-center justify-between gap-3 py-1">
+                      <span class="text-sm text-base-content/75" x-text="item.description"></span>
+                      <span class="flex items-center gap-1.5 shrink-0" x-html="renderTokens(item.tokens)"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </section>
+        </template>
+
+        <!-- Everywhere — the always-on global set. The eyebrow only appears when
+             a page section sits above it (otherwise it's the only thing here and
+             the label is redundant). -->
+        <template x-if="sections.global.length > 0">
+          <section :class="sections.pageScoped ? 'mt-6' : ''">
+            <div class="flex items-center gap-2 mb-1" x-show="sections.pageScoped">
+              <span class="text-[0.65rem] font-semibold uppercase tracking-[0.07em] text-base-content/40">Everywhere</span>
+            </div>
+            <template x-for="(group, gi) in sections.global" :key="'global-' + group.label">
+              <div class="py-2.5" :class="gi > 0 ? 'border-t border-base-300/60' : ''">
+                <div class="text-[0.6rem] font-semibold uppercase tracking-[0.06em] text-base-content/40 mb-1.5" x-text="group.label"></div>
+                <template x-for="item in group.items" :key="item.id">
+                  <div class="flex items-center justify-between gap-3 py-1">
+                    <span class="text-sm text-base-content/75" x-text="item.description"></span>
+                    <span class="flex items-center gap-1.5 shrink-0" x-html="renderTokens(item.tokens)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </section>
+        </template>
+
+        <template x-if="sections.global.length === 0 && !sections.pageScoped">
+          <div class="py-2 text-sm text-base-content/45">No shortcuts registered.</div>
         </template>
       </div>
-      <div class="bb-shortcuts-footer">
-        Press {{renderComponent "Kbd" "?"}} anytime to toggle this panel
+
+      <!-- footer hint (mirrors components.DrawerFooter chrome, info copy) -->
+      <div class="px-5 py-3 border-t border-base-300 shrink-0 text-center text-[0.7rem] text-base-content/40">
+        Press {{renderComponent "Kbd" "?"}} to toggle · {{renderComponent "Kbd" "esc"}} to close
       </div>
     </div>
   </div>
@@ -2479,18 +2663,24 @@
       }
 
       // Build the section data structure consumed by the template.
-      // Returns { global: [{label, items: [{id, description, tokens}]}, ...],
-      //           page:   [...], pageLabel: '...' } where `page` excludes
-      // entries whose scope is 'global'. When the current scope is 'global'
-      // or there are no page-scoped shortcuts, `page` is empty and the
-      // template hides the whole page section.
+      // Returns:
+      //   { global:    [{label, items: [{id, description, tokens}]}, ...],
+      //     page:      [...],            // empty when no page-scoped shortcuts
+      //     pageLabel: 'Transactions',   // display name for the current scope
+      //     pageScoped: true,            // current scope is a page (not global)
+      //     pageCount:  3 }              // total visible page-scoped shortcuts
+      // `page` excludes entries whose scope is 'global'. `pageScoped` drives
+      // whether the "On this page" section renders at all — when true but
+      // `page` is empty, the section still shows with an empty-state line so
+      // the user gets feedback rather than a silently-missing section.
       function buildSections() {
         var store = (window.Alpine && Alpine.store('shortcuts')) || null;
-        var empty = { global: [], page: [], pageLabel: 'This page' };
+        var empty = { global: [], page: [], pageLabel: 'This page', pageScoped: false, pageCount: 0 };
         if (!store) return empty;
         var scope = store.currentScope || 'global';
         var all = store.forScope(scope) || [];
         var byScope = { global: {}, page: {} };
+        var pageCount = 0;
 
         all.forEach(function(spec) {
           if (!spec || spec.visible === false) return;
@@ -2502,6 +2692,7 @@
             description: spec.description || spec.id,
             tokens: toTokens(spec.keys)
           });
+          if (bucket === 'page') pageCount++;
         });
 
         function flatten(buckets) {
@@ -2513,34 +2704,22 @@
         return {
           global: flatten(byScope.global),
           page: flatten(byScope.page),
-          pageLabel: scopeLabel(scope)
+          pageLabel: scopeLabel(scope),
+          pageScoped: scope !== 'global',
+          pageCount: pageCount
         };
       }
 
       return {
-        open: false,
-        sections: { global: [], page: [], pageLabel: 'This page' },
+        sections: { global: [], page: [], pageLabel: 'This page', pageScoped: false, pageCount: 0 },
         renderTokens: renderTokens,
-        openHelp: function() {
-          // Rebuild on open so newly registered shortcuts (late-init pages,
-          // dynamic scope changes) surface immediately.
+        // Rebuild the section data — called by the x-init $watch whenever the
+        // shortcuts drawer is opened, so newly registered shortcuts (late-init
+        // pages, dynamic scope changes) surface immediately. Visibility +
+        // scroll-lock + Escape are owned by the shared `drawers` store and the
+        // drawer markup; this factory only supplies the rendered content.
+        rebuild: function() {
           this.sections = buildSections();
-          this.open = true;
-          // Freeze the body so trackpad rubber-band on the page behind doesn't
-          // bleed through the dialog (visible at the top/bottom of the dialog
-          // scroll on macOS).
-          if (window.bbLockScroll) window.bbLockScroll();
-          setTimeout(function() {
-            var dialog = document.querySelector('.bb-shortcuts-dialog');
-            if (dialog && typeof lucide !== 'undefined') {
-              lucide.createIcons({ nodes: [dialog] });
-            }
-          }, 50);
-        },
-        closeHelp: function() {
-          if (!this.open) return;
-          this.open = false;
-          if (window.bbUnlockScroll) window.bbUnlockScroll();
         }
       };
     }
@@ -2823,13 +3002,18 @@
       }
 
       function isOverlayOpen() {
-        // Check if command palette or shortcuts help is open.
+        // Command palette open?
         var cmdkEl = document.querySelector('[x-data="commandPalette()"]');
-        var shortcutsEl = document.querySelector('[x-data="shortcutsHelp()"]');
         if (cmdkEl && cmdkEl.style.display !== 'none' && cmdkEl.__x && cmdkEl.__x.$data && cmdkEl.__x.$data.open) return true;
-        if (shortcutsEl && shortcutsEl.style.display !== 'none' && shortcutsEl.__x && shortcutsEl.__x.$data && shortcutsEl.__x.$data.open) return true;
-        // Also check by visibility of backdrop.
-        var backdrops = document.querySelectorAll('.bb-cmdk-backdrop, .bb-shortcuts-backdrop');
+        // Any slide-over drawer (incl. the keyboard-shortcuts help, now a
+        // drawer) is modal — suppress page/global single-key shortcuts behind
+        // it. The drawer owns its own Escape-to-close, so this just stops a
+        // stray `j`/`g`/etc. from acting on the page underneath.
+        var drawers = window.Alpine && Alpine.store('drawers');
+        if (drawers && drawers.active) return true;
+        // Also check by visibility of the cmdk backdrop (covers the brief
+        // window before Alpine state settles).
+        var backdrops = document.querySelectorAll('.bb-cmdk-backdrop');
         for (var i = 0; i < backdrops.length; i++) {
           if (backdrops[i].offsetParent !== null) return true;
         }
@@ -2856,10 +3040,12 @@
         reg.register({
           id: 'global.help',
           keys: '?',
-          description: 'Show keyboard shortcuts',
+          description: 'Toggle keyboard shortcuts',
           group: 'Actions',
           scope: 'global',
-          action: function() { window.dispatchEvent(new CustomEvent('open-shortcuts')); }
+          action: function() {
+            if (window.Alpine && Alpine.store('drawers')) Alpine.store('drawers').open('shortcuts');
+          }
         });
 
         reg.register({
@@ -3031,6 +3217,18 @@
         // dispatcher is modifier-free.
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (isInputFocused()) return;
+
+        // `?` toggles the shortcuts drawer: when it's already the active
+        // overlay, a second `?` closes it (the open path is the normal
+        // dispatch below). Handled before the isOverlayOpen() gate, which
+        // would otherwise swallow the keystroke while the drawer is open.
+        var drawersStore = window.Alpine && Alpine.store('drawers');
+        if (e.key === '?' && drawersStore && drawersStore.active === 'shortcuts') {
+          e.preventDefault();
+          drawersStore.close();
+          return;
+        }
+
         if (isOverlayOpen()) return;
 
         var reg = (window.Alpine && Alpine.store('shortcuts')) || null;

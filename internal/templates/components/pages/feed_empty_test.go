@@ -36,7 +36,9 @@ func TestFeedEmptyStateVariants(t *testing.T) {
 			mustContain: []string{
 				"Welcome to Breadbox",
 				"Connect your first bank to start filling your feed.",
-				`href="/connections/new"`,
+				// The CTA now opens the app-wide connect-bank drawer in place
+				// rather than navigating to the standalone /connections/new page.
+				`$store.drawers.open('connect-bank')`,
 				"btn-primary",
 			},
 			mustOmit: []string{

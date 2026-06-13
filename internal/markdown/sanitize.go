@@ -53,7 +53,7 @@ func buildPolicy() *bluemonday.Policy {
 	p.AllowElements("button")
 	p.AllowAttrs("type", "aria-label", "data-bb-copy").OnElements("button")
 	p.AllowAttrs("data-lucide", "aria-hidden").OnElements("i")
-	p.AllowAttrs("aria-hidden", "tabindex").OnElements("a")
+	p.AllowAttrs("aria-label", "aria-hidden", "tabindex").OnElements("a")
 
 	return p
 }

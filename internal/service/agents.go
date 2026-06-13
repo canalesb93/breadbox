@@ -1003,11 +1003,14 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 }
 
 // WorkflowRunStatusCounts returns a status→count map across preset-backed
-// workflow runs (source_template IS NOT NULL), optionally narrowed to one
-// workflow. Powers the count badges on the Workflows → Runs status tabs.
-// Same hand-rolled SQL pattern as ListAllAgentRuns.
+// workflow runs, optionally narrowed to one workflow. Powers the count
+// badges on the Workflows → Runs status tabs. Every definition is a
+// workflow now (preset-instantiated AND custom/hand-authored), so this
+// counts them all — the page is the single runs surface and must not
+// hide custom-workflow runs. Same hand-rolled SQL pattern as
+// ListAllAgentRuns.
 func (s *Service) WorkflowRunStatusCounts(ctx context.Context, workflowSlugOrID string) (map[string]int, error) {
-	where := []string{"d.source_template IS NOT NULL"}
+	where := []string{}
 	args := []any{}
 	if workflowSlugOrID != "" {
 		def, err := s.resolveAgentDefinition(ctx, workflowSlugOrID)
@@ -1020,8 +1023,11 @@ func (s *Service) WorkflowRunStatusCounts(ctx context.Context, workflowSlugOrID 
 		args = append(args, def.ID)
 	}
 	query := "SELECT r.status, COUNT(*) FROM workflow_runs r " +
-		"JOIN workflows d ON d.id = r.agent_definition_id WHERE " +
-		strings.Join(where, " AND ") + " GROUP BY r.status"
+		"JOIN workflows d ON d.id = r.agent_definition_id"
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " GROUP BY r.status"
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("workflow run status counts: %w", err)

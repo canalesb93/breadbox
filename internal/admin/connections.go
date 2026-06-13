@@ -476,6 +476,42 @@ func renderConnectionNew(
 	tr.RenderWithTempl(w, r, data, pages.ConnectionNew(props))
 }
 
+// newConnectDrawerResolver builds the render-time resolver for the app-wide
+// connect-bank drawer (rendered once globally in layout/base.html). It runs
+// on every authenticated full-page render, so it stays cheap: a few in-memory
+// provider-map lookups plus the small, indexed ListUsers query the wizard's
+// member-select needs. Unauthenticated requests (no session account) return
+// ok=false so the drawer is skipped — base.html only renders it in the
+// authenticated main-layout shell anyway.
+func newConnectDrawerResolver(a *app.App, sm *scs.SessionManager) func(*http.Request) (pages.ConnectionNewProps, bool) {
+	return func(r *http.Request) (pages.ConnectionNewProps, bool) {
+		if sm == nil || sm.GetString(r.Context(), sessionKeyAccountID) == "" {
+			return pages.ConnectionNewProps{}, false
+		}
+		props := pages.ConnectionNewProps{
+			CSRFToken:    GetCSRFToken(r),
+			HasPlaid:     a.Providers["plaid"] != nil,
+			HasTeller:    a.Providers["teller"] != nil,
+			HasSimpleFin: a.Providers["simplefin"] != nil,
+			TellerEnv:    a.Config.TellerEnv,
+		}
+		users, err := a.Queries.ListUsers(r.Context())
+		if err != nil {
+			// Non-fatal: render the drawer without the member list rather than
+			// failing the whole page. The wizard still works for a single-member
+			// household (the common case) and degrades gracefully otherwise.
+			a.Logger.Error("connect-bank drawer: list users", "error", err)
+		}
+		for _, u := range users {
+			props.Users = append(props.Users, pages.ConnectionNewUser{
+				ID:   pgconv.FormatUUID(u.ID),
+				Name: u.Name,
+			})
+		}
+		return props, true
+	}
+}
+
 // linkTokenRequest is the JSON body for POST /admin/api/link-token.
 type linkTokenRequest struct {
 	UserID   string `json:"user_id"`

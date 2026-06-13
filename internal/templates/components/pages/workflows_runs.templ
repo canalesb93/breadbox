@@ -41,18 +41,21 @@ templ WorkflowRuns(p WorkflowRunsProps) {
 // preserves the workflow filter); the workflow select is a GET form so
 // it works without JS and preserves the active status.
 templ workflowRunsFilters(p WorkflowRunsProps) {
-	<div class="flex flex-wrap items-center justify-between gap-3">
-		@components.TabBar(components.TabBarProps{
-			Variant:   "box",
-			AriaLabel: "Filter runs by status",
-			Items: []components.TabBarItem{
-				{Label: "All", Href: workflowRunsHref("", p.WorkflowSlug), Active: p.StatusFilter == "", Count: workflowCountPtr(p.Counts.All)},
-				{Label: "Success", Href: workflowRunsHref("success", p.WorkflowSlug), Active: p.StatusFilter == "success", Count: workflowCountPtr(p.Counts.Success)},
-				{Label: "Error", Href: workflowRunsHref("error", p.WorkflowSlug), Active: p.StatusFilter == "error", Count: workflowCountPtr(p.Counts.Error)},
-				{Label: "In progress", Href: workflowRunsHref("in_progress", p.WorkflowSlug), Active: p.StatusFilter == "in_progress", Count: workflowCountPtr(p.Counts.InProgress)},
-				{Label: "Skipped", Href: workflowRunsHref("skipped", p.WorkflowSlug), Active: p.StatusFilter == "skipped", Count: workflowCountPtr(p.Counts.Skipped)},
-			},
-		})
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+		<div class="overflow-x-auto">
+			@components.TabBar(components.TabBarProps{
+				Variant:    "box",
+				AriaLabel:  "Filter runs by status",
+				Scrollable: true,
+				Items: []components.TabBarItem{
+					{Label: "All", Href: workflowRunsHref("", p.WorkflowSlug), Active: p.StatusFilter == "", Count: workflowCountPtr(p.Counts.All)},
+					{Label: "Success", Href: workflowRunsHref("success", p.WorkflowSlug), Active: p.StatusFilter == "success", Count: workflowCountPtr(p.Counts.Success)},
+					{Label: "Error", Href: workflowRunsHref("error", p.WorkflowSlug), Active: p.StatusFilter == "error", Count: workflowCountPtr(p.Counts.Error)},
+					{Label: "In progress", Href: workflowRunsHref("in_progress", p.WorkflowSlug), Active: p.StatusFilter == "in_progress", Count: workflowCountPtr(p.Counts.InProgress)},
+					{Label: "Skipped", Href: workflowRunsHref("skipped", p.WorkflowSlug), Active: p.StatusFilter == "skipped", Count: workflowCountPtr(p.Counts.Skipped)},
+				},
+			})
+		</div>
 		if len(p.Options) > 0 {
 			<form method="GET" action="/workflows/runs" class="shrink-0">
 				<input type="hidden" name="status" value={ p.StatusFilter }/>
@@ -87,7 +90,7 @@ templ workflowRunsFilters(p WorkflowRunsProps) {
 templ workflowRunActions(slug, shortID string, ready bool) {
 	@components.OverflowMenu(components.OverflowMenuProps{
 		AriaLabel: "Run " + shortID + " actions",
-		Size:      "xs",
+		Size:      "sm",
 		Items: []components.OverflowMenuItem{
 			{
 				Label:     "Re-run workflow",

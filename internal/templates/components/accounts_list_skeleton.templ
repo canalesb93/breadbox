@@ -2,13 +2,14 @@ package components
 
 // AccountsListSkeleton renders a placeholder mirroring the layout of the
 // /accounts page — the three-stat summary card (Net Worth / Assets /
-// Liabilities) plus the sortable account table. Sized to match the
-// real component so a swap-in (current or future) doesn't shift layout.
+// Liabilities) plus a couple of connection groups (a quiet label line over a
+// card of account list-rows). Sized to match the real component so a swap-in
+// (current or future) doesn't shift layout.
 //
 // /accounts is a full-SSR page today; this primitive is exposed in
-// /design#loading so it's ready for the eventual AJAX/paginated swap
-// and discoverable to anyone wiring loading states for adjacent
-// account-centric panels.
+// /design#loading so it's ready for the eventual AJAX/paginated swap and
+// discoverable to anyone wiring loading states for adjacent account-centric
+// panels.
 //
 // Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
 // hand-rolled `bb-skeleton*` family is being retired).
@@ -25,71 +26,41 @@ templ AccountsListSkeleton() {
 				}
 			</div>
 		</div>
-		<!-- Filter search input -->
-		<div class="skeleton h-10 w-full sm:max-w-sm rounded-xl mb-4"></div>
-		<!-- Accounts table -->
-		<div class="bb-card overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="table table-sm">
-					<thead class="text-xs text-base-content/60">
-						<tr>
-							<th class="min-w-[12rem]"><div class="skeleton h-3 w-16"></div></th>
-							<th class="hidden md:table-cell"><div class="skeleton h-3 w-20"></div></th>
-							<th class="hidden lg:table-cell"><div class="skeleton h-3 w-12"></div></th>
-							<th class="hidden lg:table-cell"><div class="skeleton h-3 w-14"></div></th>
-							<th class="text-right"><div class="skeleton h-3 w-16 ml-auto"></div></th>
-							<th class="w-8"></th>
-						</tr>
-					</thead>
-					<tbody>
-						for i := 0; i < 6; i++ {
-							@accountsListSkeletonRow()
-						}
-					</tbody>
-				</table>
-			</div>
+		<!-- Connection groups: a label line over a card of account rows -->
+		<div class="flex flex-col gap-5">
+			@accountsListSkeletonGroup(2)
+			@accountsListSkeletonGroup(1)
 		</div>
 	</div>
 }
 
-// accountsListSkeletonRow mirrors one accountsListRow: icon tile + name/meta
-// stack, optional desktop-only institution/type/owner cells, right-aligned
-// balance, overflow-menu slot. Widths line up with real-row content so the
-// swap-in doesn't shift the page.
-templ accountsListSkeletonRow() {
-	<tr>
-		<!-- Account name + icon -->
-		<td>
-			<div class="flex items-center gap-3">
-				<div class="skeleton w-8 h-8 rounded-md shrink-0"></div>
-				<div class="min-w-0 space-y-1.5">
-					<div class="skeleton h-3 w-32"></div>
-					<div class="skeleton h-2.5 w-20 md:hidden"></div>
-				</div>
-			</div>
-		</td>
-		<!-- Institution (md+) -->
-		<td class="hidden md:table-cell">
-			<div class="skeleton h-3 w-28"></div>
-		</td>
-		<!-- Type (lg+) -->
-		<td class="hidden lg:table-cell">
-			<div class="skeleton h-3 w-16"></div>
-		</td>
-		<!-- Owner (lg+) -->
-		<td class="hidden lg:table-cell">
-			<div class="flex items-center gap-1.5">
-				<div class="skeleton w-5 h-5 rounded-full shrink-0"></div>
-				<div class="skeleton h-3 w-14"></div>
-			</div>
-		</td>
-		<!-- Balance -->
-		<td class="text-right">
+// accountsListSkeletonGroup mirrors one connection group — the quiet header
+// line (institution · count … subtotal) and `rows` account list-rows.
+templ accountsListSkeletonGroup(rows int) {
+	<div class="flex flex-col gap-2">
+		<div class="flex items-center gap-2 px-1">
+			<div class="skeleton h-3 w-24"></div>
+			<div class="skeleton h-2.5 w-14"></div>
 			<div class="skeleton h-3.5 w-20 ml-auto"></div>
-		</td>
-		<!-- Overflow menu slot -->
-		<td class="text-right">
-			<div class="skeleton h-6 w-6 ml-auto"></div>
-		</td>
-	</tr>
+		</div>
+		<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+			for i := 0; i < rows; i++ {
+				@accountsListSkeletonRow()
+			}
+		</ul>
+	</div>
+}
+
+// accountsListSkeletonRow mirrors one accountsListRow: type tile + name/meta
+// stack, right-aligned balance, overflow-menu slot.
+templ accountsListSkeletonRow() {
+	<li class="list-row items-center">
+		<div class="skeleton w-9 h-9 rounded-lg shrink-0"></div>
+		<div class="min-w-0 space-y-1.5">
+			<div class="skeleton h-3 w-32"></div>
+			<div class="skeleton h-2.5 w-20"></div>
+		</div>
+		<div class="skeleton h-3.5 w-20 ml-auto self-center"></div>
+		<div class="skeleton h-6 w-6 self-center"></div>
+	</li>
 }

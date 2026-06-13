@@ -48,6 +48,21 @@ templ userMenuItems(p SidebarUserMenuProps, logoutFormID string) {
 			</a>
 		</li>
 	}
+	<!-- Keyboard shortcuts — desktop only (no physical keyboard on touch, and
+	     the drawer's bindings can't be triggered there). Toggles the same
+	     shortcuts drawer the `?` key opens; the trailing Kbd advertises it. The
+	     row hides on touch via $store.device + a `sm:` CSS fallback, mirroring
+	     the Kbd component's own two-layer guard. -->
+	<li class="hidden sm:block" x-data x-show="!$store.device.isTouch" x-cloak>
+		<button
+			type="button"
+			@click="$store.drawers.open('shortcuts'); $el.closest('[popover]')?.hidePopover()"
+		>
+			@LucideIcon("keyboard", "w-3.5 h-3.5")
+			<span class="flex-1">Keyboard shortcuts</span>
+			@Kbd("?")
+		</button>
+	</li>
 	<hr class="border-base-300 my-1 mx-2"/>
 	@privacyControlRow()
 	<hr class="border-base-300 my-1 mx-2"/>

@@ -1,0 +1,104 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// design_prompt_preview.templ — the global prompt modal (preview / edit
+// Markdown), lifted into the sandbox so we can iterate on it in isolation.
+//
+// The modal itself is a singleton mounted once in layout/base.html and opened
+// from anywhere via a window event:
+//
+//	$dispatch('bb-prompt-modal', { mode, edit, title, subtitle, value, target, onSaved })
+//
+// It has two modes:
+//   - preview  : read-only render of the given Markdown + Copy + Close.
+//   - editable : an Edit/Preview toggle, with ⌘/Ctrl+Enter (or Save) writing
+//     the buffer back into the originating field. Doubles as a "compose this
+//     prompt" surface — some entry points open straight into the editor.
+//
+// These examples just dispatch the open event with different configs; the
+// dialog lives in base.html (present in the standalone ?embed=1 view too).
+templ SectionPromptPreview() {
+	<div class="flex flex-col gap-6" x-data>
+		// The sample Markdown the demos feed the modal. Hidden; read via $refs.
+		<textarea x-ref="sample" class="hidden" aria-hidden="true">{ designPromptPreviewSample() }</textarea>
+		@designExample(
+			"Preview-only",
+			"Read-only mode — feed it Markdown, it renders into .bb-prose with a Copy button and nothing else. This is what the Workflows \"Workflow prompt\" button shows today.",
+		) {
+			<button
+				type="button"
+				class="btn btn-primary btn-sm gap-1.5"
+				@click="$dispatch('bb-prompt-modal', { mode: 'preview', title: 'Bulk Catch-Up', subtitle: 'The built-in base prompt this workflow runs with.', value: $refs.sample.value })"
+			>
+				@components.LucideIcon("file-text", "w-4 h-4")
+				Workflow prompt
+			</button>
+		}
+		@designExample(
+			"Edit / Preview — opens in the editor",
+			"Editable mode opened straight into the editor (the modal-as-input case). Toggle to Preview to render your edits server-side; ⌘/Ctrl+Enter or Save writes the text back into the field below and closes. Esc / Cancel discards. The custom-workflow prompt field is the primary consumer — a button like this replaces the inline textarea.",
+		) {
+			<div class="flex flex-col gap-3 max-w-md">
+				<button
+					type="button"
+					class="btn btn-primary btn-sm gap-1.5 self-start"
+					@click="$dispatch('bb-prompt-modal', { mode: 'editable', edit: true, title: 'Custom workflow prompt', subtitle: 'Markdown — runs verbatim on every run.', target: $refs.promptField })"
+				>
+					@components.LucideIcon("pencil", "w-4 h-4")
+					Edit prompt
+				</button>
+				<label class="text-xs font-medium text-base-content/50" for="ds-prompt-field">Prompt field (Save writes here)</label>
+				<textarea
+					id="ds-prompt-field"
+					x-ref="promptField"
+					rows="4"
+					class="textarea textarea-bordered w-full text-sm font-mono"
+					placeholder="Empty — open the editor and Save to fill this."
+				></textarea>
+			</div>
+		}
+		@designExample(
+			"Edit / Preview — opens in preview",
+			"Same editable modal, but opened on the Preview view first (prefilled from the field). Use this when the prompt usually already exists and editing is the exception. The Edit/Preview toggle and Save behave identically.",
+		) {
+			<div class="flex flex-col gap-3 max-w-md">
+				<button
+					type="button"
+					class="btn btn-outline btn-sm gap-1.5 self-start"
+					@click="$dispatch('bb-prompt-modal', { mode: 'editable', edit: false, title: 'Review prompt', subtitle: 'Preview first; switch to Edit to change it.', target: $refs.prefilledField })"
+				>
+					@components.LucideIcon("eye", "w-4 h-4")
+					View / edit prompt
+				</button>
+				<label class="text-xs font-medium text-base-content/50" for="ds-prefilled-field">Prefilled prompt field</label>
+				<textarea
+					id="ds-prefilled-field"
+					x-ref="prefilledField"
+					rows="4"
+					class="textarea textarea-bordered w-full text-sm font-mono"
+				>{ designPromptPreviewSample() }</textarea>
+			</div>
+		}
+	</div>
+}
+
+// designPromptPreviewSample is a representative composed workflow prompt —
+// headings, a callout, an ordered plan, and a fenced query — so the modal
+// shows the full range of .bb-prose rendering it has to handle in practice.
+func designPromptPreviewSample() string {
+	return "You are catching up a **large backlog** of transactions awaiting review — typically hundreds to thousands tagged `needs-review`. This is the high-volume, one-pass version of the routine review: the same decisions, far more of them, optimized for throughput.\n\n" +
+		"## Objective\n\n" +
+		"Shrink the `needs-review` queue as much as possible in one pass. Confidently categorize the clear-cut transactions and clear their `needs-review` tag; leave only the genuinely ambiguous ones tagged for a human.\n\n" +
+		"## Step by step\n\n" +
+		"1. Read `breadbox://overview` for context (accounts, users, currency).\n" +
+		"2. `count_transactions{tags:[\"needs-review\"]}` to size the backlog up front.\n" +
+		"3. Work in batches. `query_transactions` the largest raw-category groups together.\n" +
+		"4. For each transaction, decide the category from its name, merchant, amount, and raw category fields.\n" +
+		"5. Apply decisions in large compound writes — `update_transactions` (max 50 per call).\n\n" +
+		"> [!IMPORTANT]\n" +
+		"> When you are **not** confident, SKIP — leave the `needs-review` tag in place. Never guess just to clear the queue.\n\n" +
+		"### Example query\n\n" +
+		"```sql\nSELECT merchant_name, COUNT(*) AS n\nFROM transactions\nWHERE 'needs-review' = ANY(tags)\nGROUP BY merchant_name\nORDER BY n DESC;\n```\n\n" +
+		"Finish with a one-paragraph summary: how many you categorized, how many you skipped, and the merchants worth a human's attention."
+}

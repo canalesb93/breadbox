@@ -37,13 +37,14 @@ type TabBarItem struct {
 }
 
 type TabBarProps struct {
-	Items     []TabBarItem
-	Variant   string // "border" (default) | "box"
-	AriaLabel string // required
+	Items      []TabBarItem
+	Variant    string // "border" (default) | "box"
+	AriaLabel  string // required
+	Scrollable bool   // prevent tab wrapping; add flex-nowrap so caller can wrap in overflow-x-auto
 }
 
 templ TabBar(p TabBarProps) {
-	<div role="tablist" class={ "tabs", tabBarVariantClass(p.Variant) } aria-label={ p.AriaLabel }>
+	<div role="tablist" class={ "tabs", tabBarVariantClass(p.Variant), templ.KV("flex-nowrap", p.Scrollable) } aria-label={ p.AriaLabel }>
 		for _, it := range p.Items {
 			<a
 				role="tab"

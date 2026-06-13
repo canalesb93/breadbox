@@ -56,14 +56,18 @@ templ Toast() {
 				x-transition:leave-end="opacity-0 translate-y-2"
 				class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2 pointer-events-auto max-w-[calc(100vw-2rem)]"
 			>
-				<template x-if="t.type === 'success'">@LucideIcon("check", "w-4 h-4 text-success shrink-0")
-</template>
-				<template x-if="t.type === 'error'">@LucideIcon("x-circle", "w-4 h-4 text-error shrink-0")
-</template>
-				<template x-if="t.type === 'warning'">@LucideIcon("alert-triangle", "w-4 h-4 text-warning shrink-0")
-</template>
-				<template x-if="t.type === 'info'">@LucideIcon("info", "w-4 h-4 text-info shrink-0")
-</template>
+				<template x-if="t.type === 'success'">
+					@LucideIcon("check", "w-4 h-4 text-success shrink-0")
+				</template>
+				<template x-if="t.type === 'error'">
+					@LucideIcon("x-circle", "w-4 h-4 text-error shrink-0")
+				</template>
+				<template x-if="t.type === 'warning'">
+					@LucideIcon("alert-triangle", "w-4 h-4 text-warning shrink-0")
+				</template>
+				<template x-if="t.type === 'info'">
+					@LucideIcon("info", "w-4 h-4 text-info shrink-0")
+				</template>
 				<span class="text-sm font-medium" x-text="t.message"></span>
 				<button
 					type="button"
