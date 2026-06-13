@@ -587,6 +587,36 @@ func TestQueryTransactionRulesShape(t *testing.T) {
 	}
 }
 
+// TestMerchantSummaryShape pins the merchant_summary tool: a merchants array of
+// per-merchant aggregates plus a totals block. seedFixtures creates two
+// "Whole Foods" rows, so a window covering them yields a merchant with count 2.
+func TestMerchantSummaryShape(t *testing.T) {
+	f := seedFixtures(t)
+
+	res, _, err := f.svc.handleMerchantSummary(f.ctx, nil, merchantSummaryInput{
+		StartDate: "2026-04-01",
+		EndDate:   "2026-05-01",
+	})
+	out := decodeToolResult[map[string]any](t, "merchant_summary", res, err)
+	requireKeys(t, "merchant_summary", out, "merchants", "totals")
+	merchants := asArray(t, "merchant_summary.merchants", out["merchants"])
+	if len(merchants) == 0 {
+		t.Fatal("expected at least one merchant in window")
+	}
+	row := asObject(t, "merchant_summary.merchants[0]", merchants[0])
+	requireKeys(t, "merchant_summary.merchants[0]", row,
+		"merchant", "transaction_count", "total_amount", "avg_amount", "first_date", "last_date")
+
+	// min_count=3 excludes the count-2 Whole Foods merchant → empty result.
+	resHi, _, errHi := f.svc.handleMerchantSummary(f.ctx, nil, merchantSummaryInput{
+		StartDate: "2026-04-01", EndDate: "2026-05-01", MinCount: 3,
+	})
+	outHi := decodeToolResult[map[string]any](t, "merchant_summary(min_count=3)", resHi, errHi)
+	if got := asArray(t, "merchant_summary(min_count=3).merchants", outHi["merchants"]); len(got) != 0 {
+		t.Errorf("min_count=3: expected no merchants, got %d", len(got))
+	}
+}
+
 // TestPreviewRuleResponseShape pins `sample_matches` (not `sample`) + sample
 // row fields (transaction_id, not id).
 func TestPreviewRuleResponseShape(t *testing.T) {

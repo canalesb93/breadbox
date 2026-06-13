@@ -440,6 +440,10 @@ func (s *MCPServer) buildToolRegistry() {
 			Name: "transaction_summary", Title: "Spending Summary", Classification: ToolRead,
 			Description: "Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
 		}, s.handleTransactionSummary, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "merchant_summary", Title: "Merchant Summary", Classification: ToolRead,
+			Description: "Aggregate spend per MERCHANT over a window (default last 90 days) — the merchant-grouped companion to transaction_summary, which groups by category/time but not merchant. Each row: merchant, transaction_count, total_amount, avg_amount, first_date, last_date. Amounts follow the convention positive = money out (debit), negative = money in (credit); never summed across currencies. Use min_count=2 to surface recurring merchants, min_count=3+ for subscriptions; spending_only=true to exclude credits/refunds in a spending report; first_date to spot newly-appearing merchants. Filter by category_slug, account_id, user_id, amount range, or search (fuzzy-tolerant for bank-feed name variants). Capped at 500 merchants.",
+		}, s.handleMerchantSummary, s),
 
 		// --- Apply review decisions ---
 		// update_transactions is the universal write for review work. It

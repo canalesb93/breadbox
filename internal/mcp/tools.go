@@ -311,6 +311,56 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 	return jsonResult(result)
 }
 
+type merchantSummaryInput struct {
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 90 days ago."`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to tomorrow."`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug before aggregating (parent slug includes children)"`
+	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count for a merchant to appear (default 1). Use 2 to surface recurring charges, 3+ for subscriptions."`
+	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only count money-out (positive) amounts; exclude credits/refunds. Use for spending reports."`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount (positive=debit, negative=credit)"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search merchant names (min 2 chars). Comma-separated values are ORed."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy (typo-tolerant — good for bank-feed name variants)"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants whose name matches this text (min 2 chars)"`
+}
+
+// handleMerchantSummary aggregates spend per merchant over a window. Backs the
+// same GetMerchantSummary the REST /transactions/merchants endpoint uses.
+func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input merchantSummaryInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	params := service.MerchantSummaryParams{
+		AccountID:     optStr(input.AccountID),
+		UserID:        optStr(input.UserID),
+		CategorySlug:  optStr(input.CategorySlug),
+		MinCount:      input.MinCount,
+		MinAmount:     input.MinAmount,
+		MaxAmount:     input.MaxAmount,
+		Search:        optStr(input.Search),
+		ExcludeSearch: optStr(input.ExcludeSearch),
+	}
+
+	var err error
+	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.SpendingOnly != nil && *input.SpendingOnly {
+		params.SpendingOnly = true
+	}
+
+	result, err := s.svc.GetMerchantSummary(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(result)
+}
+
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
@@ -839,7 +889,7 @@ func shortIDPrefix(key string) (string, bool) {
 // avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream and
 // collapses each object's own id/short_id pair:
 //
-//   {"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
+//	{"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
 //
 // Only the bare "short_id" key triggers the rewrite; the "short_id" key is
 // then dropped. If the sibling "id" field is missing or "short_id" is null,
@@ -1134,4 +1184,3 @@ func scanJSONString(data []byte, pos int) (string, int) {
 	}
 	return s, end
 }
-

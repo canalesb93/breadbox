@@ -70,16 +70,19 @@ Aggregated spending totals. Default date range: 30 days.
 
 ### merchant_summary (Read)
 
-Merchant-level statistics. Default date range: 90 days.
+Aggregate spend per **merchant** over a window (default last 90 days) — the merchant-grouped companion to `transaction_summary` (which groups by category/time, not merchant). Each row: `merchant`, `transaction_count`, `total_amount`, `avg_amount`, `first_date`, `last_date`, `iso_currency_code`. Amounts follow the convention positive = money out (debit); never summed across currencies. Capped at 500 merchants.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `min_count` | int | Minimum transaction count (use 2 for recurring, 3 for subscriptions) |
-| `spending_only` | bool | Exclude credits/refunds |
-| `search` | string | Search merchant names |
-| `exclude_search` | string | Exclude matching merchants |
-
-Plus same date/account/user filters as `transaction_summary`.
+| `start_date` / `end_date` | string | Window (YYYY-MM-DD). Defaults: 90 days ago → tomorrow |
+| `min_count` | int | Minimum transaction count (use 2 for recurring, 3+ for subscriptions) |
+| `spending_only` | bool | Only money-out amounts; exclude credits/refunds |
+| `category_slug` | string | Filter by category before aggregating (parent includes children) |
+| `account_id` / `user_id` | string | Filter by account or household member |
+| `min_amount` / `max_amount` | float | Amount range (positive=debit, negative=credit) |
+| `search` | string | Search merchant names (min 2 chars). Comma-separated values ORed |
+| `search_mode` | string | `contains` (default) \| `words` \| `fuzzy` |
+| `exclude_search` | string | Exclude merchants matching this text |
 
 ---
 

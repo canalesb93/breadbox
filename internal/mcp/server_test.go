@@ -132,6 +132,7 @@ func TestToolRegistryScopeContract(t *testing.T) {
 		"query_transactions",
 		"count_transactions",
 		"transaction_summary",
+		"merchant_summary",
 		"list_annotations",
 		"preview_rule",
 		"find_matching_rules",
