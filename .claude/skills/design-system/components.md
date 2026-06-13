@@ -225,6 +225,11 @@ CollapsibleSectionProps{
   with `x-show="!open"` surfaces only when collapsed (the "active filter hidden
   here" cue). Nest the component inside an ancestor `x-data` to let the
   indicator read reactive state (e.g. the Tags section reads `selectedSlugs`).
+- The header is a real `<button>` with a comfortable `py-3` touch target and
+  full interaction states (per the *Interaction states* principle in
+  [`SKILL.md`](SKILL.md)): `hover:bg-base-200/60` with `transition-colors`,
+  `cursor-pointer`, and a keyboard `focus-visible:ring-2 focus-visible:ring-primary/40`
+  ring. The chevron rotates smoothly (`transition-transform duration-200`).
 - Backs the `/transactions` filter drawer's When / Where / What / Tags / Search
   sections: each defaults open when it holds an active filter (computed in
   `TransactionsProps.*SectionOpen`) and collapses with a count/dot indicator

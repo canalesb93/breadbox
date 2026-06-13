@@ -37,7 +37,7 @@ this skill and the running app as a bug in one of them — reconcile, don't igno
 
 ---
 
-## The seven principles
+## The eight principles
 
 The DNA. Each is a small, reusable decision; together they're why our best
 surfaces feel calm.
@@ -70,6 +70,20 @@ surfaces feel calm.
 
 7. **Identity via avatar.** People and workflows get a stable DiceBear avatar
    (`UserAvatar`). Any feed of "who did this" reads the same on every surface.
+
+8. **Every interactive element has interaction states.** Anything clickable — a
+   button, a row that toggles, a custom control, a card that acts as a link —
+   must show a visible **hover** state *and* a **focus-visible** state for
+   keyboard users. Hover is a subtle background/opacity shift, never a jarring
+   one; pair it with `transition-colors` so it eases, and `cursor-pointer` so
+   the affordance reads. Keyboard focus gets a ring — the project idiom is
+   `focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40` (use
+   `focus-visible:`, not `:focus`, so the ring only shows for keyboard nav). The
+   mechanics: `hover:bg-base-200/60` (or `hover:bg-base-content/5` on darker
+   rows), `transition-colors`, `cursor-pointer`, the focus-visible ring. **Don't
+   re-roll press feedback for `.btn`** — `input.css` already ships the Nova
+   `:active` translate; a real daisy button is covered. This rule is app-wide:
+   a control with no hover and no focus state is a bug, not a style choice.
 
 ---
 
