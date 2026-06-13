@@ -74,12 +74,13 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 		if len(p.Accounts) > 0 {
 			@connDetailAccounts(p)
 		} else {
-			<div class="bb-card mb-6">
-				<div class="flex flex-col items-center justify-center py-12 text-base-content/30">
-					@components.LucideIcon("wallet", "w-10 h-10 mb-3 opacity-50")
-					<p class="text-sm">No accounts found for this connection</p>
-					<p class="text-xs mt-1">Accounts will appear after the first sync</p>
-				</div>
+			<div class="mb-6">
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:    "wallet",
+					Title:   "No accounts yet — they appear after the first sync",
+					Compact: true,
+					InCard:  true,
+				})
 			</div>
 		}
 		<!-- Sync History -->
