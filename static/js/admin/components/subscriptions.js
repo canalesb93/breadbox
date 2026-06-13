@@ -92,6 +92,22 @@
           return (el.dataset.search || '').indexOf(this.filter.toLowerCase()) !== -1;
         },
 
+        // Whether a status group still has a visible row under the active
+        // member / type / search filters. Drives the group wrapper's x-show so
+        // a status header never dangles over an empty card. Reads the three
+        // filter properties so Alpine re-evaluates when any of them change; the
+        // DOM scan is over the group's static rows.
+        groupVisible: function (el) {
+          var rows = el.querySelectorAll('[data-series-card]');
+          for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            var userOk = this.filterUser === 'all' || this.filterUser === r.dataset.filterUser;
+            var typeOk = this.filterType === 'all' || this.filterType === r.dataset.type;
+            if (userOk && typeOk && this.matches(r)) return true;
+          }
+          return false;
+        },
+
         submitVerdict: function (seriesId, seriesName, verdict) {
           var label = {
             confirm: 'Confirmed',

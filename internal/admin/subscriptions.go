@@ -729,6 +729,9 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 	if s.LastAmount != nil {
 		row.HasAmount = true
 		row.Amount = math.Abs(*s.LastAmount)
+		// Monthly-equivalent contribution — drives the ledger group's monthly
+		// subtotal (single-currency only; never summed across currencies).
+		row.MonthlyEquiv = monthlyEquivalent(s.Cadence, row.Amount)
 	}
 	if s.CategoryID != nil {
 		row.CategoryName = catName[*s.CategoryID]

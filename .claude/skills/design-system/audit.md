@@ -70,8 +70,12 @@ name · one body line · value · overflow), grouped where there's a natural axi
   (group by pipeline stage; the enabled toggle is the leading status
   control, no separate tile; action summary the one body line, hits +
   last-hit the right metadata). Sandbox: `/design/c/rules-list`.
-- `pages/subscriptions_list.templ:276` — recurring charges. Group by status
-  (active/paused); status tile + name + cadence line + amount.
+- ~~`pages/subscriptions_list.templ:276`~~ — **DONE.** Recurring charges
+  migrated to grouped list-rows (group by status: Active → Paused → Ended;
+  leading status tile, name + type/renewal/price chips, cadence·next-renewal
+  body line, amount, overflow menu; Active header carries a single-currency
+  monthly subtotal). Grouping pinned by `GroupSubscriptionsByStatus` +
+  `subscriptions_list_test.go`. Sandbox: `/design/c/recurring-ledger`.
 - `pages/account_link_detail.templ:36` — matched txn pairs. Already carries a
   mobile card fallback → unify to one list-row layout (confidence as the tile).
 > These overlap with the goal-3 surface loop (e.g. `/rules`, `/subscriptions`).
