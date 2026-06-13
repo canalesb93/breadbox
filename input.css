@@ -449,6 +449,31 @@
     border-color: var(--color-base-300);
   }
 
+  /* ── List-row keyboard focus ──
+   * The redesigned list surfaces (/reports, /rules, /recurring,
+   * /accounts, /tags, /categories, /connections, /household, agent-run
+   * rows) wrap each row's whole-row link in an `<a class="contents">`.
+   * `display:contents` produces no box, so `:focus-visible` on the
+   * anchor has nothing to paint — keyboard users tabbing through rows
+   * got no visible focus indicator (the `hover:bg-base-200/40` mouse
+   * state already worked). Promote the keyboard-focus ring onto the
+   * `.list-row` <li> itself.
+   *   - `:has(> a.contents:focus-visible)` scopes it to rows whose
+   *     DIRECT child row-link is focused. An inner control (the
+   *     overflow kebab) is NOT a `> a.contents`, so focusing the kebab
+   *     keeps its own focus ring and never double-rings the whole row.
+   *   - `:focus-visible` keeps it keyboard-only — a mouse click on the
+   *     row doesn't trigger the ring.
+   *   - Inset `box-shadow` (not outline) so the ring never shifts
+   *     layout, never overlaps the hairline divider, and never clips
+   *     against the bb-card's rounded first/last-row corners.
+   *   `--color-primary` at 0.4 alpha matches the app's `ring-primary/40`
+   *   focus idiom (principle #8 / StatTile, CollapsibleSection). */
+  .list-row:has(> a.contents:focus-visible) {
+    box-shadow: inset 0 0 0 2px oklch(from var(--color-primary) l c h / 0.4);
+    border-radius: inherit;
+  }
+
   /* ── Form card primitives ── */
   /* Icon-header: colored tile + title + optional subtitle.
      Used at the top of sectioned form cards (bb-card p-0 overflow-hidden). */
