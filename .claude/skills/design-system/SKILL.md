@@ -149,6 +149,44 @@ one component.
 
 ---
 
+## Format palette — the list-row is the default, not the only format
+
+The list-row earns its place as the default for *entity lists*, but a great
+surface uses the format that fits its content. **Be bold:** a **table**, a
+**card grid**, or a **timeline** is the right call when the content calls for it.
+What makes them feel like one product is the shared **family treatment**, not a
+single layout — don't force everything into list-rows.
+
+Pick by content:
+
+- **list-row** — entity lists (accounts, rules, reports, members, tags…). The
+  default. Status tile · title + one body line · value · overflow.
+- **table** — dense, sortable, **multi-numeric-column matrices** where columns
+  must align across rows (Backups files, CSV preview, a sample-matches grid).
+  Don't list-row these.
+- **card / card grid** — heterogeneous or **visual** items that need a richer
+  preview (the Workflows gallery, onboarding step cards, the recurring
+  candidate cards with detection evidence).
+- **stat tiles** — summary numbers that lead a page (`StatTileRow`).
+- **timeline** — chronological activity (the activity timeline, run transcript).
+
+The **family treatment** is what unifies every format — whatever the layout, it
+wears the same skin so it reads as one product:
+
+- the `bb-card` surface (flat border + dark-mode lift) and **hairline dividers** —
+  never heavy shadows or boxed sub-headers;
+- the color-coded **status tile / `IconTile`** for state — not a parallel text badge;
+- **vivid-only badges** (`info`/`success`/`warning`/`error`; `ghost` for a quiet neutral);
+- quiet **uppercase `text-xs text-base-content/50`** section + column labels;
+- **`tabular-nums`** for money/metrics, `Amount` for currency, privacy marking;
+- generous, honest spacing, and principle #8 **hover + focus-visible** on every
+  interactive element.
+
+A table that wears these reads as the same family as a list-row. The "family
+table" + "family card" specifics live in [`components.md`](components.md).
+
+---
+
 ## The redesign method — IA first, not a re-skin
 
 When asked to bring a surface up to the design system, **do not** just swap
