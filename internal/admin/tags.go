@@ -41,6 +41,7 @@ func TagsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 				Description:      t.Description,
 				Color:            t.Color,
 				Icon:             t.Icon,
+				Lifecycle:        t.Lifecycle,
 				TransactionCount: count,
 			})
 		}
