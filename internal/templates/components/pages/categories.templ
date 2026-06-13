@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
 
@@ -16,6 +15,15 @@ import (
 // This is a purely configuration-focused page: no period selector, no
 // spending totals, no per-category amounts. Users manage the two-level
 // taxonomy here; spending analytics live on the Insights page.
+//
+// IA (Workflows-DNA surface language): one bb-card of list-rows per
+// top-level category — the parent as the emphasized lead row, its
+// subcategories as indented rows beneath. Each row leads with the
+// category's own color/icon tile (the bb-tx-avatar data-color mechanism),
+// names the category as the title, carries a muted descriptor (subcategory
+// count for parents · slug for children), and ends with an OverflowMenu
+// (edit/delete) rendered OUTSIDE the row link. The whole row links to the
+// category's edit page.
 //
 // The categoriesPage Alpine factory + j/k/Enter/Space/e/n keyboard
 // shortcuts live in static/js/admin/components/categories.js. Loaded
@@ -46,14 +54,12 @@ templ Categories(p CategoriesProps) {
 		})
 		if len(p.Categories) > 0 {
 			<div class="text-xs text-base-content/40 px-1">
-				{ fmt.Sprintf("%d top-level categories", len(p.Categories)) }
+				{ categoriesTopLevelLabel(len(p.Categories)) }
 			</div>
-			<div class="bb-card overflow-hidden">
-				<div class="divide-y divide-base-300/40">
-					for _, parent := range p.Categories {
-						@categoryRow(parent)
-					}
-				</div>
+			<div class="flex flex-col gap-3">
+				for _, g := range BuildCategoryGroups(p.Categories) {
+					@categoryGroup(g)
+				}
 			</div>
 		} else {
 			@categoriesEmpty()
@@ -73,155 +79,115 @@ templ Categories(p CategoriesProps) {
 	</script>
 }
 
-// categoryRow renders one top-level category with its expandable child list.
-templ categoryRow(c service.CategoryResponse) {
-	<div data-search={ categorySearchIndex(c) } x-show="matches($el)">
-		<div
-			role="button"
-			tabindex="0"
-			data-category-row
-			data-category-level="primary"
-			data-category-id={ c.ID }
-			data-category-slug={ c.Slug }
-			class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 hover:bg-base-200/30 transition-colors duration-150 cursor-pointer select-none"
-			@click={ fmt.Sprintf("toggle('%s')", c.ID) }
+// categoryGroup renders one top-level category and its subcategories as a
+// single card of list-rows. The wrapper carries the combined data-search
+// index so the Alpine filter can hide a whole group when neither the parent
+// nor any child matches.
+templ categoryGroup(g CategoryGroup) {
+	<div data-search={ g.Parent.Search } x-show="matches($el)">
+		@components.AgentRunRowList() {
+			@categoryRow(g.Parent)
+			for _, ch := range g.Children {
+				@categoryRow(ch)
+			}
+		}
+	</div>
+}
+
+// categoryRow renders one category — parent or child — as a daisy list-row.
+// Child rows indent so the hierarchy reads at a glance; the leading tile,
+// title, descriptor, badges, and trailing overflow menu are otherwise the
+// same shape for both levels.
+templ categoryRow(r CategoryRowVM) {
+	<li
+		class={ "list-row transition-colors hover:bg-base-200/40 items-center",
+			templ.KV("pl-12 sm:pl-14", r.IsChild) }
+		data-category-row
+		data-category-level={ categoryRowLevel(r) }
+		data-category-id={ r.ID }
+		data-category-slug={ r.Slug }
+		data-search={ r.Search }
+		x-show="matches($el)"
+	>
+		<a
+			class="contents no-underline focus:outline-none"
+			href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", r.ID)) }
 		>
-			@categoryIconTile(c, false)
-			<div class="flex items-center gap-2 min-w-0 flex-1">
-				<i
-					data-lucide="chevron-right"
-					class="w-3.5 h-3.5 text-base-content opacity-30 transition-transform duration-200 shrink-0"
-					:class={ fmt.Sprintf("isOpen('%s') ? 'rotate-90' : ''", c.ID) }
-				></i>
-				<span class={ "font-semibold text-sm truncate", templ.KV("text-base-content/40", c.IsSystem), templ.KV("text-base-content/40 italic", c.Hidden && !c.IsSystem) }>
-					{ c.DisplayName }
-				</span>
-				if len(c.Children) > 0 {
-					<span class="text-[0.65rem] font-medium px-1.5 py-0.5 rounded-full bg-base-200/60 text-base-content/40 shrink-0">
-						{ strconv.Itoa(len(c.Children)) }
-					</span>
-				}
-				if c.IsSystem {
-					<span class="badge badge-ghost badge-xs">System</span>
-				}
-				if c.Hidden {
-					<span class="badge badge-ghost badge-xs">Hidden</span>
-				}
-			</div>
-			<div class="flex items-center justify-end shrink-0" @click.stop>
-				@categoryRowActions(c, false)
-			</div>
-		</div>
-		if len(c.Children) > 0 {
-			<div x-show={ fmt.Sprintf("isOpen('%s')", c.ID) } x-cloak x-collapse>
-				<div class="border-t border-base-300/30 bg-base-200/20">
-					for _, child := range c.Children {
-						@categoryChildRow(child)
+			@categoryColorTile(r)
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class={ categoryNameClass(r) }>{ r.DisplayName }</span>
+					if !r.IsChild && r.ChildCount > 0 {
+						<span class="badge badge-ghost badge-xs shrink-0">{ strconv.Itoa(r.ChildCount) }</span>
+					}
+					if r.IsSystem {
+						<span class="badge badge-ghost badge-xs shrink-0">System</span>
+					}
+					if r.Hidden {
+						<span class="badge badge-soft badge-warning badge-xs shrink-0">Hidden</span>
 					}
 				</div>
+				<div class="mt-0.5 text-xs text-base-content/45 truncate">{ categoryRowDescriptor(r) }</div>
 			</div>
-		} else {
-			<div x-show={ fmt.Sprintf("expanded['%s']", c.ID) } x-cloak x-collapse>
-				<div class="border-t border-base-300/30 bg-base-200/20 py-3 pl-14 sm:pl-20 pr-5">
-					<p class="text-sm text-base-content/30 italic">No subcategories</p>
-				</div>
-			</div>
-		}
-	</div>
+		</a>
+		<div class="shrink-0 self-center">
+			@categoryRowActions(r)
+		</div>
+	</li>
 }
 
-// categoryChildRow renders one subcategory beneath its parent.
-templ categoryChildRow(c service.CategoryResponse) {
-	<div
-		data-search={ categoryChildSearchIndex(c) }
-		data-category-row
-		data-category-level="sub"
-		data-category-id={ c.ID }
-		data-category-slug={ c.Slug }
-		x-show="matches($el)"
-		class="group flex items-center gap-3 sm:gap-4 pl-10 sm:pl-14 pr-4 sm:pr-5 py-2.5 hover:bg-base-200/30 transition-colors duration-150"
-	>
-		@categoryIconTile(c, true)
-		<div class="flex items-center gap-2 min-w-0 flex-1">
-			<span class={ "text-sm truncate", templ.KV("text-base-content/40 italic", c.Hidden) }>
-				{ c.DisplayName }
-			</span>
-			if c.Hidden {
-				<span class="badge badge-ghost badge-xs">Hidden</span>
+// categoryColorTile renders the leading identity tile using the category's
+// own color + icon, via the shared bb-tx-avatar data-color mechanism
+// (`--avatar-color` drives a color-mix background + the glyph tint, with
+// per-theme tuning handled by the CSS). Colorless categories fall back to
+// the neutral `bb-tx-avatar--uncategorized` tile with a tag glyph. Child
+// rows use the smaller `--sm` variant.
+templ categoryColorTile(r CategoryRowVM) {
+	if r.Color != "" || r.Icon != "" {
+		<div class={ categoryTileClass(r.IsChild) } style={ categoryTileColorStyle(r.Color) }>
+			if r.Icon != "" {
+				@components.LucideIcon(r.Icon, categoryTileIconClass(r.IsChild))
+			} else {
+				@components.LucideIcon("folder", categoryTileIconClass(r.IsChild))
 			}
 		</div>
-		<div class="flex items-center justify-end shrink-0" @click.stop>
-			@categoryRowActions(c, true)
-		</div>
-	</div>
-}
-
-// categoryIconTile renders the colored square icon tile at the start of
-// each row. Parent rows use the larger 9–10 geometry; child rows use 7–8.
-templ categoryIconTile(c service.CategoryResponse, child bool) {
-	if child {
-		<div class="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg shrink-0" style={ categoryTileBg(c.Color, true) }>
-			@categoryTileInner(c, true)
-		</div>
 	} else {
-		<div class="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl shrink-0" style={ categoryTileBg(c.Color, false) }>
-			@categoryTileInner(c, false)
+		<div class={ categoryTileClass(r.IsChild) + " bb-tx-avatar--uncategorized" }>
+			@components.LucideIcon("tag", categoryTileIconClass(r.IsChild))
 		</div>
-	}
-}
-
-templ categoryTileInner(c service.CategoryResponse, child bool) {
-	if c.Icon != nil && *c.Icon != "" {
-		if child {
-			@components.LucideIconWithStyle(*c.Icon, "w-3.5 h-3.5", categoryIconColor(c.Color))
-		} else {
-			@components.LucideIconWithStyle(*c.Icon, "w-5 h-5", categoryIconColor(c.Color))
-		}
-	} else if c.Color != nil && *c.Color != "" {
-		if child {
-			<span class="w-2 h-2 rounded-full" style={ fmt.Sprintf("background-color: %s", *c.Color) }></span>
-		} else {
-			<span class="w-3 h-3 rounded-full" style={ fmt.Sprintf("background-color: %s", *c.Color) }></span>
-		}
-	} else {
-		if child {
-			<span class="w-2 h-2 rounded-full bg-base-content/20"></span>
-		} else {
-			@components.LucideIcon("tag", "w-5 h-5 text-primary opacity-60")
-		}
 	}
 }
 
 // categoryRowActions emits the trailing edit/delete controls as a single
 // always-visible kebab menu so actions are reachable on every viewport
-// (mouse, touch, keyboard). Matches the pattern used on /tags (PR #728).
-templ categoryRowActions(c service.CategoryResponse, child bool) {
+// (mouse, touch, keyboard), rendered outside the row's navigation anchor so
+// the menu button isn't swallowed by the row link.
+templ categoryRowActions(r CategoryRowVM) {
 	@components.OverflowMenu(components.OverflowMenuProps{
-		AriaLabel: fmt.Sprintf("Category %s actions", c.DisplayName),
-		Size:      "xs",
-		Items:     categoryRowItems(c),
+		AriaLabel: fmt.Sprintf("Category %s actions", r.DisplayName),
+		Size:      "sm",
+		Items:     categoryRowItems(r),
 	})
 }
 
 // categoryRowItems builds the Edit (+ optional Delete) items for one
-// category row. System categories omit Delete entirely (same as the
-// inline version we replaced).
-func categoryRowItems(c service.CategoryResponse) []components.OverflowMenuItem {
+// category row. System categories omit Delete entirely.
+func categoryRowItems(r CategoryRowVM) []components.OverflowMenuItem {
 	items := []components.OverflowMenuItem{
 		{
 			Label:     "Edit",
 			Icon:      "pencil",
-			Href:      templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)),
-			AriaLabel: fmt.Sprintf("Edit category %s", c.DisplayName),
+			Href:      templ.SafeURL(fmt.Sprintf("/categories/%s/edit", r.ID)),
+			AriaLabel: fmt.Sprintf("Edit category %s", r.DisplayName),
 		},
 	}
-	if !c.IsSystem {
+	if !r.IsSystem {
 		items = append(items, components.OverflowMenuItem{
 			Label:       "Delete",
 			Icon:        "trash-2",
-			OnClick:     fmt.Sprintf("$dispatch('delete-category', {id: '%s', name: '%s'})", jsEscape(c.ID), jsEscape(c.DisplayName)),
+			OnClick:     fmt.Sprintf("$dispatch('delete-category', {id: '%s', name: '%s'})", jsEscape(r.ID), jsEscape(r.DisplayName)),
 			Destructive: true,
-			AriaLabel:   fmt.Sprintf("Delete category %s", c.DisplayName),
+			AriaLabel:   fmt.Sprintf("Delete category %s", r.DisplayName),
 		})
 	}
 	return items
@@ -283,27 +249,56 @@ templ deleteCategoryModal() {
 	</dialog>
 }
 
-// categoryTileBg returns a background-color style string for the icon tile.
-// When a category has a color it's used at ~12% alpha; otherwise a neutral
-// default matches the old html/template rendering.
-func categoryTileBg(color *string, child bool) string {
-	if color != nil && *color != "" {
-		if child {
-			return fmt.Sprintf("background-color: %s12", *color)
-		}
-		return fmt.Sprintf("background-color: %s18", *color)
+// categoryRowLevel returns the data-category-level value the keyboard
+// navigation in categories.js reads ("primary" / "sub").
+func categoryRowLevel(r CategoryRowVM) string {
+	if r.IsChild {
+		return "sub"
 	}
-	if child {
-		return ""
-	}
-	return "background-color: oklch(48% 0.17 265 / 0.08)"
+	return "primary"
 }
 
-// categoryIconColor returns a text-color style string for a colored icon,
-// or empty when the category has no color set.
-func categoryIconColor(color *string) string {
-	if color == nil || *color == "" {
+// categoryNameClass styles the row title: parents read heavier than
+// children; system + hidden categories dim (hidden also italic) so the
+// taxonomy's inactive corners recede.
+func categoryNameClass(r CategoryRowVM) string {
+	weight := "font-medium"
+	if !r.IsChild {
+		weight = "font-semibold"
+	}
+	tone := "text-base-content"
+	switch {
+	case r.IsSystem:
+		tone = "text-base-content/55"
+	case r.Hidden:
+		tone = "text-base-content/55 italic"
+	}
+	return "truncate text-sm " + weight + " " + tone
+}
+
+// categoryTileClass returns the bb-tx-avatar tile class; child rows use the
+// smaller --sm variant.
+func categoryTileClass(child bool) string {
+	if child {
+		return "bb-tx-avatar bb-tx-avatar--sm"
+	}
+	return "bb-tx-avatar"
+}
+
+// categoryTileIconClass sizes the glyph inside the tile to match the tile.
+func categoryTileIconClass(child bool) string {
+	if child {
+		return "w-3.5 h-3.5"
+	}
+	return "w-4 h-4"
+}
+
+// categoryTileColorStyle binds the category's color to the bb-tx-avatar
+// `--avatar-color` custom property (empty when the category has no color, so
+// the CSS fallback applies).
+func categoryTileColorStyle(color string) string {
+	if color == "" {
 		return ""
 	}
-	return fmt.Sprintf("color: %s", *color)
+	return "--avatar-color: " + color
 }
