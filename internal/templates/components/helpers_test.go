@@ -358,7 +358,7 @@ func TestSyncBadge(t *testing.T) {
 	}{
 		{"success", `<span class="badge badge-soft badge-success badge-sm">success</span>`},
 		{"error", `<span class="badge badge-soft badge-error badge-sm">error</span>`},
-		{"in_progress", `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`},
+		{"in_progress", `<span class="inline-flex items-center gap-1.5 text-sm text-base-content/60"><span class="loading loading-spinner loading-xs"></span>In progress</span>`},
 		{"", `<span class="badge badge-ghost badge-sm"></span>`},
 		{"unknown", `<span class="badge badge-ghost badge-sm">unknown</span>`},
 		{"<script>", `<span class="badge badge-ghost badge-sm">&lt;script&gt;</span>`},
