@@ -127,7 +127,7 @@ templ notificationChannelRow(c NotificationChannelView, csrf string) {
 // (error) when the last send failed, otherwise Enabled (success).
 templ notificationChannelStatusBadge(c NotificationChannelView) {
 	if !c.Enabled {
-		<span class="badge badge-soft badge-neutral badge-sm">Disabled</span>
+		<span class="badge badge-ghost badge-sm">Disabled</span>
 	} else if c.HasStatus && !c.StatusOK {
 		<span class="badge badge-soft badge-error badge-sm">Delivery failed</span>
 	} else {
