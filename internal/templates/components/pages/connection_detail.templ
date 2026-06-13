@@ -500,10 +500,11 @@ templ connDetailSyncHistory(p ConnectionDetailProps) {
 				}
 			</div>
 			<div id="sync-history-empty" class={ "px-4 sm:px-5 pb-4", templ.KV("hidden", len(p.SyncLogs) > 0) }>
-				<div class="flex flex-col items-center justify-center py-10 text-base-content/30">
-					@components.LucideIcon("refresh-cw", "w-10 h-10 mb-3 opacity-50")
-					<p class="text-sm">No sync history yet</p>
-				</div>
+				@components.EmptyState(components.EmptyStateProps{
+					Icon:    "history",
+					Title:   "No sync history yet",
+					Compact: true,
+				})
 			</div>
 		</div>
 		<!-- /sync-history-content -->
