@@ -7,9 +7,11 @@
 // j/k/Enter/Space/e/n to the registered handlers when the page scope is
 // 'categories' (set by the sibling x-init scope-setter div in templ).
 //
-// The list is always fully expanded now (no accordion — the page IS the
-// disclosure): each top-level category and its subcategories render as
-// list-rows in a card, and every row links to the category's edit page.
+// Top-level categories that own subcategories are collapsible disclosure
+// rows (default collapsed). The group's `expanded` flag lives on the group
+// wrapper's x-data; subcategory rows show when `expanded || filtering`, so a
+// search still surfaces matching children inside a collapsed group. Childless
+// parents and subcategory rows remain plain edit links.
 //
 // Keyboard registrations and the document-level click listener live at
 // module scope under one alpine:init — they're global by design and
@@ -44,6 +46,12 @@
       return {
         // --- Filter state (used by inline x-show on groups + rows) ---
         filter: '',
+
+        // True while a filter is typed. Subcategory rows read this so a
+        // search reveals matching children even inside a collapsed group.
+        get filtering() {
+          return this.filter.trim() !== '';
+        },
 
         // --- Keyboard navigation state ---
         focusedIdx: -1,
@@ -98,9 +106,15 @@
           return null;
         },
 
-        // Activate the focused row: open the category's edit page. Every
-        // row (parent or child) links there, so Enter mirrors a click.
+        // Activate the focused row by triggering its primary control, so
+        // Enter mirrors a click: an expandable parent toggles its
+        // subcategories (button.contents), a leaf/child opens its edit page
+        // (a.contents). Falls back to editRow() if neither is present.
         activateRow: function () {
+          var row = this.currentRow();
+          if (!row) return;
+          var ctrl = row.querySelector('a.contents, button.contents');
+          if (ctrl) { ctrl.click(); return; }
           this.editRow();
         },
 
