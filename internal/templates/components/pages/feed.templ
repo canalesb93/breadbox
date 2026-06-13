@@ -49,6 +49,13 @@ templ feedActiveFilterBanner(p FeedProps) {
 }
 
 // ── Hero band ─────────────────────────────────────────────────────────────
+//
+// The summary strip is the canonical StatTileRow: three plain StatTiles
+// (events / new transactions / unread reports) plus a sync tile. The sync
+// tile stays bespoke because it carries two affordances StatTile doesn't
+// model — a status-toned icon tile that doubles as the health indicator,
+// and a second "next sync" sub-line — but it mirrors StatTile's
+// icon-tile-left geometry exactly so the row reads as one uniform strip.
 templ feedHero(p FeedProps) {
 	<header class="mb-6">
 		@components.PageHeader(components.PageHeaderProps{
@@ -56,50 +63,61 @@ templ feedHero(p FeedProps) {
 			Subtitle: "Everything that happened in your breadbox · " + p.Hero.Generated,
 			Action:   connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect bank"),
 		})
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-			@feedHeroTile("activity", "Events today", fmt.Sprintf("%d", p.Hero.EventsToday), feedHeroSubEvents(p))
-			@feedHeroTile("download-cloud", "New transactions", fmt.Sprintf("%d", p.Hero.NewTransactionsToday), "synced today")
+		@components.StatTileRow() {
+			@components.StatTile(components.StatTileProps{
+				Icon:        "activity",
+				Label:       "Events today",
+				Value:       fmt.Sprintf("%d", p.Hero.EventsToday),
+				Description: feedHeroSubEvents(p),
+			})
+			@components.StatTile(components.StatTileProps{
+				Icon:        "download-cloud",
+				Label:       "New transactions",
+				Value:       fmt.Sprintf("%d", p.Hero.NewTransactionsToday),
+				Description: "synced today",
+			})
 			@feedHeroSyncTile(p)
-			@feedHeroTile("file-text", "Unread reports", fmt.Sprintf("%d", p.Hero.UnreadReports), feedHeroSubReports(p))
-		</div>
+			@components.StatTile(components.StatTileProps{
+				Icon:        "file-text",
+				Label:       "Unread reports",
+				Value:       fmt.Sprintf("%d", p.Hero.UnreadReports),
+				Description: feedHeroSubReports(p),
+				Tone:        feedUnreadReportsTone(p.Hero.UnreadReports),
+			})
+		}
 	</header>
 }
 
-templ feedHeroTile(icon, label, value, sub string) {
-	<div class="bb-card p-4">
-		<div class="flex items-center gap-2">
-			@components.LucideIcon(icon, "w-3.5 h-3.5 text-base-content opacity-40")
-			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">{ label }</div>
-		</div>
-		<div class="text-2xl font-bold tabular-nums tracking-tight mt-1.5">{ value }</div>
-		if sub != "" {
-			<div class="text-[0.65rem] text-base-content/45 mt-1">{ sub }</div>
-		}
-	</div>
-}
-
+// feedHeroSyncTile mirrors components.StatTile's icon-tile-left geometry so
+// it sits flush in the StatTileRow, but stays bespoke: the icon tile is
+// status-toned (carrying the health signal a plain StatTile can't), and a
+// second muted "Next sync" line points users at the upcoming cron fire.
 templ feedHeroSyncTile(p FeedProps) {
-	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline group block" aria-label="Last sync — view sync logs">
-		<div class="flex items-center gap-2">
-			@components.LucideIcon("refresh-cw", "w-3.5 h-3.5 text-base-content opacity-40")
-			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Last sync</div>
-			<span class={ "ml-auto inline-block w-1.5 h-1.5 rounded-full", feedSyncDotClass(p.Hero.LastSyncStatus) } aria-hidden="true"></span>
-		</div>
-		if p.Hero.LastSyncRel != "" {
-			<div class="text-xl sm:text-2xl font-bold tabular-nums tracking-tight mt-1.5">{ p.Hero.LastSyncRel }</div>
-			<div class="text-[0.65rem] text-base-content/45 mt-1 truncate">
-				{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }
+	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="Last sync — view sync logs">
+		<div class="flex items-center gap-2.5 sm:gap-3">
+			<div class={ "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0", feedSyncTileBg(p.Hero.LastSyncStatus) }>
+				@components.LucideIcon("refresh-cw", "w-4 h-4 "+feedSyncTileText(p.Hero.LastSyncStatus))
 			</div>
-			if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
-				<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate flex items-center gap-1">
-					@components.LucideIcon("clock", "w-3 h-3 shrink-0")
-					<span>Next sync { p.Hero.NextSyncRel }</span>
-				</div>
-			}
-		} else {
-			<div class="text-xl sm:text-2xl font-bold tabular-nums tracking-tight mt-1.5 text-base-content/30">—</div>
-			<div class="text-[0.65rem] text-base-content/45 mt-1">No syncs yet</div>
-		}
+			<div class="min-w-0 flex-1">
+				if p.Hero.LastSyncRel != "" {
+					<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate">{ p.Hero.LastSyncRel }</div>
+					<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">Last sync</div>
+					<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">
+						{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }
+					</div>
+					if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
+						<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate flex items-center gap-1">
+							@components.LucideIcon("clock", "w-3 h-3 shrink-0")
+							<span>Next sync { p.Hero.NextSyncRel }</span>
+						</div>
+					}
+				} else {
+					<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate text-base-content/30">—</div>
+					<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">Last sync</div>
+					<div class="text-[0.65rem] text-base-content/45 mt-0.5">No syncs yet</div>
+				}
+			</div>
+		</div>
 	</a>
 }
 
@@ -279,17 +297,16 @@ templ feedEmptyState(p FeedProps) {
 }
 
 // feedEmptyFirstRun is shown when zero bank connections exist. The CTA is
-// the only path forward — connect a bank — so we render it as a primary
-// button rather than a quiet link.
+// the only path forward — connect a bank — so the canonical EmptyState
+// renders the primary connect-bank button (which opens the app-wide
+// connect-bank drawer) via its CustomCTA slot.
 templ feedEmptyFirstRun() {
-	<div class="bb-card p-10 sm:p-12 text-center">
-		@components.LucideIcon("landmark", "w-10 h-10 mx-auto mb-3 text-base-content opacity-20")
-		<h2 class="text-lg font-semibold mb-1">Welcome to Breadbox</h2>
-		<p class="text-sm text-base-content/55 max-w-md mx-auto mb-5">
-			Connect your first bank to start filling your feed.
-		</p>
-		@connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect a bank")
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:      "landmark",
+		Title:     "Welcome to Breadbox",
+		Body:      "Connect your first bank to start filling your feed.",
+		CustomCTA: connectBankButton("btn btn-primary btn-sm gap-2", "plus", "Connect a bank"),
+	})
 }
 
 // feedEmptyFiltered is shown when a chip filter is active but produced
@@ -297,17 +314,14 @@ templ feedEmptyFirstRun() {
 // filter banner offers, repeated here so a user landing in an empty state
 // has a clear way out without scrolling back up.
 templ feedEmptyFiltered(filter string) {
-	<div class="bb-card p-10 sm:p-12 text-center">
-		@components.LucideIcon("filter", "w-10 h-10 mx-auto mb-3 text-base-content opacity-20")
-		<h2 class="text-lg font-semibold mb-1">{ feedEmptyFilteredHeadline(filter) }</h2>
-		<p class="text-sm text-base-content/55 mb-5">
-			Nothing in this slice today.
-		</p>
-		<a href="/" class="btn btn-sm btn-ghost border border-base-300">
-			@components.LucideIcon("x", "w-3.5 h-3.5")
-			Clear filter
-		</a>
-	</div>
+	@components.EmptyState(components.EmptyStateProps{
+		Icon:     "filter",
+		Title:    feedEmptyFilteredHeadline(filter),
+		Body:     "Nothing in this slice today.",
+		CTAHref:  templ.SafeURL("/"),
+		CTAIcon:  "x",
+		CTALabel: "Clear filter",
+	})
 }
 
 // feedEmptyNoRecent is the "all caught up" card for households that have
@@ -316,41 +330,44 @@ templ feedEmptyFiltered(filter string) {
 // browse-history link, since sync-all is admin-only.
 templ feedEmptyNoRecent(p FeedProps) {
 	if p.IsAdmin {
-		<div class="bb-card p-10 sm:p-12 text-center" x-data="feedSyncNow">
-			@components.LucideIcon("moon", "w-10 h-10 mx-auto mb-3 text-base-content opacity-20")
-			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
-			<p class="text-sm text-base-content/55 mb-5">
-				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
-			</p>
-			<div class="flex items-center justify-center gap-2 flex-wrap">
-				<button
-					type="button"
-					class="btn btn-primary btn-sm"
-					x-bind:disabled="state !== 'idle'"
-					x-on:click="triggerSyncNow()"
-				>
-					<i data-lucide="refresh-cw" class="w-3.5 h-3.5" x-bind:class="state === 'syncing' ? 'animate-spin' : ''"></i>
-					<span x-text="state === 'syncing' ? 'Syncing…' : (state === 'done' ? 'Sync queued' : 'Sync now')"></span>
-				</button>
-				<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
-					@components.LucideIcon("receipt", "w-3.5 h-3.5")
-					Browse transactions
-				</a>
-			</div>
-		</div>
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:      "moon",
+			Title:     "Quiet around here",
+			Body:      feedEmptyNoRecentSubline(p.LastSyncAt),
+			CustomCTA: feedEmptyNoRecentAdminCTA(),
+		})
 	} else {
-		<div class="bb-card p-10 sm:p-12 text-center">
-			@components.LucideIcon("moon", "w-10 h-10 mx-auto mb-3 text-base-content opacity-20")
-			<h2 class="text-lg font-semibold mb-1">Quiet around here</h2>
-			<p class="text-sm text-base-content/55 mb-5">
-				{ feedEmptyNoRecentSubline(p.LastSyncAt) }
-			</p>
-			<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
-				@components.LucideIcon("receipt", "w-3.5 h-3.5")
-				Browse transactions
-			</a>
-		</div>
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:     "moon",
+			Title:    "Quiet around here",
+			Body:     feedEmptyNoRecentSubline(p.LastSyncAt),
+			CTAHref:  templ.SafeURL("/transactions"),
+			CTAIcon:  "receipt",
+			CTALabel: "Browse transactions",
+		})
 	}
+}
+
+// feedEmptyNoRecentAdminCTA is the admin empty-state action pair: the
+// sync-all kickoff button (wired to the feedSyncNow Alpine factory in
+// feed.js) plus a quiet link into the transaction history. Rendered into
+// the EmptyState CustomCTA slot so the card chrome stays canonical.
+templ feedEmptyNoRecentAdminCTA() {
+	<div class="flex items-center justify-center gap-2 flex-wrap" x-data="feedSyncNow">
+		<button
+			type="button"
+			class="btn btn-primary btn-sm"
+			x-bind:disabled="state !== 'idle'"
+			x-on:click="triggerSyncNow()"
+		>
+			<i data-lucide="refresh-cw" class="w-3.5 h-3.5" x-bind:class="state === 'syncing' ? 'animate-spin' : ''"></i>
+			<span x-text="state === 'syncing' ? 'Syncing…' : (state === 'done' ? 'Sync queued' : 'Sync now')"></span>
+		</button>
+		<a href="/transactions" class="btn btn-sm btn-ghost border border-base-300">
+			@components.LucideIcon("receipt", "w-3.5 h-3.5")
+			Browse transactions
+		</a>
+	</div>
 }
 
 // feedEmptyFilteredHeadline maps a chip slug onto its empty-state
@@ -1009,17 +1026,14 @@ func feedNonEmpty(a, fallback string) string {
 	return fallback
 }
 
-func feedSyncDotClass(status string) string {
-	switch status {
-	case "success":
-		return "bg-success"
-	case "error":
-		return "bg-error animate-pulse"
-	case "in_progress":
-		return "bg-info animate-pulse"
-	default:
-		return "bg-base-300"
+// feedUnreadReportsTone draws the eye to the unread-reports stat tile only
+// when there's something to read — a primary-toned icon tile when unread > 0,
+// otherwise the quiet neutral default.
+func feedUnreadReportsTone(unread int) components.StatTileTone {
+	if unread > 0 {
+		return components.StatTonePrimary
 	}
+	return components.StatToneNeutral
 }
 
 func feedSyncSubLine(status, institution string) string {
