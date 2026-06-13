@@ -4,6 +4,115 @@ package pages
 
 import "testing"
 
+func dptr(n int) *int { return &n }
+
+// TestBuildUpcomingRenewals pins the hero rail's selection + ordering: only
+// active series with a live projection (not stale, not beyond the horizon)
+// earn a card, most-overdue / soonest first, with the right countdown copy.
+func TestBuildUpcomingRenewals(t *testing.T) {
+	t.Run("selects + orders active projected series, excludes the rest", func(t *testing.T) {
+		rows := []SubscriptionRow{
+			{ShortID: "soon", Status: "active", DaysUntilRenewal: dptr(7)},
+			{ShortID: "overdue", Status: "active", DaysUntilRenewal: dptr(-5)},
+			{ShortID: "today", Status: "active", DaysUntilRenewal: dptr(0)},
+			{ShortID: "noproj", Status: "active", DaysUntilRenewal: nil},                          // excluded: no projection
+			{ShortID: "stale", Status: "active", DaysUntilRenewal: dptr(-60), RenewalTone: "error"}, // excluded: stale
+			{ShortID: "far", Status: "active", DaysUntilRenewal: dptr(90)},                         // excluded: beyond horizon
+			{ShortID: "paused", Status: "paused", DaysUntilRenewal: dptr(3)},                       // excluded: not active
+		}
+		cards := BuildUpcomingRenewals(rows)
+		gotIDs := make([]string, len(cards))
+		for i, c := range cards {
+			gotIDs[i] = c.ShortID
+		}
+		want := []string{"overdue", "today", "soon"}
+		if len(gotIDs) != len(want) {
+			t.Fatalf("got %v, want %v", gotIDs, want)
+		}
+		for i := range want {
+			if gotIDs[i] != want[i] {
+				t.Errorf("card %d = %q, want %q (order %v)", i, gotIDs[i], want[i], gotIDs)
+			}
+		}
+	})
+
+	t.Run("countdown labels + urgency", func(t *testing.T) {
+		cases := []struct {
+			days       int
+			wantLabel  string
+			wantUrgent string
+		}{
+			{-5, "5d overdue", "overdue"},
+			{0, "Due today", "today"},
+			{1, "Tomorrow", "soon"},
+			{4, "in 4d", "soon"},
+			{20, "in 20d", "later"},
+		}
+		for _, tc := range cases {
+			cards := BuildUpcomingRenewals([]SubscriptionRow{{Status: "active", DaysUntilRenewal: dptr(tc.days)}})
+			if len(cards) != 1 {
+				t.Fatalf("days=%d: want 1 card, got %d", tc.days, len(cards))
+			}
+			if cards[0].CountLabel != tc.wantLabel || cards[0].Urgency != tc.wantUrgent {
+				t.Errorf("days=%d = (%q,%q), want (%q,%q)", tc.days, cards[0].CountLabel, cards[0].Urgency, tc.wantLabel, tc.wantUrgent)
+			}
+		}
+	})
+}
+
+// TestBuildMonthlyComposition pins the spend-composition bar: single-currency
+// active monthly-equivalent, descending by amount, the tail folded into
+// "Other", and no data across mixed currencies.
+func TestBuildMonthlyComposition(t *testing.T) {
+	t.Run("sums single currency, descending, with shares", func(t *testing.T) {
+		rows := []SubscriptionRow{
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 10, Name: "B"},
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 30, Name: "A"},
+			{Status: "active", HasAmount: false, Currency: "USD", MonthlyEquiv: 99, Name: "skip"}, // no amount
+			{Status: "paused", HasAmount: true, Currency: "USD", MonthlyEquiv: 50, Name: "paused"}, // not active
+		}
+		comp := BuildMonthlyComposition(rows)
+		if !comp.HasData || comp.Currency != "USD" || comp.Total != 40 {
+			t.Fatalf("got (has=%v cur=%q total=%v), want (true USD 40)", comp.HasData, comp.Currency, comp.Total)
+		}
+		if len(comp.Segments) != 2 || comp.Segments[0].Label != "A" || comp.Segments[1].Label != "B" {
+			t.Fatalf("segments = %+v, want [A B]", comp.Segments)
+		}
+		if comp.Segments[0].Percent != 75 {
+			t.Errorf("top share = %v, want 75", comp.Segments[0].Percent)
+		}
+	})
+
+	t.Run("folds the tail beyond top-N into Other", func(t *testing.T) {
+		rows := []SubscriptionRow{
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 50, Name: "n1"},
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 40, Name: "n2"},
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 30, Name: "n3"},
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 20, Name: "n4"},
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 6, Name: "n5"},
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 4, Name: "n6"},
+		}
+		comp := BuildMonthlyComposition(rows)
+		if len(comp.Segments) != monthlyCompositionTopN+1 {
+			t.Fatalf("want %d segments, got %d", monthlyCompositionTopN+1, len(comp.Segments))
+		}
+		last := comp.Segments[len(comp.Segments)-1]
+		if !last.IsOther || last.Amount != 10 {
+			t.Errorf("Other segment = %+v, want IsOther+amount 10", last)
+		}
+	})
+
+	t.Run("mixed currencies yield no data", func(t *testing.T) {
+		rows := []SubscriptionRow{
+			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 10, Name: "a"},
+			{Status: "active", HasAmount: true, Currency: "EUR", MonthlyEquiv: 5, Name: "b"},
+		}
+		if comp := BuildMonthlyComposition(rows); comp.HasData {
+			t.Errorf("want no data across currencies, got %+v", comp)
+		}
+	})
+}
+
 // TestGroupSubscriptionsByStatus pins the ledger IA: rows bucket into
 // Active → Paused → Ended in that order, unknown statuses sink last in
 // first-seen order, row order is preserved within a group, and only the
