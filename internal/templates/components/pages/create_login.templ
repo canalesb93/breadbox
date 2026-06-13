@@ -79,8 +79,10 @@ templ createLoginManage(p CreateLoginProps) {
 				</span>
 				<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 				<button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary gap-1.5 min-w-32">
-					<span x-show="!saving" class="inline-flex items-center gap-1.5">@components.LucideIcon("save", "w-3.5 h-3.5")
-Save Changes</span>
+					<span x-show="!saving" class="inline-flex items-center gap-1.5">
+						@components.LucideIcon("save", "w-3.5 h-3.5")
+						Save Changes
+					</span>
 					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
 				</button>
 			</div>
@@ -221,8 +223,10 @@ templ createLoginNew(p CreateLoginProps) {
 				<div class="bb-action-row">
 					<a href="/household" class="btn btn-sm btn-ghost">Cancel</a>
 					<button type="submit" class="btn btn-sm btn-primary gap-1.5 min-w-32" :disabled="submitting">
-						<span x-show="!submitting" class="inline-flex items-center gap-1.5">@components.LucideIcon("user-plus", "w-3.5 h-3.5")
-Create Login</span>
+						<span x-show="!submitting" class="inline-flex items-center gap-1.5">
+							@components.LucideIcon("user-plus", "w-3.5 h-3.5")
+							Create Login
+						</span>
 						<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
 					</button>
 				</div>
