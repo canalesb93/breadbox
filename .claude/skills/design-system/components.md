@@ -50,6 +50,31 @@ TabBarItem{ Label string; Href templ.SafeURL; Active bool; Icon string; Count *i
   don't stack two tab rows.
 - Never stretch a `box` TabBar full-width. It scrolls horizontally on mobile.
 
+## Filter controls — three blessed shapes, not duplicates
+
+There are three filter primitives. They are **not** redundant — pick by the
+filtering model, don't invent a fourth:
+
+| Use | Shape | Example |
+| --- | --- | --- |
+| Single-axis **client-side text** filter on a short list | `FilterSearchInput` (`filter_search_input.templ`) | `/tags`, `/categories`, `/subscriptions` |
+| **Multi-axis server-side** filter (search + status + category + creator) | server filter toolbar (sandbox slug `server-filter-toolbar`) | `/rules` |
+| **Status segments** with live counts | box-variant `TabBar` + a `<select>` for the secondary axis | `/workflows/runs` |
+
+Complex multi-field panels (date ranges + pickers, e.g. `/transactions`,
+`/logs`) are a collapsible panel — fine, but hold them to one shape. A
+low-cardinality *view* toggle (Grouped/List) is a daisy `join`, not a filter.
+
+## Badge tone & contrast — vivid only
+
+Badges are **terminal/categorical** state only — never a loading/running/
+in-progress state (that's a spinner + text). And on the dark theme only
+`info`/`success`/`warning`/`error` are vivid; `primary`/`secondary`/`accent`/
+`neutral` soft badges read as gray-on-gray and all but disappear
+(`reference_theme_vivid_tones`). Map meaning to a vivid tone, or use
+`badge-ghost` for a deliberately quiet neutral. Standard shape:
+`badge badge-soft badge-{vivid-tone} badge-sm`.
+
 ## SectionHeader — `section_header.templ`
 
 A titled section divider with an optional count + trailing action.
