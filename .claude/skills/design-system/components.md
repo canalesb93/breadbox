@@ -177,22 +177,42 @@ AmountProps{
 
 ## StatTile / StatTileRow — `stat_tile.templ`
 
-Summary numbers when figures lead the page (Net Worth / Assets / Liabilities).
+Quiet summary numbers in the **Mintlify-clean** style (see "Stat cards" below).
+A plain hairline box, small muted label on top, big plain number, optional tiny
+delta + description. **No icon, no tone fill, no tint.**
 
 ```go
 StatTileProps{
-    Icon string; Label string; Value string; Description string
-    Tone StatTileTone; Href templ.SafeURL
+    Label string; Value string; Description string // label on top, big number, muted subline
+    Delta string; DeltaDir StatTileDeltaDir         // optional tiny "↓ 45.7% vs previous" trend line
+    Href templ.SafeURL
     ValuePrivateKind string; DescriptionPrivateKind string // "amount" → marks data-private
+    Icon string; Tone StatTileTone // RETAINED for caller compat but NO-OPS (not rendered)
 }
-// Tone: StatToneNeutral · StatTonePrimary · StatToneSuccess · StatToneWarning · StatToneError · StatToneInfo
-@components.StatTileRow() { @components.StatTile(...) ... } // the divided strip
+// DeltaDir: StatDeltaUp (success-ish ↑) · StatDeltaDown (error-ish ↓) · StatDeltaNeutral (muted, default)
+@components.StatTileRow() { @components.StatTile(...) ... } // the 2-up / 4-up grid
 ```
 
-Set `ValuePrivateKind: "amount"` on money tiles so they obfuscate with privacy mode.
-When `Href` is set the tile is an `<a>` and carries both `bb-card--interactive`
-hover and a keyboard `focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`
-ring (principle #8 — every interactive element has visible hover + focus states).
+The number renders in **default ink** — never a tone color. `Icon`/`Tone` are
+kept only so existing callers compile; the clean tile shows neither. Set
+`Delta` (with `DeltaDir`) for a small semantic trend line under the value.
+Set `ValuePrivateKind: "amount"` on money tiles so they obfuscate with privacy
+mode. When `Href` is set the tile is an `<a>` and carries both
+`bb-card--interactive` hover and a keyboard
+`focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40` ring
+(principle #8 — every interactive element has visible hover + focus states).
+
+### Stat cards — the Mintlify-clean pattern
+
+The canonical stat treatment, going forward, for **every** surface that shows a
+metric: a **hairline-bordered box** · a **small muted label on top** · a **big
+plain number** below (`text-2xl`/`text-3xl`, `font-semibold`, `tabular-nums`,
+default ink — *not* a tone color) · an **optional tiny delta** beneath (small
+arrow + text in a quiet semantic color) · airy padding. **No icon tile, no tone
+background fill, no tint, no left-accent.** The number speaks; status stays
+quiet. Don't reintroduce the old colored-icon-square-on-the-left tile — that was
+the decorated shape this pattern replaced. Reach for `StatTile`; if you're
+hand-rolling a metric box, match this shape.
 
 ## EmptyState — `empty_state.templ`
 
