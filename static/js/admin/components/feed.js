@@ -95,6 +95,37 @@ document.addEventListener('alpine:init', function () {
     };
   });
 
+  // feedCountUp animates a hero metric number from 0 to its target on
+  // load. The element ships with its final value as text content (no-JS
+  // fallback) plus a `data-count-target` attr; this tween overwrites it
+  // for the ~0.7s reveal, then snaps to the exact target. Honors
+  // prefers-reduced-motion by skipping straight to the final value.
+  Alpine.data('feedCountUp', function () {
+    return {
+      init: function () {
+        var el = this.$el;
+        var target = parseInt(el.getAttribute('data-count-target') || '0', 10);
+        if (!target || target < 0) return;
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { el.textContent = String(target); return; }
+        var dur = 700, start = null;
+        el.textContent = '0';
+        function step(ts) {
+          if (start === null) start = ts;
+          var p = Math.min((ts - start) / dur, 1);
+          var eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = String(Math.round(eased * target));
+          if (p < 1) {
+            requestAnimationFrame(step);
+          } else {
+            el.textContent = String(target);
+          }
+        }
+        requestAnimationFrame(step);
+      },
+    };
+  });
+
   Alpine.data('feedSyncNow', function () {
     return {
       state: 'idle',
