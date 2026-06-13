@@ -23,12 +23,10 @@ templ CreateLogin(p CreateLoginProps) {
 }
 
 templ createLoginManage(p CreateLoginProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Manage Login</h1>
-			<p class="text-sm text-base-content/50 mt-1">Login account for { p.UserName }</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Manage Login",
+		Subtitle: "Login account for " + p.UserName,
+	})
 	<div class="max-w-lg">
 		<div
 			class="bb-card p-0 overflow-hidden"
@@ -36,14 +34,9 @@ templ createLoginManage(p CreateLoginProps) {
 		>
 			<!-- Account info -->
 			<div class="p-5 sm:p-6">
-				<div class="bb-icon-header">
-					<div class="bb-icon-header__tile bb-icon-tile--primary">
-						@components.LucideIcon("key", "w-5 h-5")
-					</div>
-					<div class="bb-icon-header__text">
-						<h2 class="text-sm font-semibold truncate">{ p.LoginUsername }</h2>
-						<p class="text-xs text-base-content/45">Login account</p>
-					</div>
+				<div class="mb-5">
+					<h2 class="text-sm font-semibold truncate">{ p.LoginUsername }</h2>
+					<p class="text-xs text-base-content/45">Login account</p>
 				</div>
 				<div class="grid grid-cols-2 gap-4">
 					<div>
@@ -93,14 +86,9 @@ templ createLoginManage(p CreateLoginProps) {
 				class="bb-card p-5 sm:p-6 mt-4"
 				x-data={ manageLoginSetupAlpine(p) }
 			>
-				<div class="bb-icon-header">
-					<div class="bb-icon-header__tile bb-icon-tile--warning">
-						@components.LucideIcon("link", "w-5 h-5")
-					</div>
-					<div class="bb-icon-header__text">
-						<h2 class="text-sm font-semibold">Setup Link</h2>
-						<p class="text-xs text-base-content/45">Share this link with { p.UserName } so they can set their password.</p>
-					</div>
+				<div class="mb-5">
+					<h2 class="text-sm font-semibold">Setup Link</h2>
+					<p class="text-xs text-base-content/45">Share this link with { p.UserName } so they can set their password.</p>
 				</div>
 				<div class="flex items-center gap-2 mb-3">
 					<input
@@ -170,25 +158,18 @@ templ createLoginManage(p CreateLoginProps) {
 }
 
 templ createLoginNew(p CreateLoginProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Create Login</h1>
-			<p class="text-sm text-base-content/50 mt-1">Create a sign-in account for { p.UserName }</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Create Login",
+		Subtitle: "Create a sign-in account for " + p.UserName,
+	})
 	<div class="max-w-lg" x-data={ newLoginAlpine(p) }>
 		<template x-if="!done">
 			<form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
 				<!-- Header + fields -->
 				<div class="p-5 sm:p-6">
-					<div class="bb-icon-header">
-						<div class="bb-icon-header__tile bb-icon-tile--primary">
-							@components.LucideIcon("user-plus", "w-5 h-5")
-						</div>
-						<div class="bb-icon-header__text">
-							<h2 class="text-sm font-semibold">New login account</h2>
-							<p class="text-xs text-base-content/45">They'll receive a link to set their password</p>
-						</div>
+					<div class="mb-5">
+						<h2 class="text-sm font-semibold">New login account</h2>
+						<p class="text-xs text-base-content/45">They'll receive a link to set their password</p>
 					</div>
 					<div class="space-y-4">
 						<div>
@@ -236,14 +217,9 @@ templ createLoginNew(p CreateLoginProps) {
 			<div class="bb-card p-0 overflow-hidden">
 				<!-- Header -->
 				<div class="p-5 sm:p-6">
-					<div class="bb-icon-header">
-						<div class="bb-icon-header__tile bb-icon-tile--success">
-							@components.LucideIcon("circle-check", "w-5 h-5")
-						</div>
-						<div class="bb-icon-header__text">
-							<h2 class="text-sm font-semibold">Login created</h2>
-							<p class="text-xs text-base-content/45">Share the setup link with { p.UserName }</p>
-						</div>
+					<div class="mb-5">
+						<h2 class="text-sm font-semibold">Login created</h2>
+						<p class="text-xs text-base-content/45">Share the setup link with { p.UserName }</p>
 					</div>
 					<div x-data="{ copied: false }">
 						<label class="block text-xs font-medium text-base-content/50 mb-1.5">Setup Link</label>
