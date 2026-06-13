@@ -1000,44 +1000,38 @@ templ workflowCustomPromptField() {
 					</button>
 				</div>
 			</div>
-			// Empty body — bold centered invitation.
+			// Empty body — clean centered invitation with a real CTA button.
 			<button
 				type="button"
 				x-show="!custom.prompt.trim()"
 				@click="editPrompt(true)"
-				class="group flex w-full flex-col items-center gap-3 px-5 py-9 text-center transition-colors hover:bg-base-200/40"
+				class="group flex w-full cursor-pointer flex-col items-center gap-3 px-5 py-9 text-center transition-colors hover:bg-base-200/40"
 			>
-				<span class="flex w-12 h-12 items-center justify-center rounded-xl bg-primary text-primary-content shadow-sm transition-transform group-hover:scale-105">
+				<span class="flex h-12 w-12 items-center justify-center rounded-full bg-base-200 text-base-content/50 transition-colors group-hover:bg-primary/10 group-hover:text-primary">
 					@components.LucideIcon("sparkles", "w-5 h-5")
 				</span>
 				<span class="max-w-sm">
 					<span class="block text-sm font-semibold">Compose the prompt</span>
 					<span class="block text-xs text-base-content/55 mt-1">The full instructions sent on every run — author it in Markdown with live preview. This is the entire workflow; there's no template behind it.</span>
 				</span>
-				<span class="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-					@components.LucideIcon("pencil", "w-3.5 h-3.5")
-					Open the editor
+				<span class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("pencil", "w-4 h-4")
+					Open editor
 				</span>
 			</button>
-			// Filled body — clickable monospace excerpt with a hover hint.
+			// Filled body — clickable monospace excerpt; hover highlights it.
 			<button
 				type="button"
 				x-show="custom.prompt.trim()"
 				x-cloak
 				@click="editPrompt(true)"
-				class="group relative block w-full max-h-44 overflow-hidden text-left transition-colors hover:bg-base-200/25"
+				class="relative block w-full max-h-44 cursor-pointer overflow-hidden text-left transition-colors hover:bg-base-200/50"
 				aria-label="Edit prompt"
 			>
 				<pre class="px-4 py-3.5 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words text-base-content/80" x-text="custom.prompt"></pre>
-				// Fade the bottom of the excerpt into the card, and float an
-				// "edit" hint there that lifts in on hover.
-				<span class="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-base-100 via-base-100/85 to-transparent"></span>
-				<span class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-3 opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0">
-					<span class="inline-flex items-center gap-1.5 rounded-full border border-base-300 bg-base-100 px-3 py-1 text-xs font-medium shadow-sm">
-						@components.LucideIcon("pencil", "w-3.5 h-3.5")
-						Click to edit
-					</span>
-				</span>
+				// Fade the bottom of the excerpt into the card so the clipped
+				// text doesn't end in a hard line.
+				<span class="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-base-100 via-base-100/85 to-transparent"></span>
 			</button>
 		</div>
 		<p x-show="custom.promptError" x-cloak class="text-xs text-error mt-1.5">A prompt is required — open the editor and add instructions.</p>
