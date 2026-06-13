@@ -12,24 +12,13 @@ templ UserForm(p UserFormProps) {
 	// listener before Alpine fires the event. See #828 for the debugging
 	// trail behind this rule.
 	<script src="/static/js/admin/components/user_form.js"></script>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">
-				if p.IsEdit {
-					Edit { userFormName(p.User) }
-				} else {
-					Add Member
-				}
-			</h1>
-			<p class="text-sm text-base-content/50 mt-1">
-				if p.IsEdit {
-					Update member details
-				} else {
-					Add a new person to your household
-				}
-			</p>
-		</div>
-	</div>
+	{{ title := "Add Member" }}
+	{{ subtitle := "Add a new person to your household" }}
+	if p.IsEdit {
+		{{ title = "Edit " + userFormName(p.User) }}
+		{{ subtitle = "Update member details" }}
+	}
+	@components.PageHeader(components.PageHeaderProps{Title: title, Subtitle: subtitle})
 	if p.IsEdit {
 		@userFormEdit(p)
 	} else {
