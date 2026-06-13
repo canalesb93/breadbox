@@ -33,35 +33,18 @@ templ ReportDetail(p ReportDetailProps) {
 					<span x-text="toast"></span>
 				</div>
 			</div>
-			<!-- Report header -->
-			<div class="flex items-start justify-between gap-4 mb-5">
-				<div class="min-w-0">
-					<div class="flex items-center gap-2 mb-2 flex-wrap">
-						@components.ReportPriorityBadge(p.Report.Priority)
-						<span x-show="!isRead" x-cloak class="badge badge-soft badge-info badge-sm">Unread</span>
-					</div>
-					<h1 class="text-xl sm:text-2xl font-semibold leading-snug break-words text-base-content">{ p.Report.Title }</h1>
-					<div class="mt-2.5 flex items-center gap-1.5 text-xs text-base-content/50">
-						@components.LucideIcon("bot", "w-3.5 h-3.5 text-base-content/40")
-						<span class="font-medium text-base-content/70">{ p.Report.DisplayAuthor }</span>
-						<span class="text-base-content/25">·</span>
-						<span title={ p.Report.CreatedAt }>{ p.Report.CreatedAtRel }</span>
-					</div>
-				</div>
-				<div class="flex items-center gap-2 shrink-0">
-					<button type="button" @click="toggleRead()" class="btn btn-ghost btn-sm gap-2">
-						<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-4 h-4"></i>
-						<span class="hidden sm:inline" x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
-					</button>
-					@components.OverflowMenu(components.OverflowMenuProps{
-						AriaLabel: "Report actions",
-						Items: []components.OverflowMenuItem{
-							{Label: "Copy link", Icon: "link", OnClick: "copyLink()"},
-							{Label: "Manage report format", Icon: "sliders-horizontal", Href: "/settings/mcp#report-format"},
-						},
-					})
-				</div>
-			</div>
+			<!-- Report header — the canonical EntityHeader (PageHeader's
+			     detail sibling). The priority chip stays the header's
+			     status affordance (the /reports index encodes priority in
+			     its leading status tile instead), so the header is
+			     intentionally icon-less. -->
+			@components.EntityHeader(components.EntityHeaderProps{
+				Title:      p.Report.Title,
+				TitleClass: "break-words",
+				Badges:     reportDetailBadges(p),
+				Meta:       reportDetailMeta(p),
+				Action:     reportDetailActions(),
+			})
 			<!-- Body card — Markdown rendered server-side into .bb-prose -->
 			<div class="bb-card">
 				<div class="px-5 sm:px-7 py-5 sm:py-6">
@@ -69,6 +52,46 @@ templ ReportDetail(p ReportDetailProps) {
 				</div>
 			</div>
 		</div>
+	</div>
+}
+
+// reportDetailBadges renders the EntityHeader badge row: the priority
+// chip plus the reactive Unread badge (Alpine x-show, info-vivid). Both
+// hide < sm per the EntityHeader contract — the mark-read action stays
+// reachable on mobile.
+templ reportDetailBadges(p ReportDetailProps) {
+	@components.ReportPriorityBadge(p.Report.Priority)
+	<span x-show="!isRead" x-cloak class="badge badge-soft badge-info badge-sm">Unread</span>
+}
+
+// reportDetailMeta is the bullet-separated subtitle row: agent author ·
+// relative submit time. Rendered inside EntityHeader's meta slot.
+templ reportDetailMeta(p ReportDetailProps) {
+	<span class="flex items-center gap-1">
+		@components.LucideIcon("bot", "w-3.5 h-3.5")
+		<span class="font-medium text-base-content/70">{ p.Report.DisplayAuthor }</span>
+	</span>
+	<span class="text-base-content/20">·</span>
+	<span title={ p.Report.CreatedAt }>{ p.Report.CreatedAtRel }</span>
+}
+
+// reportDetailActions is the EntityHeader trailing cluster: the
+// mark-read/unread toggle (reactive label, icon-only < sm) and the
+// overflow menu (copy link, manage format). Rendered inside the x-data
+// scope so the Alpine bindings stay live.
+templ reportDetailActions() {
+	<div class="flex items-center gap-2">
+		<button type="button" @click="toggleRead()" class="btn btn-ghost btn-sm gap-2">
+			<i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-4 h-4"></i>
+			<span class="hidden sm:inline" x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
+		</button>
+		@components.OverflowMenu(components.OverflowMenuProps{
+			AriaLabel: "Report actions",
+			Items: []components.OverflowMenuItem{
+				{Label: "Copy link", Icon: "link", OnClick: "copyLink()"},
+				{Label: "Manage report format", Icon: "sliders-horizontal", Href: "/settings/mcp#report-format"},
+			},
+		})
 	</div>
 }
 
