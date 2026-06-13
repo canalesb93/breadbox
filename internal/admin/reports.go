@@ -42,9 +42,23 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 		}
 
 		var unreadCount int
+		// Tally unread reports per author so the at-a-glance line can name
+		// the agent contributing the most ("8 unread · 3 from Review Agent").
+		unreadByAuthor := map[string]int{}
+		var topAuthor string
+		var topAuthorCount int
 		for _, rep := range all {
 			if rep.ReadAt == nil {
 				unreadCount++
+				author := reportDisplayAuthor(rep.CreatedByName, rep.Author)
+				if author == "" {
+					continue
+				}
+				unreadByAuthor[author]++
+				if unreadByAuthor[author] > topAuthorCount {
+					topAuthorCount = unreadByAuthor[author]
+					topAuthor = author
+				}
 			}
 		}
 
@@ -80,11 +94,13 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 
 		data := BaseTemplateData(r, sm, "reports", "Agent Reports")
 		props := pages.ReportsProps{
-			Reports:      reports,
-			FilterStatus: statusFilter,
-			AllCount:     len(all),
-			UnreadCount:  unreadCount,
-			ReadCount:    len(all) - unreadCount,
+			Reports:             reports,
+			FilterStatus:        statusFilter,
+			AllCount:            len(all),
+			UnreadCount:         unreadCount,
+			ReadCount:           len(all) - unreadCount,
+			TopUnreadAgent:      topAuthor,
+			TopUnreadAgentCount: topAuthorCount,
 		}
 		tr.RenderWithTempl(w, r, data, pages.Reports(props))
 	}

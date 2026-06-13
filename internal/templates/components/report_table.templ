@@ -53,20 +53,20 @@ templ ReportsList(rows []ReportRowProps) {
 	}
 }
 
-// ReportRow renders one report as a daisy `list-row`: a leading
-// priority-coded status tile, the agent identity (avatar + name) with an
-// unread dot and relative time as the title line, the summary as the one
-// body line below, and an overflow menu rendered OUTSIDE the row's
-// navigation anchor. Read rows fade and drop the dot; unread rows stay
-// full-strength with a heavier summary — the two restrained unread
-// channels (the leading info dot is the third). Status lives in the tile,
-// not a parallel text badge.
+// ReportRow renders one report as a daisy `list-row`. The summary (the
+// agent's finding) is the prominent line; the agent identity (avatar +
+// name) + an unread dot + relative time ride above it as a quiet metadata
+// line. A small, bare priority glyph leads the row — vivid ink only for
+// warning/critical, a muted glyph for routine — replacing the old 40×40
+// tinted tile so the inbox reads calm (Mintlify-clean: color is an accent,
+// not a per-row fill). Read rows fade and drop the dot; unread rows keep a
+// slightly stronger summary. Status is a small glyph, not a parallel badge.
 templ ReportRow(r ReportRowProps) {
 	<li
 		x-show={ fmt.Sprintf("!dismissed['%s']", r.ID) }
 		x-transition.opacity.duration.200ms
-		class={ "list-row transition-colors hover:bg-base-200/40 items-center",
-			templ.KV("opacity-60", r.IsRead) }
+		class={ "list-row py-3.5 gap-3 transition-colors hover:bg-base-200/40 items-center",
+			templ.KV("opacity-55", r.IsRead) }
 		data-report-id={ r.ID }
 	>
 		<a
@@ -74,7 +74,9 @@ templ ReportRow(r ReportRowProps) {
 			href={ templ.SafeURL("/reports/" + r.ID) }
 			aria-label={ reportRowLinkLabel(r) }
 		>
-			@IconTile(reportTileTone(r.Priority), reportTileIcon(r.Priority))
+			<div class="w-5 self-center flex items-center justify-center shrink-0">
+				@LucideIcon(reportTileIcon(r.Priority), "w-4 h-4 "+reportGlyphClass(r.Priority))
+			</div>
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 min-w-0">
 					@UserAvatar(UserAvatarProps{
@@ -86,13 +88,13 @@ templ ReportRow(r ReportRowProps) {
 						Lazy:       true,
 						Class:      "shrink-0",
 					})
-					<span class={ "text-sm truncate", reportAuthorClass(r.IsRead) }>{ reportAuthorLabel(r.Author) }</span>
+					<span class={ "text-xs truncate", reportAuthorClass(r.IsRead) }>{ reportAuthorLabel(r.Author) }</span>
 					if !r.IsRead {
 						<span class="w-1.5 h-1.5 rounded-full bg-info shrink-0" title="Unread" aria-hidden="true"></span>
 					}
-					<span class="ml-auto shrink-0 text-xs text-base-content/45 tabular-nums" title="Submitted">{ r.Time }</span>
+					<span class="ml-auto shrink-0 text-xs text-base-content/40 tabular-nums" title="Submitted">{ r.Time }</span>
 				</div>
-				<div class="mt-0.5 min-w-0">
+				<div class="mt-1 min-w-0">
 					<span class={ "block text-sm line-clamp-1 leading-snug", reportSummaryClass(r.IsRead) }>{ r.Title }</span>
 				</div>
 			</div>
@@ -134,22 +136,24 @@ func reportRowMenuItems(r ReportRowProps) []OverflowMenuItem {
 	return items
 }
 
-// reportTileTone maps a report's priority to the IconTile tone — a vivid
-// status colour per the badge-tone rule (error/warning/info). Routine
-// reports ("" / "info") use the calm info tone; read rows desaturate via
-// the row-level opacity, so the tile never shouts once the report is seen.
-func reportTileTone(priority string) string {
+// reportGlyphClass colours the small leading priority glyph. Vivid ink is
+// reserved for the priorities that actually warrant a glance — warning and
+// critical; routine reports get a quiet muted glyph so the inbox doesn't
+// repeat a loud tinted square down every row (Mintlify-clean restraint:
+// color is a small accent, not a per-row fill). Read rows desaturate
+// further via the row-level opacity.
+func reportGlyphClass(priority string) string {
 	switch priority {
 	case "critical":
-		return "error"
+		return "text-error"
 	case "warning":
-		return "warning"
+		return "text-warning"
 	default:
-		return "info"
+		return "text-base-content/35"
 	}
 }
 
-// reportTileIcon picks the glyph inside the status tile — alert shapes for
+// reportTileIcon picks the leading priority glyph — alert shapes for
 // warning/critical (matching ReportPriorityBadge), a neutral message glyph
 // for routine reports.
 func reportTileIcon(priority string) string {
@@ -173,13 +177,14 @@ func reportAvatarSeed(r ReportRowProps) string {
 	return reportAuthorLabel(r.Author)
 }
 
-// reportAuthorClass splits the agent-name weight by read state — unread
-// reports stay full-strength, read ones fade.
+// reportAuthorClass styles the agent name, which now reads as a quiet
+// metadata label above the summary — muted either way, a touch quieter
+// once the report is read. The summary carries the row's weight.
 func reportAuthorClass(isRead bool) string {
 	if isRead {
-		return "font-normal text-base-content/55"
+		return "text-base-content/45"
 	}
-	return "font-medium text-base-content"
+	return "font-medium text-base-content/70"
 }
 
 // reportAuthorLabel falls back to a neutral label when an agent didn't
@@ -191,11 +196,11 @@ func reportAuthorLabel(author string) string {
 	return author
 }
 
-// reportSummaryClass styles the summary line by read state — medium + full
-// strength when unread, lighter + muted when read.
+// reportSummaryClass styles the summary line — the row's prominent content
+// line. Medium + full-strength ink when unread; lighter + muted when read.
 func reportSummaryClass(isRead bool) string {
 	if isRead {
-		return "font-normal text-base-content/55"
+		return "font-normal text-base-content/50"
 	}
 	return "font-medium text-base-content"
 }

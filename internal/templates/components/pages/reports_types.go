@@ -3,6 +3,7 @@
 package pages
 
 import (
+	"fmt"
 	"strconv"
 
 	"breadbox/internal/templates/components"
@@ -43,6 +44,28 @@ type ReportsProps struct {
 	AllCount    int
 	UnreadCount int
 	ReadCount   int
+	// At-a-glance: the agent contributing the most unread reports and how
+	// many, used to render the quiet "N unread · M from <Agent>" context
+	// line above the filter tabs. TopUnreadAgent is "" when no single agent
+	// stands out (or there are no unread reports).
+	TopUnreadAgent      string
+	TopUnreadAgentCount int
+}
+
+// reportsGlance renders the quiet at-a-glance line above the filter tabs —
+// plain muted text (not a hero/digest card), e.g. "8 unread · 3 from
+// Review Agent". Returns "" when there's nothing unread, so the line only
+// appears when it carries information. The "· M from <Agent>" clause is
+// appended only when one agent clearly leads the unread pile (>= 2).
+func reportsGlance(p ReportsProps) string {
+	if p.UnreadCount <= 0 {
+		return ""
+	}
+	line := fmt.Sprintf("%d unread", p.UnreadCount)
+	if p.TopUnreadAgentCount >= 2 && p.TopUnreadAgent != "" {
+		line += fmt.Sprintf(" · %d from %s", p.TopUnreadAgentCount, p.TopUnreadAgent)
+	}
+	return line
 }
 
 // reportsCountPtr adapts an int count to the *int TabBarItem.Count slot,

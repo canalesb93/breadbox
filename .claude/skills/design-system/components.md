@@ -288,11 +288,14 @@ ReportRowProps{
 @components.ReportsList(rows) // convenience: flat list in one card
 ```
 
-- Leading status tile = priority → vivid `IconTile` tone (critical→error,
-  warning→warning, routine→info). No parallel priority text badge in the row.
-- Title line: `UserAvatar` (IsAgent) + agent name + an info **unread dot** + the
-  relative time; the summary is the one body line below. Read rows fade
-  (`opacity-60`) and drop the dot; unread rows keep a heavier summary.
+- Leading status = a **small bare priority glyph** (no tinted tile): vivid ink
+  only for critical (`text-error`) / warning (`text-warning`), a muted glyph for
+  routine — color is an accent, not a per-row fill. No parallel priority badge.
+- The **summary is the prominent line**; the `UserAvatar` (IsAgent) + agent name
+  + an info **unread dot** + relative time ride above it as a quiet metadata
+  line. Read rows fade (`opacity-55`) and drop the dot; unread rows keep a
+  slightly stronger summary. A quiet "N unread · M from <Agent>" at-a-glance line
+  (plain muted text, not a card) sits above the filter tabs.
 - `OverflowMenu` (Size `"sm"`) — mark read/unread + open — renders OUTSIDE the
   row's `<a>` link. The `/reports` All view groups rows unread-first under quiet
   label lines (`partitionReportsByRead`). `ReportPriorityBadge` is now
