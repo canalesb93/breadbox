@@ -53,7 +53,6 @@ templ Transactions(p TransactionsProps) {
 		SecondaryAction: txExportAction(p),
 	})
 	@txFilters(p)
-	@txToolbar(p)
 	if len(p.Transactions) > 0 {
 		@txResultsShell(p)
 	} else {
@@ -126,38 +125,17 @@ templ txExportLink(exportURL string) {
 	</a>
 }
 
-// txToolbar sits between the filter bar and the results. After the
-// header-reorg, the only affordance that still belongs here is the
-// filter-scoped Clear button — view-mode + selection toggles now live
-// inside the results shell, and Export CSV is the page header's
-// SecondaryAction. The wrapper is skipped entirely when no filter is
-// active so it doesn't reserve vertical space for nothing.
-templ txToolbar(p TransactionsProps) {
-	if p.HasAnyFilter() {
-		<div class="flex items-center justify-end gap-2 mb-3">
-			<a href="/transactions" class="btn btn-ghost btn-sm">
-				@components.LucideIcon("x", "w-3.5 h-3.5")
-				<span class="hidden sm:inline">Clear filters</span>
-			</a>
-		</div>
-	}
-}
-
 templ txFilters(p TransactionsProps) {
-	<!-- Search + Filters -->
-	<div class="mb-6" x-data={ filtersOpenInit(p) } x-init={ filtersOpenWatch() }>
+	<!-- Search + Filters. The bare x-data scopes this subtree so Alpine
+	     processes the Filters trigger's @click (it opens the slide-over via
+	     the global $store.drawers). Without it the button sits outside any
+	     Alpine root and the click is inert. -->
+	<div class="mb-6" x-data>
 		<!-- Search bar + filter toggle row -->
 		<div class="flex items-center gap-3">
-			<!-- Quick search (collapses when filters open) -->
+			<!-- Quick search — always visible; the Filters drawer narrows the rest. -->
 			<div
-				x-show="!filtersOpen"
 				x-data="quickSearch"
-				x-transition:enter="transition ease-out duration-200"
-				x-transition:enter-start="opacity-0 -translate-x-4"
-				x-transition:enter-end="opacity-100 translate-x-0"
-				x-transition:leave="transition ease-in duration-150"
-				x-transition:leave-start="opacity-100 translate-x-0"
-				x-transition:leave-end="opacity-0 -translate-x-4"
 				class="relative flex-1"
 			>
 				<svg
@@ -200,205 +178,250 @@ templ txFilters(p TransactionsProps) {
 					</button>
 				</div>
 			</div>
-			<!-- Filter toggle button (always pinned right) -->
+			<!-- Filters trigger — opens the slide-over (always pinned right) -->
 			<button
 				type="button"
-				class="btn gap-2 shrink-0 ml-auto h-10 min-h-0 px-4"
-				:class="filtersOpen ? 'btn-primary' : 'btn-ghost'"
-				@click="filtersOpen = !filtersOpen"
+				class="btn btn-ghost gap-2 shrink-0 ml-auto h-10 min-h-0 px-4"
+				@click="$store.drawers.open('tx-filters')"
 			>
 				@components.LucideIcon("sliders-horizontal", "w-3.5 h-3.5")
 				<span>Filters</span>
-				if p.HasAnyFilter() {
-					<span class="badge badge-xs" :class="filtersOpen ? 'badge-primary-content' : 'badge-primary'">Active</span>
+				if len(p.FilterChips) > 0 {
+					<span class="badge badge-primary badge-xs">{ fmt.Sprintf("%d", len(p.FilterChips)) }</span>
 				}
-				<i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="filtersOpen && 'rotate-180'"></i>
 			</button>
 		</div>
-		<!-- Filter panel -->
-		<form method="GET" action="/transactions" x-show="filtersOpen" x-cloak x-collapse class="bb-card mt-3 p-4" x-data>
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-				<!-- Date range: paired together at every breakpoint so Start/End stay adjacent -->
-				<div class="grid grid-cols-2 gap-3 lg:col-span-2">
-					<label class="bb-filter-label">
-						Start Date
-						<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm w-full"/>
-					</label>
-					<label class="bb-filter-label">
-						End Date
-						<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm w-full"/>
-					</label>
-				</div>
-				<label class="bb-filter-label">
-					Connection
-					<select name="connection_id" class="select select-sm w-full">
-						<option value="">All connections</option>
-						for _, c := range p.Connections {
-							@txSelectOption(c.ID, c.InstitutionName, p.FilterConnID)
-						}
-					</select>
-				</label>
-				<label class="bb-filter-label">
-					Account
-					<select name="account_id" class="select select-sm w-full">
-						<option value="">All accounts</option>
-						for _, a := range p.Accounts {
-							@txSelectOption(a.ID, accountSelectLabel(a.Name, a.Mask), p.FilterAccountID)
-						}
-					</select>
-				</label>
-				<label class="bb-filter-label">
-					Family Member
-					<select name="user_id" class="select select-sm w-full">
-						<option value="">All members</option>
-						for _, u := range p.Users {
-							@txSelectOption(u.ID, u.Name, p.FilterUserID)
-						}
-					</select>
-				</label>
-			</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-				<label class="bb-filter-label">
-					Category
-					<div
-						class="bb-cat-picker"
-						data-picker-source="tx-filter-cat"
-						x-data="categoryPicker"
-						data-mode="filter"
-						data-source-id="tx-filter-cat"
-						data-allow-empty="true"
-						data-empty-label="All categories"
-						data-initial={ p.FilterCategory }
-						@category-change="$refs.catInput.value = selectedSlug"
-					>
-						<input type="hidden" name="category" x-ref="catInput" value={ p.FilterCategory }/>
-						<button type="button" class="select select-sm w-full text-left flex items-center gap-2" @click="openPicker()">
-							<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-							<span x-text="displayLabel" class="text-sm truncate"></span>
-						</button>
-					</div>
-				</label>
-				<!-- Amount range: paired together at every breakpoint so Min/Max stay adjacent -->
-				<div class="grid grid-cols-2 gap-3 lg:col-span-2">
-					<label class="bb-filter-label">
-						Min Amount
-						<input type="number" name="min_amount" step="0.01" value={ p.FilterMinAmount } placeholder="0.00" class="input input-sm w-full"/>
-					</label>
-					<label class="bb-filter-label">
-						Max Amount
-						<input type="number" name="max_amount" step="0.01" value={ p.FilterMaxAmount } placeholder="0.00" class="input input-sm w-full"/>
-					</label>
-				</div>
-				<label class="bb-filter-label">
-					Pending
-					<select name="pending" class="select select-sm w-full">
-						<option value="">All</option>
-						@txSelectOption("true", "Yes", p.FilterPending)
-						@txSelectOption("false", "No", p.FilterPending)
-					</select>
-				</label>
-				<label class="bb-filter-label">
-					Flagged
-					<select name="flagged" class="select select-sm w-full">
-						<option value="">All</option>
-						@txSelectOption("true", "Flagged only", p.FilterFlagged)
-						@txSelectOption("false", "Not flagged", p.FilterFlagged)
-					</select>
-				</label>
-			</div>
-			<!-- Search within filters -->
-			<div class="border-t border-base-200 pt-4 mb-4" x-data={ txSearchModeInit(p.FilterSearchMode) }>
-				<div class="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1">
-					<div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 hidden sm:flex">
-						@components.LucideIcon("search", "w-3.5 h-3.5 text-base-content opacity-40")
-						Search
-					</div>
-					<div class="text-[0.65rem] text-base-content/40 hidden sm:block">Search in</div>
-					<div class="text-[0.65rem] text-base-content/40 hidden sm:block">Match type</div>
-					<div class="col-span-2 sm:hidden text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 mb-1">
-						@components.LucideIcon("search", "w-3.5 h-3.5 text-base-content opacity-40")
-						Search
-					</div>
-					<input type="search" enterkeyhint="search" name="search" value={ p.FilterSearch } placeholder="Search transactions..." class="input input-sm w-full col-span-2 sm:col-span-1"/>
-					<select name="search_field" class="select select-sm w-full">
-						@txSearchFieldOption("all", "Name & Merchant", p.FilterSearchField, true)
-						@txSearchFieldOption("name", "Name only", p.FilterSearchField, false)
-						@txSearchFieldOption("merchant", "Merchant only", p.FilterSearchField, false)
-					</select>
-					<select name="search_mode" class="select select-sm w-full" x-model="mode">
-						<option value="contains">Contains</option>
-						<option value="words">All words</option>
-						<option value="fuzzy">Fuzzy match</option>
-					</select>
-				</div>
-				<p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'contains'" x-cloak>Substring match — finds transactions containing the exact text</p>
-				<p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'words'" x-cloak>Matches each word independently — "Century Link" finds "CenturyLink"</p>
-				<p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'fuzzy'" x-cloak>Typo-tolerant similarity — finds close matches even with misspellings</p>
-			</div>
-			<!-- Tags filter -->
-			<div class="border-t border-base-200 pt-4 mb-4" x-data="tagFilter">
-				<div class="flex items-center justify-between mb-2">
-					<div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2">
-						@components.LucideIcon("tags", "w-3.5 h-3.5 text-base-content opacity-40")
-						Tags
-					</div>
-					<label class="flex items-center gap-1.5 text-[0.65rem] text-base-content/50 cursor-pointer">
-						<input type="checkbox" x-model="anyMode" class="checkbox checkbox-xs"/>
-						<span x-text="anyMode ? 'Match any (OR)' : 'Match all (AND)'"></span>
-					</label>
-				</div>
-				<input type="hidden" name="tags" :value="!anyMode ? selectedSlugs.join(',') : ''"/>
-				<input type="hidden" name="any_tag" :value="anyMode ? selectedSlugs.join(',') : ''"/>
-				<div class="flex flex-wrap gap-1.5">
-					<template x-for="t in availableTags" :key="t.slug">
-						<button
-							type="button"
-							class="bb-tag bb-tag-interactive"
-							:class="{ 'bb-tag-ghost': !isSelected(t.slug) }"
-							:title="t.display_name && t.display_name !== t.slug ? (t.display_name + ' — ' + t.slug) : t.slug"
-							:style="t.color ? ('--tag-color:' + t.color) : ''"
-							@click="toggle(t.slug)"
-						>
-							<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
-							<span x-text="t.display_name || t.slug"></span>
-						</button>
-					</template>
-					<span x-show="!availableTags.length" class="text-xs text-base-content/30 italic">No tags registered yet — go to <a href="/tags" class="link">/tags</a> to create one.</span>
-				</div>
-			</div>
-			<div class="bb-filter-actions">
-				<a href="/transactions" class="btn btn-sm btn-ghost">Reset</a>
-				<button type="submit" class="btn btn-sm btn-primary">
-					@components.LucideIcon("search", "w-3.5 h-3.5")
-					Apply Filters
-				</button>
-			</div>
-		</form>
 		if len(p.FilterChips) > 0 {
 			@txFilterChips(p.FilterChips)
 		}
 	</div>
+	@txFilterDrawer(p)
 }
 
-// txFilterChips renders a row of removable chips summarising each active
-// filter. Shown only when the filter panel is collapsed (x-show="!filtersOpen")
-// so the chips and the expanded panel never duplicate each other. Each chip's
-// × link drops just that one param from the current URL.
+// txFilterDrawer is the right-side slide-over that holds every filter axis,
+// relocated out of the old inline collapse panel (design-system sprint). It
+// stays a plain server GET form — Apply submits to /transactions with the same
+// query params as before — so all server-side filtering/pagination is
+// unchanged; only the chrome moved. The page's quick-search box remains the
+// single search input: a hidden `search` field is synced from #bb-quick-search
+// on submit so there is no second search box to reconcile.
+templ txFilterDrawer(p TransactionsProps) {
+	@components.Drawer(components.DrawerProps{ID: "tx-filters", Title: "Filter transactions", Size: "lg"}) {
+		<form
+			method="GET"
+			action="/transactions"
+			class="flex flex-col h-full"
+			x-data
+			@submit="document.getElementById('bb-tx-search-hidden').value = (document.getElementById('bb-quick-search') ? document.getElementById('bb-quick-search').value.trim() : '')"
+		>
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "sliders-horizontal",
+				Title:    "Filters",
+				Subtitle: "Narrow the transaction list",
+			})
+			<!-- Carries the page quick-search text into this GET submit so the
+			     quick-search box stays the only visible search input. -->
+			<input type="hidden" name="search" id="bb-tx-search-hidden" value={ p.FilterSearch }/>
+			<div class="flex-1 overflow-y-auto p-5 space-y-6">
+				<!-- When -->
+				<section class="space-y-2">
+					@txFilterSectionLabel("calendar", "When")
+					<div class="grid grid-cols-2 gap-3">
+						<label class="bb-filter-label">
+							Start date
+							<input type="date" name="start_date" value={ p.FilterStartDate } class="input input-sm w-full"/>
+						</label>
+						<label class="bb-filter-label">
+							End date
+							<input type="date" name="end_date" value={ p.FilterEndDate } class="input input-sm w-full"/>
+						</label>
+					</div>
+				</section>
+				<!-- Where -->
+				<section class="space-y-2">
+					@txFilterSectionLabel("landmark", "Where")
+					<div class="space-y-3">
+						<label class="bb-filter-label">
+							Connection
+							<select name="connection_id" class="select select-sm w-full">
+								<option value="">All connections</option>
+								for _, c := range p.Connections {
+									@txSelectOption(c.ID, c.InstitutionName, p.FilterConnID)
+								}
+							</select>
+						</label>
+						<label class="bb-filter-label">
+							Account
+							<select name="account_id" class="select select-sm w-full">
+								<option value="">All accounts</option>
+								for _, a := range p.Accounts {
+									@txSelectOption(a.ID, accountSelectLabel(a.Name, a.Mask), p.FilterAccountID)
+								}
+							</select>
+						</label>
+						<label class="bb-filter-label">
+							Family member
+							<select name="user_id" class="select select-sm w-full">
+								<option value="">All members</option>
+								for _, u := range p.Users {
+									@txSelectOption(u.ID, u.Name, p.FilterUserID)
+								}
+							</select>
+						</label>
+					</div>
+				</section>
+				<!-- What -->
+				<section class="space-y-2">
+					@txFilterSectionLabel("shapes", "What")
+					<div class="space-y-3">
+						<label class="bb-filter-label">
+							Category
+							<div
+								class="bb-cat-picker"
+								data-picker-source="tx-filter-cat"
+								x-data="categoryPicker"
+								data-mode="filter"
+								data-source-id="tx-filter-cat"
+								data-allow-empty="true"
+								data-empty-label="All categories"
+								data-initial={ p.FilterCategory }
+								@category-change="$refs.catInput.value = selectedSlug"
+							>
+								<input type="hidden" name="category" x-ref="catInput" value={ p.FilterCategory }/>
+								<button type="button" class="select select-sm w-full text-left flex items-center gap-2" @click="openPicker()">
+									<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+									<span x-text="displayLabel" class="text-sm truncate"></span>
+								</button>
+							</div>
+						</label>
+						<div class="grid grid-cols-2 gap-3">
+							<label class="bb-filter-label">
+								Min amount
+								<input type="number" name="min_amount" step="0.01" value={ p.FilterMinAmount } placeholder="0.00" class="input input-sm w-full"/>
+							</label>
+							<label class="bb-filter-label">
+								Max amount
+								<input type="number" name="max_amount" step="0.01" value={ p.FilterMaxAmount } placeholder="0.00" class="input input-sm w-full"/>
+							</label>
+						</div>
+						<div class="grid grid-cols-2 gap-3">
+							<label class="bb-filter-label">
+								Pending
+								<select name="pending" class="select select-sm w-full">
+									<option value="">All</option>
+									@txSelectOption("true", "Yes", p.FilterPending)
+									@txSelectOption("false", "No", p.FilterPending)
+								</select>
+							</label>
+							<label class="bb-filter-label">
+								Flagged
+								<select name="flagged" class="select select-sm w-full">
+									<option value="">All</option>
+									@txSelectOption("true", "Flagged only", p.FilterFlagged)
+									@txSelectOption("false", "Not flagged", p.FilterFlagged)
+								</select>
+							</label>
+						</div>
+					</div>
+				</section>
+				<!-- Tags -->
+				<section class="space-y-2" x-data="tagFilter">
+					<div class="flex items-center justify-between">
+						@txFilterSectionLabel("tags", "Tags")
+						<label class="flex items-center gap-1.5 text-[0.65rem] text-base-content/50 cursor-pointer">
+							<input type="checkbox" x-model="anyMode" class="checkbox checkbox-xs"/>
+							<span x-text="anyMode ? 'Match any (OR)' : 'Match all (AND)'"></span>
+						</label>
+					</div>
+					<input type="hidden" name="tags" :value="!anyMode ? selectedSlugs.join(',') : ''"/>
+					<input type="hidden" name="any_tag" :value="anyMode ? selectedSlugs.join(',') : ''"/>
+					<div class="flex flex-wrap gap-1.5">
+						<template x-for="t in availableTags" :key="t.slug">
+							<button
+								type="button"
+								class="bb-tag bb-tag-interactive"
+								:class="{ 'bb-tag-ghost': !isSelected(t.slug) }"
+								:title="t.display_name && t.display_name !== t.slug ? (t.display_name + ' — ' + t.slug) : t.slug"
+								:style="t.color ? ('--tag-color:' + t.color) : ''"
+								@click="toggle(t.slug)"
+							>
+								<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
+								<span x-text="t.display_name || t.slug"></span>
+							</button>
+						</template>
+						<span x-show="!availableTags.length" class="text-xs text-base-content/30 italic">No tags registered yet — go to <a href="/tags" class="link">/tags</a> to create one.</span>
+					</div>
+				</section>
+				<!-- Search options (apply to the quick-search box above) -->
+				<section class="space-y-2" x-data={ txSearchModeInit(p.FilterSearchMode) }>
+					@txFilterSectionLabel("search", "Search options")
+					<p class="text-[0.65rem] text-base-content/40 -mt-1">Applies to the search box above.</p>
+					<div class="grid grid-cols-2 gap-3">
+						<label class="bb-filter-label">
+							Search in
+							<select name="search_field" class="select select-sm w-full">
+								@txSearchFieldOption("all", "Name & Merchant", p.FilterSearchField, true)
+								@txSearchFieldOption("name", "Name only", p.FilterSearchField, false)
+								@txSearchFieldOption("merchant", "Merchant only", p.FilterSearchField, false)
+							</select>
+						</label>
+						<label class="bb-filter-label">
+							Match type
+							<select name="search_mode" class="select select-sm w-full" x-model="mode">
+								<option value="contains">Contains</option>
+								<option value="words">All words</option>
+								<option value="fuzzy">Fuzzy match</option>
+							</select>
+						</label>
+					</div>
+					<p class="text-[0.65rem] text-base-content/30" x-show="mode === 'contains'" x-cloak>Substring match — finds transactions containing the exact text</p>
+					<p class="text-[0.65rem] text-base-content/30" x-show="mode === 'words'" x-cloak>Matches each word independently — "Century Link" finds "CenturyLink"</p>
+					<p class="text-[0.65rem] text-base-content/30" x-show="mode === 'fuzzy'" x-cloak>Typo-tolerant similarity — finds close matches even with misspellings</p>
+				</section>
+			</div>
+			@components.DrawerFooter() {
+				<a href="/transactions" class="btn btn-ghost btn-sm">Reset</a>
+				<button type="submit" class="btn btn-primary btn-sm gap-2">
+					@components.LucideIcon("search", "w-3.5 h-3.5")
+					Apply filters
+				</button>
+			}
+		</form>
+	}
+}
+
+// txFilterSectionLabel is the quiet uppercase section divider used inside the
+// filter drawer — a small lucide glyph + label, matching the section-label
+// idiom in the design system.
+templ txFilterSectionLabel(icon, label string) {
+	<div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2">
+		@components.LucideIcon(icon, "w-3.5 h-3.5 opacity-60")
+		{ label }
+	</div>
+}
+
+// txFilterChips renders a row of removable badges summarising each active
+// filter, plus a trailing "Clear all". Always visible now that filters live in
+// a slide-over (the chips are the at-a-glance summary of what's applied). Each
+// badge's × link drops just that one param from the current URL; canonical
+// `badge badge-soft badge-info` per the design system (vivid on dark, unlike
+// the old hand-rolled primary/10 chip).
 templ txFilterChips(chips []TransactionsFilterChip) {
-	<div x-show="!filtersOpen" x-cloak class="flex flex-wrap items-center gap-1.5 mt-3" aria-label="Active filters">
+	<div class="flex flex-wrap items-center gap-1.5 mt-3" aria-label="Active filters">
 		for _, chip := range chips {
-			<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+			<span class="badge badge-soft badge-info gap-1 pr-1">
 				<span>{ chip.Label }</span>
 				<a
 					href={ templ.SafeURL(chip.RemoveURL) }
-					class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-primary/20 transition-colors"
+					class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full hover:bg-info/30 transition-colors"
 					aria-label={ "Remove filter " + chip.Label }
 					title={ "Remove " + chip.Label }
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+					@components.LucideIcon("x", "w-3 h-3")
 				</a>
 			</span>
 		}
+		<a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors ml-1">Clear all</a>
 	</div>
 }
 
@@ -572,31 +595,6 @@ func accountSelectLabel(name, mask string) string {
 		return name + " ••" + mask
 	}
 	return name
-}
-
-// filtersOpenInit renders the x-data initializer for the filters-open state.
-// The original html/template injected `true` / `false` directly via {{if}};
-// we do the same here so the DOM boots in the right state on first render.
-func filtersOpenInit(p TransactionsProps) string {
-	initial := "false"
-	if p.HasActiveFilters() {
-		initial = "true"
-	}
-	return fmt.Sprintf("{ filtersOpen: localStorage.getItem('bb-tx-filters-open') === 'true' || %s }", initial)
-}
-
-// filtersOpenWatch wires the localStorage persistence + quick-search →
-// advanced-search hand-off side effect. Pulled out of the inline string
-// so templ can attribute-escape it without fighting embedded quotes.
-func filtersOpenWatch() string {
-	return `$watch('filtersOpen', v => {
-  localStorage.setItem('bb-tx-filters-open', v);
-  if (v) {
-    var qs = document.getElementById('bb-quick-search');
-    var adv = document.querySelector('input[name="search"]');
-    if (qs && adv && qs.value.trim()) adv.value = qs.value.trim();
-  }
-})`
 }
 
 // txSearchModeInit renders the x-data initializer for the search-mode
