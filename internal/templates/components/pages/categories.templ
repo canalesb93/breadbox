@@ -83,8 +83,14 @@ templ Categories(p CategoriesProps) {
 // single card of list-rows. The wrapper carries the combined data-search
 // index so the Alpine filter can hide a whole group when neither the parent
 // nor any child matches.
+//
+// Each group owns a local `expanded` flag (default collapsed): the parent row
+// is a disclosure toggle, the subcategory rows show only when the group is
+// expanded OR a filter is active (so a search still surfaces matching
+// children inside a collapsed group). Groups whose parent has no children
+// render the parent as a plain edit link with no disclosure.
 templ categoryGroup(g CategoryGroup) {
-	<div data-search={ g.Parent.Search } x-show="matches($el)">
+	<div data-search={ g.Parent.Search } x-show="matches($el)" x-data="{ expanded: false }">
 		@components.AgentRunRowList() {
 			@categoryRow(g.Parent)
 			for _, ch := range g.Children {
@@ -107,33 +113,84 @@ templ categoryRow(r CategoryRowVM) {
 		data-category-id={ r.ID }
 		data-category-slug={ r.Slug }
 		data-search={ r.Search }
-		x-show="matches($el)"
+		if r.IsChild {
+			x-show="matches($el) && (expanded || filtering)"
+		} else {
+			x-show="matches($el)"
+		}
 	>
-		<a
-			class="contents no-underline focus:outline-none"
-			href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", r.ID)) }
-		>
-			@categoryColorTile(r)
-			<div class="min-w-0">
-				<div class="flex items-center gap-2 min-w-0">
-					<span class={ categoryNameClass(r) }>{ r.DisplayName }</span>
-					if !r.IsChild && r.ChildCount > 0 {
-						<span class="badge badge-ghost badge-xs shrink-0">{ strconv.Itoa(r.ChildCount) }</span>
-					}
-					if r.IsSystem {
-						<span class="badge badge-ghost badge-xs shrink-0">System</span>
-					}
-					if r.Hidden {
-						<span class="badge badge-soft badge-warning badge-xs shrink-0">Hidden</span>
-					}
-				</div>
-				<div class="mt-0.5 text-xs text-base-content/45 truncate">{ categoryRowDescriptor(r) }</div>
-			</div>
-		</a>
+		if categoryIsExpandable(r) {
+			<button
+				type="button"
+				class="contents text-left cursor-pointer focus:outline-none"
+				@click="expanded = !expanded"
+				:aria-expanded="expanded"
+				aria-label={ fmt.Sprintf("Toggle %s subcategories", r.DisplayName) }
+			>
+				@categoryRowLead(r)
+				@categoryRowBody(r)
+			</button>
+		} else {
+			<a
+				class="contents no-underline focus:outline-none"
+				href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", r.ID)) }
+			>
+				@categoryRowLead(r)
+				@categoryRowBody(r)
+			</a>
+		}
 		<div class="shrink-0 self-center">
 			@categoryRowActions(r)
 		</div>
 	</li>
+}
+
+// categoryRowLead renders the leading cell: the color tile, preceded by a
+// disclosure chevron (expandable parents) or an equal-width spacer
+// (childless parents — so every parent tile lines up). Child rows lead with
+// the bare tile; their nesting reads from the row's left indent instead.
+templ categoryRowLead(r CategoryRowVM) {
+	if r.IsChild {
+		@categoryColorTile(r)
+	} else {
+		<div class="flex items-center gap-1.5 shrink-0">
+			if categoryIsExpandable(r) {
+				<span class="shrink-0 text-base-content/40 transition-transform" :class="expanded ? 'rotate-90' : ''">
+					@components.LucideIcon("chevron-right", "w-4 h-4")
+				</span>
+			} else {
+				<span class="w-4 h-4 shrink-0"></span>
+			}
+			@categoryColorTile(r)
+		</div>
+	}
+}
+
+// categoryRowBody renders the title row (name + count/system/hidden badges)
+// and the muted descriptor line. Shared by the link and disclosure-button
+// row variants.
+templ categoryRowBody(r CategoryRowVM) {
+	<div class="min-w-0">
+		<div class="flex items-center gap-2 min-w-0">
+			<span class={ categoryNameClass(r) }>{ r.DisplayName }</span>
+			if !r.IsChild && r.ChildCount > 0 {
+				<span class="badge badge-ghost badge-xs shrink-0">{ strconv.Itoa(r.ChildCount) }</span>
+			}
+			if r.IsSystem {
+				<span class="badge badge-ghost badge-xs shrink-0">System</span>
+			}
+			if r.Hidden {
+				<span class="badge badge-soft badge-warning badge-xs shrink-0">Hidden</span>
+			}
+		</div>
+		<div class="mt-0.5 text-xs text-base-content/45 truncate">{ categoryRowDescriptor(r) }</div>
+	</div>
+}
+
+// categoryIsExpandable reports whether a row is a top-level category that
+// owns subcategories — the only rows that render a disclosure toggle.
+func categoryIsExpandable(r CategoryRowVM) bool {
+	return !r.IsChild && r.ChildCount > 0
 }
 
 // categoryColorTile renders the leading identity tile using the category's
