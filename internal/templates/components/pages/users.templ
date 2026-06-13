@@ -15,30 +15,41 @@ templ Users(p UsersProps) {
 		   n (registered below) to the Add Member link, and so the ? help modal
 		   surfaces it under "This page". Reset on Alpine teardown. */
 	}}
-	<div x-data x-init="$store.shortcuts.setScope('users')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	@components.PageHeader(components.PageHeaderProps{
-		Title:    "Household",
-		Subtitle: "Manage who has bank connections in Breadbox",
-		Action:   usersAddMemberAction(),
-	})
-	if p.Created {
-		<div role="alert" class="alert alert-success mb-6">
-			@components.LucideIcon("check-circle", "w-5 h-5")
-			<span>Member created. <button type="button" x-data @click="$store.drawers.open('connect-bank')" class="link font-medium">Connect a bank for them</button></span>
-		</div>
-	}
-	if p.IsUnlinked {
-		@usersUnlinkedPrompt(p)
-	}
-	if len(p.EnrichedUsers) > 0 {
-		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-			for _, u := range p.EnrichedUsers {
-				@usersMemberCard(u)
-			}
-		</div>
-	} else {
-		@usersEmpty()
-	}
+	<!-- Root Alpine scope: sets the keyboard-shortcut scope AND establishes a
+	     data scope so $store magics (drawers) bind inside the member rows'
+	     overflow-menu @click handlers. -->
+	<div x-data x-init="$store.shortcuts.setScope('users')" x-destroy="$store.shortcuts.setScope('global')">
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Household",
+			Subtitle:             "Everyone in your household — their sign-in access and connected accounts.",
+			SubtitleHideOnMobile: true,
+			Action:               usersAddMemberAction(),
+		})
+		if p.Created {
+			<div role="alert" class="alert alert-success mb-6">
+				@components.LucideIcon("check-circle", "w-5 h-5")
+				<span>Member created. <button type="button" @click="$store.drawers.open('connect-bank')" class="link font-medium">Connect a bank for them</button></span>
+			</div>
+		}
+		if p.IsUnlinked {
+			@usersUnlinkedPrompt(p)
+		}
+		if len(p.EnrichedUsers) > 0 {
+			{{ groups := groupHouseholdMembers(p.EnrichedUsers) }}
+			<div class="flex flex-col gap-5">
+				for _, g := range groups {
+					@householdMemberGroup(g, len(groups) > 1)
+				}
+			</div>
+		} else {
+			@usersEmpty()
+		}
+		<!-- Loading skeleton, mirroring the SSR list above. Exposed in
+		     /design#loading for any future client-side refresh. -->
+		<template id="bb-household-skeleton-template">
+			@components.HouseholdSkeleton()
+		</template>
+	</div>
 }
 
 // usersUnlinkedPrompt renders the warning panel shown when the current
@@ -55,9 +66,7 @@ templ usersUnlinkedPrompt(p UsersProps) {
 	<!-- Admin link prompt: admin account not yet linked to a household member -->
 	<div class="bb-card p-0 overflow-hidden mb-6 border-warning/30 bg-warning/[0.03]" x-data="{ mode: 'create', open: true }" x-show="open">
 		<div class="p-4 sm:p-5 flex items-start gap-3">
-			<div class="bb-icon-header__tile bb-icon-tile--warning">
-				@components.LucideIcon("user-plus", "w-5 h-5")
-			</div>
+			@components.LucideIcon("user-plus", "w-5 h-5 text-warning shrink-0 mt-0.5")
 			<div class="min-w-0 flex-1">
 				<h3 class="text-sm font-semibold">Link your admin account to a household member</h3>
 				<p class="text-xs text-base-content/60 mt-0.5">Your admin account isn't linked yet. Link it to manage bank connections and view your financial data.</p>
@@ -123,66 +132,88 @@ templ usersUnlinkedPrompt(p UsersProps) {
 	</div>
 }
 
-// usersMemberCard renders one household member's card: avatar, profile
-// info, login badge, and a compact stats footer. Account details are
-// intentionally omitted — the focus is the member profile.
-templ usersMemberCard(u UsersEnrichedRow) {
-	<div class="bb-card p-4 sm:p-5 flex flex-col gap-4">
-		<div class="flex items-start gap-4">
+// householdMemberGroup renders one IA bucket: a quiet label line (label ·
+// count) over the bucket's member list-rows inside a bb-card. The label is
+// suppressed when there's only one group — a single clean list needs no
+// header (design-system: group with quiet label lines, else a plain list).
+templ householdMemberGroup(g HouseholdMemberGroup, showLabel bool) {
+	<div class="flex flex-col gap-2">
+		if showLabel {
+			<div class="flex items-center gap-2 px-1 min-w-0">
+				<span class="text-sm font-medium text-base-content shrink-0">{ g.Label }</span>
+				<span class="text-xs text-base-content/40 shrink-0">{ fmt.Sprintf("%d", len(g.Rows)) }</span>
+			</div>
+		}
+		@components.AgentRunRowList() {
+			for _, u := range g.Rows {
+				@householdMemberRow(u)
+			}
+		}
+	</div>
+}
+
+// householdMemberRow renders one member as a list-row: the leading
+// UserAvatar IS the row's identity/status (design-system principle #7), a
+// title row (name + role + setup-pending badge), one body line (email ·
+// accounts summary), and an OverflowMenu outside the navigation anchor. The
+// row links to the member's edit page.
+templ householdMemberRow(u UsersEnrichedRow) {
+	<li class="list-row transition-colors hover:bg-base-200/40 focus-within:bg-base-200/40 items-center">
+		<a
+			class="contents no-underline"
+			href={ templ.SafeURL(fmt.Sprintf("/household/%s/edit", u.ID)) }
+			aria-label={ fmt.Sprintf("Edit %s", u.Name) }
+		>
 			@components.UserAvatar(components.UserAvatarProps{
 				ID:         u.ID,
 				Name:       u.Name,
 				Version:    u.AvatarVersion,
-				Size:       components.UserAvatar2XL,
+				Size:       components.UserAvatarXL,
 				Decorative: true,
+				Lazy:       true,
 				Class:      "shrink-0",
 			})
-			<div class="flex-1 min-w-0">
-				<div class="flex items-start justify-between gap-2">
-					<div class="min-w-0">
-						<div class="flex items-center gap-1.5 flex-wrap">
-							<h3 class="font-semibold text-base leading-snug">{ u.Name }</h3>
-							if u.HasLogin {
-								<span class={ "badge badge-xs", usersLoginRoleBadgeClass(u.LoginRole) }>{ u.LoginRole }</span>
-								if u.LoginSetupPending {
-									<span class="badge badge-xs badge-warning">setup pending</span>
-								}
-							} else {
-								<span class="badge badge-xs badge-ghost">no login</span>
-							}
-						</div>
-						if u.HasEmail {
-							<p class="text-xs text-base-content/45 mt-0.5">{ u.Email }</p>
-						} else if u.LoginUsername != "" {
-							<p class="text-xs text-base-content/45 mt-0.5">{ u.LoginUsername }</p>
-						} else {
-							<p class="text-xs text-base-content/30 italic mt-0.5">No email</p>
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="font-medium text-sm text-base-content truncate">{ u.Name }</span>
+					if u.HasLogin {
+						<span class={ "badge badge-xs shrink-0", usersLoginRoleBadgeClass(u.LoginRole) }>{ householdRoleLabel(u.LoginRole) }</span>
+						if u.LoginSetupPending {
+							<span class="badge badge-xs badge-warning shrink-0">setup pending</span>
 						}
-					</div>
-					@components.OverflowMenu(components.OverflowMenuProps{
-						AriaLabel: fmt.Sprintf("Actions for %s", u.Name),
-						Items:     usersOverflowItems(u),
-					})
+					}
 				</div>
+				@householdMemberRowBody(u)
 			</div>
+		</a>
+		<div class="shrink-0 self-center">
+			@components.OverflowMenu(components.OverflowMenuProps{
+				AriaLabel: fmt.Sprintf("Actions for %s", u.Name),
+				Size:      "sm",
+				Items:     usersOverflowItems(u),
+			})
 		</div>
-		<!-- Footer: account stats + member since -->
-		<div class="flex items-center justify-between gap-2 pt-3 border-t border-base-300/60">
-			if u.AccountCount > 0 {
-				<span class="flex items-center gap-1.5 text-xs text-base-content/50">
-					@components.LucideIcon("landmark", "w-3.5 h-3.5")
-					{ usersAccountsSummary(u.AccountCount, u.ConnectionCount) }
-				</span>
-			} else {
-				<button type="button" x-data @click="$store.drawers.open('connect-bank')" class="flex items-center gap-1 text-xs text-base-content/40 hover:text-primary transition-colors">
-					@components.LucideIcon("plus", "w-3.5 h-3.5")
-					Connect a bank
-				</button>
-			}
-			if u.HasCreatedAt {
-				<span class="text-xs text-base-content/30 shrink-0">Since { u.CreatedAtLabel }</span>
-			}
-		</div>
+	</li>
+}
+
+// householdMemberRowBody renders the single body line: the member's email
+// (or login username, or a quiet "No email"), then the accounts summary —
+// "N accounts across M connections" or a muted "No accounts yet".
+templ householdMemberRowBody(u UsersEnrichedRow) {
+	<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
+		if u.HasEmail {
+			<span>{ u.Email }</span>
+		} else if u.LoginUsername != "" {
+			<span>{ u.LoginUsername }</span>
+		} else {
+			<span class="text-base-content/35 italic">No email</span>
+		}
+		<span class="text-base-content/25">&middot;</span>
+		if u.AccountCount > 0 {
+			<span>{ usersAccountsSummary(u.AccountCount, u.ConnectionCount) }</span>
+		} else {
+			<span class="text-base-content/35">No accounts yet</span>
+		}
 	</div>
 }
 
@@ -228,6 +259,12 @@ func usersOverflowItems(u UsersEnrichedRow) []components.OverflowMenuItem {
 			Label: "Transactions",
 			Icon:  "receipt",
 			Href:  templ.SafeURL(fmt.Sprintf("/transactions?user_id=%s", u.ID)),
+		})
+	} else {
+		items = append(items, components.OverflowMenuItem{
+			Label:   "Connect a bank",
+			Icon:    "plus",
+			OnClick: "$store.drawers.open('connect-bank')",
 		})
 	}
 	return items

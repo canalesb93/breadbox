@@ -1,0 +1,41 @@
+package components
+
+// HouseholdSkeleton mirrors the /household members list: two quiet
+// label-line groups, each over a daisy `list` of member rows. Exposed in
+// /design#loading and embedded in a <template> on the live page for any
+// future client-side refresh. The live page is full-SSR today.
+templ HouseholdSkeleton() {
+	<div aria-hidden="true" class="flex flex-col gap-5">
+		@householdSkeletonGroup(2)
+		@householdSkeletonGroup(2)
+	</div>
+}
+
+// householdSkeletonGroup mirrors one member group: a label line over a
+// rounded list of member rows.
+templ householdSkeletonGroup(rows int) {
+	<div class="flex flex-col gap-2">
+		<div class="flex items-center gap-2 px-1">
+			<div class="skeleton h-3 w-24"></div>
+			<div class="skeleton h-3 w-4"></div>
+		</div>
+		<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+			for j := 0; j < rows; j++ {
+				@householdSkeletonRow()
+			}
+		</ul>
+	</div>
+}
+
+// householdSkeletonRow mirrors householdMemberRow: a round leading avatar,
+// name + body line, and a trailing kebab slot.
+templ householdSkeletonRow() {
+	<li class="list-row items-center">
+		<div class="skeleton w-10 h-10 rounded-full shrink-0"></div>
+		<div class="min-w-0 space-y-1.5">
+			<div class="skeleton h-4 w-32 sm:w-40"></div>
+			<div class="skeleton h-2.5 w-48"></div>
+		</div>
+		<div class="skeleton w-8 h-8 rounded-lg shrink-0 ml-auto"></div>
+	</li>
+}
