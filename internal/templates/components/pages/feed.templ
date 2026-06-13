@@ -88,35 +88,32 @@ templ feedHero(p FeedProps) {
 	</header>
 }
 
-// feedHeroSyncTile mirrors components.StatTile's icon-tile-left geometry so
-// it sits flush in the StatTileRow, but stays bespoke: the icon tile is
-// status-toned (carrying the health signal a plain StatTile can't), and a
-// second muted "Next sync" line points users at the upcoming cron fire.
+// feedHeroSyncTile mirrors components.StatTile's Mintlify-clean geometry so
+// it sits flush in the StatTileRow: small label on top, big plain number,
+// muted sublines. It stays bespoke only to carry the sync health signal as a
+// small status-colored icon inline with the subline (a quiet accent, not a
+// tinted tile) plus a second muted "Next sync" line pointing at the upcoming
+// cron fire.
 templ feedHeroSyncTile(p FeedProps) {
-	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-4 no-underline block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="Last sync — view sync logs">
-		<div class="flex items-center gap-2.5 sm:gap-3">
-			<div class={ "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0", feedSyncTileBg(p.Hero.LastSyncStatus) }>
-				@components.LucideIcon("refresh-cw", "w-4 h-4 "+feedSyncTileText(p.Hero.LastSyncStatus))
-			</div>
-			<div class="min-w-0 flex-1">
-				if p.Hero.LastSyncRel != "" {
-					<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate">{ p.Hero.LastSyncRel }</div>
-					<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">Last sync</div>
-					<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate">
-						{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }
+	<a href="/logs?tab=syncs" class="bb-card bb-card--interactive p-5 no-underline block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="Last sync — view sync logs">
+		<div class="min-w-0">
+			<div class="text-xs font-medium text-base-content/50 truncate">Last sync</div>
+			if p.Hero.LastSyncRel != "" {
+				<div class="text-2xl sm:text-3xl font-semibold tabular-nums text-base-content leading-tight mt-1.5 truncate">{ p.Hero.LastSyncRel }</div>
+				<div class="text-xs text-base-content/45 mt-1 truncate flex items-center gap-1">
+					@components.LucideIcon(feedSyncIcon(p.Hero.LastSyncStatus), "w-3 h-3 shrink-0 "+feedSyncTileText(p.Hero.LastSyncStatus))
+					<span class="truncate">{ feedSyncSubLine(p.Hero.LastSyncStatus, p.Hero.LastSyncInstitution) }</span>
+				</div>
+				if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
+					<div class="text-xs text-base-content/45 mt-1 truncate flex items-center gap-1">
+						@components.LucideIcon("clock", "w-3 h-3 shrink-0")
+						<span>Next sync { p.Hero.NextSyncRel }</span>
 					</div>
-					if feedShowNextSync(p.Hero.LastSyncStatus, p.Hero.NextSyncRel) {
-						<div class="text-[0.65rem] text-base-content/45 mt-0.5 truncate flex items-center gap-1">
-							@components.LucideIcon("clock", "w-3 h-3 shrink-0")
-							<span>Next sync { p.Hero.NextSyncRel }</span>
-						</div>
-					}
-				} else {
-					<div class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate text-base-content/30">—</div>
-					<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">Last sync</div>
-					<div class="text-[0.65rem] text-base-content/45 mt-0.5">No syncs yet</div>
 				}
-			</div>
+			} else {
+				<div class="text-2xl sm:text-3xl font-semibold tabular-nums text-base-content/30 leading-tight mt-1.5 truncate">—</div>
+				<div class="text-xs text-base-content/45 mt-1">No syncs yet</div>
+			}
 		</div>
 	</a>
 }

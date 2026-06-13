@@ -1336,40 +1336,60 @@ templ SectionEmptyStates() {
 // ─── Stat tiles ────────────────────────────────────────────────────────
 templ SectionStatTiles() {
 	<div class="flex flex-col gap-6">
-		@designExample("4-up tile row (canonical dashboard pattern)", "StatTileRow lays out the 2-up / 4-up grid. Tones drive the icon-tile color.") {
+		@designExample("4-up tile row (Mintlify-clean dashboard pattern)", "Hairline box · small muted label on top · big plain number (default ink) · optional muted description. No icon, no tone fill, no tint — the number speaks.") {
 			@components.StatTileRow() {
 				@components.StatTile(components.StatTileProps{
-					Icon:  "target",
 					Label: "Times matched",
 					Value: "1,284",
-					Tone:  components.StatTonePrimary,
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:  "layers",
 					Label: "Transactions",
 					Value: "342",
-					Tone:  components.StatToneInfo,
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:        "alert-circle",
 					Label:       "Pending",
 					Value:       "12",
-					Tone:        components.StatToneWarning,
 					Description: "review needed",
 				})
 				@components.StatTile(components.StatTileProps{
-					Icon:  "clock",
 					Label: "Last active",
 					Value: "2h ago",
 					Href:  "#",
 				})
 			}
 		}
-		@designExample("Without icon (label-only)", "Omit Icon when there's no meaningful glyph.") {
+		@designExample("With delta (↓/↑ vs previous)", "Set Delta + DeltaDir for a tiny semantic trend line under the value — down=error-ish, up=success-ish, neutral=muted. Mirrors Mintlify's \"↓ 45.7% vs previous\".") {
+			@components.StatTileRow() {
+				@components.StatTile(components.StatTileProps{
+					Label:    "Visitors",
+					Value:    "22",
+					Delta:    "45.7% vs previous",
+					DeltaDir: components.StatDeltaDown,
+				})
+				@components.StatTile(components.StatTileProps{
+					Label:    "Views",
+					Value:    "37",
+					Delta:    "12.4% vs previous",
+					DeltaDir: components.StatDeltaUp,
+				})
+				@components.StatTile(components.StatTileProps{
+					Label:    "Searches",
+					Value:    "0",
+					Delta:    "no change",
+					DeltaDir: components.StatDeltaNeutral,
+				})
+				@components.StatTile(components.StatTileProps{
+					Label: "Feedback",
+					Value: "0",
+				})
+			}
+		}
+		@designExample("Single tile", "Drop a StatTile anywhere — it fills its container.") {
 			<div class="max-w-sm">
 				@components.StatTile(components.StatTileProps{
-					Label: "Total volume (USD)",
-					Value: "$48,201.55",
+					Label:            "Total volume (USD)",
+					Value:            "$48,201.55",
+					ValuePrivateKind: "amount",
 				})
 			</div>
 		}

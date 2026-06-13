@@ -66,6 +66,12 @@ Concretely:
 - **Decoration earns its place or it's cut.** Gradients, glows, motion,
   accent washes, oversized numerals — each must justify itself against "would
   Mintlify do this?". Usually the answer is no.
+- **Stat cards are quiet.** A metric tile is a hairline box · small muted label
+  on top · big plain number (default ink, *not* a tone color) · an optional tiny
+  delta line (small arrow + "↓ 45.7% vs previous" in a quiet semantic color).
+  **No icon tile, no tone fill, no tint, no left-accent.** Use the shared
+  `StatTile` (`stat_tile.templ`); the full pattern is in `components.md` →
+  "Stat cards — the Mintlify-clean pattern".
 
 This section overrides any temptation toward "bold = bigger/louder." Bold here
 means **confidently restrained**. Keep referencing Mintlify; fold new learnings
