@@ -1000,24 +1000,16 @@ templ workflowCustomPromptField() {
 					</button>
 				</div>
 			</div>
-			// Empty body — clean centered invitation with a real CTA button.
+			// Empty body — a quiet placeholder that reads like an empty editor
+			// field; click anywhere to compose.
 			<button
 				type="button"
 				x-show="!custom.prompt.trim()"
 				@click="editPrompt(true)"
-				class="group flex w-full cursor-pointer flex-col items-center gap-3 px-5 py-9 text-center transition-colors hover:bg-base-200/40"
+				class="flex min-h-28 w-full cursor-pointer items-start gap-2 px-4 py-3.5 text-left text-sm text-base-content/40 transition-colors hover:bg-base-200/40 hover:text-base-content/60"
 			>
-				<span class="flex h-12 w-12 items-center justify-center rounded-full bg-base-200 text-base-content/50 transition-colors group-hover:bg-primary/10 group-hover:text-primary">
-					@components.LucideIcon("sparkles", "w-5 h-5")
-				</span>
-				<span class="max-w-sm">
-					<span class="block text-sm font-semibold">Compose the prompt</span>
-					<span class="block text-xs text-base-content/55 mt-1">The full instructions sent on every run — author it in Markdown with live preview. This is the entire workflow; there's no template behind it.</span>
-				</span>
-				<span class="btn btn-primary btn-sm gap-1.5">
-					@components.LucideIcon("pencil", "w-4 h-4")
-					Open editor
-				</span>
+				@components.LucideIcon("pencil", "w-4 h-4 mt-0.5 shrink-0")
+				<span>The full instructions sent on every run. Click to compose it in Markdown, with live preview.</span>
 			</button>
 			// Filled body — clickable monospace excerpt; hover highlights it.
 			<button
