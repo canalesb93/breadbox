@@ -160,6 +160,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionCards() },
 		},
 		{
+			Slug:        "collapsible-section",
+			Title:       "Collapsible section",
+			Description: "components.CollapsibleSection — a quiet disclosure (lucide glyph + label + optional right-slot indicator) toggling its body with a rotating chevron. Alpine `{ open }` state so default-open is data-driven; the body uses x-show (kept in the DOM) so form inputs inside a collapsed section still submit. Backs the /transactions filter drawer's When/Where/What/Tags/Search sections — open when they hold an active filter, collapsed with a count/dot indicator otherwise.",
+			Group:       "layout",
+			Render:      func() templ.Component { return SectionCollapsibleSection() },
+		},
+		{
 			Slug:        "empty-states",
 			Title:       "Empty states",
 			Description: "Standard no-data and no-results patterns. Use components.EmptyState.",

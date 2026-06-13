@@ -1,0 +1,77 @@
+package components
+
+// CollapsibleSection is a quiet, reusable disclosure: a header row (lucide
+// glyph + label + an optional right-slot indicator) that toggles a body open
+// or closed with a rotating chevron. It is the shared abstraction behind the
+// /transactions filter drawer's When / Where / What / Tags / Search sections,
+// where each section defaults open when it holds an active filter and collapses
+// otherwise so the drawer stays scannable.
+//
+// Disclosure state is a tiny Alpine x-data (`{ open: <bool> }`) so the
+// default-open decision is data-driven by the caller (a Go bool) rather than a
+// CSS-only <details>. The body is rendered with `x-show` (NOT removed from the
+// DOM) so any form inputs inside a collapsed section still submit — this is the
+// load-bearing reason CollapsibleSection is used instead of daisy `collapse` /
+// `<details>` inside a <form>.
+//
+// The component exposes `open` in its Alpine scope. A caller's Right component
+// can read it — e.g. pass an indicator guarded with `x-show="!open"` so it only
+// surfaces when the section is collapsed (the "you have an active filter hidden
+// here" cue).
+//
+//	@components.CollapsibleSection(components.CollapsibleSectionProps{
+//	    Icon: "calendar", Label: "When", DefaultOpen: true,
+//	}) {
+//	    <!-- body controls -->
+//	}
+type CollapsibleSectionProps struct {
+	// Icon is a lucide glyph name shown left of the label. Optional.
+	Icon string
+	// Label is the section title. Required.
+	Label string
+	// DefaultOpen seeds the disclosure open on first render.
+	DefaultOpen bool
+	// Right is an optional templ.Component rendered in the header between the
+	// label and the chevron — typically a small active-filter indicator. It is
+	// rendered inside this component's Alpine scope, so it may reference `open`.
+	Right templ.Component
+	// Class adds extra classes to the section wrapper (rare).
+	Class string
+}
+
+templ CollapsibleSection(p CollapsibleSectionProps) {
+	<section x-data={ collapsibleSectionData(p.DefaultOpen) } class={ "space-y-2 " + p.Class }>
+		<button
+			type="button"
+			class="group flex items-center gap-2 w-full text-left"
+			@click="open = !open"
+			:aria-expanded="open ? 'true' : 'false'"
+		>
+			if p.Icon != "" {
+				@LucideIcon(p.Icon, "w-3.5 h-3.5 opacity-60 shrink-0")
+			}
+			<span class="text-xs font-medium text-base-content/50 uppercase tracking-wider">{ p.Label }</span>
+			<span class="flex-1"></span>
+			if p.Right != nil {
+				@p.Right
+			}
+			<!-- chevron — borrows the collapse-arrow rotation idiom -->
+			<span class="inline-flex transition-transform duration-200 text-base-content/40 group-hover:text-base-content/70 shrink-0" :class="open && 'rotate-180'">
+				@LucideIcon("chevron-down", "w-3.5 h-3.5")
+			</span>
+		</button>
+		<div x-show="open" x-collapse>
+			{ children... }
+		</div>
+	</section>
+}
+
+// collapsibleSectionData returns the Alpine x-data object literal seeding the
+// disclosure's open state. Kept as a Go helper so the default-open decision is
+// driven by a typed bool from the caller rather than string-built markup.
+func collapsibleSectionData(open bool) string {
+	if open {
+		return "{ open: true }"
+	}
+	return "{ open: false }"
+}

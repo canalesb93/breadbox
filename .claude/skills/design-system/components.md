@@ -203,6 +203,33 @@ EmptyStateProps{
 }
 ```
 
+## CollapsibleSection — `collapsible_section.templ`
+
+A quiet, reusable disclosure: a header row (lucide glyph + label + optional
+right-slot indicator) toggling its body open/closed with a rotating chevron.
+
+```go
+CollapsibleSectionProps{
+    Icon string; Label string /* required */
+    DefaultOpen bool            // data-driven open-on-render decision
+    Right templ.Component       // optional header indicator (rendered in scope)
+    Class string
+}
+```
+
+- Disclosure state is a tiny Alpine `{ open: <bool> }`; the body renders with
+  `x-show` (NOT `<details>`), so **form inputs inside a collapsed section still
+  submit** — this is the reason to use it over daisy `collapse`/`<details>`
+  inside a `<form>`.
+- The component exposes `open` in its Alpine scope. A `Right` indicator guarded
+  with `x-show="!open"` surfaces only when collapsed (the "active filter hidden
+  here" cue). Nest the component inside an ancestor `x-data` to let the
+  indicator read reactive state (e.g. the Tags section reads `selectedSlugs`).
+- Backs the `/transactions` filter drawer's When / Where / What / Tags / Search
+  sections: each defaults open when it holds an active filter (computed in
+  `TransactionsProps.*SectionOpen`) and collapses with a count/dot indicator
+  otherwise. Sandbox: `/design/c/collapsible-section`.
+
 ## Skeletons — `*_skeleton.templ`
 
 Loading placeholders that mirror the real component's shape so the swap-in
