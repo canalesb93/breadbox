@@ -292,6 +292,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionRecurringChips() },
 		},
 		{
+			Slug:        "recurring-ledger",
+			Title:       "Recurring ledger",
+			Description: "The /recurring charge ledger after its table → grouped-list-row migration: rows grouped by status (Active → Paused → Ended) under quiet label lines, a single-currency monthly subtotal on the Active header, a leading status tile (success/warning/muted), name + type/renewal/price chips, a cadence·next-renewal body line, the amount, and an overflow menu (View · Pause/Resume · Cancel). Same list-row shape as /accounts and /rules.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionRecurringLedger() },
+		},
+		{
 			Slug:        "recurring-detail",
 			Title:       "Recurring detail panels",
 			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz, with a no-amount variant), the standalone SeriesMatchWindow amount-axis viz, SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset, read-only and unlinkable variants), and SeriesFactStrip (read-only derived facts). Money values carry data-private so privacy mode obfuscates them. The handler assembles the values; these are pure presentation.",
