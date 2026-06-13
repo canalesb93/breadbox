@@ -43,13 +43,6 @@ func connectionsAccountSuffix(n int64, compact bool) string {
 	return "accounts"
 }
 
-// connectionsHumanize replaces underscores with spaces so subtype slugs like
-// "credit_card" render as "credit card". Mirrors the funcMap "humanize"
-// helper in admin/templates.go.
-func connectionsHumanize(s string) string {
-	return strings.ReplaceAll(s, "_", " ")
-}
-
 // connectionsLinkActionURL builds a templ.SafeURL for the account-link form
 // actions (reconcile, delete). The path-construction lives in Go rather
 // than as a string literal in the .templ file so the routes-drift test
