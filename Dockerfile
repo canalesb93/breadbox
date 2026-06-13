@@ -70,7 +70,22 @@ FROM alpine:3.21
 #   Without nodejs the spawn fires ENOENT on an unhandled error handler
 #   inside the SDK; the async iterator ends silently with zero messages
 #   and the run is misclassified as a 0-cost, 0-turn "success".
-RUN apk --no-cache add ca-certificates tzdata postgresql16-client libstdc++ libgcc nodejs
+# bash + ripgrep: the agent's own analysis tools (Bash, Grep) need a POSIX
+#   shell and ripgrep. Alpine ships neither (only busybox sh, no rg), so an
+#   agent that tried to grep a large saved tool-result hit
+#   "No suitable shell found" / "spawn .../vendor/ripgrep/.../rg ENOENT" and
+#   was left unable to do file-level analysis. We install both and point the
+#   SDK at the system rg via USE_BUILTIN_RIPGREP=0 (its bundled copy is not
+#   embedded in the Bun --compile output). See agent/sidecar/index.ts.
+RUN apk --no-cache add ca-certificates tzdata postgresql16-client libstdc++ libgcc nodejs bash ripgrep
+
+# SHELL: the Claude Agent SDK's Bash tool requires SHELL to point at a POSIX
+#   shell; the container env doesn't set it otherwise. USE_BUILTIN_RIPGREP=0:
+#   use the system ripgrep we installed instead of the SDK's vendored binary,
+#   which isn't present in the sidecar bundle. Both are also defaulted
+#   defensively in the sidecar itself for non-Docker installs.
+ENV SHELL=/bin/bash \
+    USE_BUILTIN_RIPGREP=0
 
 WORKDIR /app
 COPY --from=builder /breadbox /app/breadbox

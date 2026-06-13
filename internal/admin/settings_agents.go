@@ -60,6 +60,7 @@ func AgentsSettingsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			"update_transactions":           "Tags",
 			"list_annotations":              "Tags",
 			"list_transaction_rules":        "Rules",
+			"query_transaction_rules":       "Rules",
 			"create_transaction_rule":       "Rules",
 			"update_transaction_rule":       "Rules",
 			"delete_transaction_rule":       "Rules",

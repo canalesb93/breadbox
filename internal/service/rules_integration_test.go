@@ -358,6 +358,92 @@ func TestListTransactionRules_FilterByCategory(t *testing.T) {
 	}
 }
 
+// TestQueryTransactionRules_FiltersAndSort exercises the query_transaction_rules
+// knobs added on top of the base list: trigger filter, hit-count filters
+// (min_hit_count / only_unused), explicit sort, and the rule that an explicit
+// sort suppresses cursor pagination (the cursor key is (created_at,id), valid
+// only for the default ordering).
+func TestQueryTransactionRules_FiltersAndSort(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	// Three rules with distinct triggers + hit counts.
+	mk := func(name, trigger string, hits int) string {
+		r, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+			Name:         name,
+			CategorySlug: cat.Slug,
+			Trigger:      trigger,
+			Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: name},
+		})
+		if err != nil {
+			t.Fatalf("create %q: %v", name, err)
+		}
+		if hits > 0 {
+			if _, err := pool.Exec(ctx, "UPDATE transaction_rules SET hit_count = $1 WHERE id = $2", hits, r.ID); err != nil {
+				t.Fatalf("bump hit_count for %q: %v", name, err)
+			}
+		}
+		return r.ID
+	}
+	mk("alpha", "on_create", 0) // never fired
+	mk("bravo", "on_change", 5) // mid
+	mk("charlie", "always", 20) // top impact
+
+	// trigger filter: on_change matches the on_change rule (and the on_update alias).
+	trig := "on_change"
+	got, err := svc.ListTransactionRules(ctx, service.TransactionRuleListParams{Trigger: &trig})
+	if err != nil {
+		t.Fatalf("trigger filter: %v", err)
+	}
+	if got.Total != 1 || len(got.Rules) != 1 || got.Rules[0].Name != "bravo" {
+		t.Errorf("trigger=on_change: want [bravo], got total=%d %+v", got.Total, ruleNames(got.Rules))
+	}
+
+	// only_unused: just the never-fired rule.
+	got, err = svc.ListTransactionRules(ctx, service.TransactionRuleListParams{OnlyUnused: true})
+	if err != nil {
+		t.Fatalf("only_unused: %v", err)
+	}
+	if got.Total != 1 || got.Rules[0].Name != "alpha" {
+		t.Errorf("only_unused: want [alpha], got total=%d %+v", got.Total, ruleNames(got.Rules))
+	}
+
+	// min_hit_count >= 5 excludes the never-fired rule.
+	minHits := 5
+	got, err = svc.ListTransactionRules(ctx, service.TransactionRuleListParams{MinHitCount: &minHits})
+	if err != nil {
+		t.Fatalf("min_hit_count: %v", err)
+	}
+	if got.Total != 2 {
+		t.Errorf("min_hit_count=5: want 2, got %d %+v", got.Total, ruleNames(got.Rules))
+	}
+
+	// sort_by=hit_count desc → charlie(20), bravo(5), alpha(0); and no cursor on
+	// an explicit sort even when there's more than a page.
+	got, err = svc.ListTransactionRules(ctx, service.TransactionRuleListParams{SortBy: "hit_count", SortDir: "desc", Limit: 2})
+	if err != nil {
+		t.Fatalf("sort_by hit_count: %v", err)
+	}
+	if len(got.Rules) != 2 || got.Rules[0].Name != "charlie" || got.Rules[1].Name != "bravo" {
+		t.Errorf("sort_by=hit_count desc: want [charlie bravo], got %+v", ruleNames(got.Rules))
+	}
+	if !got.HasMore {
+		t.Errorf("sort_by=hit_count limit=2: expected HasMore with 3 rules")
+	}
+	if got.NextCursor != "" {
+		t.Errorf("explicit sort must not emit a next_cursor, got %q", got.NextCursor)
+	}
+}
+
+func ruleNames(rules []service.TransactionRuleResponse) []string {
+	out := make([]string, len(rules))
+	for i, r := range rules {
+		out[i] = r.Name
+	}
+	return out
+}
+
 func TestListTransactionRules_FilterBySearch(t *testing.T) {
 	svc, queries, _ := newService(t)
 	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
