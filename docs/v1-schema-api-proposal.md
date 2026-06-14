@@ -31,7 +31,7 @@ Seven bold strokes define this proposal:
 4. **Rename `annotations` → `transaction_events`** and treat it as the first-class, partition-ready event log it already is.
 5. **Split the surface: public `/api/v1` (token-auth, OpenAPI, stable) vs. operator `/admin` (session-auth).** Workflows, provider credentials, users/logins, and settings move to operator-only.
 6. **Uniform cursor pagination + field selection on every list.** Kill offset pagination and bare-array responses.
-7. **Defer OAuth and device-codes out of the advertised v1.** Ship API-keys as the single, coherent front door. Add the missing retention/cleanup jobs for everything we *do* ship.
+7. **Defer OAuth out of the advertised v1; ship API-keys as the single, coherent front door** (and finish device-code CLI login so headless self-hosters can mint a key). Add the missing retention/cleanup jobs for everything we ship.
 
 > ⚠️ **Scope note (verified):** `csv_import_*`, `dev_reports`, and `transactions.content_hash`
 > appear in the shared dev database but are **NOT in `main`** — they leaked from sibling
@@ -68,7 +68,8 @@ by domain. Renamed columns are shown as `old → new`. New columns marked **+**.
 
 | Table | Notable target shape | Changes |
 |---|---|---|
-| `transactions` | the core ledger | **drop** `unofficial_currency_code` (dead Plaid legacy); `provider_pending_transaction_id → replaced_pending_provider_id`; `category_override → category_source` (ENUM none/rule/agent/user); evaluate moving `provider_raw` off the hot row (see §4); + index `(attributed_user_id)` |
+| `transactions` | the core ledger | **drop** `unofficial_currency_code` (dead Plaid legacy); **move** `provider_raw` → side table `transaction_provider_payloads` (decision §4.1); `provider_pending_transaction_id → replaced_pending_provider_id`; `category_override → category_source` (ENUM none/rule/agent/user); + index `(attributed_user_id)` |
+| `transaction_provider_payloads` **(NEW)** | 1:1 raw provider payload archive, keyed by `transaction_id` | holds `provider_raw JSONB` off the hot ledger so scans/queries stay lean; full payload available on join for debugging/re-enrichment |
 | `categories` | hierarchical category tree | no change — clean |
 | `tags` | reusable labels | `lifecycle TEXT → tag_retention ENUM(persistent, ephemeral)` + document "ephemeral = removal requires a reason" |
 | `transaction_tags` | txn↔tag join w/ provenance | no change — clean |
@@ -110,15 +111,15 @@ by domain. Renamed columns are shown as `old → new`. New columns marked **+**.
 |---|---|---|
 | `app_config` | env→DB→default key/value | remove dead seeded keys `sync_interval_hours`, `setup_complete` |
 
-### 2.8 Deferred out of advertised v1 (kept dormant, unadvertised, or removed)
+### 2.8 Deferred out of advertised v1
 
 | Table(s) | Verdict | Rationale |
 |---|---|---|
 | `oauth_clients`, `oauth_access_tokens`, `oauth_refresh_tokens`, `oauth_authorization_codes` | **DEFER** — not advertised; remove from v1 docs/UI | 0 production rows; expiry-cleanup job never wired; unproven rotation/revocation under load. Ship API-keys as the single front door. Re-introduce as a post-1.0 minor with the cleanup hook. |
-| `auth_device_codes` | **FINISH or CUT** | RFC-8628 CLI login is genuinely valuable, but the service layer is not wired (orphaned queries). Either complete `breadbox auth login` for v1 or drop the table until it's real. |
+| `auth_device_codes` | **FINISH for v1** (decision §4.2) | RFC-8628 CLI login is a real self-hoster story. Wire the service layer + `breadbox auth login`, add the expiry-cleanup job, and ship it. |
 
-> Net table count: 34 today − 4 OAuth (deferred) − 1 device-codes (if cut) − 1 (`reports`
-> rename is not a drop) = **~28–30 advertised tables for v1.**
+> Net table count: 34 today + 1 (`transaction_provider_payloads`) − 4 OAuth (deferred) −
+> 0 (`reports` is a rename, device-codes now ships) = **~31 advertised tables for v1.**
 
 ---
 
@@ -198,32 +199,37 @@ needs admin rights. The split makes the public contract honest.
 
 ---
 
-## 4. Open decisions (need a call before implementation)
+## 4. Resolved decisions
 
-1. **`transactions.provider_raw` (JSONB, full provider payload per row).** Useful for
-   debugging and re-processing, but stored on the hottest table for every row — real bytes
-   at scale. **Options:** (a) keep + document as internal; (b) move to a side table
-   `transaction_provider_payloads`; (c) make it config-gated (off by default).
-   **Recommendation:** (b) or (c) — keep the hot ledger lean.
-2. **`auth_device_codes`:** finish `breadbox auth login` for v1, or cut the table?
-   **Recommendation:** cut for v1 unless CLI login is a launch story.
-3. **`transaction_events` partitioning:** ship v1 with the rename + ENUM only, and add
-   `PARTITION BY RANGE (created_at)` as a documented v1.x step — or do it now?
-   **Recommendation:** rename + ENUM now; partition when an install crosses ~1M events.
-4. **Enum migration ordering:** `TEXT → ENUM` conversions are `ALTER TYPE`-class changes
-   that the shared-dev-DB rule flags as destructive. They must be sequenced carefully and
-   run as a coordinated cutover, not additive trickle. (Affects the build plan, not the
-   target.)
+These were the four open calls; resolved 2026-06-14.
+
+1. **`transactions.provider_raw` → side table.** ✅ Move to a new 1:1
+   `transaction_provider_payloads` (keyed by `transaction_id`). Keeps the hot ledger lean
+   for scans/queries while preserving every payload for debugging and re-enrichment. The
+   sync upsert writes the lean row + the payload row in the same transaction.
+2. **`auth_device_codes` → finish for v1.** ✅ Wire the service layer + `breadbox auth login`
+   so headless self-hosters can bootstrap a key without a browser. Add the missing
+   expiry-cleanup job alongside it. Table stays.
+3. **`transaction_events` partitioning → defer.** ✅ Ship the rename + ENUM in v1; add
+   `PARTITION BY RANGE (created_at)` as a documented v1.x step once an install crosses
+   ~1M events. No over-engineering for typical household scale.
+4. **Enum conversions → do them now (v1).** ✅ Convert all 14 canonical enums from
+   `TEXT+CHECK` to real Postgres `ENUM` types as part of v1. These are `ALTER TYPE`-class
+   (destructive on the shared dev DB), so they run as a **coordinated cutover** —
+   sequenced, announced to other worktrees, applied against `breadbox_test` first — not as
+   additive trickle. This is the riskiest migration in the set and gets its own wave.
 
 ---
 
 ## 5. Changelog (concise)
 
 ### ✅ ADD
+- **`transaction_provider_payloads` table** (1:1 raw-payload archive; `provider_raw` moves here off the hot ledger).
+- **Finish `breadbox auth login`** — wire `auth_device_codes` service layer + CLI + expiry-cleanup job.
 - `users.deleted_at` (soft-delete).
 - Indexes: `bank_connections(user_id, status)`, `transactions(attributed_user_id)`.
 - `UNIQUE(bank_connections.provider, provider_connection_id)` constraint.
-- Retention/cleanup jobs: `webhook_events` (7d), `mcp_tool_calls` (30d), OAuth auth-codes (if OAuth ever ships).
+- Retention/cleanup jobs: `webhook_events` (7d), `mcp_tool_calls` (30d), `auth_device_codes` (expiry).
 - Config flag gating `mcp_tool_calls` request/response JSON persistence.
 - Public API: outbound webhooks, `Idempotency-Key`, `X-Request-ID` echo, CORS config, OpenAPI request examples.
 
@@ -245,15 +251,16 @@ needs admin rights. The split makes the public contract honest.
 - `transactions.unofficial_currency_code` (dead).
 - `app_config` seeded keys `sync_interval_hours`, `setup_complete` (dead).
 - OAuth (4 tables) **from advertised v1** — keep dormant or remove; ship API-keys only.
-- `auth_device_codes` if CLI login isn't a v1 story.
 - API: flat `/login-accounts` list, redundant `batch-categorize`/`bulk-recategorize` (→ `/transactions/update`).
 
-### ➡️ MOVE (public → operator surface)
-- `/workflows`, `/workflow-runs`, `/reports`, `/connectors`, provider credentials, users/login management, settings, sync-schedules → `/admin/*` (session-auth, out of the public spec).
+### ➡️ MOVE
+- `transactions.provider_raw` column → `transaction_provider_payloads` side table (DB).
+- Surface (public → operator): `/workflows`, `/workflow-runs`, `/reports`, `/connectors`, provider credentials, users/login management, settings, sync-schedules → `/admin/*` (session-auth, out of the public spec).
 
 ### ⏸️ DEFER (document, don't build for v1)
-- Multi-tenant OAuth 2.1 client-credentials, fine-grained scopes beyond read/write,
-  `transaction_events` partitioning, account-link MCP tools (unless linking ships).
+- OAuth 2.1 (4 tables), multi-tenant client-credentials, fine-grained scopes beyond read/write.
+- `transaction_events` partitioning (`PARTITION BY RANGE (created_at)`) — add at ~1M events.
+- Account-link MCP tools (unless linking ships).
 
 ---
 
