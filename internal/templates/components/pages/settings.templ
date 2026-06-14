@@ -208,7 +208,7 @@ templ settingsScheduleRow(p SettingsProps, sched service.SyncScheduleView) {
 				@components.LucideIcon("pencil", "w-4 h-4")
 			</button>
 			<form method="POST" action={ scheduleDeleteURL(sched.ShortID) } onsubmit="return confirm('Delete this schedule?')">
-				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				<button type="submit" class="btn btn-ghost btn-sm btn-square text-error" aria-label="Delete schedule">
 					@components.LucideIcon("trash-2", "w-4 h-4")
 				</button>
@@ -463,30 +463,38 @@ templ settingsResourcesSection(p SettingsProps) {
 	}
 }
 
-// Setup guide doesn't fit SettingsRowLink because the trailing
-// affordance is either a button or a link (re-open vs. open), so the
-// row is composed by hand. The leading compass icon mirrors the
-// sibling Documentation row's leading book-open icon — this Resources
-// section is an action list where the leading icon is the affordance.
-// The dedicated walkthrough page is retired: the "Finish setting up"
-// banner on the home feed is now the onboarding surface, so re-opening
-// un-dismisses the banner and lands on `/`.
+// Setup guide row. The dedicated walkthrough page is retired: the "Finish
+// setting up" banner on the home feed is now the onboarding surface, and its
+// "Hide" button dismisses it. This row is the inverse — a single "un-hide"
+// action that clears the dismissed flag and lands on `/` so the banner
+// reappears (when setup is still incomplete). The caption flips to reflect
+// whether the banner is currently hidden. The leading compass icon mirrors
+// the sibling Documentation row — this Resources section is an action list
+// where the leading icon is the affordance.
 templ settingsGettingStartedRow(p SettingsProps) {
 	<div class="bb-settings-row">
 		@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50 shrink-0")
 		<div class="bb-settings-row__main">
 			<div class="bb-settings-row__label">Setup guide</div>
-			<p class="bb-settings-row__caption">Onboarding checklist on your home feed</p>
+			<p class="bb-settings-row__caption">
+				if p.OnboardingDismissed {
+					Hidden — show the onboarding checklist on your home feed again
+				} else {
+					Onboarding checklist on your home feed
+				}
+			</p>
 		</div>
 		<div class="bb-settings-row__control">
-			if p.OnboardingDismissed {
-				<form method="POST" action="/getting-started/reopen">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<button type="submit" class="btn btn-ghost btn-sm">Re-open setup guide</button>
-				</form>
-			} else {
-				<a href="/" class="btn btn-ghost btn-sm">Open</a>
-			}
+			<form method="POST" action="/getting-started/reopen">
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				<button type="submit" class="btn btn-ghost btn-sm">
+					if p.OnboardingDismissed {
+						Show setup guide
+					} else {
+						Show on home feed
+					}
+				</button>
+			</form>
 		</div>
 	</div>
 }

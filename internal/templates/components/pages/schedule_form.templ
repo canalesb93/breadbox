@@ -15,7 +15,7 @@ templ ScheduleDrawer(p ScheduleFormProps) {
 			class="flex flex-col h-full"
 			x-data={ scheduleFormState(p) }
 		>
-			<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			@components.DrawerHeader(components.DrawerHeaderProps{Icon: "refresh-cw", Title: scheduleFormTitle(p)})
 			<div class="flex-1 overflow-y-auto p-5 space-y-5">
 				@scheduleFormFields(p)
@@ -48,7 +48,7 @@ templ ScheduleForm(p ScheduleFormProps) {
 			</div>
 		}
 		<form method="POST" action={ templ.SafeURL(p.FormAction()) } class="bb-card p-5 space-y-5">
-			<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 			@scheduleFormFields(p)
 			<div class="flex items-center justify-end gap-2 pt-2 border-t border-base-200">
 				<a href="/settings/general#sync" class="btn btn-ghost btn-sm">Cancel</a>
