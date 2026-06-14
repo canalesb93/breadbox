@@ -26,7 +26,10 @@ templ Reports(p ReportsProps) {
 		Title:                "Agent Reports",
 		Subtitle:             "Messages from your AI agents — their work, flagged items, and findings",
 		SubtitleHideOnMobile: true,
-		Action:               reportsManageFormatLink(),
+		// The trailing action collapses to a compact icon button on mobile;
+		// keep it on the title's row so it doesn't orphan onto its own line.
+		ActionsInline: true,
+		Action:        reportsManageFormatLink(),
 	})
 	<div x-data="reportsPage">
 		if line := reportsGlance(p); line != "" {
