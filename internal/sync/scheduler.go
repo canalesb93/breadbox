@@ -51,13 +51,15 @@ func (s *Scheduler) Start(fallbackIntervalMinutes int) {
 		return
 	}
 
-	// Daily sync log cleanup at 3:00 AM.
+	// Daily audit-log cleanup at 3:00 AM (sync logs, webhook events, MCP tool calls).
 	_, err = s.cron.AddFunc("0 3 * * *", func() {
 		ctx := context.Background()
 		s.cleanupSyncLogs(ctx)
+		s.cleanupWebhookEvents(ctx)
+		s.cleanupMcpAuditLog(ctx)
 	})
 	if err != nil {
-		s.logger.Error("failed to add sync log cleanup job", "error", err)
+		s.logger.Error("failed to add audit-log cleanup job", "error", err)
 	}
 
 	s.cron.Start()
@@ -267,5 +269,69 @@ func (s *Scheduler) cleanupSyncLogs(ctx context.Context) {
 		s.logger.Info("sync log cleanup completed", "deleted", deleted, "retention_days", retentionDays)
 	} else {
 		s.logger.Debug("sync log cleanup completed, no old logs to delete", "retention_days", retentionDays)
+	}
+}
+
+// defaultWebhookEventRetentionDays is used when webhook_event_retention_days is
+// not configured. Webhook payloads aren't persisted, so this audit trail is thin
+// and safe to prune quickly.
+const defaultWebhookEventRetentionDays = 7
+
+// defaultMcpToolCallRetentionDays is used when mcp_tool_call_retention_days is not
+// configured. These rows store full tool request/response JSON (possible PII), so
+// keep the horizon bounded.
+const defaultMcpToolCallRetentionDays = 30
+
+// cleanupWebhookEvents deletes webhook_events older than the configured retention
+// period (webhook_event_retention_days, default 7). A value of 0 disables cleanup.
+func (s *Scheduler) cleanupWebhookEvents(ctx context.Context) {
+	retentionDays := appconfig.Int(ctx, s.queries, appconfig.KeyWebhookEventRetentionDays, defaultWebhookEventRetentionDays)
+	if retentionDays < 0 {
+		retentionDays = defaultWebhookEventRetentionDays
+	}
+	if retentionDays == 0 {
+		s.logger.Debug("webhook event cleanup disabled (retention_days=0)")
+		return
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	result, err := s.queries.DeleteWebhookEventsOlderThan(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
+	if err != nil {
+		s.logger.Error("webhook event cleanup failed", "error", err)
+		return
+	}
+	if deleted := result.RowsAffected(); deleted > 0 {
+		s.logger.Info("webhook event cleanup completed", "deleted", deleted, "retention_days", retentionDays)
+	}
+}
+
+// cleanupMcpAuditLog deletes mcp_tool_calls older than the configured retention
+// period (mcp_tool_call_retention_days, default 30), then prunes any mcp_sessions
+// older than the cutoff that no longer have child tool calls. A value of 0
+// disables cleanup. Tool-call rows hold full request/response JSON (possible PII).
+func (s *Scheduler) cleanupMcpAuditLog(ctx context.Context) {
+	retentionDays := appconfig.Int(ctx, s.queries, appconfig.KeyMcpToolCallRetentionDays, defaultMcpToolCallRetentionDays)
+	if retentionDays < 0 {
+		retentionDays = defaultMcpToolCallRetentionDays
+	}
+	if retentionDays == 0 {
+		s.logger.Debug("mcp audit cleanup disabled (retention_days=0)")
+		return
+	}
+
+	cutoff := pgtype.Timestamptz{Time: time.Now().AddDate(0, 0, -retentionDays), Valid: true}
+	callRes, err := s.queries.DeleteMcpToolCallsOlderThan(ctx, cutoff)
+	if err != nil {
+		s.logger.Error("mcp tool-call cleanup failed", "error", err)
+		return
+	}
+	sessRes, err := s.queries.DeleteMcpSessionsOlderThan(ctx, cutoff)
+	if err != nil {
+		s.logger.Error("mcp session cleanup failed", "error", err)
+		return
+	}
+	calls, sessions := callRes.RowsAffected(), sessRes.RowsAffected()
+	if calls > 0 || sessions > 0 {
+		s.logger.Info("mcp audit cleanup completed", "tool_calls_deleted", calls, "sessions_deleted", sessions, "retention_days", retentionDays)
 	}
 }

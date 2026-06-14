@@ -39,6 +39,17 @@ const (
 	// agent_runs rows. Default: 30. 0 disables cleanup.
 	KeyAgentRunRetentionDays = "agent.run_retention_days"
 
+	// KeyWebhookEventRetentionDays is the number of days to keep webhook_events
+	// audit rows. Default: 7. 0 disables cleanup. Webhook payloads are not
+	// persisted (only a hash), so this is a thin audit trail safe to prune fast.
+	KeyWebhookEventRetentionDays = "webhook_event_retention_days"
+
+	// KeyMcpToolCallRetentionDays is the number of days to keep mcp_tool_calls
+	// audit rows (and the now-empty mcp_sessions they belonged to). Default: 30.
+	// 0 disables cleanup. These rows store full tool request/response JSON, which
+	// can contain user financial data — prune them on a bounded horizon.
+	KeyMcpToolCallRetentionDays = "mcp_tool_call_retention_days"
+
 	// KeyEncryptionKeyAcknowledgedAt is the RFC3339 timestamp at which the
 	// admin clicked through the /setup/save-key reveal page. Unset (empty)
 	// means the reveal page is still offered; once set, the page redirects
