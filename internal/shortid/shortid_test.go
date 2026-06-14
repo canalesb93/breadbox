@@ -33,6 +33,49 @@ func TestGenerateUniqueness(t *testing.T) {
 	}
 }
 
+// TestGenerateLeadingCharDistribution guards against modulo bias. 6 random
+// bytes span [0, 2^48), which exceeds the 62^8 code space, so a naive reduction
+// would over-represent IDs whose leading character maps to a low index (the
+// first ~18 of 62 symbols would be ~2x as likely). Generate rejection-samples
+// to keep the distribution uniform; here we assert the leading-character low
+// bucket stays close to the uniform expectation. With 60k samples the unbiased
+// fraction is ~0.290 with tiny noise, while the buggy reduction skews it to
+// ~0.452 — far outside the tolerance below.
+func TestGenerateLeadingCharDistribution(t *testing.T) {
+	const samples = 60000
+	const lowCut = 18 // alphabet indices [0,18) are the over-represented region under bias
+
+	indexOf := func(c byte) int {
+		for i := 0; i < len(alphabet); i++ {
+			if alphabet[i] == c {
+				return i
+			}
+		}
+		return -1
+	}
+
+	lowCount := 0
+	for i := 0; i < samples; i++ {
+		id, err := Generate()
+		if err != nil {
+			t.Fatalf("Generate() error: %v", err)
+		}
+		idx := indexOf(id[0])
+		if idx < 0 {
+			t.Fatalf("leading char %q not in alphabet (%q)", id[0], id)
+		}
+		if idx < lowCut {
+			lowCount++
+		}
+	}
+
+	got := float64(lowCount) / float64(samples)
+	want := float64(lowCut) / 62 // ~0.290 when uniform
+	if got < want-0.03 || got > want+0.03 {
+		t.Errorf("leading-char low-bucket fraction = %.4f, want ~%.4f (modulo bias?)", got, want)
+	}
+}
+
 func TestIsShortID(t *testing.T) {
 	tests := []struct {
 		input string
