@@ -79,7 +79,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Old `/feed` URL retired — feed is now the root. Redirect any
 		// straggling external links (bookmarks, in-app history) to `/`.
 		r.Get("/feed", redirectGET("/"))
-		r.Get("/getting-started", GettingStartedHandler(a, sm, tr))
+		// The dedicated Getting Started page is retired — the home-feed
+		// onboarding banner is the onboarding surface now. Redirect to `/`.
+		r.Get("/getting-started", redirectGET("/"))
 		r.Post("/getting-started/dismiss", DismissGettingStartedHandler(a, sm))
 		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))
 

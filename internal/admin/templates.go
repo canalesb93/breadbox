@@ -502,8 +502,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// in favor of the Workflows surface (/workflows).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.SessionDetail).
-		// pages/getting_started.html removed — renders via RenderWithTempl
-		// using the _templ_shell template key (see pages.GettingStarted).
+		// The Getting Started page is retired entirely — onboarding now lives
+		// in the home-feed components.OnboardingBanner; /getting-started
+		// redirects to /.
 	}
 
 	for _, page := range basePages {
