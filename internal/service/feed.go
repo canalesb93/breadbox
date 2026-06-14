@@ -1035,36 +1035,85 @@ ORDER BY t.created_at DESC
 	return samples, nil
 }
 
-// parseFeedRuleHits decodes the `sync_logs.rule_hits` JSONB column into the
-// feed's lightweight FeedRuleOutcome slice. The richer SyncLogRow path
-// resolves rule names against the live rules table; on the feed we accept
-// the frozen names captured at sync-time, which is good enough for the
-// "X auto-tagged" outcome line and avoids the extra round-trip.
-func (s *Service) parseFeedRuleHits(ctx context.Context, payload []byte) []FeedRuleOutcome {
+// decodeRuleHitCounts decodes the `sync_logs.rule_hits` JSONB column into a
+// {ruleUUID: count} map. The column is written by RuleResolver.HitCountsJSON
+// as a flat object of canonical-UUID → hit-count, so that's the only shape we
+// accept. Empty/blank payloads and malformed JSON yield nil.
+func decodeRuleHitCounts(payload []byte) map[string]int {
 	if len(payload) == 0 || string(payload) == "{}" || string(payload) == "[]" {
 		return nil
 	}
-	type hit struct {
-		RuleID      string `json:"rule_id"`
-		RuleShortID string `json:"rule_short_id"`
-		RuleName    string `json:"rule_name"`
-		Count       int    `json:"count"`
-	}
-	var raw []hit
-	if err := json.Unmarshal(payload, &raw); err != nil {
+	var counts map[string]int
+	if err := json.Unmarshal(payload, &counts); err != nil {
 		return nil
 	}
-	out := make([]FeedRuleOutcome, 0, len(raw))
-	for _, h := range raw {
-		if h.Count <= 0 {
+	if len(counts) == 0 {
+		return nil
+	}
+	return counts
+}
+
+// parseFeedRuleHits decodes the `sync_logs.rule_hits` JSONB column into the
+// feed's lightweight FeedRuleOutcome slice. The column stores a flat
+// {ruleUUID: count} map (see RuleResolver.HitCountsJSON), so we resolve each
+// rule's short_id + current name in a single batched lookup for the
+// "X auto-tagged" outcome line. Rules deleted since the sync fall back to an
+// empty short_id (rendered without a link) and the template's placeholder name.
+func (s *Service) parseFeedRuleHits(ctx context.Context, payload []byte) []FeedRuleOutcome {
+	counts := decodeRuleHitCounts(payload)
+	if len(counts) == 0 {
+		return nil
+	}
+
+	uuids := make([]pgtype.UUID, 0, len(counts))
+	for id := range counts {
+		if u, err := pgconv.ParseUUID(id); err == nil {
+			uuids = append(uuids, u)
+		}
+	}
+
+	type ruleMeta struct {
+		shortID string
+		name    string
+	}
+	meta := make(map[string]ruleMeta, len(uuids))
+	if len(uuids) > 0 {
+		rows, err := s.Pool.Query(ctx,
+			`SELECT id::text, short_id, name FROM transaction_rules WHERE id = ANY($1::uuid[])`, uuids)
+		if err != nil {
+			s.Logger.Warn("resolve feed rule_hits names", "error", err)
+		} else {
+			for rows.Next() {
+				var id, shortID, name string
+				if err := rows.Scan(&id, &shortID, &name); err != nil {
+					continue
+				}
+				meta[id] = ruleMeta{shortID: shortID, name: name}
+			}
+			rows.Close()
+		}
+	}
+
+	out := make([]FeedRuleOutcome, 0, len(counts))
+	for id, count := range counts {
+		if count <= 0 {
 			continue
 		}
+		m := meta[id]
 		out = append(out, FeedRuleOutcome{
-			RuleName:    h.RuleName,
-			RuleShortID: h.RuleShortID,
-			Count:       h.Count,
+			RuleName:    m.name,
+			RuleShortID: m.shortID,
+			Count:       count,
 		})
 	}
+	// Stable order: highest count first, then name, so repeated renders of the
+	// same sync card don't reshuffle the outcome lines.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].RuleName < out[j].RuleName
+	})
 	return out
 }
 
