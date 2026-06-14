@@ -101,7 +101,7 @@ templ OnboardingBanner(p OnboardingBannerProps) {
 // (struck through + receded when done, emphasized when active), a short
 // description, and the highlighted CTA on the active step only.
 templ onboardingStepRow(s OnboardingStep) {
-	<li class="flex items-start gap-3 py-2.5 border-t border-base-200/70">
+	<li class="flex items-start gap-3 py-2.5 border-t" style="border-top-color: color-mix(in oklab, var(--color-base-content) 6%, transparent)">
 		<span class={ onboardingStepGlyphClass(s) }>
 			@LucideIcon(onboardingStepGlyph(s), "w-[18px] h-[18px]")
 		</span>
