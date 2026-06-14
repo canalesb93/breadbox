@@ -25,15 +25,16 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// subscriptionCandidateEvidenceMax caps how many member charges a candidate
+// row fetches for its inline "Why detected?" evidence peek — bounded so the
+// list view stays cheap even with many candidates awaiting review.
+const subscriptionCandidateEvidenceMax = 5
+
 // SubscriptionsListPageHandler serves GET /subscriptions — the single
 // human-adjudication surface for recurring series. Candidates (auto-detected,
 // awaiting a verdict) are split out from the confirmed/live ledger, and the
 // stat tiles (active count, monthly-equivalent spend per currency, candidates
 // awaiting review) are computed here.
-// subscriptionCandidateEvidenceMax caps how many member charges a candidate
-// card previews as detection evidence (the rest are summarized as "+N more").
-const subscriptionCandidateEvidenceMax = 5
-
 func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -75,7 +76,9 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			}
 			if s.Status == service.SeriesStatusCandidate {
 				// Attach a bounded sample of the charges the detector grouped so
-				// the review card shows the evidence before the user confirms.
+				// the candidate row's inline "Why detected?" peek can show the
+				// evidence in place — without a trip to the detail page.
+				// SignalFacts is already populated during subscriptionRow above.
 				if mem, merr := svc.SeriesMembers(ctx, s.ShortID); merr == nil {
 					ids := make([]string, 0, len(mem))
 					for _, m := range mem {
@@ -729,6 +732,9 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 	if s.LastAmount != nil {
 		row.HasAmount = true
 		row.Amount = math.Abs(*s.LastAmount)
+		// Monthly-equivalent contribution — drives the ledger group's monthly
+		// subtotal (single-currency only; never summed across currencies).
+		row.MonthlyEquiv = monthlyEquivalent(s.Cadence, row.Amount)
 	}
 	if s.CategoryID != nil {
 		row.CategoryName = catName[*s.CategoryID]

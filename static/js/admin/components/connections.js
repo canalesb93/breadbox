@@ -3,13 +3,14 @@
 // Convention reference: docs/design-system.md → "Alpine page components".
 // Two factories ship from this module:
 //
+//   - `connectionsList` — the page root. Owns the Connections/Links tab
+//     state (hydrated from `data-tab`) and the per-row Sync now / Disconnect
+//     actions dispatched from each row's OverflowMenu (and the `s` keyboard
+//     shortcut). Listening on `.window` so a `$dispatch` from inside a
+//     popover menu still reaches it after it bubbles to the document.
 //   - `syncAllBtn` — page-level "Sync All" button. Tracks state and disables
 //     itself for 8s after a successful POST so accidental re-clicks don't
 //     fan out duplicate jobs.
-//   - `syncBtn` — per-row sync button. Reads its connection ID from
-//     `data-conn-id` on the x-data root (set by the templ via
-//     `<div x-data="syncBtn" data-conn-id={ c.ID }>`) so the factory body
-//     keeps the no-arg shape the convention requires.
 //
 // `bbConnNav` is the keyboard-navigation module backing j/k/Enter/s.
 // Stashed on `window` so the shortcut handlers below can reach it without
@@ -18,11 +19,14 @@
 // All shortcut bindings flow through the global Alpine `shortcuts` store,
 // per .claude/rules/ui.md → "Keyboard shortcuts".
 
+function bbToast(message, type) {
+  window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type } }));
+}
+
 // Keyboard navigation for the connections list. Reads the DOM for visible
-// rows (respecting the provider filter via data-filter-provider + Alpine's
-// x-show display:none) instead of mirroring connection data into a store.
-// The base.html dispatcher already guards against input focus, overlays,
-// and touch devices, so these handlers just do the thing.
+// rows instead of mirroring connection data into a store. The base.html
+// dispatcher already guards against input focus, overlays, and touch
+// devices, so these handlers just do the thing.
 window.bbConnNav = {
   focusedIdx: -1,
   FOCUSED_CLASS: 'bb-tx-row--focused', // reuse the tx-list focus styling
@@ -67,6 +71,65 @@ window.bbConnNav = {
 };
 
 document.addEventListener('alpine:init', function () {
+  // Page root: tab state + per-row Sync now / Disconnect actions.
+  Alpine.data('connectionsList', function () {
+    return {
+      tab: 'connections',
+      // Track in-flight syncs so a double-dispatch (menu + `s`) doesn't fan
+      // out duplicate jobs for the same connection.
+      syncing: {},
+
+      init: function () {
+        this.tab = this.$el.dataset.tab || 'connections';
+      },
+
+      syncOne: function (id, name) {
+        if (!id || this.syncing[id]) return;
+        this.syncing[id] = true;
+        var self = this;
+        fetch('/-/connections/' + id + '/sync', { method: 'POST' })
+          .then(function (res) {
+            if (res.ok) {
+              bbToast('Sync triggered for ' + (name || 'this connection') + '.', 'success');
+            } else {
+              return res.json().then(function (data) {
+                bbToast(data.error || 'Failed to trigger sync.', 'error');
+              });
+            }
+          })
+          .catch(function () { bbToast('Network error. Please try again.', 'error'); })
+          .finally(function () {
+            setTimeout(function () { delete self.syncing[id]; }, 4000);
+          });
+      },
+
+      disconnectOne: function (id, name) {
+        if (!id) return;
+        var self = this;
+        bbConfirm({
+          title: 'Disconnect ' + (name || 'this bank') + '?',
+          message: 'Syncing stops and the connection is marked disconnected. Existing accounts and transactions are preserved.',
+          confirmLabel: 'Disconnect',
+          variant: 'danger',
+        }).then(function (ok) {
+          if (!ok) return;
+          fetch('/-/connections/' + id, { method: 'DELETE' })
+            .then(function (res) {
+              if (res.ok) {
+                bbToast((name || 'Connection') + ' disconnected.', 'success');
+                setTimeout(function () { window.location.reload(); }, 400);
+              } else {
+                return res.json().then(function (data) {
+                  bbToast(data.error || 'Failed to disconnect.', 'error');
+                });
+              }
+            })
+            .catch(function () { bbToast('Network error. Please try again.', 'error'); });
+        });
+      },
+    };
+  });
+
   // Page-level "Sync All" button. Triggers a sync across every connection
   // owned by the current user. Disables itself for 8s after a successful
   // POST so accidental re-clicks don't fan out duplicate jobs.
@@ -87,59 +150,18 @@ document.addEventListener('alpine:init', function () {
             if (res.ok) {
               self.state = 'done';
               self.$nextTick(function () { lucide.createIcons(); });
-              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for all connections.', type: 'success' } }));
+              bbToast('Sync triggered for all connections.', 'success');
               setTimeout(function () { self.state = 'idle'; self.$nextTick(function () { lucide.createIcons(); }); }, 8000);
             } else {
               return res.json().then(function (data) {
-                window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
+                bbToast(data.error || 'Failed to trigger sync.', 'error');
                 self.state = 'idle';
                 self.$nextTick(function () { lucide.createIcons(); });
               });
             }
           })
           .catch(function () {
-            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
-            self.state = 'idle';
-            self.$nextTick(function () { lucide.createIcons(); });
-          });
-      },
-    };
-  });
-
-  // Per-row sync button. The wrapping element passes the connection ID via
-  // `data-conn-id`; the factory reads it once in init() so the body keeps
-  // the no-arg shape the convention requires.
-  Alpine.data('syncBtn', function () {
-    return {
-      state: 'idle',
-      connId: '',
-
-      init: function () {
-        this.connId = this.$el.dataset.connId || '';
-      },
-
-      triggerSync: function () {
-        if (this.state !== 'idle') return;
-        if (!this.connId) return;
-        this.state = 'syncing';
-        var self = this;
-        fetch('/-/connections/' + this.connId + '/sync', { method: 'POST' })
-          .then(function (res) {
-            if (res.ok) {
-              self.state = 'done';
-              self.$nextTick(function () { lucide.createIcons(); });
-              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for this connection.', type: 'success' } }));
-              setTimeout(function () { self.state = 'idle'; self.$nextTick(function () { lucide.createIcons(); }); }, 5000);
-            } else {
-              return res.json().then(function (data) {
-                window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
-                self.state = 'idle';
-                self.$nextTick(function () { lucide.createIcons(); });
-              });
-            }
-          })
-          .catch(function () {
-            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
+            bbToast('Network error. Please try again.', 'error');
             self.state = 'idle';
             self.$nextTick(function () { lucide.createIcons(); });
           });
@@ -191,12 +213,13 @@ document.addEventListener('alpine:init', function () {
     action: function () {
       var row = window.bbConnNav.currentRow();
       if (!row) return;
-      // Reuse the existing syncBtn Alpine component's click handler so CSRF,
-      // toast, and UI-state logic (disabled, spinner, 5s cooldown) stay in
-      // one place. Inactive and CSV connections don't render the button —
-      // no-op in that case.
-      var btn = row.querySelector('[data-sync-btn]');
-      if (btn) btn.click();
+      // Only syncable (active, non-CSV) rows carry data-can-sync. Dispatch
+      // the same event the OverflowMenu uses so CSRF/toast/dedup logic stays
+      // in one place (the connectionsList factory, listening on .window).
+      if (!row.getAttribute('data-can-sync')) return;
+      var id = row.getAttribute('data-conn-id');
+      if (!id) return;
+      window.dispatchEvent(new CustomEvent('connection-sync', { detail: { id: id, name: '' } }));
     },
   });
 });

@@ -8,47 +8,31 @@ import "breadbox/internal/templates/components"
 // Alpine submit flow) is preserved.
 templ TagForm(p TagFormProps) {
 	<script src="/static/js/admin/slug.js"></script>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">
-				if p.IsEdit {
-					Edit Tag
-				} else {
-					Add Tag
-				}
-			</h1>
-			<p class="text-sm text-base-content/50 mt-1">
-				if p.IsEdit {
-					Slug is immutable &mdash; other fields can be changed.
-				} else {
-					Create a new tag for coordinating transaction work.
-				}
-			</p>
-		</div>
-	</div>
+	{{ title := "Add Tag" }}
+	{{ subtitle := "Create a new tag for coordinating transaction work." }}
+	if p.IsEdit {
+		{{ title = "Edit Tag" }}
+		{{ subtitle = "Slug is immutable — other fields can be changed." }}
+	}
+	@components.PageHeader(components.PageHeaderProps{Title: title, Subtitle: subtitle})
 	<div class="max-w-lg" x-data="tagForm()">
 		<form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
 			<div class="p-5 sm:p-6">
-				<div class="bb-icon-header">
-					<div class="bb-icon-header__tile bb-icon-tile--primary">
-						@components.LucideIcon("tag", "w-5 h-5")
-					</div>
-					<div class="bb-icon-header__text">
-						<h2 class="text-sm font-semibold">
-							if p.IsEdit {
-								{ tagDisplayOr(p.Tag) }
-							} else {
-								New tag
-							}
-						</h2>
-						<p class="text-xs text-base-content/45">
-							if p.IsEdit {
-								<code class="font-mono text-xs">{ tagSlugOr(p.Tag) }</code>
-							} else {
-								Open-ended label for transactions
-							}
-						</p>
-					</div>
+				<div class="mb-5">
+					<h2 class="text-sm font-semibold">
+						if p.IsEdit {
+							{ tagDisplayOr(p.Tag) }
+						} else {
+							New tag
+						}
+					</h2>
+					<p class="text-xs text-base-content/45">
+						if p.IsEdit {
+							<code class="font-mono text-xs">{ tagSlugOr(p.Tag) }</code>
+						} else {
+							Open-ended label for transactions
+						}
+					</p>
 				</div>
 				<!-- Live preview chip -->
 				<div class="flex items-center gap-3 p-3 bg-base-200/40 rounded-xl mb-5">
@@ -209,14 +193,12 @@ templ TagForm(p TagFormProps) {
 		if p.IsEdit {
 			<div class="bb-card mt-6 border-error/30">
 				<div class="p-5 sm:p-6">
-					<div class="bb-icon-header">
-						<div class="bb-icon-header__tile bg-error/10 text-error">
-							@components.LucideIcon("alert-triangle", "w-5 h-5")
-						</div>
-						<div class="bb-icon-header__text">
-							<h2 class="text-sm font-semibold">Danger zone</h2>
-							<p class="text-xs text-base-content/45">Deleting a tag removes it from all transactions. Activity annotations are preserved.</p>
-						</div>
+					<div class="mb-5">
+						<h2 class="text-sm font-semibold flex items-center gap-2">
+							@components.LucideIcon("alert-triangle", "w-4 h-4 text-error")
+							Danger zone
+						</h2>
+						<p class="text-xs text-base-content/45">Deleting a tag removes it from all transactions. Activity annotations are preserved.</p>
 					</div>
 					<div class="mt-4">
 						<button

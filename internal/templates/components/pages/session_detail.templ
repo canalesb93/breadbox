@@ -10,40 +10,21 @@ import (
 // handler builds typed props in admin/sessions.go and the bridge drops
 // the rendered HTML into base.html's TemplContent slot.
 templ SessionDetail(p SessionDetailProps) {
-	<div class="bb-page-header">
-		<div>
-			<div class="flex items-center gap-2 text-sm text-base-content/50 mb-1">
-				<a href="/logs?tab=sessions" class="hover:text-base-content">Logs</a>
-				@components.LucideIcon("chevron-right", "w-3 h-3")
-				<span>Session</span>
-			</div>
-			<h1 class="bb-page-title">{ p.Session.Purpose }</h1>
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-base-content/50 mt-1">
-				if p.Session.AgentName != "" {
-					<span class="flex items-center gap-1">
-						@components.LucideIcon("bot", "w-3.5 h-3.5")
-						{ p.Session.AgentName }
-					</span>
-				} else {
-					<span class="flex items-center gap-1">
-						@components.LucideIcon("key", "w-3.5 h-3.5")
-						{ p.Session.APIKeyName }
-					</span>
-				}
-				<span>{ p.Session.CreatedAt }</span>
-				<span>{ strconv.FormatInt(p.Session.ToolCallCount, 10) } tool calls</span>
-				if p.Session.ErrorCount > 0 {
-					<span class="inline-flex items-center gap-1 badge badge-sm badge-error">
-						@components.LucideIcon("alert-triangle", "w-3 h-3")
-						{ strconv.Itoa(p.Session.ErrorCount) } { sessionErrorWord(p.Session.ErrorCount) }
-					</span>
-				}
-				if p.Session.WriteCount > 0 || p.Session.ReadCount > 0 {
-					<span class="text-base-content/60">{ strconv.Itoa(p.Session.WriteCount) } write · { strconv.Itoa(p.Session.ReadCount) } read</span>
-				}
-			</div>
-		</div>
+	<!-- Breadcrumb kept inline (single back-affordance for this page); the
+	     header itself is the canonical EntityHeader — PageHeader's detail
+	     sibling — carrying the session title, status badge, and meta row. -->
+	<div class="flex items-center gap-2 text-sm text-base-content/50 mb-3">
+		<a href="/logs?tab=sessions" class="hover:text-base-content">Logs</a>
+		@components.LucideIcon("chevron-right", "w-3 h-3")
+		<span>Session</span>
 	</div>
+	@components.EntityHeader(components.EntityHeaderProps{
+		Title:    p.Session.Purpose,
+		Icon:     "bot",
+		IconTone: components.IconToneNeutral,
+		Badges:   sessionDetailBadges(p),
+		Meta:     sessionDetailMeta(p),
+	})
 	if len(p.ToolCalls) > 0 {
 		<div class="space-y-2">
 			for _, c := range p.ToolCalls {
@@ -51,13 +32,48 @@ templ SessionDetail(p SessionDetailProps) {
 			}
 		</div>
 	} else {
-		<div class="bb-card p-12 text-center">
-			<div class="flex flex-col items-center">
-				@components.LucideIcon("scroll-text", "w-12 h-12 text-base-content opacity-20 mb-3")
-				<h3 class="font-medium text-base-content/70">No tool calls recorded</h3>
-				<p class="text-sm text-base-content/50">This session has no recorded tool calls yet.</p>
-			</div>
-		</div>
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:  "scroll-text",
+			Title: "No tool calls recorded",
+			Body:  "This session has no recorded tool calls yet.",
+		})
+	}
+}
+
+// sessionDetailBadges renders the trailing status chips for the session
+// header — currently just the error count when the session logged any
+// failed tool call. Vivid `badge-error` so it reads on the dark theme.
+templ sessionDetailBadges(p SessionDetailProps) {
+	if p.Session.ErrorCount > 0 {
+		<span class="badge badge-sm badge-error gap-1">
+			@components.LucideIcon("alert-triangle", "w-3 h-3")
+			{ strconv.Itoa(p.Session.ErrorCount) } { sessionErrorWord(p.Session.ErrorCount) }
+		</span>
+	}
+}
+
+// sessionDetailMeta is the bullet-separated subtitle row for the session
+// header: actor (agent name or API key) · created · tool-call count · the
+// write/read split when present. Rendered inside EntityHeader's meta slot.
+templ sessionDetailMeta(p SessionDetailProps) {
+	if p.Session.AgentName != "" {
+		<span class="flex items-center gap-1">
+			@components.LucideIcon("bot", "w-3 h-3")
+			{ p.Session.AgentName }
+		</span>
+	} else {
+		<span class="flex items-center gap-1">
+			@components.LucideIcon("key", "w-3 h-3")
+			{ p.Session.APIKeyName }
+		</span>
+	}
+	<span class="text-base-content/20">·</span>
+	<span>{ p.Session.CreatedAt }</span>
+	<span class="text-base-content/20">·</span>
+	<span>{ strconv.FormatInt(p.Session.ToolCallCount, 10) } tool calls</span>
+	if p.Session.WriteCount > 0 || p.Session.ReadCount > 0 {
+		<span class="text-base-content/20">·</span>
+		<span>{ strconv.Itoa(p.Session.WriteCount) } write · { strconv.Itoa(p.Session.ReadCount) } read</span>
 	}
 }
 

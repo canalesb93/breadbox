@@ -2,10 +2,16 @@
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 //
-// Owns the per-instance filter / expansion state and the j/k focus ring
-// for the category tree. The shared base.html shortcuts dispatcher routes
+// Owns the per-instance filter state and the j/k focus ring for the
+// category list. The shared base.html shortcuts dispatcher routes
 // j/k/Enter/Space/e/n to the registered handlers when the page scope is
 // 'categories' (set by the sibling x-init scope-setter div in templ).
+//
+// Top-level categories that own subcategories are collapsible disclosure
+// rows (default collapsed). The group's `expanded` flag lives on the group
+// wrapper's x-data; subcategory rows show when `expanded || filtering`, so a
+// search still surfaces matching children inside a collapsed group. Childless
+// parents and subcategory rows remain plain edit links.
 //
 // Keyboard registrations and the document-level click listener live at
 // module scope under one alpine:init — they're global by design and
@@ -13,11 +19,9 @@
 (function () {
   var FOCUSED_CLASS = 'bb-tx-row--focused'; // reuse the tx-list focus styling
 
-  // Reads the DOM for visible category rows (two levels: primary row +
-  // subcategory rows inside each expanded x-collapse). offsetParent !== null
-  // respects both the filter (x-show on parent/child wrappers) and the
-  // collapsed state (x-collapse toggles display) — collapsed children
-  // simply won't appear here.
+  // Reads the DOM for visible category rows (parent + subcategory rows).
+  // offsetParent !== null respects the filter (x-show on group + row
+  // wrappers) so filtered-out rows simply won't appear here.
   function visibleRows() {
     var all = document.querySelectorAll('[data-category-row]');
     var out = [];
@@ -40,9 +44,14 @@
   document.addEventListener('alpine:init', function () {
     Alpine.data('categoriesPage', function () {
       return {
-        // --- Filter + expansion state (used by inline x-show / x-collapse) ---
+        // --- Filter state (used by inline x-show on groups + rows) ---
         filter: '',
-        expanded: {},
+
+        // True while a filter is typed. Subcategory rows read this so a
+        // search reveals matching children even inside a collapsed group.
+        get filtering() {
+          return this.filter.trim() !== '';
+        },
 
         // --- Keyboard navigation state ---
         focusedIdx: -1,
@@ -55,15 +64,7 @@
           if (instance === this) instance = null;
         },
 
-        // --- Filter + expansion methods (called from inline x-* expressions) ---
-        toggle: function (id) {
-          this.expanded[id] = !this.expanded[id];
-        },
-
-        isOpen: function (id) {
-          return !!this.expanded[id] || !!this.filter;
-        },
-
+        // --- Filter method (called from inline x-show expressions) ---
         matches: function (el) {
           if (!this.filter) return true;
           return (el.dataset.search || '').includes(this.filter.toLowerCase());
@@ -105,21 +106,16 @@
           return null;
         },
 
-        // Activate the focused row: expand/collapse a primary via click
-        // (which fires the @click="toggle('<id>')" handler on the row);
-        // jump to the filtered transactions list for a subcategory.
+        // Activate the focused row by triggering its primary control, so
+        // Enter mirrors a click: an expandable parent toggles its
+        // subcategories (button.contents), a leaf/child opens its edit page
+        // (a.contents). Falls back to editRow() if neither is present.
         activateRow: function () {
           var row = this.currentRow();
           if (!row) return;
-          var level = row.getAttribute('data-category-level');
-          if (level === 'primary') {
-            row.click();
-            return;
-          }
-          if (level === 'sub') {
-            var slug = row.getAttribute('data-category-slug');
-            if (slug) window.location.href = '/transactions?category=' + encodeURIComponent(slug);
-          }
+          var ctrl = row.querySelector('a.contents, button.contents');
+          if (ctrl) { ctrl.click(); return; }
+          this.editRow();
         },
 
         editRow: function () {
@@ -158,7 +154,7 @@
     reg.register({
       id: 'categories.activate',
       keys: 'Enter',
-      description: 'Expand primary / open subcategory',
+      description: 'Open focused category',
       group: 'Actions',
       scope: 'categories',
       action: function () { if (instance) instance.activateRow(); },
@@ -167,7 +163,7 @@
     reg.register({
       id: 'categories.activate.space',
       keys: ' ', // Space — e.key is a literal space
-      description: 'Expand / open (Space)',
+      description: 'Open focused category (Space)',
       group: 'Actions',
       scope: 'categories',
       visible: false, // Enter is the canonical binding shown in help
@@ -200,9 +196,10 @@
     });
   });
 
-  // When the user clicks a row (to expand/collapse a primary or select
-  // a sub), sync the j/k ring to that row so subsequent keyboard nav
-  // picks up from there — matches the tx-list convention.
+  // When the user clicks within a row, sync the j/k ring to that row so
+  // subsequent keyboard nav picks up from there — matches the tx-list
+  // convention. (Row clicks land on the inner edit link and navigate; this
+  // only matters for keyboard users who then resume j/k.)
   document.addEventListener('click', function (e) {
     var row = e.target && e.target.closest && e.target.closest('[data-category-row]');
     if (!row) return;

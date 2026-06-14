@@ -9,174 +9,95 @@ import (
 
 // AccountLinkDetail renders the transaction-matches admin page for a
 // single account link. Hosts inside the base layout via
-// TemplateRenderer.RenderWithTempl. Markup mirrors the previous
-// html/template version byte-for-byte: same desktop table, same mobile
-// card list, same empty-state, same per-match Confirm/Reject affordances
-// for auto-confidence rows.
+// TemplateRenderer.RenderWithTempl. The header is the canonical
+// PageHeader; the matched pairs render as one responsive list-row layout
+// (a confidence IconTile · primary txn + amount title · dependent txn +
+// "matched on" body line · date · inline confirm/reject for auto rows) —
+// the old desktop-table + mobile-card duplication is gone.
 templ AccountLinkDetail(p AccountLinkDetailProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Transaction Matches</h1>
-			<p class="text-base-content/60 text-sm mt-1">
-				<span class="font-medium">{ fmt.Sprintf("%d", p.MatchCount) }</span> matched,
-				<span class="font-medium">{ fmt.Sprintf("%d", p.UnmatchedDependentCount) }</span> unmatched
-			</p>
-		</div>
-		<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/account-links/%s/reconcile", p.LinkID)) } class="inline">
-			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-			<button type="submit" class="btn btn-primary btn-sm">
-				@components.LucideIcon("refresh-cw", "w-4 h-4")
-				<span class="hidden sm:inline">Reconcile Now</span><span class="sm:hidden">Reconcile</span>
-			</button>
-		</form>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Transaction Matches",
+		Subtitle: fmt.Sprintf("%d matched, %d unmatched", p.MatchCount, p.UnmatchedDependentCount),
+		Action:   accountLinkReconcileAction(p),
+	})
 	if len(p.Matches) > 0 {
-		<!-- Desktop table -->
-		<div class="hidden md:block overflow-x-auto mt-6">
-			<table class="table table-sm">
-				<thead>
-					<tr>
-						<th>Date</th>
-						<th>Amount</th>
-						<th>Primary Transaction</th>
-						<th>Dependent Transaction</th>
-						<th>Confidence</th>
-						<th>Matched On</th>
-						<th></th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, m := range p.Matches {
-						@accountLinkDetailDesktopRow(m, p.CSRFToken)
-					}
-				</tbody>
-			</table>
-		</div>
-		<!-- Mobile card list -->
-		<div class="md:hidden space-y-3 mt-4">
+		<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden mt-6">
 			for _, m := range p.Matches {
-				@accountLinkDetailMobileCard(m, p.CSRFToken)
+				@accountLinkMatchRow(m, p.CSRFToken)
 			}
-		</div>
+		</ul>
 	} else {
 		@accountLinkDetailEmpty()
 	}
 }
 
-templ accountLinkDetailDesktopRow(m AccountLinkDetailMatchRow, csrfToken string) {
-	<tr>
-		<td class="whitespace-nowrap">{ m.Date }</td>
-		<td class="whitespace-nowrap text-right">
-			<!-- AmountBalance: matched pairs in this table compare magnitudes
-			     between linked accounts. Keep the raw sign visible and skip
-			     the success-green income coloring — the row already conveys
-			     which side is the credit via account context. -->
-			@components.Amount(components.AmountProps{Value: m.Amount, Intent: components.AmountBalance})
-		</td>
-		<td>
-			<a href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.PrimaryTransactionID)) } class="link link-hover">{ m.PrimaryTxnName }</a>
-			if m.PrimaryTxnMerchant != "" {
-				<div class="text-xs text-base-content/50">{ m.PrimaryTxnMerchant }</div>
-			}
-		</td>
-		<td>
-			<a href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.DependentTransactionID)) } class="link link-hover">{ m.DependentTxnName }</a>
-			if m.DependentTxnMerchant != "" {
-				<div class="text-xs text-base-content/50">{ m.DependentTxnMerchant }</div>
-			}
-		</td>
-		<td>
-			@accountLinkDetailConfidenceBadge(m.MatchConfidence)
-		</td>
-		<td class="text-xs text-base-content/60">{ accountLinkDetailMatchedOn(m.MatchedOn) }</td>
-		<td>
-			if m.MatchConfidence == "auto" {
-				<div class="flex gap-1">
-					<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/confirm", m.ID)) } class="inline">
-						<input type="hidden" name="_csrf" value={ csrfToken }/>
-						<button type="submit" class="btn btn-ghost btn-xs text-success" title="Confirm match">
-							@components.LucideIcon("check", "w-3.5 h-3.5")
-						</button>
-					</form>
-					<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/reject", m.ID)) } class="inline">
-						<input type="hidden" name="_csrf" value={ csrfToken }/>
-						<button type="submit" class="btn btn-ghost btn-xs text-error" title="Reject match">
-							@components.LucideIcon("x", "w-3.5 h-3.5")
-						</button>
-					</form>
-				</div>
-			}
-		</td>
-	</tr>
+// accountLinkReconcileAction is the trailing primary action — a CSRF-guarded
+// POST form (so it can't be a plain PageHeaderAction link).
+templ accountLinkReconcileAction(p AccountLinkDetailProps) {
+	<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/account-links/%s/reconcile", p.LinkID)) } class="inline">
+		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+		<button type="submit" class="btn btn-primary btn-sm gap-2">
+			@components.LucideIcon("refresh-cw", "w-4 h-4")
+			<span class="hidden sm:inline">Reconcile Now</span><span class="sm:hidden">Reconcile</span>
+		</button>
+	</form>
 }
 
-templ accountLinkDetailMobileCard(m AccountLinkDetailMatchRow, csrfToken string) {
-	<div class="bb-card p-4">
-		<div class="flex items-start justify-between gap-2 mb-3">
-			<div class="flex items-center gap-2">
-				<span class="text-xs text-base-content/40">{ m.Date }</span>
-				@accountLinkDetailConfidenceBadge(m.MatchConfidence)
+// accountLinkMatchRow is one matched transaction pair as a daisy list-row.
+// The leading IconTile carries the match confidence (status lives in one
+// tile, no parallel badge); the primary transaction name + magnitude is the
+// title; the dependent transaction + "matched on" strategy is the one body
+// line; the date trails; auto rows keep their inline confirm/reject forms.
+templ accountLinkMatchRow(m AccountLinkDetailMatchRow, csrfToken string) {
+	<li class="list-row items-center">
+		<span class="tooltip" data-tip={ accountLinkConfidenceLabel(m.MatchConfidence) }>
+			@components.IconTile(accountLinkConfidenceTone(m.MatchConfidence), accountLinkConfidenceIcon(m.MatchConfidence))
+		</span>
+		<div class="min-w-0">
+			<div class="flex items-center gap-2 min-w-0">
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.PrimaryTransactionID)) }
+					class="text-sm font-medium truncate no-underline hover:text-primary transition-colors"
+					data-private="merchant"
+				>{ m.PrimaryTxnName }</a>
+				<span class="ml-auto shrink-0">
+					<!-- AmountBalance: matched pairs compare magnitudes between
+					     linked accounts, so keep the raw sign and skip the
+					     income-green coloring — account context conveys the side. -->
+					@components.Amount(components.AmountProps{Value: m.Amount, Intent: components.AmountBalance, Class: "text-sm font-semibold"})
+				</span>
 			</div>
-			@components.Amount(components.AmountProps{
-				Value:  m.Amount,
-				Intent: components.AmountBalance,
-				Class:  "text-sm font-semibold",
-			})
+			<div class="mt-0.5 flex items-center gap-1.5 text-xs text-base-content/50 min-w-0 flex-wrap">
+				@components.LucideIcon("corner-down-right", "w-3 h-3 shrink-0 text-base-content/30")
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.DependentTransactionID)) }
+					class="truncate no-underline hover:text-primary transition-colors"
+					data-private="merchant"
+				>{ m.DependentTxnName }</a>
+				if label := accountLinkMatchedOnLabel(m.MatchedOn); label != "" {
+					<span class="text-base-content/20">·</span>
+					<span class="shrink-0">{ label }</span>
+				}
+			</div>
 		</div>
-		<div class="space-y-2">
-			<div class="flex items-center gap-2">
-				<div class="w-5 h-5 rounded bg-primary/10 flex items-center justify-center shrink-0">
-					@components.LucideIcon("credit-card", "w-3 h-3 text-primary")
-				</div>
-				<div class="min-w-0">
-					<a href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.PrimaryTransactionID)) } class="link link-hover text-sm truncate block">{ m.PrimaryTxnName }</a>
-					if m.PrimaryTxnMerchant != "" {
-						<div class="text-xs text-base-content/40 truncate">{ m.PrimaryTxnMerchant }</div>
-					}
-				</div>
-			</div>
-			<div class="flex items-center gap-2">
-				<div class="w-5 h-5 rounded bg-secondary/10 flex items-center justify-center shrink-0">
-					@components.LucideIcon("credit-card", "w-3 h-3 text-secondary")
-				</div>
-				<div class="min-w-0">
-					<a href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", m.DependentTransactionID)) } class="link link-hover text-sm truncate block">{ m.DependentTxnName }</a>
-					if m.DependentTxnMerchant != "" {
-						<div class="text-xs text-base-content/40 truncate">{ m.DependentTxnMerchant }</div>
-					}
-				</div>
-			</div>
-		</div>
+		<span class="shrink-0 self-center text-xs text-base-content/45 tabular-nums whitespace-nowrap">{ m.Date }</span>
 		if m.MatchConfidence == "auto" {
-			<div class="flex gap-2 mt-3 pt-3 border-t border-base-200">
+			<div class="shrink-0 self-center flex items-center gap-1">
 				<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/confirm", m.ID)) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
-					<button type="submit" class="btn btn-success btn-xs btn-soft">
+					<button type="submit" class="btn btn-ghost btn-xs btn-square text-success" title="Confirm match" aria-label="Confirm match">
 						@components.LucideIcon("check", "w-3.5 h-3.5")
-						Confirm
 					</button>
 				</form>
 				<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/-/transaction-matches/%s/reject", m.ID)) } class="inline">
 					<input type="hidden" name="_csrf" value={ csrfToken }/>
-					<button type="submit" class="btn btn-error btn-xs btn-soft">
+					<button type="submit" class="btn btn-ghost btn-xs btn-square text-error" title="Reject match" aria-label="Reject match">
 						@components.LucideIcon("x", "w-3.5 h-3.5")
-						Reject
 					</button>
 				</form>
 			</div>
 		}
-	</div>
-}
-
-templ accountLinkDetailConfidenceBadge(confidence string) {
-	switch confidence {
-		case "confirmed":
-			<span class="badge badge-soft badge-success badge-xs">Confirmed</span>
-		case "auto":
-			<span class="badge badge-soft badge-info badge-xs">Auto</span>
-		default:
-			<span class="badge badge-ghost badge-xs">{ confidence }</span>
-	}
+	</li>
 }
 
 templ accountLinkDetailEmpty() {
@@ -187,12 +108,56 @@ templ accountLinkDetailEmpty() {
 	})
 }
 
-// accountLinkDetailMatchedOn mirrors the original `{{range .MatchedOn}}{{.}} {{end}}`
-// — each element followed by a single space. Using strings.Join with " "
-// would drop the trailing space; reproduce it exactly with a manual concat.
-func accountLinkDetailMatchedOn(items []string) string {
+// accountLinkConfidenceTone maps the match confidence to an IconTile tone:
+// confirmed → success, auto (pending review) → info, rejected → error,
+// anything else → neutral.
+func accountLinkConfidenceTone(confidence string) string {
+	switch confidence {
+	case "confirmed":
+		return "success"
+	case "auto":
+		return "info"
+	case "rejected":
+		return "error"
+	default:
+		return "neutral"
+	}
+}
+
+// accountLinkConfidenceIcon picks the tile glyph for each confidence.
+func accountLinkConfidenceIcon(confidence string) string {
+	switch confidence {
+	case "confirmed":
+		return "check-circle-2"
+	case "auto":
+		return "sparkles"
+	case "rejected":
+		return "x-circle"
+	default:
+		return "link"
+	}
+}
+
+// accountLinkConfidenceLabel is the human label surfaced on the tile's
+// tooltip (the tile color/glyph carries the state; this names it).
+func accountLinkConfidenceLabel(confidence string) string {
+	switch confidence {
+	case "confirmed":
+		return "Confirmed match"
+	case "auto":
+		return "Auto-detected match"
+	case "rejected":
+		return "Rejected match"
+	default:
+		return confidence
+	}
+}
+
+// accountLinkMatchedOnLabel renders the match strategy fields as a
+// "matched on a, b" suffix, or "" when none were recorded.
+func accountLinkMatchedOnLabel(items []string) string {
 	if len(items) == 0 {
 		return ""
 	}
-	return strings.Join(items, " ") + " "
+	return "matched on " + strings.Join(items, ", ")
 }

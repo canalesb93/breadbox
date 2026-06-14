@@ -86,11 +86,17 @@ templ MCPGuide(p MCPGuideProps) {
 			<div class="px-4 sm:px-5 py-4">
 				<!-- Agent tabs + flavor toggle -->
 				<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-					<div class="flex flex-wrap gap-1.5" role="tablist">
+					<!-- Daisy tabs-border shape (matches components.TabBar Variant:"border").
+					     Kept as an Alpine x-for + @click strip rather than the Go-slice
+					     TabBar component because the tabs are client-reactive: switchTab
+					     carries side effects (flavor flip + per-panel lucide re-render) and
+					     the active state is driven by Alpine `tab`, which the static
+					     server-rendered TabBar can't express. -->
+					<div class="tabs tabs-border" role="tablist" aria-label="MCP client">
 						<template x-for="t in tabs" :key="t.id">
 							<button
-								class="btn btn-sm gap-2 transition-all"
-								:class="tab === t.id ? 'btn-primary' : 'btn-ghost'"
+								class="tab gap-2"
+								:class="tab === t.id && 'tab-active'"
 								@click="switchTab(t.id)"
 								role="tab"
 								:aria-selected="tab === t.id"
@@ -118,7 +124,7 @@ templ MCPGuide(p MCPGuideProps) {
 					<div x-show="flavor === 'guide'" class="space-y-4">
 						<div class="flex items-center gap-2 mb-1">
 							<span class="badge badge-soft badge-warning badge-xs">API Key</span>
-							<span class="badge badge-soft badge-primary badge-xs">OAuth</span>
+							<span class="badge badge-soft badge-info badge-xs">OAuth</span>
 						</div>
 						<ol class="text-sm text-base-content/60 space-y-2 list-decimal list-inside">
 							<li>Open <strong>Claude Desktop</strong> and go to <strong>Settings</strong></li>
@@ -165,7 +171,7 @@ templ MCPGuide(p MCPGuideProps) {
 					<div class="space-y-4">
 						<div class="flex items-center gap-2 mb-1">
 							<span class="badge badge-soft badge-warning badge-xs">API Key</span>
-							<span class="badge badge-soft badge-primary badge-xs">OAuth</span>
+							<span class="badge badge-soft badge-info badge-xs">OAuth</span>
 						</div>
 						<p class="text-sm text-base-content/60">Run this command:</p>
 						<div class="relative" x-data="{ copied: false }">
@@ -194,7 +200,7 @@ templ MCPGuide(p MCPGuideProps) {
 					<!-- Guide flavor -->
 					<div x-show="flavor === 'guide'" class="space-y-4">
 						<div class="flex items-center gap-2 mb-1">
-							<span class="badge badge-soft badge-primary badge-xs">OAuth required</span>
+							<span class="badge badge-soft badge-info badge-xs">OAuth required</span>
 						</div>
 						<ol class="text-sm text-base-content/60 space-y-2 list-decimal list-inside">
 							<li>Create an <a href="/oauth-clients/new" class="link link-primary">OAuth Client</a> in Breadbox if you haven't already</li>

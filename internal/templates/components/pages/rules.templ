@@ -70,25 +70,14 @@ templ Rules(p RulesProps) {
 		if len(p.Rules) == 0 {
 			@rulesEmpty(p.FiltersActive)
 		} else {
-			<div class="overflow-x-auto rounded-xl bg-base-100 border border-base-300">
-				<table class="table table-sm table-zebra-soft">
-					<thead>
-						<tr class="text-xs text-base-content/50">
-							<th class="font-medium text-center w-14">Enabled</th>
-							<th class="font-medium">Rule</th>
-							<th class="font-medium hidden md:table-cell w-64">Action</th>
-							<th class="font-medium hidden lg:table-cell text-center w-16">Stage</th>
-							<th class="font-medium hidden sm:table-cell text-right w-20">Hits</th>
-							<th class="font-medium hidden md:table-cell w-28">Last hit</th>
-							<th class="w-12"></th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, r := range p.Rules {
-							@rulesRow(r)
-						}
-					</tbody>
-				</table>
+			<!-- Grouped by pipeline stage (baseline → override), the order
+			     rules actually execute in during sync. Each stage is a quiet
+			     label line over a card of list-rows — the /accounts day-group
+			     idiom. Within a group, rows keep the server's sort order. -->
+			<div class="flex flex-col gap-5">
+				for _, g := range GroupRulesByStage(p.Rules) {
+					@rulesStageGroup(g)
+				}
 			</div>
 		}
 		if p.TotalPages > 1 {
@@ -245,19 +234,40 @@ templ rulesEmpty(filtered bool) {
 	}
 }
 
-// rulesRow renders one rule as a <tr> in the table. Critical signal
-// (toggle, name, condition/action summary, kebab) is always present;
-// secondary columns (category, stage, hits, last hit) collapse on
-// smaller viewports via `hidden md:table-cell` etc. Anything we hide on
-// mobile is folded into the second line under the name so no signal is
-// lost — only the column density changes.
-// rulesRow renders one rule. Clicking anywhere on the row toggles the
-// rule's enablement; the name link, toggle cell, and overflow cell stop
-// propagation so they keep their own behavior (open detail / toggle /
-// open the actions menu).
-templ rulesRow(r RulesRow) {
-	<tr
-		class={ "hover:bg-base-200/40 cursor-pointer", templ.KV("opacity-60", !r.Enabled) }
+// rulesStageGroup renders one pipeline stage: a quiet label line
+// (stage name · rule count · one-line description) above the stage's
+// list-rows in their own card. The grouping axis is the rule pipeline
+// itself — rules execute baseline → override during sync, so the page
+// reads top-to-bottom as the pipeline it drives. Mirrors the
+// /accounts connection-group idiom.
+templ rulesStageGroup(g RulesStageGroup) {
+	<div class="flex flex-col gap-2">
+		<div class="flex items-center gap-2 px-1 min-w-0">
+			<span class="text-sm font-medium text-base-content shrink-0">{ g.Label }</span>
+			<span class="text-xs text-base-content/40 shrink-0">{ fmt.Sprintf("%d rule%s", len(g.Rules), components.PluralS(len(g.Rules))) }</span>
+			<span class="text-xs text-base-content/30 truncate hidden sm:inline">{ g.Description }</span>
+		</div>
+		@components.AgentRunRowList() {
+			for _, r := range g.Rules {
+				@rulesListRow(r)
+			}
+		}
+	</div>
+}
+
+// rulesListRow renders one rule as a daisy list-row. The leading control
+// is the enabled toggle — for a rule, enabled/disabled IS the status, so
+// the toggle stands in for a status tile (no redundant second signal); a
+// disabled row dims via `opacity-60`, the same read-row treatment as
+// /reports. The toggle and the overflow menu sit OUTSIDE the row's
+// navigation anchor so flipping the toggle or opening the menu never
+// triggers the row link. The row links to the rule detail; the name is
+// the title, the action summary the one body line, and hits + last-hit
+// the compact muted metadata on the right.
+templ rulesListRow(r RulesRow) {
+	<li
+		class={ "list-row transition-colors hover:bg-base-200/40 items-center",
+			templ.KV("opacity-60", !r.Enabled) }
 		data-rule-row
 		data-rule-id={ r.ID }
 		data-open-url={ "/rules/" + r.ID }
@@ -265,15 +275,13 @@ templ rulesRow(r RulesRow) {
 		if !r.IsSystem {
 			data-can-delete="true"
 		}
-		@click={ "toggleRule('" + r.ID + "')" }
 	>
-		<!-- Toggle column. Click is scoped to the cell so the row's
-		     toggle-on-click doesn't double-fire against the explicit
-		     control (which would net out to no change). -->
-		<td class="align-middle text-center" @click.stop>
+		<!-- Leading control = the enabled toggle (the row's status
+		     affordance). Outside the <a>, so toggling never navigates. -->
+		<label class="shrink-0 self-center cursor-pointer" title={ rulesToggleLabel(r) }>
 			<input
 				type="checkbox"
-				class="toggle toggle-sm"
+				class="toggle toggle-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
 				if r.Enabled {
 					checked
 				}
@@ -281,90 +289,74 @@ templ rulesRow(r RulesRow) {
 				data-toggle-enabled
 				@change={ "toggleRule('" + r.ID + "')" }
 			/>
-		</td>
-		<!-- Name + condition/action summary line. On mobile this cell
-		     carries the chips for category, stage, hits, and last hit
-		     too (the dedicated columns are hidden < md). -->
-		<td class="align-middle">
-			<div class="flex items-center gap-2 flex-wrap">
-				<a
-					href={ templ.SafeURL("/rules/" + r.ID) }
-					class="font-medium text-sm hover:underline truncate max-w-[40ch]"
-					@click.stop
-				>{ r.Name }</a>
-				if r.IsSystem {
-					<span class="badge badge-soft badge-info badge-xs gap-1" title="Built-in system rule">
-						@components.LucideIcon("shield", "w-2.5 h-2.5")
-						System
-					</span>
-				}
-				if r.Enabled && r.ExpiresAt != nil && r.Expired {
-					<span class="badge badge-warning badge-xs">Expired</span>
-				}
-			</div>
-			<div class="flex items-center gap-2 mt-0.5 text-xs text-base-content/50 whitespace-nowrap overflow-hidden">
-				<span class="inline-flex items-center gap-1 shrink-0" title={ r.ConditionSummary }>
-					if r.IsMatchAll {
-						@components.LucideIcon("infinity", "w-3 h-3")
-						<span class="italic">All transactions</span>
-					} else {
-						@components.LucideIcon("list-filter", "w-3 h-3")
-						<span class="tabular-nums">{ fmt.Sprintf("%d cond.", r.ConditionCount) }</span>
+		</label>
+		<a
+			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+			href={ templ.SafeURL("/rules/" + r.ID) }
+			aria-label={ "Open rule " + r.Name }
+		>
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="font-medium text-sm text-base-content truncate">{ r.Name }</span>
+					if r.IsSystem {
+						<span class="badge badge-soft badge-info badge-xs gap-1 shrink-0" title="Built-in system rule">
+							@components.LucideIcon("shield", "w-2.5 h-2.5")
+							System
+						</span>
 					}
-				</span>
-				<span class="text-base-content/30 shrink-0">&middot;</span>
-				<span class="inline-flex items-center gap-1 shrink-0 tabular-nums" title={ r.ActionsSummary }>
-					@components.LucideIcon("zap", "w-3 h-3")
-					{ fmt.Sprintf("%d action%s", r.ActionsCount, components.PluralS(r.ActionsCount)) }
-				</span>
-				<!-- Mobile-only stage + hits chips. Hidden once the
-				     dedicated columns appear so we don't double-render. -->
-				<span class="sm:hidden text-base-content/30 shrink-0">&middot;</span>
-				<span class="sm:hidden inline-flex items-center gap-1 shrink-0 tabular-nums" title="Hits">
-					{ fmt.Sprintf("%d hits", r.HitCount) }
-				</span>
+					if r.Enabled && r.ExpiresAt != nil && r.Expired {
+						<span class="badge badge-soft badge-warning badge-xs shrink-0">Expired</span>
+					}
+					if rulesShowCreatorAvatar(r) {
+						@components.UserAvatar(components.UserAvatarProps{
+							ID:         rulesCreatorSeed(r),
+							Name:       r.CreatedByName,
+							IsAgent:    true,
+							Size:       components.UserAvatarXS,
+							Decorative: true,
+							Lazy:       true,
+							Class:      "shrink-0",
+						})
+					}
+				</div>
+				<div class="mt-0.5 flex items-center gap-1.5 text-xs text-base-content/55 min-w-0">
+					@components.LucideIcon(rulesActionIcon(r), "w-3 h-3 shrink-0 opacity-70")
+					<span class="truncate" title={ r.ActionsSummary }>{ rulesActionLabel(r) }</span>
+					<!-- Mobile-only hits; the right metadata column is hidden < sm. -->
+					<span class="sm:hidden text-base-content/30 shrink-0">&middot;</span>
+					<span class="sm:hidden shrink-0 tabular-nums whitespace-nowrap">{ fmt.Sprintf("%d hits", r.HitCount) }</span>
+				</div>
 			</div>
-		</td>
-		<td class="align-middle text-xs hidden md:table-cell">
-			@rulesActionChip(r)
-		</td>
-		<td class="align-middle text-xs text-center hidden lg:table-cell tabular-nums text-base-content/60">
-			{ fmt.Sprintf("%d", r.Priority) }
-		</td>
-		<td class="align-middle text-xs text-right hidden sm:table-cell tabular-nums text-base-content/60">
-			{ fmt.Sprintf("%d", r.HitCount) }
-		</td>
-		<td class="align-middle text-xs hidden md:table-cell text-base-content/60 tabular-nums">
-			if r.LastHitAt != nil {
-				{ r.LastHitAtRelative }
-			} else {
-				<span class="text-base-content/30">—</span>
-			}
-		</td>
-		<td class="align-middle text-right" @click.stop>
+			@rulesRowMetadata(r)
+		</a>
+		<div class="shrink-0 self-center">
 			@components.OverflowMenu(components.OverflowMenuProps{
 				AriaLabel: "Rule " + r.Name + " actions",
 				Size:      "sm",
 				Items:     rulesOverflowItems(r),
 			})
-		</td>
-	</tr>
+		</div>
+	</li>
 }
 
-// rulesActionChip renders the "what this rule does" column. Rules are no
-// longer category-only — they can set a category, add/remove a tag, add a
-// comment, or assign a series — so every row gets an icon that reflects
-// its action. A set_category rule keeps its colored category avatar; other
-// actions get a neutral icon in the same avatar shape so the column reads
-// as one consistent surface. The label fills the column and only truncates
-// when it has to, fixing the old cramped max-w cap.
-templ rulesActionChip(r RulesRow) {
-	<span class="inline-flex items-center gap-2 min-w-0">
-		<span class="bb-tx-avatar bb-tx-avatar-sm shrink-0" style={ rulesActionAvatarStyle(r) }>
-			@components.LucideIcon(rulesActionIcon(r), "w-3.5 h-3.5")
-		</span>
-		<span class="truncate" title={ r.ActionsSummary }>{ r.ActionsSummary }</span>
-	</span>
+// rulesRowMetadata renders the compact right-aligned metric column: hit
+// count over last-hit relative time. Hidden below `sm` (folded into the
+// body's second line on mobile). Pipeline stage is NOT repeated here — the
+// group header already names it.
+templ rulesRowMetadata(r RulesRow) {
+	<div class="shrink-0 self-center text-right hidden sm:block tabular-nums">
+		<div class="text-sm text-base-content/70">
+			{ fmt.Sprintf("%d", r.HitCount) }
+			<span class="text-xs text-base-content/35"> hits</span>
+		</div>
+		<div class="text-xs text-base-content/40">
+			if r.LastHitAt != nil {
+				{ r.LastHitAtRelative }
+			} else {
+				never
+			}
+		</div>
+	</div>
 }
 
 templ rulesPaginator(p RulesProps) {
@@ -424,22 +416,31 @@ templ rulesPerPageOption(value, current int) {
 	}
 }
 
-func rulesAvatarStyle(color *string) string {
-	if color != nil && *color != "" {
-		return "--avatar-color: " + *color
+// rulesActionLabel is the one body line — what the rule does. Falls back
+// to a neutral label when a rule has no actions so the row never renders an
+// empty line.
+func rulesActionLabel(r RulesRow) string {
+	if r.ActionsSummary == "" {
+		return "No actions"
 	}
-	return "--avatar-color: oklch(0.65 0 0)"
+	return r.ActionsSummary
 }
 
-// rulesActionAvatarStyle tints the action avatar. A set_category rule with
-// a known color uses the category color; every other action (tags,
-// comments, series, multi-action) gets the neutral gray so the icon, not
-// the color, carries the meaning.
-func rulesActionAvatarStyle(r RulesRow) string {
-	if r.PrimaryActionType == "set_category" {
-		return rulesAvatarStyle(r.CategoryColor)
+// rulesShowCreatorAvatar surfaces an identity avatar only where it adds
+// signal — agent-authored rules (principle 7). User rules don't need a
+// face, and system rules already carry their System badge.
+func rulesShowCreatorAvatar(r RulesRow) bool {
+	return r.CreatedByType == "agent" && r.CreatedByName != ""
+}
+
+// rulesCreatorSeed is the stable DiceBear seed for the creator avatar —
+// the actor id when known (so every rule from one agent shares a face),
+// falling back to the display name.
+func rulesCreatorSeed(r RulesRow) string {
+	if r.CreatedByID != "" {
+		return r.CreatedByID
 	}
-	return rulesAvatarStyle(nil)
+	return r.CreatedByName
 }
 
 // rulesActionIcon picks the lucide icon for the rule's primary action.

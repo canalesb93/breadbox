@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -95,10 +94,11 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			}
 		}
 
-		// Fetch accounts for each connection and compute balances.
+		// Fetch accounts for each connection and compute display-ready
+		// per-account balances (liabilities shown negative). Net-worth /
+		// asset / liability totals live on /accounts now — /connections is a
+		// connection-management surface, so it only needs per-connection sums.
 		var enriched []ConnectionWithAccounts
-		var totalAssets, totalLiabilities float64
-		var hasAnyBalance bool
 
 		for _, conn := range connections {
 			cwa := ConnectionWithAccounts{ListBankConnectionsRow: conn}
@@ -113,15 +113,12 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 						if f, ok := pgconv.NumericToFloat(acct.BalanceCurrent); ok {
 							ca.HasBalance = true
 							cwa.HasBalance = true
-							hasAnyBalance = true
 
 							// Classify as asset or liability based on account type.
 							if IsLiabilityAccount(acct.Type) {
-								totalLiabilities += math.Abs(f)
 								// Show as negative for display.
 								ca.BalanceFloat = -math.Abs(f)
 							} else {
-								totalAssets += f
 								ca.BalanceFloat = f
 							}
 						}
@@ -131,8 +128,6 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			}
 			enriched = append(enriched, cwa)
 		}
-
-		netWorth := totalAssets - totalLiabilities
 
 		// Compute per-connection display total from display-ready balances,
 		// next-sync schedule, and staleness.
@@ -211,31 +206,6 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			})
 		}
 
-		// Build the provider filter strip: one chip per provider that
-		// actually has a connection in the list, ordered by descending
-		// connection count then alphabetically. The shape of the strip
-		// (chips with icon + label + count) is built here so the templ
-		// can stay markup-only.
-		providerCounts := make(map[string]int)
-		for _, conn := range enriched {
-			providerCounts[string(conn.Provider)]++
-		}
-		var providers []pages.ConnectionsProviderFilter
-		for slug, count := range providerCounts {
-			providers = append(providers, pages.ConnectionsProviderFilter{
-				Slug:  slug,
-				Label: providerLabel(slug),
-				Icon:  providerIcon(slug),
-				Count: count,
-			})
-		}
-		sort.Slice(providers, func(i, j int) bool {
-			if providers[i].Count != providers[j].Count {
-				return providers[i].Count > providers[j].Count
-			}
-			return providers[i].Label < providers[j].Label
-		})
-
 		data := map[string]any{
 			"PageTitle":   "Connections",
 			"CurrentPage": "connections",
@@ -248,57 +218,19 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			a.Logger.Error("list users for connect drawer", "error", err)
 		}
 		props := buildConnectionsProps(connectionsListInput{
-			Tab:              tab,
-			CSRFToken:        GetCSRFToken(r),
-			Connections:      enriched,
-			Providers:        providers,
-			Links:            links,
-			LinkAccounts:     linkAccounts,
-			NetWorth:         netWorth,
-			TotalAssets:      totalAssets,
-			TotalLiabilities: totalLiabilities,
-			HasAnyBalance:    hasAnyBalance,
-			Users:            connectUsers,
-			HasPlaid:         a.Providers["plaid"] != nil,
-			HasTeller:        a.Providers["teller"] != nil,
-			HasSimpleFin:     a.Providers["simplefin"] != nil,
-			TellerEnv:        a.Config.TellerEnv,
+			Tab:          tab,
+			CSRFToken:    GetCSRFToken(r),
+			CanManage:    IsAdmin(sm, r),
+			Connections:  enriched,
+			Links:        links,
+			LinkAccounts: linkAccounts,
+			Users:        connectUsers,
+			HasPlaid:     a.Providers["plaid"] != nil,
+			HasTeller:    a.Providers["teller"] != nil,
+			HasSimpleFin: a.Providers["simplefin"] != nil,
+			TellerEnv:    a.Config.TellerEnv,
 		})
 		tr.RenderWithTempl(w, r, data, pages.Connections(props))
-	}
-}
-
-// providerLabel maps a canonical provider slug to the display label shown
-// on the connections filter chips.
-func providerLabel(p string) string {
-	switch p {
-	case "plaid":
-		return "Plaid"
-	case "teller":
-		return "Teller"
-	case "simplefin":
-		return "SimpleFIN"
-	case "csv":
-		return "CSV"
-	default:
-		return p
-	}
-}
-
-// providerIcon mirrors the per-card icon choice in connections.templ so the
-// chip and the card stay visually consistent.
-func providerIcon(p string) string {
-	switch p {
-	case "plaid":
-		return "building-2"
-	case "teller":
-		return "landmark"
-	case "simplefin":
-		return "key-round"
-	case "csv":
-		return "file-spreadsheet"
-	default:
-		return "link"
 	}
 }
 
@@ -306,16 +238,12 @@ func providerIcon(p string) string {
 // list page. Building props through this struct keeps the conversion from
 // db rows + ad-hoc maps into typed templ props in one place.
 type connectionsListInput struct {
-	Tab              string
-	CSRFToken        string
-	Connections      []ConnectionWithAccounts
-	Providers        []pages.ConnectionsProviderFilter
-	Links            []service.AccountLinkResponse
-	LinkAccounts     []AccountForLink
-	NetWorth         float64
-	TotalAssets      float64
-	TotalLiabilities float64
-	HasAnyBalance    bool
+	Tab          string
+	CSRFToken    string
+	CanManage    bool
+	Connections  []ConnectionWithAccounts
+	Links        []service.AccountLinkResponse
+	LinkAccounts []AccountForLink
 
 	// Connect-a-bank drawer (shared connectWizard partial).
 	Users        []db.User
@@ -329,19 +257,14 @@ type connectionsListInput struct {
 // pages.ConnectionsProps the templ component renders.
 func buildConnectionsProps(in connectionsListInput) pages.ConnectionsProps {
 	props := pages.ConnectionsProps{
-		Tab:              in.Tab,
-		CSRFToken:        in.CSRFToken,
-		NetWorth:         in.NetWorth,
-		TotalAssets:      in.TotalAssets,
-		TotalLiabilities: in.TotalLiabilities,
-		HasAnyBalance:    in.HasAnyBalance,
-		HasPlaid:         in.HasPlaid,
-		HasTeller:        in.HasTeller,
-		HasSimpleFin:     in.HasSimpleFin,
-		TellerEnv:        in.TellerEnv,
+		Tab:          in.Tab,
+		CSRFToken:    in.CSRFToken,
+		CanManage:    in.CanManage,
+		HasPlaid:     in.HasPlaid,
+		HasTeller:    in.HasTeller,
+		HasSimpleFin: in.HasSimpleFin,
+		TellerEnv:    in.TellerEnv,
 	}
-
-	props.Providers = in.Providers
 
 	for _, u := range in.Users {
 		props.Users = append(props.Users, pages.ConnectionNewUser{
@@ -373,23 +296,6 @@ func buildConnectionsProps(in connectionsListInput) pages.ConnectionsProps {
 		}
 		if c.LastSyncedAt.Valid {
 			row.LastSyncedAtRelative = relativeTime(c.LastSyncedAt.Time)
-		}
-		for _, a := range c.Accounts {
-			row.Accounts = append(row.Accounts, pages.ConnectionsAccountRow{
-				ID:                pgconv.FormatUUID(a.ID),
-				Name:              a.Name,
-				DisplayNameValid:  a.DisplayName.Valid,
-				DisplayName:       a.DisplayName.String,
-				Type:              a.Type,
-				SubtypeValid:      a.Subtype.Valid,
-				Subtype:           a.Subtype.String,
-				MaskValid:         a.Mask.Valid,
-				Mask:              a.Mask.String,
-				IsDependentLinked: a.IsDependentLinked,
-				Excluded:          a.Excluded,
-				HasBalance:        a.HasBalance,
-				BalanceFloat:      a.BalanceFloat,
-			})
 		}
 		props.Connections = append(props.Connections, row)
 	}

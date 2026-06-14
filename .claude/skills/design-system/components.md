@@ -177,19 +177,42 @@ AmountProps{
 
 ## StatTile / StatTileRow — `stat_tile.templ`
 
-Summary numbers when figures lead the page (Net Worth / Assets / Liabilities).
+Quiet summary numbers in the **Mintlify-clean** style (see "Stat cards" below).
+A plain hairline box, small muted label on top, big plain number, optional tiny
+delta + description. **No icon, no tone fill, no tint.**
 
 ```go
 StatTileProps{
-    Icon string; Label string; Value string; Description string
-    Tone StatTileTone; Href templ.SafeURL
+    Label string; Value string; Description string // label on top, big number, muted subline
+    Delta string; DeltaDir StatTileDeltaDir         // optional tiny "↓ 45.7% vs previous" trend line
+    Href templ.SafeURL
     ValuePrivateKind string; DescriptionPrivateKind string // "amount" → marks data-private
+    Icon string; Tone StatTileTone // RETAINED for caller compat but NO-OPS (not rendered)
 }
-// Tone: StatToneNeutral · StatTonePrimary · StatToneSuccess · StatToneWarning · StatToneError · StatToneInfo
-@components.StatTileRow() { @components.StatTile(...) ... } // the divided strip
+// DeltaDir: StatDeltaUp (success-ish ↑) · StatDeltaDown (error-ish ↓) · StatDeltaNeutral (muted, default)
+@components.StatTileRow() { @components.StatTile(...) ... } // the 2-up / 4-up grid
 ```
 
-Set `ValuePrivateKind: "amount"` on money tiles so they obfuscate with privacy mode.
+The number renders in **default ink** — never a tone color. `Icon`/`Tone` are
+kept only so existing callers compile; the clean tile shows neither. Set
+`Delta` (with `DeltaDir`) for a small semantic trend line under the value.
+Set `ValuePrivateKind: "amount"` on money tiles so they obfuscate with privacy
+mode. When `Href` is set the tile is an `<a>` and carries both
+`bb-card--interactive` hover and a keyboard
+`focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40` ring
+(principle #8 — every interactive element has visible hover + focus states).
+
+### Stat cards — the Mintlify-clean pattern
+
+The canonical stat treatment, going forward, for **every** surface that shows a
+metric: a **hairline-bordered box** · a **small muted label on top** · a **big
+plain number** below (`text-2xl`/`text-3xl`, `font-semibold`, `tabular-nums`,
+default ink — *not* a tone color) · an **optional tiny delta** beneath (small
+arrow + text in a quiet semantic color) · airy padding. **No icon tile, no tone
+background fill, no tint, no left-accent.** The number speaks; status stays
+quiet. Don't reintroduce the old colored-icon-square-on-the-left tile — that was
+the decorated shape this pattern replaced. Reach for `StatTile`; if you're
+hand-rolling a metric box, match this shape.
 
 ## EmptyState — `empty_state.templ`
 
@@ -202,6 +225,38 @@ EmptyStateProps{
     Compact bool; InCard bool // Compact = small inline; InCard wraps the compact variant
 }
 ```
+
+## CollapsibleSection — `collapsible_section.templ`
+
+A quiet, reusable disclosure: a header row (lucide glyph + label + optional
+right-slot indicator) toggling its body open/closed with a rotating chevron.
+
+```go
+CollapsibleSectionProps{
+    Icon string; Label string /* required */
+    DefaultOpen bool            // data-driven open-on-render decision
+    Right templ.Component       // optional header indicator (rendered in scope)
+    Class string
+}
+```
+
+- Disclosure state is a tiny Alpine `{ open: <bool> }`; the body renders with
+  `x-show` (NOT `<details>`), so **form inputs inside a collapsed section still
+  submit** — this is the reason to use it over daisy `collapse`/`<details>`
+  inside a `<form>`.
+- The component exposes `open` in its Alpine scope. A `Right` indicator guarded
+  with `x-show="!open"` surfaces only when collapsed (the "active filter hidden
+  here" cue). Nest the component inside an ancestor `x-data` to let the
+  indicator read reactive state (e.g. the Tags section reads `selectedSlugs`).
+- The header is a real `<button>` with a comfortable `py-3` touch target and
+  full interaction states (per the *Interaction states* principle in
+  [`SKILL.md`](SKILL.md)): `hover:bg-base-200/60` with `transition-colors`,
+  `cursor-pointer`, and a keyboard `focus-visible:ring-2 focus-visible:ring-primary/40`
+  ring. The chevron rotates smoothly (`transition-transform duration-200`).
+- Backs the `/transactions` filter drawer's When / Where / What / Tags / Search
+  sections: each defaults open when it holds an active filter (computed in
+  `TransactionsProps.*SectionOpen`) and collapses with a count/dot indicator
+  otherwise. Sandbox: `/design/c/collapsible-section`.
 
 ## Skeletons — `*_skeleton.templ`
 
@@ -218,9 +273,105 @@ Settings tabs use a local dialect of this language. See
 
 ---
 
+## ReportRow / ReportsList — `report_table.templ`
+
+The agent-reports inbox row, a list-row sibling of `AgentRunRow` (same
+shape, so `/reports` and `/agents/runs` read as one product).
+
+```go
+ReportRowProps{
+    ID string; Title string /* summary */; Priority string /* "" | "info" | "warning" | "critical" */
+    Author string; AuthorID string /* avatar seed */; IsAgent bool
+    Time string /* pre-rendered relative */; IsRead bool
+}
+@components.ReportRowList() { for _, r := range rows { @components.ReportRow(r) } }
+@components.ReportsList(rows) // convenience: flat list in one card
+```
+
+- Leading status = a **small bare priority glyph** (no tinted tile): vivid ink
+  only for critical (`text-error`) / warning (`text-warning`), a muted glyph for
+  routine — color is an accent, not a per-row fill. No parallel priority badge.
+- The **summary is the prominent line**; the `UserAvatar` (IsAgent) + agent name
+  + an info **unread dot** + relative time ride above it as a quiet metadata
+  line. Read rows fade (`opacity-55`) and drop the dot; unread rows keep a
+  slightly stronger summary. A quiet "N unread · M from <Agent>" at-a-glance line
+  (plain muted text, not a card) sits above the filter tabs.
+- `OverflowMenu` (Size `"sm"`) — mark read/unread + open — renders OUTSIDE the
+  row's `<a>` link. The `/reports` All view groups rows unread-first under quiet
+  label lines (`partitionReportsByRead`). `ReportPriorityBadge` is now
+  detail-header-only.
+
+## Family table — the dense matrix, wearing the family skin
+
+When the content is a genuinely dense, multi-numeric-column matrix that must
+align across rows (the Backups file list, a CSV preview, a sample-matches grid),
+keep it a **`<table>`** — do *not* shred it into list-rows. Make it read as the
+same product by wearing the family treatment:
+
+```html
+<div class="bb-card overflow-hidden">          <!-- flat border, clips the corners -->
+  <div class="overflow-x-auto">                 <!-- horizontal scroll on mobile -->
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <!-- quiet uppercase column labels -->
+          <th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Filename</th>
+          <th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Size</th>
+          <th class="text-xs font-medium uppercase tracking-wide text-base-content/50 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="hover:bg-base-200/40 transition-colors">  <!-- principle #8 hover -->
+          <td>…</td>
+          <td class="tabular-nums text-sm">…</td>            <!-- tabular-nums on every number -->
+          <td>… vivid-only badge, never badge-soft …</td>
+          <td>
+            <div class="flex items-center justify-end gap-1" x-data>
+              <a … class="btn btn-ghost btn-xs btn-square focus-visible:ring-2 focus-visible:ring-primary/40">…</a>
+              @components.OverflowMenu(components.OverflowMenuProps{ Size: "sm", … })  <!-- secondary/destructive -->
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+Rules, all load-bearing:
+
+- **`bb-card overflow-hidden`** wrapper (flat border + dark-mode lift, rounded
+  corners clipped) — never a heavy shadow or a boxed sub-header. Inside a
+  `SettingsSection`, set `Bare: true` so the table is the family-`bb-card`, not a
+  card-in-card.
+- Quiet **uppercase `text-xs … text-base-content/50`** `<th>` labels; daisy
+  `table`'s own hairline row borders are the dividers (no zebra).
+- **`hover:bg-base-200/40 transition-colors`** on every `<tr>`.
+- **`tabular-nums`** on every numeric `<td>` (size, dates, counts, money).
+- Type/state as a **vivid-only** badge (`info`/`success`/`warning`/`error`, or
+  `ghost` for a quiet neutral) — never a `badge-soft` low-contrast tone.
+- Row actions = **bare-icon button(s)** for the primary action (`btn btn-ghost
+  btn-xs btn-square` + explicit `focus-visible:ring-2 focus-visible:ring-primary/40`)
+  **plus an `OverflowMenu` (`Size: "sm"`)** for secondary/destructive actions.
+  When a menu item must POST (restore/delete), render a row-local hidden
+  `<form x-ref="…">` carrying the CSRF token and have the item's `OnClick`
+  dispatch `bb-confirm` with `onConfirm: () => $refs.<form>.requestSubmit()`.
+
+Worked example: `backups.templ` (`backupsFilesSection` / `backupsRow`).
+
+## Family card — the richer preview format
+
+Heterogeneous or visual items that need more than a row (the Workflows gallery
+tiles, onboarding step cards, recurring-candidate cards) use a **card**, not a
+list-row. Reference formats already in the language: the **Workflows gallery**
+card (`workflows_gallery.templ`) and the **`StatTile` / `StatTileRow`** strip for
+summary numbers. Reuse those shells — same `bb-card` surface, quiet uppercase
+labels, `tabular-nums` figures, `IconTile` for state — before authoring a bespoke
+card.
+
 ## Reference implementation
 
 `agent_run_row.templ` (`AgentRunRowList` + `AgentRunRow`) is the cleanest single
 example of principles 2–7: status `IconTile`, one priority body line, bare-icon
 actions, `UserAvatar` identity, list-row spacing in a `bb-card`. Read it before
-authoring a new feed/list row.
+authoring a new feed/list row. `report_table.templ` is its inbox sibling.

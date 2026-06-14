@@ -5,6 +5,7 @@ package admin
 import (
 	"context"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -22,10 +23,11 @@ import (
 const feedWindowDays = 3
 
 // FeedHandler serves GET / — the activity-style household home page.
-// The Getting Started guide stays linked from the sidebar (driven by
-// `onboarding_dismissed`) so first-run users can still reach it, but the
-// root path no longer bounces there. Post-setup landing happens once,
-// from the setup handler — see CreateAdminHandler in setup.go.
+// Onboarding lives inline here: the "Finish setting up" banner surfaces
+// at the top while setup is incomplete and the guide hasn't been dismissed
+// (driven by `onboarding_dismissed`). The dedicated /getting-started page
+// is retired — it redirects to `/`. Post-setup landing happens once, from
+// the setup handler — see CreateAdminHandler in setup.go.
 //
 // The aggregation pipeline is:
 //
@@ -193,8 +195,27 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
+		// "Finish setting up" banner: surfaces incomplete onboarding at the
+		// top of the home feed (nil once setup is complete or dismissed).
+		onboarding := onboardingBannerProps(computeOnboardingProgress(r.Context(), a), GetCSRFToken(r))
+
+		// Dev-only preview: a fully set-up instance hides the banner, so this
+		// forces a representative in-progress banner. Gated to BREADBOX_DEV_RELOAD
+		// (never set in production) + an explicit ?onboarding_preview=1 opt-in.
+		if os.Getenv("BREADBOX_DEV_RELOAD") == "1" && r.URL.Query().Get("onboarding_preview") == "1" {
+			onboarding = onboardingBannerProps(OnboardingProgress{
+				HasProvider:    true,
+				HasMember:      true,
+				CompletedSteps: 2,
+				TotalSteps:     5,
+				ActiveStep:     3,
+				TimeRemaining:  "~6 min left",
+			}, GetCSRFToken(r))
+		}
+
 		body := pages.Feed(pages.FeedProps{
 			CSRFToken:        GetCSRFToken(r),
+			Onboarding:       onboarding,
 			Hero:             hero,
 			ConnectionAlerts: alerts,
 			Days:             days,

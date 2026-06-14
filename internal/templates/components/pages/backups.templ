@@ -66,25 +66,45 @@ templ backupsEncryptionAlert(p BackupsProps) {
 	}
 }
 
+// backupsStats leads the tab with the canonical 4-up StatTileRow so the
+// summary numbers wear the same family skin as every other stat strip
+// (tinted icon tile · tabular-nums value · quiet uppercase label).
 templ backupsStats(p BackupsProps) {
-	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-		<div class="bb-card p-4">
-			<div class="text-xs text-base-content/40 mb-1">Backups</div>
-			<div class="text-2xl font-bold tabular-nums">{ fmt.Sprintf("%d", p.BackupCount) }</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="text-xs text-base-content/40 mb-1">Total Size</div>
-			<div class="text-2xl font-bold tabular-nums">{ p.TotalSize }</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="text-xs text-base-content/40 mb-1">Schedule</div>
-			<div class="text-2xl font-bold">{ scheduleLabel(p.Schedule) }</div>
-		</div>
-		<div class="bb-card p-4">
-			<div class="text-xs text-base-content/40 mb-1">Retention</div>
-			<div class="text-2xl font-bold tabular-nums">{ fmt.Sprintf("%dd", p.RetentionDays) }</div>
-		</div>
-	</div>
+	@components.StatTileRow() {
+		@components.StatTile(components.StatTileProps{
+			Icon:  "database",
+			Label: "Backups",
+			Value: fmt.Sprintf("%d", p.BackupCount),
+			Tone:  components.StatToneNeutral,
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "hard-drive",
+			Label: "Total size",
+			Value: p.TotalSize,
+			Tone:  components.StatToneNeutral,
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "clock",
+			Label: "Schedule",
+			Value: scheduleLabel(p.Schedule),
+			Tone:  scheduleTone(p.Schedule),
+		})
+		@components.StatTile(components.StatTileProps{
+			Icon:  "history",
+			Label: "Retention",
+			Value: fmt.Sprintf("%dd", p.RetentionDays),
+			Tone:  components.StatToneNeutral,
+		})
+	}
+}
+
+// scheduleTone tints the Schedule stat tile info when automatic backups
+// are enabled, neutral when off — vivid-only, matching the family.
+func scheduleTone(schedule string) components.StatTileTone {
+	if schedule == "" {
+		return components.StatToneNeutral
+	}
+	return components.StatToneInfo
 }
 
 // ---------------------------------------------------------------------
@@ -174,15 +194,22 @@ templ backupsRetentionOption(value int, label string, current int) {
 // ---------------------------------------------------------------------
 // File list
 // ---------------------------------------------------------------------
+// backupsFilesSection is the canonical "family table" worked example: a
+// genuinely dense, multi-numeric-column matrix that stays a TABLE (not
+// list-rows) but wears the family skin so it reads as the same product as
+// the list-row surfaces. The section keeps the settings-dialect header in
+// the left gutter (Bare: true) and supplies its own `bb-card` family-table
+// — see the "Family table" recipe in the design-system components catalog.
 templ backupsFilesSection(p BackupsProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "archive",
 		Title:   "Backup files",
 		Caption: fmt.Sprintf("%d files on disk", p.BackupCount),
+		Bare:    true,
 	}) {
 		if p.BackupCount == 0 {
-			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-				<div class="text-center text-sm text-base-content/40 py-6">
+			<div class="bb-card overflow-hidden">
+				<div class="text-center text-sm text-base-content/40 py-8 px-4">
 					@components.LucideIcon("database", "w-8 h-8 mx-auto mb-2 opacity-30")
 					if p.PreflightOK {
 						<p>No backups yet. Click "Create Backup Now" above to create your first backup.</p>
@@ -191,18 +218,18 @@ templ backupsFilesSection(p BackupsProps) {
 						<p class="mt-1">Resolve the preflight issue shown above, then come back to create your first backup.</p>
 					}
 				</div>
-			}
+			</div>
 		} else {
-			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-				<div class="overflow-x-auto -mx-4 sm:-mx-5">
+			<div class="bb-card overflow-hidden">
+				<div class="overflow-x-auto">
 					<table class="table table-sm">
 						<thead>
 							<tr>
-								<th>Filename</th>
-								<th>Size</th>
-								<th>Created</th>
-								<th>Type</th>
-								<th class="text-right">Actions</th>
+								<th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Filename</th>
+								<th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Size</th>
+								<th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Created</th>
+								<th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Type</th>
+								<th class="text-xs font-medium uppercase tracking-wide text-base-content/50 text-right">Actions</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -212,13 +239,13 @@ templ backupsFilesSection(p BackupsProps) {
 						</tbody>
 					</table>
 				</div>
-			}
+			</div>
 		}
 	}
 }
 
 templ backupsRow(b BackupRow, csrf string) {
-	<tr>
+	<tr class="hover:bg-base-200/40 transition-colors">
 		<td>
 			<div class="flex items-center gap-2">
 				@components.LucideIcon("file-archive", "w-4 h-4 text-base-content opacity-30 flex-shrink-0")
@@ -226,62 +253,65 @@ templ backupsRow(b BackupRow, csrf string) {
 			</div>
 		</td>
 		<td class="tabular-nums text-sm">{ b.SizeFormatted }</td>
-		<td class="text-sm">{ b.CreatedAtRel }</td>
+		<td class="tabular-nums text-sm">{ b.CreatedAtRel }</td>
 		<td>
 			@backupsTriggerBadge(b.Trigger)
 		</td>
 		<td>
-			<div class="flex items-center justify-end gap-1">
-				<a href={ templ.SafeURL(b.DownloadHref) } class="btn btn-ghost btn-xs" title="Download">
+			<div class="flex items-center justify-end gap-1" x-data>
+				<a
+					href={ templ.SafeURL(b.DownloadHref) }
+					class="btn btn-ghost btn-xs btn-square focus-visible:ring-2 focus-visible:ring-primary/40"
+					title="Download"
+					aria-label="Download backup"
+				>
 					@components.LucideIcon("download", "w-3.5 h-3.5")
 				</a>
-				<form
-					method="POST"
-					action={ templ.SafeURL(b.RestoreAction) }
-					x-data="{ confirmed: false }"
-					@submit="if (!confirmed) { $event.preventDefault(); $dispatch('bb-confirm', {
-                        title: 'Restore this backup?',
-                        message: 'This will replace all current data with the contents of this backup. This action cannot be undone.',
-                        variant: 'danger',
-                        confirmLabel: 'Restore',
-                        cancelLabel: 'Cancel',
-                        onConfirm: () => { confirmed = true; $el.requestSubmit(); }
-                      }) }"
-				>
+				<form x-ref="restoreForm" method="POST" action={ templ.SafeURL(b.RestoreAction) } class="hidden">
 					<input type="hidden" name="_csrf" value={ csrf }/>
-					<button type="submit" class="btn btn-ghost btn-xs text-warning" title="Restore">
-						@components.LucideIcon("rotate-ccw", "w-3.5 h-3.5")
-					</button>
 				</form>
-				<form
-					method="POST"
-					action={ templ.SafeURL(b.DeleteAction) }
-					x-data="{ confirmed: false }"
-					@submit="if (!confirmed) { $event.preventDefault(); $dispatch('bb-confirm', {
-                        title: 'Delete this backup?',
-                        message: 'The backup file will be permanently removed from disk.',
-                        variant: 'danger',
-                        confirmLabel: 'Delete',
-                        cancelLabel: 'Cancel',
-                        onConfirm: () => { confirmed = true; $el.requestSubmit(); }
-                      }) }"
-				>
+				<form x-ref="deleteForm" method="POST" action={ templ.SafeURL(b.DeleteAction) } class="hidden">
 					<input type="hidden" name="_csrf" value={ csrf }/>
-					<button type="submit" class="btn btn-ghost btn-xs text-error" title="Delete">
-						@components.LucideIcon("trash-2", "w-3.5 h-3.5")
-					</button>
 				</form>
+				@components.OverflowMenu(components.OverflowMenuProps{
+					AriaLabel: "Backup actions",
+					Size:      "sm",
+					Items: []components.OverflowMenuItem{
+						{Label: "Restore", Icon: "rotate-ccw", OnClick: backupsRestoreConfirm},
+						{Label: "Delete", Icon: "trash-2", Destructive: true, OnClick: backupsDeleteConfirm},
+					},
+				})
 			</div>
 		</td>
 	</tr>
 }
 
+// backupsRestoreConfirm / backupsDeleteConfirm are the Alpine handlers wired
+// to the OverflowMenu items. Each dispatches the shared bb-confirm dialog and,
+// on confirm, submits the row-local hidden form (carrying its CSRF token) via
+// the x-ref registered on the row's x-data scope — preserving the exact POST +
+// CSRF + confirm behavior the inline buttons had.
+const backupsRestoreConfirm = `$dispatch('bb-confirm', {` +
+	`title: 'Restore this backup?',` +
+	`message: 'This will replace all current data with the contents of this backup. This action cannot be undone.',` +
+	`variant: 'danger', confirmLabel: 'Restore', cancelLabel: 'Cancel',` +
+	`onConfirm: () => $refs.restoreForm.requestSubmit()})`
+
+const backupsDeleteConfirm = `$dispatch('bb-confirm', {` +
+	`title: 'Delete this backup?',` +
+	`message: 'The backup file will be permanently removed from disk.',` +
+	`variant: 'danger', confirmLabel: 'Delete', cancelLabel: 'Cancel',` +
+	`onConfirm: () => $refs.deleteForm.requestSubmit()})`
+
+	// backupsTriggerBadge types the row with a vivid-only badge — no low-contrast
+	// soft tones. Scheduled rows get a solid info badge; manual/other stay a quiet
+	// ghost (the family's allowed neutral).
 templ backupsTriggerBadge(trigger string) {
 	switch trigger {
 		case "manual":
 			<span class="badge badge-ghost badge-sm">manual</span>
 		case "scheduled":
-			<span class="badge badge-soft badge-info badge-sm">scheduled</span>
+			<span class="badge badge-info badge-sm">scheduled</span>
 		default:
 			<span class="badge badge-ghost badge-sm">{ trigger }</span>
 	}

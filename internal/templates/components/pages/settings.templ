@@ -74,9 +74,9 @@ templ SettingsSystem(p SettingsProps) {
 	</div>
 }
 
-// SettingsHelp renders the Help tab — pointer to the Getting Started
-// wizard, links to external docs, and (for developers) a link to the
-// design-system sandbox.
+// SettingsHelp renders the Help tab — a control to re-open the setup
+// guide (the home-feed onboarding banner), links to external docs, and
+// (for developers) a link to the design-system sandbox.
 templ SettingsHelp(p SettingsProps) {
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
@@ -463,26 +463,29 @@ templ settingsResourcesSection(p SettingsProps) {
 	}
 }
 
-// Getting Started doesn't fit SettingsRowLink because the trailing
-// affordance is either a button or a form (re-open vs. open), so the
+// Setup guide doesn't fit SettingsRowLink because the trailing
+// affordance is either a button or a link (re-open vs. open), so the
 // row is composed by hand. The leading compass icon mirrors the
 // sibling Documentation row's leading book-open icon — this Resources
 // section is an action list where the leading icon is the affordance.
+// The dedicated walkthrough page is retired: the "Finish setting up"
+// banner on the home feed is now the onboarding surface, so re-opening
+// un-dismisses the banner and lands on `/`.
 templ settingsGettingStartedRow(p SettingsProps) {
 	<div class="bb-settings-row">
 		@components.LucideIcon("compass", "w-4 h-4 text-base-content opacity-50 shrink-0")
 		<div class="bb-settings-row__main">
-			<div class="bb-settings-row__label">Getting started</div>
-			<p class="bb-settings-row__caption">Step-by-step setup walkthrough</p>
+			<div class="bb-settings-row__label">Setup guide</div>
+			<p class="bb-settings-row__caption">Onboarding checklist on your home feed</p>
 		</div>
 		<div class="bb-settings-row__control">
 			if p.OnboardingDismissed {
 				<form method="POST" action="/getting-started/reopen">
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<button type="submit" class="btn btn-ghost btn-sm">Re-open</button>
+					<button type="submit" class="btn btn-ghost btn-sm">Re-open setup guide</button>
 				</form>
 			} else {
-				<a href="/getting-started" class="btn btn-ghost btn-sm">Open</a>
+				<a href="/" class="btn btn-ghost btn-sm">Open</a>
 			}
 		</div>
 	</div>

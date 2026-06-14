@@ -150,6 +150,32 @@ design-system sprint.
 - **Daisy 5 ships new components we should use:** `validator`,
   `status`, `list`, `filter`, `card-dash`. Don't roll equivalents.
 
+### Tailwind v4 semantic-color utilities — what works, what doesn't
+
+Audited 2026-06-14. The boundary is non-obvious and has produced two
+wrong diagnoses, so it's written down:
+
+- **Opacity modifiers WORK on `bg` / `border` / `ring` / `text` /
+  `divide` for daisy semantic colors** — both standard steps
+  (`border-primary/40`, `bg-success/10`) and arbitrary values
+  (`bg-primary/[0.03]`). Tailwind v4 emits a *fallback* rule
+  (`…:var(--color-x)`, solid) **plus** an `@supports (color:color-mix(…))`
+  rule that applies the real alpha. Modern browsers use the
+  `@supports` rule, so the alpha renders. **A grep of `styles.css` that
+  only finds the solid fallback is not proof the alpha is missing** —
+  look for the `@supports color-mix` sibling (there's one big block).
+- **`stroke-{semantic}` and `fill-{semantic}` do NOT generate at all**
+  (no rule, no `@supports`) — `stroke-primary` computes to
+  `stroke: none`. For SVG strokes/fills tied to a theme color, use an
+  inline style: `style="stroke: var(--color-primary)"`, or
+  `style="stroke: color-mix(in oklab, var(--color-base-content) 6%, transparent)"`
+  for an alpha. (Both the onboarding ring and its dividers use this.)
+- **When a CSS change "doesn't apply," suspect the cache first.** The
+  `#1831` content-hash ETags + dev-reload can serve a stale `styles.css`;
+  a normal browser reload may not refetch it. **Hard-reload (ignore
+  cache)** before concluding a utility is broken — a stale bundle is
+  what made the divider opacity look like it had silently failed.
+
 ## Spec'd overrides (the only `!important` and only deep overrides)
 
 These are documented load-bearing overrides — leave them alone.

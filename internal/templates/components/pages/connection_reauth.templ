@@ -41,12 +41,10 @@ templ ConnectionReauth(p ConnectionReauthProps) {
 		<script src="https://cdn.teller.io/connect/connect.js"></script>
 	}
 	<script src="/static/js/admin/components/connection_reauth.js"></script>
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Re-authenticate</h1>
-			<p class="text-sm text-base-content/50 mt-1">{ p.InstitutionName } needs to be re-connected</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Re-authenticate",
+		Subtitle: p.InstitutionName + " needs to be re-connected",
+	})
 	<div class="bb-card p-8 max-w-lg">
 		<div
 			x-data="connectionReauth"

@@ -11,14 +11,6 @@ document.addEventListener('alpine:init', function () {
 
       init: function () {},
 
-      // Full-row navigation: a click anywhere on a table row opens the
-      // report, except on the mark-read button or the summary link (which
-      // navigate on their own).
-      rowNav: function (event, url) {
-        if (event.target.closest('button') || event.target.closest('a')) return;
-        window.location.href = url;
-      },
-
       flash: function (message, type) {
         window.dispatchEvent(new CustomEvent('bb-toast', {
           detail: { message: message, type: type || 'error' }
@@ -36,6 +28,18 @@ document.addEventListener('alpine:init', function () {
         } catch (e) {
           delete this.dismissed[id];
           this.flash('Could not mark read — try again');
+        }
+      },
+
+      // Mark a read report unread again. Reload on success so the row
+      // moves back into the Unread group; toast on failure.
+      markUnread: async function (id) {
+        try {
+          var res = await fetch('/-/reports/' + id + '/unread', { method: 'POST' });
+          if (!res.ok) throw new Error(String(res.status));
+          window.location.reload();
+        } catch (e) {
+          this.flash('Could not mark unread — try again');
         }
       },
 
