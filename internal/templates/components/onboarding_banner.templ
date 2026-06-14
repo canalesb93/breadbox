@@ -47,15 +47,19 @@ type OnboardingBannerProps struct {
 //     persists in localStorage, and hovering the header highlights the
 //     chevron so the entire banner reads as the collapse control.
 templ OnboardingBanner(p OnboardingBannerProps) {
+	<!-- Tray styling: the outer surface reads gray (.bb-tray), while the
+	     checklist rows sit on the regular base-100 fill inside a nested
+	     .bb-card panel — Mintlify's "Finish setting up" treatment. -->
 	<div
-		class="bb-card mb-6 overflow-hidden"
+		class="bb-tray mb-6"
 		x-data="{ open: localStorage.getItem('bb-onboarding-collapsed') !== '1', toggle() { this.open = !this.open; localStorage.setItem('bb-onboarding-collapsed', this.open ? '0' : '1') } }"
 	>
-		<!-- Header — the whole row is the collapse toggle; group-hover lifts the
-		     chevron so hovering anywhere reads as hovering the control. -->
+		<!-- Header sits directly on the gray tray. The whole row is the collapse
+		     toggle; group-hover lifts the chevron so hovering anywhere reads as
+		     hovering the control. -->
 		<div
 			@click="toggle()"
-			class="group flex items-center gap-3.5 p-4 cursor-pointer select-none transition-colors hover:bg-base-200/40"
+			class="group flex items-center gap-3.5 px-2.5 py-2 rounded-xl cursor-pointer select-none transition-colors hover:bg-base-300/40"
 		>
 			@onboardingProgressRing(p.CompletedSteps, p.TotalSteps)
 			<div class="min-w-0 flex-1">
@@ -86,13 +90,16 @@ templ OnboardingBanner(p OnboardingBannerProps) {
 				</span>
 			</button>
 		</div>
-		<!-- Checklist — collapses below the header. -->
+		<!-- Checklist — a regular-bg .bb-card panel floating on the gray tray,
+		     collapsing below the header. -->
 		<div x-show="open" x-collapse>
-			<ul class="px-4 pb-2 flex flex-col">
-				for _, s := range p.Steps {
-					@onboardingStepRow(s)
-				}
-			</ul>
+			<div class="bb-card mt-1">
+				<ul class="px-3.5 py-1 flex flex-col">
+					for _, s := range p.Steps {
+						@onboardingStepRow(s)
+					}
+				</ul>
+			</div>
 		</div>
 	</div>
 }
@@ -101,7 +108,7 @@ templ OnboardingBanner(p OnboardingBannerProps) {
 // (struck through + receded when done, emphasized when active), a short
 // description, and the highlighted CTA on the active step only.
 templ onboardingStepRow(s OnboardingStep) {
-	<li class="flex items-start gap-3 py-2.5 border-t" style="border-top-color: color-mix(in oklab, var(--color-base-content) 6%, transparent)">
+	<li class="flex items-start gap-3 py-2.5 border-t first:border-t-0" style="border-top-color: color-mix(in oklab, var(--color-base-content) 6%, transparent)">
 		<span class={ onboardingStepGlyphClass(s) }>
 			@LucideIcon(onboardingStepGlyph(s), "w-[18px] h-[18px]")
 		</span>
@@ -126,17 +133,19 @@ templ onboardingStepRow(s OnboardingStep) {
 }
 
 // onboardingProgressRing renders the Mintlify-style circular progress donut:
-// a quiet track ring with a primary arc proportional to completion.
+// a thicker arc over a track that keeps contrast against the gray tray. The
+// track is a base-content tint (not base-200, which now matches the tray) so
+// the incomplete portion stays legible in both themes.
 templ onboardingProgressRing(completed, total int) {
-	<svg class="w-9 h-9 shrink-0 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
-		<circle cx="18" cy="18" r="15" fill="none" style="stroke: var(--color-base-200)" stroke-width="3"></circle>
+	<svg class="w-10 h-10 shrink-0 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+		<circle cx="18" cy="18" r="15" fill="none" style="stroke: color-mix(in oklab, var(--color-base-content) 15%, transparent)" stroke-width="4"></circle>
 		<circle
 			cx="18"
 			cy="18"
 			r="15"
 			fill="none"
 			style="stroke: var(--color-primary)"
-			stroke-width="3"
+			stroke-width="4"
 			stroke-linecap="round"
 			stroke-dasharray={ onboardingRingDash(completed, total) }
 		></circle>

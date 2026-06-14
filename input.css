@@ -449,6 +449,23 @@
     border-color: var(--color-base-300);
   }
 
+  /* ── Tray — a recessed, grouped surface ──
+   * A muted base-200 "well" that holds regular-bg `.bb-card` panels floating
+   * inside it (the tray's own padding is the gray gutter around them). Models
+   * Mintlify's "Finish setting up" card: the outer surface reads gray, while
+   * the grouped rows sit on the regular base-100 fill — an inversion of the
+   * usual flat card. Reusable across the design system: wrap grouped content
+   * in `.bb-tray`, keep a header / section labels directly on the tray, and
+   * nest one or more `.bb-card` panels for the rows. The gray↔regular contrast
+   * is just the base-200/base-100 relationship, so it holds in both themes.
+   * `.bb-tray__label` is the quiet uppercase section label between panels. */
+  .bb-tray {
+    @apply rounded-2xl bg-base-200/70 border border-base-300/60 p-1.5;
+  }
+  .bb-tray__label {
+    @apply px-2.5 pt-2 pb-1 text-[0.7rem] font-medium uppercase tracking-wider text-base-content/40;
+  }
+
   /* ── List-row keyboard focus ──
    * The redesigned list surfaces (/reports, /rules, /recurring,
    * /accounts, /tags, /categories, /connections, /household, agent-run
