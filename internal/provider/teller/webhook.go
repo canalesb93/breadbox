@@ -69,6 +69,14 @@ func (p *TellerProvider) HandleWebhook(ctx context.Context, payload provider.Web
 //
 // Header format: t=1688960969,v1=signature1,v1=signature2
 func (p *TellerProvider) verifySignature(header string, body []byte) error {
+	// Fail closed when no webhook secret is configured. Without a secret the
+	// HMAC reduces to hmac.New(sha256.New, []byte("")), a value any caller can
+	// compute — an attacker could forge a valid signature and slip an
+	// unverified payload through. An unverifiable webhook must be rejected.
+	if p.webhookSecret == "" {
+		return fmt.Errorf("teller: webhook secret not configured")
+	}
+
 	parts := strings.Split(header, ",")
 
 	var timestamp string
