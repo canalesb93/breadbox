@@ -8,9 +8,12 @@ import (
 )
 
 // SubscriptionsList renders /recurring — the human-adjudication surface for
-// recurring series. A stat row sits on top, then two tabs: "Active" (the
-// confirmed/live ledger, the default landing) and "Needs review" (auto-detected
-// candidates awaiting a verdict, each showing the charges it was detected from).
+// recurring series. A stat row sits on top, then ONE continuous ledger (no
+// tabs): the "Needs review" section (auto-detected candidates awaiting a
+// verdict, with inline Confirm / Not-recurring actions) leads, followed by the
+// confirmed/live ledger grouped by status. Candidates and confirmed charges
+// share the same list-row shape so the page reads as one surface; full
+// detection evidence lives on each candidate's detail page.
 //
 // Alpine factory `subscriptionsList` (member + type + search filters, verdict
 // submit) lives in static/js/admin/components/subscriptions.js.
@@ -57,7 +60,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 					Value:       fmt.Sprintf("%d", p.CandidateCount),
 					Description: subNeedsReviewDesc(p.CandidateCount),
 					Tone:        subNeedsReviewTone(p.CandidateCount),
-					Href:        templ.SafeURL("/recurring?tab=review"),
+					Href:        templ.SafeURL("#needs-review"),
 				})
 			}
 		</div>
@@ -68,15 +71,7 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 				Body:  "As your transactions sync, Breadbox spots recurring charges — same merchant, regular interval, steady amount — and surfaces them here for you to confirm.",
 			})
 		} else {
-			<!-- Primary tabs: Active (default) / Needs review -->
-			@components.TabBar(components.TabBarProps{
-				AriaLabel: "Recurring views",
-				Items: []components.TabBarItem{
-					{Label: "Active", Href: templ.SafeURL("/recurring"), Active: p.ActiveTab != "review", Count: intPtr(len(p.Active))},
-					{Label: "Needs review", Href: templ.SafeURL("/recurring?tab=review"), Active: p.ActiveTab == "review", Count: intPtr(len(p.Candidates))},
-				},
-			})
-			<!-- Member + type filters (client-side, apply within the active tab) -->
+			<!-- Member + type filters (client-side, apply across every section) -->
 			if len(p.Users) > 1 || len(p.Types) > 1 {
 				<div class="flex flex-wrap items-center gap-3 mt-4">
 					if len(p.Users) > 1 {
@@ -97,49 +92,23 @@ templ SubscriptionsList(p SubscriptionsListProps) {
 					}
 				</div>
 			}
-			if p.ActiveTab == "review" {
-				<!-- Needs review: the adjudication queue, with detection evidence -->
-				<div class="mt-5">
-					if len(p.Candidates) == 0 {
-						@components.EmptyState(components.EmptyStateProps{
-							Icon:    "check-check",
-							Title:   "Nothing to review",
-							Body:    "No candidate recurring charges are waiting on a verdict.",
-							Compact: true,
-							InCard:  true,
-						})
-					} else {
-						<div class="space-y-3">
-							for _, s := range p.Candidates {
-								@subscriptionCandidateCard(s)
-							}
-						</div>
-					}
-				</div>
-			} else {
-				<!-- Active: the confirmed / live ledger -->
-				<div class="mt-5">
-					if len(p.Active) == 0 {
-						@components.EmptyState(components.EmptyStateProps{
-							Icon:    "repeat",
-							Title:   "No tracked recurring charges yet",
-							Body:    "Confirm a candidate from Needs review and it'll show up here.",
-							Compact: true,
-							InCard:  true,
-						})
-					} else {
-						@components.FilterSearchInput(components.FilterSearchInputProps{
-							Placeholder: "Filter recurring charges...",
-							XModel:      "filter",
-						})
-						<div class="mt-4 flex flex-col gap-5">
-							for _, g := range GroupSubscriptionsByStatus(p.Active) {
-								@subscriptionsStatusGroup(g)
-							}
-						</div>
-					}
-				</div>
-			}
+			<div class="mt-4">
+				@components.FilterSearchInput(components.FilterSearchInputProps{
+					Placeholder: "Filter recurring charges...",
+					XModel:      "filter",
+				})
+			</div>
+			<!-- One surface, no tabs: the Needs-review queue sits first (it wants
+			     a verdict), then the live ledger grouped by status. Both render as
+			     the same list-row so the page reads as one continuous ledger. -->
+			<div class="mt-4 flex flex-col gap-6">
+				if len(p.Candidates) > 0 {
+					@subscriptionsNeedsReviewSection(p.Candidates)
+				}
+				for _, g := range GroupSubscriptionsByStatus(p.Active) {
+					@subscriptionsStatusGroup(g)
+				}
+			</div>
 		}
 	</div>
 }
@@ -160,121 +129,113 @@ templ subscriptionsTypeFilterBtn(t SubscriptionTypeFilter) {
 	>{ t.Label }</button>
 }
 
-// subscriptionCandidateCard is one auto-detected series awaiting a verdict. It
-// surfaces the detection rationale (signal summary + raw signals) AND the
-// actual charges it was detected from, so Confirm is an informed decision.
-templ subscriptionCandidateCard(s SubscriptionRow) {
-	<div
-		x-data="{ why: false }"
+// subscriptionsNeedsReviewSection renders the adjudication queue as a section
+// in the unified ledger — a quiet "Needs review · N" label over the candidate
+// list-rows, mirroring subscriptionsStatusGroup so the queue reads as just
+// another section of the same page (no separate tab). The section hides under
+// an active filter when none of its candidates match.
+templ subscriptionsNeedsReviewSection(candidates []SubscriptionRow) {
+	<div id="needs-review" x-show="(filterUser === 'all' && filterType === 'all' && !filter) || groupVisible($el)" class="flex flex-col gap-2 scroll-mt-4">
+		<div class="flex items-center gap-2 px-1 min-w-0">
+			<span class="text-sm font-medium text-base-content shrink-0">Needs review</span>
+			<span class="text-xs text-base-content/40 shrink-0">{ subscriptionsCandidateCountLabel(len(candidates)) }</span>
+		</div>
+		@components.AgentRunRowList() {
+			for _, s := range candidates {
+				@subscriptionsCandidateRow(s)
+			}
+		}
+	</div>
+}
+
+// subscriptionsCandidateRow renders one auto-detected candidate as the SAME
+// list-row shape as a confirmed charge (subscriptionsListRow): a leading tile,
+// name + type + confidence on the title line, the signal summary as the body
+// line, and the amount. The difference is the trailing controls — inline
+// Confirm / Not-recurring buttons (rendered OUTSIDE the row's navigation
+// anchor, like the ledger's overflow menu) instead of a kebab. Full detection
+// evidence lives one click away on the detail page the row links to.
+templ subscriptionsCandidateRow(s SubscriptionRow) {
+	<li
+		class="list-row transition-colors hover:bg-base-200/40 items-center"
 		data-series-card
 		data-filter-user={ s.UserID }
 		data-type={ s.Type }
 		data-search={ s.Search }
-		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && (filterType === 'all' || filterType === $el.dataset.type)"
-		x-cloak
-		class="bb-card p-4"
+		x-show="(filterUser === 'all' || filterUser === $el.dataset.filterUser) && (filterType === 'all' || filterType === $el.dataset.type) && matches($el)"
 	>
-		<div class="flex items-start justify-between gap-4">
-			<div class="min-w-0 flex-1">
-				<div class="flex items-center gap-2 flex-wrap">
-					<a data-private="merchant" href={ templ.SafeURL("/recurring/" + s.ShortID) } class="text-sm font-semibold text-base-content truncate hover:underline">{ s.Name }</a>
+		<a
+			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+			href={ templ.SafeURL("/recurring/" + s.ShortID) }
+			aria-label={ "Review recurring candidate " + s.Name }
+		>
+			@subscriptionsReviewTile()
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span data-private="merchant" class="font-medium text-sm text-base-content truncate">{ s.Name }</span>
 					@components.SeriesTypeChip(s.TypeLabel, "xs")
 				</div>
-				<!-- Detection strength reads with the rationale, not as a second
-				     pill in the title (the title carries the type chip only). -->
-				<div class="flex items-center gap-1.5 text-xs text-base-content/50 mt-1">
-					@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
-					<span>{ s.SignalSummary }</span>
+				<!-- Confidence rides the body line with the signal summary (not the
+				     title) so the title stays short — matching the confirmed-charge
+				     row. The chip is shrink-0 and hidden on mobile, where the narrow
+				     grid has no room for it; the summary always shows (truncated). -->
+				<div class="mt-0.5 flex items-center gap-1.5 text-xs text-base-content/55 min-w-0">
+					<span class="hidden sm:inline-flex shrink-0">
+						@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
+					</span>
+					<span class="truncate">{ s.SignalSummary }</span>
 				</div>
 			</div>
-			<div class="text-right shrink-0">
+			<div class="shrink-0 self-center text-right">
 				if s.HasAmount {
 					@components.Amount(components.AmountProps{
 						Value:  s.Amount,
 						Intent: components.AmountCost,
 						Class:  "text-sm font-semibold",
 					})
-				}
-				<div class="text-xs text-base-content/40 mt-0.5">{ s.CadenceLabel }</div>
-			</div>
-		</div>
-		<!-- One disclosure keeps the candidate compact by default: the
-		     detection signals and the charges it was detected from both live
-		     behind "Why detected?", so the Needs-review tab reads as a clean
-		     list of decisions rather than a wall of evidence. -->
-		<div class="mt-2">
-			<button
-				type="button"
-				@click="why = !why"
-				class="text-xs text-base-content/40 hover:text-base-content/70 inline-flex items-center gap-1 cursor-pointer bg-transparent"
-				:aria-expanded="why"
-			>
-				<span class="transition-transform" :class="why ? 'rotate-90' : ''">
-					@components.LucideIcon("chevron-right", "w-3 h-3")
-				</span>
-				Why detected?
-				<span class="text-base-content/30">· { subscriptionEvidenceHint(s.OccurrenceCount) }</span>
-			</button>
-			<div x-show="why" x-cloak class="mt-2 space-y-3">
-				<div class="rounded-lg bg-base-200/50 p-3">
-					if len(s.SignalFacts) > 0 {
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-							for _, f := range s.SignalFacts {
-								<div class="flex items-center gap-2 text-xs min-w-0">
-									@components.LucideIcon(f.Icon, "w-3.5 h-3.5 text-base-content/40 shrink-0")
-									<span class="text-base-content/50 shrink-0">{ f.Label }</span>
-									<span class={ "font-medium ml-auto text-right truncate", subscriptionSignalFactClass(f.Tone) }>{ f.Value }</span>
-								</div>
-							}
-						</div>
-					} else {
-						<p class="text-xs text-base-content/50">No detection signals recorded — created manually or by an agent.</p>
-					}
-				</div>
-				if len(s.MemberRows) > 0 {
-					<div>
-						<div class="text-[0.7rem] uppercase tracking-wider text-base-content/40 mb-1">Based on these charges</div>
-						<div>
-							for _, m := range s.MemberRows {
-								@seriesChargeRow(m)
-							}
-						</div>
-						if s.OccurrenceCount > len(s.MemberRows) {
-							<div class="text-xs text-base-content/40 mt-1.5 pl-1">+ { fmt.Sprintf("%d", s.OccurrenceCount-len(s.MemberRows)) } more</div>
-						}
-					</div>
+				} else {
+					<span class="text-sm text-base-content/30">—</span>
 				}
 			</div>
-		</div>
-		<div class="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-base-200">
+		</a>
+		<div class="shrink-0 self-center flex items-center gap-1.5">
 			<button
 				type="button"
 				@click={ fmt.Sprintf("$dispatch('series-verdict', {id: %q, name: %q, verdict: 'reject'})", s.ShortID, s.Name) }
-				class="btn btn-ghost btn-sm gap-1.5"
+				class="btn btn-ghost btn-xs gap-1 text-base-content/60 hover:text-base-content"
+				title="Not recurring"
 			>
-				@components.LucideIcon("x", "w-4 h-4")
-				Not recurring
+				@components.LucideIcon("x", "w-3.5 h-3.5")
+				<span class="hidden sm:inline">Not recurring</span>
 			</button>
 			<button
 				type="button"
 				@click={ fmt.Sprintf("$dispatch('series-verdict', {id: %q, name: %q, verdict: 'confirm'})", s.ShortID, s.Name) }
-				class="btn btn-primary btn-sm gap-1.5"
+				class="btn btn-primary btn-xs gap-1"
+				title="Confirm"
 			>
-				@components.LucideIcon("check", "w-4 h-4")
-				Confirm
+				@components.LucideIcon("check", "w-3.5 h-3.5")
+				<span class="hidden sm:inline">Confirm</span>
 			</button>
 		</div>
+	</li>
+}
+
+// subscriptionsReviewTile is the leading tile for a Needs-review candidate —
+// the same 40px tile geometry as the ledger's status tile, kept neutral with a
+// "sparkles" glyph to read as "auto-detected, awaiting your call".
+templ subscriptionsReviewTile() {
+	<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200">
+		@components.LucideIcon("sparkles", "w-4 h-4 text-base-content/50")
 	</div>
 }
 
-// subscriptionEvidenceHint renders the charge-count hint on the "Why
-// detected?" toggle so reviewers know evidence sits behind it (the full
-// charge list is collapsed by default to keep each candidate compact).
-func subscriptionEvidenceHint(n int) string {
+// subscriptionsCandidateCountLabel renders the section's "N candidate(s)" count.
+func subscriptionsCandidateCountLabel(n int) string {
 	if n == 1 {
-		return "1 charge"
+		return "1 candidate"
 	}
-	return fmt.Sprintf("%d charges", n)
+	return fmt.Sprintf("%d candidates", n)
 }
 
 // seriesChargeRow renders one linked charge as a leading date column + the
@@ -431,8 +392,6 @@ func subscriptionsRowItems(s SubscriptionRow) []components.OverflowMenuItem {
 templ subscriptionsBetaBadge() {
 	<span class="badge badge-soft badge-warning badge-sm" title="Recurring is a new feature — detection is still being tuned">Beta</span>
 }
-
-func intPtr(n int) *int { return &n }
 
 // subTileMoney formats the first currency's total for a stat tile ("$170.48"
 // or "170.48 EUR"); "—" when there's nothing.
