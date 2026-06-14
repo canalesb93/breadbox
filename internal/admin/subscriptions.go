@@ -25,6 +25,11 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// subscriptionCandidateEvidenceMax caps how many member charges a candidate
+// row fetches for its inline "Why detected?" evidence peek — bounded so the
+// list view stays cheap even with many candidates awaiting review.
+const subscriptionCandidateEvidenceMax = 5
+
 // SubscriptionsListPageHandler serves GET /subscriptions — the single
 // human-adjudication surface for recurring series. Candidates (auto-detected,
 // awaiting a verdict) are split out from the confirmed/live ledger, and the
@@ -70,9 +75,22 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 				typesPresent[row.Type] = true
 			}
 			if s.Status == service.SeriesStatusCandidate {
-				// Detection evidence (the grouped charges) is shown on the
-				// candidate's detail page, which the Needs-review row links to —
-				// so the list view no longer fetches it per candidate.
+				// Attach a bounded sample of the charges the detector grouped so
+				// the candidate row's inline "Why detected?" peek can show the
+				// evidence in place — without a trip to the detail page.
+				// SignalFacts is already populated during subscriptionRow above.
+				if mem, merr := svc.SeriesMembers(ctx, s.ShortID); merr == nil {
+					ids := make([]string, 0, len(mem))
+					for _, m := range mem {
+						ids = append(ids, m.ShortID)
+					}
+					if len(ids) > subscriptionCandidateEvidenceMax {
+						ids = ids[:subscriptionCandidateEvidenceMax]
+					}
+					if rows, rerr := svc.GetAdminTransactionRowsByIDs(ctx, ids); rerr == nil {
+						row.MemberRows = rows
+					}
+				}
 				candidates = append(candidates, row)
 				continue
 			}
