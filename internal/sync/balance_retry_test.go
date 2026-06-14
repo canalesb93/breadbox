@@ -76,6 +76,40 @@ func TestUpdateBalancesWithRetry_FailThenSuccess(t *testing.T) {
 	}
 }
 
+func TestUpdateBalancesWithRetry_ContextCancelledSkipsRetry(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	// A long delay would block the full duration if the inter-retry wait
+	// ignored context cancellation. The test asserts we return well under it.
+	e := &Engine{logger: logger, balanceRetryDelay: 30 * time.Second}
+
+	mock := &mockBalanceProvider{
+		balanceErrors: []error{errors.New("first failure")},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already cancelled before the call
+
+	start := time.Now()
+	warning := e.updateBalancesWithRetry(ctx, nil, mock, provider.Connection{}, logger)
+	elapsed := time.Since(start)
+
+	if elapsed > time.Second {
+		t.Errorf("expected prompt return on cancelled context, took %s", elapsed)
+	}
+	if warning == "" {
+		t.Error("expected a warning when the retry is skipped due to cancellation")
+	}
+	if !strings.Contains(warning, "context cancelled") {
+		t.Errorf("warning should mention context cancellation, got: %s", warning)
+	}
+	if !strings.Contains(warning, "first failure") {
+		t.Errorf("warning should include the original error, got: %s", warning)
+	}
+	if mock.balanceCalls != 1 {
+		t.Errorf("expected exactly 1 call (no retry after cancellation), got %d", mock.balanceCalls)
+	}
+}
+
 func TestUpdateBalancesWithRetry_BothFail(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	e := &Engine{logger: logger, balanceRetryDelay: 1 * time.Millisecond}

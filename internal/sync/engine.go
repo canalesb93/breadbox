@@ -1071,7 +1071,19 @@ func (e *Engine) updateBalancesWithRetry(ctx context.Context, q *db.Queries, pro
 		delay = 2 * time.Second
 	}
 	logger.Warn("balance fetch failed, retrying", "error", err, "retry_delay", delay)
-	time.Sleep(delay)
+
+	// Wait before retrying, but abort promptly if the sync context is
+	// cancelled (server shutdown, sync timeout) rather than blocking the full
+	// delay only to fire a retry that the cancelled context would fail anyway.
+	timer := time.NewTimer(delay)
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		msg := fmt.Sprintf("Balance fetch failed; retry skipped (context cancelled): %s", err.Error())
+		logger.Warn("balance fetch retry skipped, context cancelled", "original_error", err, "ctx_error", ctx.Err())
+		return msg
+	case <-timer.C:
+	}
 
 	retryErr := e.updateBalances(ctx, q, prov, conn, logger)
 	if retryErr == nil {
