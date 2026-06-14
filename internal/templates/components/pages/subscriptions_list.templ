@@ -156,7 +156,16 @@ templ subscriptionsNeedsReviewSection(candidates []SubscriptionRow) {
 // anchor, like the ledger's overflow menu) instead of a kebab. Full detection
 // evidence lives one click away on the detail page the row links to.
 templ subscriptionsCandidateRow(s SubscriptionRow) {
+	<!-- x-data carries the per-row peek state; the inline list-grid-cols var makes
+	     all four row-1 columns explicit (tile · name · amount · controls) so the
+	     full-width evidence peek below can span every column via grid-column 1 to
+	     -1 (which only reaches the EXPLICIT grid lines). grid-row-start 2 on the
+	     peek is set inline because daisyUI's grid-row-start:1 child rule (which
+	     has specificity 0,2,0) would otherwise force it back onto row 1, and a
+	     list-col-wrap class or Tailwind row-start utility cannot outrank it. -->
 	<li
+		x-data="{ peek:false }"
+		style="--list-grid-cols:minmax(0,auto) 1fr auto auto"
 		class="list-row transition-colors hover:bg-base-200/40 items-center"
 		data-series-card
 		data-filter-user={ s.UserID }
@@ -199,6 +208,22 @@ templ subscriptionsCandidateRow(s SubscriptionRow) {
 			</div>
 		</a>
 		<div class="shrink-0 self-center flex items-center gap-1.5">
+			<!-- Disclosure toggle sits OUTSIDE the nav anchor so expanding the
+			     evidence never navigates to the detail page. @click.stop keeps the
+			     click off the row; type=button keeps it out of any enclosing form. -->
+			<button
+				type="button"
+				@click.stop="peek = !peek"
+				class="btn btn-ghost btn-xs gap-1 text-base-content/50 hover:text-base-content"
+				:class="peek ? 'text-base-content' : ''"
+				:aria-expanded="peek"
+				title="Why detected?"
+			>
+				<span class="transition-transform" :class="peek ? 'rotate-180' : ''">
+					@components.LucideIcon("chevron-down", "w-3.5 h-3.5")
+				</span>
+				<span class="hidden sm:inline">Why detected?</span>
+			</button>
 			<button
 				type="button"
 				@click={ fmt.Sprintf("$dispatch('series-verdict', {id: %q, name: %q, verdict: 'reject'})", s.ShortID, s.Name) }
@@ -218,7 +243,53 @@ templ subscriptionsCandidateRow(s SubscriptionRow) {
 				<span class="hidden sm:inline">Confirm</span>
 			</button>
 		</div>
+		@subscriptionsCandidatePeek(s)
 	</li>
+}
+
+// subscriptionsCandidatePeek is the in-place "Why detected?" evidence region for
+// a candidate row. It is the row's row-2 grid cell, spanning every column
+// (grid-column:1/-1) — see the comment on subscriptionsCandidateRow for why the
+// span + row placement are set inline. Collapsed by default; x-collapse animates
+// the disclosure. Contents mirror the detection evidence on the detail page: the
+// parsed signal-fact grid, then the bounded "Based on these charges" sample.
+templ subscriptionsCandidatePeek(s SubscriptionRow) {
+	<div
+		x-show="peek"
+		x-collapse
+		x-cloak
+		style="grid-column:1 / -1;grid-row-start:2"
+		class="min-w-0 mt-1 pt-3 border-t border-base-200 space-y-3"
+	>
+		<div class="rounded-lg bg-base-200/50 p-3">
+			if len(s.SignalFacts) > 0 {
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+					for _, f := range s.SignalFacts {
+						<div class="flex items-center gap-2 text-xs min-w-0">
+							@components.LucideIcon(f.Icon, "w-3.5 h-3.5 text-base-content/40 shrink-0")
+							<span class="text-base-content/50 shrink-0">{ f.Label }</span>
+							<span class={ "font-medium ml-auto text-right truncate", subscriptionSignalFactClass(f.Tone) }>{ f.Value }</span>
+						</div>
+					}
+				</div>
+			} else {
+				<p class="text-xs text-base-content/50">No detection signals recorded — created manually or by an agent.</p>
+			}
+		</div>
+		if len(s.MemberRows) > 0 {
+			<div>
+				<div class="text-[0.7rem] uppercase tracking-wider text-base-content/40 mb-1">Based on these charges</div>
+				<div>
+					for _, m := range s.MemberRows {
+						@seriesChargeRow(m)
+					}
+				</div>
+				if s.OccurrenceCount > len(s.MemberRows) {
+					<div class="text-xs text-base-content/40 mt-1.5 pl-1">+ { fmt.Sprintf("%d", s.OccurrenceCount-len(s.MemberRows)) } more</div>
+				}
+			</div>
+		}
+	</div>
 }
 
 // subscriptionsReviewTile is the leading tile for a Needs-review candidate —

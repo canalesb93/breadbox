@@ -242,6 +242,19 @@ type SubscriptionSignalFact struct {
 	Tone  string // success | warning | neutral
 }
 
+// subscriptionSignalFactClass maps a signal-fact tone to the value text color
+// in the candidate row's "Why detected?" evidence peek.
+func subscriptionSignalFactClass(tone string) string {
+	switch tone {
+	case "success":
+		return "text-success"
+	case "warning":
+		return "text-warning"
+	default:
+		return "text-base-content/80"
+	}
+}
+
 // seriesChargeDate formats an AdminTransactionRow.Date ("2006-01-02") as the
 // leading date label in the series charge list ("Jan 2, 2006"); raw on parse fail.
 func seriesChargeDate(s string) string {
