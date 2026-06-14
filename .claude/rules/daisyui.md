@@ -52,7 +52,7 @@ Always use the daisy component (with our standard overlays only):
 |---|---|---|
 | `btn` | `btn-sm` → `gap-2`; `btn-xs` → `gap-1.5` | Two sizes only. Icon size `w-4 h-4` (sm) / `w-3.5 h-3.5` (xs). Radius is daisy default — no per-caller `rounded-*`. |
 | `badge` | `badge-soft badge-{tone} badge-sm` for status; `badge-ghost badge-xs` for metadata; solid `badge-{tone} badge-xs` for counts | Never add `rounded-lg`/`rounded-xl` to a badge. |
-| `alert` | `alert alert-{tone} rounded-xl` for page-level; `alert-soft` for less prominent inline | Use `bb-form-error` inside a form card (tighter). |
+| `alert` | **Always** `alert alert-soft alert-{tone} rounded-xl` — soft only, never the fully-colored `alert-{tone}` | Use `bb-form-error` inside a form card (tighter). |
 | `modal` | `modal modal-bottom sm:modal-middle`; `modal-box rounded-xl` | Use for all confirm/dialog UX. See "Anti-patterns" below for the bespoke shells we're retiring. |
 | `dropdown` + `menu` | `dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1` | Standard overflow-menu shape. |
 | `table` | `table table-sm table-zebra` + `hover:bg-base-200` on `<tr>` | `table-md` for transaction list; `table-xs` for embedded. |

@@ -26,7 +26,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 		})
 		@workflowsTabBar("gallery")
 		if !p.Status.Ready {
-			<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
+			<div role="alert" class="alert alert-soft alert-warning rounded-xl mt-4 mb-2">
 				@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
 				<div class="flex-1">
 					<div class="font-semibold text-sm">Set up the agent runtime first</div>
@@ -37,7 +37,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 		}
 		if p.Spend.Show {
 			if p.Spend.Over {
-				<div role="alert" class="alert alert-error rounded-xl mt-4 mb-2">
+				<div role="alert" class="alert alert-soft alert-error rounded-xl mt-4 mb-2">
 					@components.LucideIcon("octagon-x", "w-5 h-5 shrink-0")
 					<div class="flex-1">
 						<div class="font-semibold text-sm">Workflows paused — spend ceiling reached</div>
@@ -46,7 +46,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 					<a href="/settings/workflows" class="btn btn-sm btn-ghost">Adjust</a>
 				</div>
 			} else {
-				<div role="alert" class="alert alert-warning rounded-xl mt-4 mb-2">
+				<div role="alert" class="alert alert-soft alert-warning rounded-xl mt-4 mb-2">
 					@components.LucideIcon("alert-triangle", "w-5 h-5 shrink-0")
 					<div class="flex-1">
 						<div class="font-semibold text-sm">Approaching spend ceiling</div>

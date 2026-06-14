@@ -16,7 +16,7 @@ templ RecurringSeriesForm(p RecurringSeriesFormProps) {
 	<form method="POST" action="/recurring/new" class="max-w-2xl">
 		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 		if p.Error != "" {
-			<div role="alert" class="alert alert-error rounded-xl mb-4">
+			<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
 				@components.LucideIcon("alert-triangle", "w-4 h-4")
 				<span>{ p.Error }</span>
 			</div>
