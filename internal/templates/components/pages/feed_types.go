@@ -2,7 +2,11 @@
 
 package pages
 
-import "time"
+import (
+	"time"
+
+	"breadbox/internal/templates/components"
+)
 
 // FeedProps is the full view model for the home Feed page. The page
 // surfaces sync runs, agent reports, MCP agent sessions, bulk-action
@@ -15,6 +19,12 @@ import "time"
 // the templ never has to import the service package.
 type FeedProps struct {
 	CSRFToken string
+
+	// Onboarding, when non-nil, renders the "Finish setting up" banner above
+	// the hero. The handler sets it only while setup is incomplete and the
+	// guide hasn't been dismissed; nil means setup is done (or dismissed) and
+	// the banner is omitted entirely.
+	Onboarding *components.OnboardingBannerProps
 
 	// Hero is the at-a-glance band rendered above the rail.
 	Hero FeedHero

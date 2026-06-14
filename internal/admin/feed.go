@@ -193,8 +193,13 @@ func FeedHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.Ha
 			}
 		}
 
+		// "Finish setting up" banner: surfaces incomplete onboarding at the
+		// top of the home feed (nil once setup is complete or dismissed).
+		onboarding := onboardingBannerProps(computeOnboardingProgress(r.Context(), a), GetCSRFToken(r))
+
 		body := pages.Feed(pages.FeedProps{
 			CSRFToken:        GetCSRFToken(r),
+			Onboarding:       onboarding,
 			Hero:             hero,
 			ConnectionAlerts: alerts,
 			Days:             days,

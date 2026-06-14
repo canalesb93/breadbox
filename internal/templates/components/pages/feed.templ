@@ -27,6 +27,9 @@ templ Feed(p FeedProps) {
 	     transaction ref). The /feed view stays a glance surface — no
 	     markdown rendering cost on every visit. -->
 	<div x-data x-init="$store.shortcuts.setScope('feed')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	if p.Onboarding != nil {
+		@components.OnboardingBanner(*p.Onboarding)
+	}
 	@feedHero(p)
 	if len(p.ConnectionAlerts) > 0 {
 		@feedAlerts(p)
