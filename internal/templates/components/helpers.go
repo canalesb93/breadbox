@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"breadbox/internal/ptrutil"
 )
@@ -121,10 +123,27 @@ func titleCase(s string) string {
 			continue
 		}
 		if i == 0 || !smallWords[w] {
-			words[i] = strings.ToUpper(w[:1]) + w[1:]
+			words[i] = upperFirstRune(w)
 		}
 	}
 	return strings.Join(words, " ")
+}
+
+// upperFirstRune uppercases the first rune of w and leaves the rest unchanged.
+// Unlike strings.ToUpper(w[:1])+w[1:], it is UTF-8 safe: slicing the first byte
+// of a multibyte rune (e.g. "élan", "über", "ñoño") splits the encoding and
+// yields mojibake. Merchant names are frequently non-ASCII, so this matters
+// for the transaction feed and detail views, where titleCase normalizes
+// all-lowercase / ALL-CAPS provider names.
+func upperFirstRune(w string) string {
+	if w == "" {
+		return w
+	}
+	r, size := utf8.DecodeRuneInString(w)
+	if r == utf8.RuneError {
+		return w
+	}
+	return string(unicode.ToUpper(r)) + w[size:]
 }
 
 // pluralInt constrains pluralS to signed int types so the same helper works

@@ -134,6 +134,13 @@ func TestTitleCase(t *testing.T) {
 		{"three-letter acronym title-cased not all-uppered", "US ATM FEE", "US Atm Fee"},
 		{"two-letter small words stay lowercase mid-phrase", "UP AND AT EM", "UP and at EM"},
 		{"single small word at start gets capitalized", "the", "The"},
+		// UTF-8 safety: a word whose first rune is multibyte must not be split
+		// mid-encoding. Byte-slicing the first byte (the old w[:1] path) produced
+		// mojibake like "\xef\xbf\xbd\xa9lan" for "élan".
+		{"all-lowercase leading multibyte rune", "élan vital", "Élan Vital"},
+		{"all-caps leading multibyte rune", "ÉLAN VITAL", "Élan Vital"},
+		{"leading multibyte rune single word", "über", "Über"},
+		{"accented mid-phrase word", "café del mar", "Café Del Mar"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
