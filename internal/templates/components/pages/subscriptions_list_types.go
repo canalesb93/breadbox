@@ -251,18 +251,6 @@ func seriesChargeDate(s string) string {
 	return s
 }
 
-// subscriptionSignalFactClass maps a signal-fact tone to the value text color.
-func subscriptionSignalFactClass(tone string) string {
-	switch tone {
-	case "success":
-		return "text-success"
-	case "warning":
-		return "text-warning"
-	default:
-		return "text-base-content/80"
-	}
-}
-
 // SubscriptionPriceChange marks a point where the charge amount changed.
 type SubscriptionPriceChange struct {
 	Date     string
