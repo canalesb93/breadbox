@@ -76,7 +76,7 @@ func TestAgentRunsTable_Exists(t *testing.T) {
 	ctx := context.Background()
 
 	cols := []string{
-		"id", "short_id", "agent_definition_id", "trigger", "status",
+		"id", "short_id", "workflow_id", "trigger", "status",
 		"started_at", "completed_at", "duration_ms",
 		"total_cost_usd", "input_tokens", "output_tokens",
 		"cache_read_tokens", "cache_creation_tokens",
@@ -128,7 +128,7 @@ func TestAgentRunsFK_SetNullOnDefinitionDelete(t *testing.T) {
 
 	var runID pgtype.UUID
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO workflow_runs (agent_definition_id, "trigger", status)
+		INSERT INTO workflow_runs (workflow_id, "trigger", status)
 		VALUES ($1, 'manual', 'success')
 		RETURNING id
 	`, defID).Scan(&runID); err != nil {
@@ -141,12 +141,12 @@ func TestAgentRunsFK_SetNullOnDefinitionDelete(t *testing.T) {
 
 	var orphanedDefID pgtype.UUID
 	if err := pool.QueryRow(ctx, `
-		SELECT agent_definition_id FROM workflow_runs WHERE id = $1
+		SELECT workflow_id FROM workflow_runs WHERE id = $1
 	`, runID).Scan(&orphanedDefID); err != nil {
 		t.Fatalf("re-fetch run: %v", err)
 	}
 	if orphanedDefID.Valid {
-		t.Errorf("expected agent_definition_id to be NULL after definition delete, got %v", orphanedDefID)
+		t.Errorf("expected workflow_id to be NULL after definition delete, got %v", orphanedDefID)
 	}
 }
 

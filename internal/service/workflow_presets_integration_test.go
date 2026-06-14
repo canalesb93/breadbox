@@ -137,7 +137,7 @@ func TestListAllAgentRuns_WorkflowsOnly(t *testing.T) {
 	// One run apiece. short_id/id/started_at are DB-defaulted.
 	for _, defID := range []string{wf.ID, plain.ID} {
 		if _, err := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
+			`INSERT INTO workflow_runs (workflow_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
 			defID); err != nil {
 			t.Fatalf("insert run for %s: %v", defID, err)
 		}
@@ -205,7 +205,7 @@ func TestWorkflowRunStatusCounts(t *testing.T) {
 
 	ins := func(defID, status string) {
 		if _, e := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron',$2)`,
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron',$2)`,
 			defID, status); e != nil {
 			t.Fatalf("insert run: %v", e)
 		}

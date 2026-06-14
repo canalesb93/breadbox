@@ -29,7 +29,7 @@ func TestListRecentErroredAgentRuns_OnlyRecentErrors(t *testing.T) {
 	mkRun := func(status string, startedAt time.Time, errMsg string) {
 		t.Helper()
 		row, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{
-			AgentDefinitionID: defUUID,
+			WorkflowID: defUUID,
 			Trigger:           "manual",
 		})
 		if err != nil {

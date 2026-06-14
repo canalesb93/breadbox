@@ -1,5 +1,5 @@
 -- name: CreateApiKey :one
-INSERT INTO api_keys (name, key_hash, key_prefix, scope, actor_type, actor_name, agent_definition_id)
+INSERT INTO api_keys (name, key_hash, key_prefix, scope, actor_type, actor_name, workflow_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
@@ -11,11 +11,11 @@ SELECT * FROM api_keys WHERE key_hash = $1;
 -- the api_keys row at mint (per-run keys). Lets every surface render an
 -- agent's activity under one name + slug-seeded avatar instead of the
 -- MCP clientInfo the SDK presents. Returns no rows for non-agent keys
--- or run keys minted before agent_definition_id existed (callers fall
+-- or run keys minted before workflow_id existed (callers fall
 -- back to parsing the slug from the key name).
 SELECT ad.id, ad.short_id, ad.name, ad.slug
 FROM api_keys ak
-JOIN workflows ad ON ad.id = ak.agent_definition_id
+JOIN workflows ad ON ad.id = ak.workflow_id
 WHERE ak.id = $1;
 
 -- name: GetApiKeyByPrefix :one

@@ -41,7 +41,7 @@ func TestT7WorkflowRunStatusCounts_CustomWorkflowIncluded(t *testing.T) {
 
 	// Insert a run for the custom workflow (no preset backing).
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'manual','success')`,
+		`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'manual','success')`,
 		custom.ID); err != nil {
 		t.Fatalf("insert custom run: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestT7WorkflowRunStatusCounts_SinglePreset(t *testing.T) {
 	ins := func(status string) {
 		t.Helper()
 		if _, e := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron',$2)`,
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron',$2)`,
 			wf.ID, status); e != nil {
 			t.Fatalf("insert run (status=%s): %v", status, e)
 		}
@@ -121,7 +121,7 @@ func TestT7WorkflowRunStatusCounts_AllStatuses(t *testing.T) {
 
 	for _, status := range []string{"in_progress", "success", "error", "timeout", "skipped"} {
 		if _, e := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron',$2)`,
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron',$2)`,
 			wf.ID, status); e != nil {
 			t.Fatalf("insert run (status=%s): %v", status, e)
 		}
@@ -157,7 +157,7 @@ func TestT7WorkflowRunStatusCounts_ScopedBySlug(t *testing.T) {
 	ins := func(defID, status string) {
 		t.Helper()
 		if _, e := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron',$2)`,
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron',$2)`,
 			defID, status); e != nil {
 			t.Fatalf("insert run: %v", e)
 		}
@@ -210,7 +210,7 @@ func TestT7WorkflowRunStatusCounts_ScopedByShortID(t *testing.T) {
 	}
 
 	if _, e := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron','success')`,
+		`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron','success')`,
 		wf.ID); e != nil {
 		t.Fatalf("insert run: %v", e)
 	}
@@ -241,7 +241,7 @@ func TestT7WorkflowRunStatusCounts_UnknownFilter(t *testing.T) {
 	}
 
 	if _, e := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron','success')`,
+		`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron','success')`,
 		wf.ID); e != nil {
 		t.Fatalf("insert run: %v", e)
 	}
@@ -277,7 +277,7 @@ func TestT7WorkflowRunStatusCounts_MultiPreset(t *testing.T) {
 	ins := func(defID, status string) {
 		t.Helper()
 		if _, e := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status) VALUES ($1,'cron',$2)`,
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status) VALUES ($1,'cron',$2)`,
 			defID, status); e != nil {
 			t.Fatalf("insert run: %v", e)
 		}

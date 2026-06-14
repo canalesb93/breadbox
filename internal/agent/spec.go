@@ -64,7 +64,7 @@ func (a AuthConfig) GoString() string { return a.String() }
 type JobSpec struct {
 	// Identity (passed through for log correlation)
 	RunID             string `json:"runId"`
-	AgentDefinitionID string `json:"agentDefinitionId"`
+	WorkflowID string `json:"workflowId"`
 
 	// Prompt
 	Prompt       string `json:"prompt"`

@@ -32,7 +32,7 @@ func TestListAgentDefinitions_PopulatesRecentCapStats(t *testing.T) {
 
 	// Mark the two most-recent rows as capped.
 	rows, err := q.ListAgentRuns(ctx, db.ListAgentRunsParams{
-		AgentDefinitionID: defUUID,
+		WorkflowID: defUUID,
 		Limit:             5,
 		Offset:            0,
 	})

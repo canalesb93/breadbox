@@ -19,7 +19,7 @@ import (
 func f1MustInsertCompletedRun(t *testing.T, q *db.Queries, defID pgtype.UUID) {
 	t.Helper()
 	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
-		AgentDefinitionID: defID,
+		WorkflowID: defID,
 		Trigger:           "manual",
 	})
 	if err != nil {

@@ -132,7 +132,7 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		Tags:          tags,
 		Author:        pgconv.TextIfNotEmpty(author),
 		SessionID:     sessUUID,
-		AgentRunID:    runUUID,
+		WorkflowRunID:    runUUID,
 	})
 	if err != nil {
 		return AgentReportResponse{}, fmt.Errorf("create agent report: %w", err)
@@ -201,10 +201,10 @@ func (s *Service) ListReportSummariesForRunIDs(ctx context.Context, runIDs []str
 		return nil, fmt.Errorf("list report summaries for runs: %w", err)
 	}
 	for _, r := range rows {
-		if !r.AgentRunID.Valid {
+		if !r.WorkflowRunID.Valid {
 			continue
 		}
-		runID := pgconv.FormatUUID(r.AgentRunID)
+		runID := pgconv.FormatUUID(r.WorkflowRunID)
 		out[runID] = append(out[runID], AgentRunReportSummary{
 			ShortID:  r.ShortID,
 			Title:    r.Title,

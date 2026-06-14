@@ -47,7 +47,7 @@ func T22_mustCreateRunWithReports(
 
 	// Insert a run row.
 	run, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{
-		AgentDefinitionID: defUUID,
+		WorkflowID: defUUID,
 		Trigger:           "manual",
 	})
 	if err != nil {
@@ -150,7 +150,7 @@ func T22TestListReportSummariesForRunIDs_RunWithNoReports(t *testing.T) {
 		t.Fatalf("T22: parse def UUID: %v", err)
 	}
 	run, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{
-		AgentDefinitionID: defUUID,
+		WorkflowID: defUUID,
 		Trigger:           "manual",
 	})
 	if err != nil {
@@ -195,7 +195,7 @@ func T22TestListReportSummariesForRunIDs_MixedBatch(t *testing.T) {
 		t.Fatalf("T22: parse defB UUID: %v", err)
 	}
 	runB, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{
-		AgentDefinitionID: defBUUID,
+		WorkflowID: defBUUID,
 		Trigger:           "cron",
 	})
 	if err != nil {

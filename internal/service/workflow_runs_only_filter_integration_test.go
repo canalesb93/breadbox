@@ -21,7 +21,7 @@ func TestT8_WorkflowsOnly_PresetRunIncluded(t *testing.T) {
 		t.Fatalf("EnableWorkflowFromPreset: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
 		wf.ID); err != nil {
 		t.Fatalf("insert preset run: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestT8_WorkflowsOnly_NonPresetRunExcluded(t *testing.T) {
 
 	plain := mustCreateAgentDefinition(t, svc, "t8-plain-agent", true)
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
 		plain.ID); err != nil {
 		t.Fatalf("insert plain run: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestT8_WorkflowsOnly_UnfilteredIncludesBoth(t *testing.T) {
 
 	for _, defID := range []string{wf.ID, plain.ID} {
 		if _, err := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
+			`INSERT INTO workflow_runs (workflow_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
 			defID); err != nil {
 			t.Fatalf("insert run for def %s: %v", defID, err)
 		}
@@ -116,7 +116,7 @@ func TestT8_WorkflowsOnly_OnlyPresetRunsReturnedAmongMixed(t *testing.T) {
 
 	for _, defID := range []string{wf.ID, plain.ID} {
 		if _, err := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
+			`INSERT INTO workflow_runs (workflow_id, "trigger", status) VALUES ($1, 'manual', 'success')`,
 			defID); err != nil {
 			t.Fatalf("insert run for def %s: %v", defID, err)
 		}

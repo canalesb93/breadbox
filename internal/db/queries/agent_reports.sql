@@ -1,5 +1,5 @@
 -- name: CreateAgentReport :one
-INSERT INTO agent_reports (title, body, created_by_type, created_by_id, created_by_name, priority, tags, author, session_id, agent_run_id)
+INSERT INTO agent_reports (title, body, created_by_type, created_by_id, created_by_name, priority, tags, author, session_id, workflow_run_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
@@ -35,12 +35,12 @@ DELETE FROM agent_reports WHERE id = $1;
 -- Powers the AgentRunRow chip on the runs landing — operators see
 -- "this run produced these reports" at a glance.
 SELECT
-    agent_run_id,
+    workflow_run_id,
     id,
     short_id,
     title,
     priority,
     created_at
 FROM agent_reports
-WHERE agent_run_id = ANY($1::uuid[])
+WHERE workflow_run_id = ANY($1::uuid[])
 ORDER BY created_at ASC;

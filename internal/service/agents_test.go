@@ -374,7 +374,7 @@ func TestListAgentDefinitions_PopulatesCostStats30d(t *testing.T) {
 func mustInsertCompletedRun(t *testing.T, q *db.Queries, defID pgtype.UUID, costStr string) {
 	t.Helper()
 	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
-		AgentDefinitionID: defID,
+		WorkflowID: defID,
 		Trigger:           "manual",
 	})
 	if err != nil {
@@ -406,7 +406,7 @@ func mustInsertCompletedRun(t *testing.T, q *db.Queries, defID pgtype.UUID, cost
 func mustInsertSkippedRun(t *testing.T, q *db.Queries, defID pgtype.UUID) {
 	t.Helper()
 	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
-		AgentDefinitionID: defID,
+		WorkflowID: defID,
 		Trigger:           "cron",
 	})
 	if err != nil {
@@ -502,7 +502,7 @@ func TestListAgentDefinitions_NoPrefixedRuns_LeavesLastPromptPrefixNil(t *testin
 func mustInsertRunWithPrefix(t *testing.T, q *db.Queries, defID pgtype.UUID, prefix string) {
 	t.Helper()
 	run, err := q.CreateAgentRun(context.Background(), db.CreateAgentRunParams{
-		AgentDefinitionID: defID,
+		WorkflowID: defID,
 		Trigger:           "manual",
 	})
 	if err != nil {

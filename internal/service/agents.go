@@ -176,7 +176,7 @@ type AgentRunSummary struct {
 type AgentRunResponse struct {
 	ID                  string   `json:"id"`
 	ShortID             string   `json:"short_id"`
-	AgentDefinitionID   *string  `json:"agent_definition_id,omitempty"`
+	WorkflowID   *string  `json:"workflow_id,omitempty"`
 	Trigger             string   `json:"trigger"`
 	Status              string   `json:"status"`
 	StartedAt           string   `json:"started_at"`
@@ -365,7 +365,7 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 	statsByID := make(map[string]AgentCostStats, len(statsRows))
 	for _, r := range statsRows {
 		cost, _ := pgconv.NumericToFloat(r.TotalCostUsd)
-		statsByID[pgconv.FormatUUID(r.AgentDefinitionID)] = AgentCostStats{
+		statsByID[pgconv.FormatUUID(r.WorkflowID)] = AgentCostStats{
 			RunCount:     int(r.RunCount),
 			TotalCostUSD: cost,
 		}
@@ -379,7 +379,7 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 	}
 	errStatsByID := make(map[string]AgentRecentErrorStats, len(errStatsRows))
 	for _, r := range errStatsRows {
-		errStatsByID[pgconv.FormatUUID(r.AgentDefinitionID)] = AgentRecentErrorStats{
+		errStatsByID[pgconv.FormatUUID(r.WorkflowID)] = AgentRecentErrorStats{
 			ErrorCount: int(r.ErrorCount),
 			RunCount:   int(r.RunCount),
 		}
@@ -394,7 +394,7 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 	}
 	capStatsByID := make(map[string]AgentRecentCapStats, len(capStatsRows))
 	for _, r := range capStatsRows {
-		capStatsByID[pgconv.FormatUUID(r.AgentDefinitionID)] = AgentRecentCapStats{
+		capStatsByID[pgconv.FormatUUID(r.WorkflowID)] = AgentRecentCapStats{
 			CapCount: int(r.CapCount),
 			RunCount: int(r.RunCount),
 		}
@@ -411,7 +411,7 @@ func (s *Service) ListAgentDefinitions(ctx context.Context) ([]AgentDefinitionRe
 	prefixByID := make(map[string]string, len(prefixRows))
 	for _, r := range prefixRows {
 		if r.PromptPrefix.Valid && r.PromptPrefix.String != "" {
-			prefixByID[pgconv.FormatUUID(r.AgentDefinitionID)] = r.PromptPrefix.String
+			prefixByID[pgconv.FormatUUID(r.WorkflowID)] = r.PromptPrefix.String
 		}
 	}
 
@@ -704,7 +704,7 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 	}
 
 	args := []any{def.ID}
-	where := []string{"agent_definition_id = $1"}
+	where := []string{"workflow_id = $1"}
 	idx := 2
 	if p.Status != "" {
 		where = append(where, fmt.Sprintf("status = $%d", idx))
@@ -740,7 +740,7 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 	// Peek for has_more by asking for limit+1.
 	args = append(args, limit+1, offset)
 	query := fmt.Sprintf(`
-		SELECT id, short_id, agent_definition_id, "trigger", status, started_at, completed_at,
+		SELECT id, short_id, workflow_id, "trigger", status, started_at, completed_at,
 		       duration_ms, total_cost_usd, input_tokens, output_tokens, cache_read_tokens,
 		       cache_creation_tokens, turn_count, max_turns_used, num_tool_calls,
 		       error_message, transcript_path, session_id,
@@ -761,7 +761,7 @@ func (s *Service) ListAgentRuns(ctx context.Context, agentSlugOrID string, p Age
 	for rows.Next() {
 		var r db.WorkflowRun
 		if scanErr := rows.Scan(
-			&r.ID, &r.ShortID, &r.AgentDefinitionID, &r.Trigger, &r.Status,
+			&r.ID, &r.ShortID, &r.WorkflowID, &r.Trigger, &r.Status,
 			&r.StartedAt, &r.CompletedAt, &r.DurationMs, &r.TotalCostUsd,
 			&r.InputTokens, &r.OutputTokens, &r.CacheReadTokens,
 			&r.CacheCreationTokens, &r.TurnCount, &r.MaxTurnsUsed,
@@ -895,7 +895,7 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		if err != nil {
 			return nil, err
 		}
-		where = append(where, fmt.Sprintf("r.agent_definition_id = $%d", idx))
+		where = append(where, fmt.Sprintf("r.workflow_id = $%d", idx))
 		args = append(args, def.ID)
 		idx++
 	}
@@ -943,14 +943,14 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 	// Peek for has_more by asking for limit+1.
 	args = append(args, limit+1, offset)
 	query := fmt.Sprintf(`
-		SELECT r.id, r.short_id, r.agent_definition_id, r."trigger", r.status, r.started_at, r.completed_at,
+		SELECT r.id, r.short_id, r.workflow_id, r."trigger", r.status, r.started_at, r.completed_at,
 		       r.duration_ms, r.total_cost_usd, r.input_tokens, r.output_tokens, r.cache_read_tokens,
 		       r.cache_creation_tokens, r.turn_count, r.max_turns_used, r.num_tool_calls,
 		       r.error_message, r.transcript_path, r.session_id,
 		       r.operator_note, r.prompt_prefix, r.hit_cap, r.model,
 		       d.slug, d.name
 		FROM workflow_runs r
-		JOIN workflows d ON d.id = r.agent_definition_id
+		JOIN workflows d ON d.id = r.workflow_id
 		%s
 		ORDER BY r.started_at DESC
 		LIMIT $%d OFFSET $%d`,
@@ -967,7 +967,7 @@ func (s *Service) ListAllAgentRuns(ctx context.Context, p AllAgentRunListParams)
 		var r db.WorkflowRun
 		var slug, name string
 		if scanErr := rows.Scan(
-			&r.ID, &r.ShortID, &r.AgentDefinitionID, &r.Trigger, &r.Status,
+			&r.ID, &r.ShortID, &r.WorkflowID, &r.Trigger, &r.Status,
 			&r.StartedAt, &r.CompletedAt, &r.DurationMs, &r.TotalCostUsd,
 			&r.InputTokens, &r.OutputTokens, &r.CacheReadTokens,
 			&r.CacheCreationTokens, &r.TurnCount, &r.MaxTurnsUsed,
@@ -1019,11 +1019,11 @@ func (s *Service) WorkflowRunStatusCounts(ctx context.Context, workflowSlugOrID 
 			// bad workflow filter rather than erroring).
 			return map[string]int{}, nil
 		}
-		where = append(where, "r.agent_definition_id = $1")
+		where = append(where, "r.workflow_id = $1")
 		args = append(args, def.ID)
 	}
 	query := "SELECT r.status, COUNT(*) FROM workflow_runs r " +
-		"JOIN workflows d ON d.id = r.agent_definition_id"
+		"JOIN workflows d ON d.id = r.workflow_id"
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -1100,7 +1100,7 @@ func (s *Service) notifyDefinitionChanged() {
 // add_model_to_workflow_runs migration.
 func (s *Service) CreateAgentRunDB(ctx context.Context, defID pgtype.UUID, trigger, model string) (db.WorkflowRun, error) {
 	return s.Queries.CreateAgentRun(ctx, db.CreateAgentRunParams{
-		AgentDefinitionID: defID,
+		WorkflowID: defID,
 		Trigger:           trigger,
 		Model:             model,
 	})
@@ -1216,7 +1216,7 @@ func (s *Service) MintRunAPIKey(ctx context.Context, def *AgentDefinitionRespons
 	// ActorName is the agent's DISPLAY name (def.Name) — every write the
 	// run makes stamps this, so the feed reads "Routine Review" rather
 	// than the slug or the SDK's generic "claude-code" clientInfo.
-	// AgentDefinitionID is the durable link that lets any of the run's
+	// WorkflowID is the durable link that lets any of the run's
 	// activity resolve back to this one definition (name + slug avatar).
 	// The slug still lives in the key Name for the avatar seed.
 	return s.CreateAPIKey(ctx, CreateAPIKeyParams{
@@ -1224,7 +1224,7 @@ func (s *Service) MintRunAPIKey(ctx context.Context, def *AgentDefinitionRespons
 		Scope:             scope,
 		ActorType:         "agent",
 		ActorName:         def.Name,
-		AgentDefinitionID: def.ID,
+		WorkflowID: def.ID,
 	})
 }
 
@@ -1344,7 +1344,7 @@ func (s *Service) AssembleJobSpec(ctx context.Context, def *AgentDefinitionRespo
 
 	spec := &agent.JobSpec{
 		RunID:             run.ID,
-		AgentDefinitionID: def.ID,
+		WorkflowID: def.ID,
 		Prompt:            def.Prompt,
 		SystemPrompt:      systemPrompt,
 		Model:             def.Model,
@@ -1549,14 +1549,14 @@ func agentDefinitionFromRow(row db.Workflow, lastRun *AgentRunSummary) AgentDefi
 
 func agentRunFromRow(row db.WorkflowRun) AgentRunResponse {
 	var defID *string
-	if row.AgentDefinitionID.Valid {
-		s := pgconv.FormatUUID(row.AgentDefinitionID)
+	if row.WorkflowID.Valid {
+		s := pgconv.FormatUUID(row.WorkflowID)
 		defID = &s
 	}
 	return AgentRunResponse{
 		ID:                  pgconv.FormatUUID(row.ID),
 		ShortID:             row.ShortID,
-		AgentDefinitionID:   defID,
+		WorkflowID:   defID,
 		Trigger:             row.Trigger,
 		Status:              row.Status,
 		StartedAt:           pgconv.TimestampStr(row.StartedAt),
