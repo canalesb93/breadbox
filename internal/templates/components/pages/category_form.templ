@@ -23,24 +23,13 @@ templ CategoryForm(p CategoryFormProps) {
 	}
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">
-				if p.IsEdit {
-					Edit Category
-				} else {
-					Add Category
-				}
-			</h1>
-			<p class="text-sm text-base-content/50 mt-1">
-				if p.IsEdit {
-					Update appearance and settings. System categories have limited editability.
-				} else {
-					Organize transactions with a new category in your taxonomy.
-				}
-			</p>
-		</div>
-	</div>
+	{{ title := "Add Category" }}
+	{{ subtitle := "Organize transactions with a new category in your taxonomy." }}
+	if p.IsEdit {
+		{{ title = "Edit Category" }}
+		{{ subtitle = "Update appearance and settings. System categories have limited editability." }}
+	}
+	@components.PageHeader(components.PageHeaderProps{Title: title, Subtitle: subtitle})
 	<div class="max-w-lg" x-data="categoryForm()">
 		<form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
 			<div class="p-5 sm:p-6">

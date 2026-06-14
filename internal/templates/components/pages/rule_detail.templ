@@ -380,16 +380,16 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 							<table class="table table-sm">
 								<thead>
 									<tr>
-										<th class="text-xs">Name</th>
-										<th class="text-xs text-right">Amount</th>
-										<th class="text-xs">Date</th>
+										<th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Name</th>
+										<th class="text-xs font-medium uppercase tracking-wide text-base-content/50 text-right">Amount</th>
+										<th class="text-xs font-medium uppercase tracking-wide text-base-content/50">Date</th>
 									</tr>
 								</thead>
 								<tbody>
 									for _, m := range p.Preview.SampleMatches {
-										<tr>
-											<td class="text-sm">{ m.ProviderName }</td>
-											<td class="text-sm text-right">
+										<tr class="hover:bg-base-200/40 transition-colors">
+											<td class="text-sm" data-private="merchant">{ m.ProviderName }</td>
+											<td class="text-sm text-right tabular-nums">
 												<!-- Rule preview shows the raw amounts the rule would
 												     match; AmountBalance keeps the stored sign visible
 												     without the success-green income tint that would
@@ -400,7 +400,7 @@ templ ruleDetailPendingMatches(p RuleDetailProps) {
 													Class:  "text-sm",
 												})
 											</td>
-											<td class="text-sm text-base-content/60">{ m.Date }</td>
+											<td class="text-sm text-base-content/60 tabular-nums">{ m.Date }</td>
 										</tr>
 									}
 								</tbody>

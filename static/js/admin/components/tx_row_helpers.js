@@ -111,6 +111,19 @@ function updateRowCategory(txId, slug) {
     }
     mobileLabel.replaceWith(newLabel);
   }
+
+  // 4) Brief confirmation flash on the row so the edit reads as "landed"
+  // without the user hunting for the toast. The keyframe (bb-tx-flash, in
+  // input.css) self-clears the background; we strip the class on animation
+  // end so a re-categorize can re-trigger it.
+  row.classList.remove('bb-tx-row--flash');
+  // Force a reflow so removing + re-adding the class restarts the animation.
+  void row.offsetWidth;
+  row.classList.add('bb-tx-row--flash');
+  row.addEventListener('animationend', function handler() {
+    row.classList.remove('bb-tx-row--flash');
+    row.removeEventListener('animationend', handler);
+  });
 }
 
 // Lucide icon names are slug-shaped (e.g. "trending-up"). Reject anything

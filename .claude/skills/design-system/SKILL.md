@@ -37,7 +37,49 @@ this skill and the running app as a bug in one of them — reconcile, don't igno
 
 ---
 
-## The seven principles
+## House style — restraint over decoration (Mintlify-clean)
+
+**This is the most load-bearing aesthetic rule, learned the hard way.** Our
+north star for "state-of-the-art" is the calm, airy restraint of
+[Mintlify's dashboard](https://app.mintlify.com), Linear, and Stripe — **not**
+color, size, or decoration. Quality here = whitespace, typography, hierarchy,
+and *less*. When in doubt, remove.
+
+Concretely:
+
+- **No hero / big-stat panels.** Do **not** build a dominant headline card to
+  show a number (a giant net-worth panel, a "pulse" hero, a stat that fills a
+  third of the page). Numbers are shown **quietly and inline**, with generous
+  whitespace around them. A page's job (the list, the content) leads — a stat
+  is a quiet supporting detail, never the visual hero. (We shipped hero/stat
+  units once; they were reverted. Don't reintroduce them.)
+- **No left-accent-tinted cards.** Do **not** put a status-tinted vertical
+  accent bar / colored left rail on cards, stat tiles, or content blocks. The
+  left-edge highlight is reserved **strictly** for genuine *selection*
+  affordances (the `j/k` keyboard-focused row). Everywhere else: a plain
+  hairline-bordered `bb-card`, no tint.
+- **Status is a small icon + a quiet pill** — e.g. a green check with
+  "Connected" / "Live" — never a big tinted panel or a wash of color across a
+  card. Color is a small accent, not a fill.
+- **Airy by default.** Generous padding and margins; let things breathe. Dense
+  is fine for a *list of entities*; do not crowd headers, summaries, or chrome.
+- **Decoration earns its place or it's cut.** Gradients, glows, motion,
+  accent washes, oversized numerals — each must justify itself against "would
+  Mintlify do this?". Usually the answer is no.
+- **Stat cards are quiet.** A metric tile is a hairline box · small muted label
+  on top · big plain number (default ink, *not* a tone color) · an optional tiny
+  delta line (small arrow + "↓ 45.7% vs previous" in a quiet semantic color).
+  **No icon tile, no tone fill, no tint, no left-accent.** Use the shared
+  `StatTile` (`stat_tile.templ`); the full pattern is in `components.md` →
+  "Stat cards — the Mintlify-clean pattern".
+
+This section overrides any temptation toward "bold = bigger/louder." Bold here
+means **confidently restrained**. Keep referencing Mintlify; fold new learnings
+back into this skill as they surface.
+
+---
+
+## The eight principles
 
 The DNA. Each is a small, reusable decision; together they're why our best
 surfaces feel calm.
@@ -70,6 +112,20 @@ surfaces feel calm.
 
 7. **Identity via avatar.** People and workflows get a stable DiceBear avatar
    (`UserAvatar`). Any feed of "who did this" reads the same on every surface.
+
+8. **Every interactive element has interaction states.** Anything clickable — a
+   button, a row that toggles, a custom control, a card that acts as a link —
+   must show a visible **hover** state *and* a **focus-visible** state for
+   keyboard users. Hover is a subtle background/opacity shift, never a jarring
+   one; pair it with `transition-colors` so it eases, and `cursor-pointer` so
+   the affordance reads. Keyboard focus gets a ring — the project idiom is
+   `focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40` (use
+   `focus-visible:`, not `:focus`, so the ring only shows for keyboard nav). The
+   mechanics: `hover:bg-base-200/60` (or `hover:bg-base-content/5` on darker
+   rows), `transition-colors`, `cursor-pointer`, the focus-visible ring. **Don't
+   re-roll press feedback for `.btn`** — `input.css` already ships the Nova
+   `:active` translate; a real daisy button is covered. This rule is app-wide:
+   a control with no hover and no focus state is a bug, not a style choice.
 
 ---
 
@@ -132,6 +188,44 @@ Reach for these before authoring anything new. Full prop catalog:
 A run/feed row reference implementation lives in `agent_run_row.templ`
 (`AgentRunRowList` + `AgentRunRow`) — the cleanest example of principles 2–7 in
 one component.
+
+---
+
+## Format palette — the list-row is the default, not the only format
+
+The list-row earns its place as the default for *entity lists*, but a great
+surface uses the format that fits its content. **Be bold:** a **table**, a
+**card grid**, or a **timeline** is the right call when the content calls for it.
+What makes them feel like one product is the shared **family treatment**, not a
+single layout — don't force everything into list-rows.
+
+Pick by content:
+
+- **list-row** — entity lists (accounts, rules, reports, members, tags…). The
+  default. Status tile · title + one body line · value · overflow.
+- **table** — dense, sortable, **multi-numeric-column matrices** where columns
+  must align across rows (Backups files, CSV preview, a sample-matches grid).
+  Don't list-row these.
+- **card / card grid** — heterogeneous or **visual** items that need a richer
+  preview (the Workflows gallery, onboarding step cards, the recurring
+  candidate cards with detection evidence).
+- **stat tiles** — summary numbers that lead a page (`StatTileRow`).
+- **timeline** — chronological activity (the activity timeline, run transcript).
+
+The **family treatment** is what unifies every format — whatever the layout, it
+wears the same skin so it reads as one product:
+
+- the `bb-card` surface (flat border + dark-mode lift) and **hairline dividers** —
+  never heavy shadows or boxed sub-headers;
+- the color-coded **status tile / `IconTile`** for state — not a parallel text badge;
+- **vivid-only badges** (`info`/`success`/`warning`/`error`; `ghost` for a quiet neutral);
+- quiet **uppercase `text-xs text-base-content/50`** section + column labels;
+- **`tabular-nums`** for money/metrics, `Amount` for currency, privacy marking;
+- generous, honest spacing, and principle #8 **hover + focus-visible** on every
+  interactive element.
+
+A table that wears these reads as the same family as a list-row. The "family
+table" + "family card" specifics live in [`components.md`](components.md).
 
 ---
 

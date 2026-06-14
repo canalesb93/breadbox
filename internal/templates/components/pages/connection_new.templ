@@ -15,12 +15,10 @@ import "breadbox/internal/templates/components"
 // (sandbox/development/production) flows in through data-teller-env on the
 // x-data root and is read once in the factory's init().
 templ ConnectionNew(p ConnectionNewProps) {
-	<div class="bb-page-header">
-		<div>
-			<h1 class="bb-page-title">Connect a bank</h1>
-			<p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
-		</div>
-	</div>
+	@components.PageHeader(components.PageHeaderProps{
+		Title:    "Connect a bank",
+		Subtitle: "Link a bank account to start syncing transactions",
+	})
 	if !p.HasPlaid && !p.HasTeller && !p.HasSimpleFin {
 		<div class="bb-card p-8 max-w-lg">
 			@connectNoProviders()

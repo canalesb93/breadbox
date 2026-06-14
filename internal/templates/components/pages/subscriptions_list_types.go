@@ -3,6 +3,8 @@
 package pages
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -249,22 +251,191 @@ func seriesChargeDate(s string) string {
 	return s
 }
 
-// subscriptionSignalFactClass maps a signal-fact tone to the value text color.
-func subscriptionSignalFactClass(tone string) string {
-	switch tone {
-	case "success":
-		return "text-success"
-	case "warning":
-		return "text-warning"
-	default:
-		return "text-base-content/80"
-	}
-}
-
 // SubscriptionPriceChange marks a point where the charge amount changed.
 type SubscriptionPriceChange struct {
 	Date     string
 	From     float64
 	To       float64
 	Currency string
+}
+
+// SubscriptionStatusGroup is one status bucket of the ledger — Active, Paused,
+// or Ended — rendered as a quiet label line (status · count · optional monthly
+// subtotal) over its list-rows, the /accounts connection-group idiom applied to
+// the recurring surface. Status lives on the group header, so the rows below it
+// don't repeat a status badge.
+type SubscriptionStatusGroup struct {
+	Status string // active | paused | cancelled | (other, last)
+	Label  string // "Active" | "Paused" | "Ended"
+	Rows   []SubscriptionRow
+
+	// Subtotal is the group's monthly-equivalent spend. Only populated
+	// (HasSubtotal=true) for the Active group when every amount-bearing row
+	// shares a single currency — paused/ended series aren't billing monthly,
+	// and we never sum across iso_currency_code. SubtotalCurrency carries that
+	// shared currency for the renderer.
+	Subtotal         float64
+	SubtotalCurrency string
+	HasSubtotal      bool
+}
+
+// subscriptionStatusOrder is the canonical group order: active charges first,
+// then paused, then ended/cancelled. Any status outside this set sorts after
+// these, in first-seen order. Pure data so the grouping stays testable.
+var subscriptionStatusOrder = []struct{ status, label string }{
+	{service.SeriesStatusActive, "Active"},
+	{service.SeriesStatusPaused, "Paused"},
+	{service.SeriesStatusCancelled, "Ended"},
+}
+
+// GroupSubscriptionsByStatus buckets the ledger rows by status into Active →
+// Paused → Ended groups (unknown statuses appended last, first-seen order),
+// preserving the incoming row order within each group (the handler pre-sorts
+// Active by renewal urgency). The Active group carries a monthly-equivalent
+// subtotal when all its amount-bearing rows share one currency; never sums
+// across currencies. Pure function — unit-tested without a DB.
+func GroupSubscriptionsByStatus(rows []SubscriptionRow) []SubscriptionStatusGroup {
+	label := make(map[string]string, len(subscriptionStatusOrder))
+	rank := make(map[string]int, len(subscriptionStatusOrder))
+	keys := make([]string, 0, len(subscriptionStatusOrder))
+	for i, o := range subscriptionStatusOrder {
+		label[o.status] = o.label
+		rank[o.status] = i
+		keys = append(keys, o.status)
+	}
+
+	byStatus := make(map[string][]SubscriptionRow)
+	for _, r := range rows {
+		if _, known := label[r.Status]; !known {
+			if _, seen := byStatus[r.Status]; !seen {
+				keys = append(keys, r.Status) // unknown status, appended last
+			}
+		}
+		byStatus[r.Status] = append(byStatus[r.Status], r)
+	}
+
+	groups := make([]SubscriptionStatusGroup, 0, len(keys))
+	for _, st := range keys {
+		rs := byStatus[st]
+		if len(rs) == 0 {
+			continue
+		}
+		lbl := label[st]
+		if lbl == "" {
+			lbl = subscriptionStatusFallbackLabel(st)
+		}
+		g := SubscriptionStatusGroup{Status: st, Label: lbl, Rows: rs}
+		if st == service.SeriesStatusActive {
+			applySubscriptionMonthlySubtotal(&g)
+		}
+		groups = append(groups, g)
+	}
+	return groups
+}
+
+// applySubscriptionMonthlySubtotal fills the Active group's monthly-equivalent
+// subtotal — but only when every amount-bearing row shares one currency and the
+// total is positive. Mixed currencies leave the group subtotal-less rather than
+// summing across them.
+func applySubscriptionMonthlySubtotal(g *SubscriptionStatusGroup) {
+	sum := 0.0
+	cur := ""
+	single := true
+	any := false
+	for _, r := range g.Rows {
+		if !r.HasAmount {
+			continue
+		}
+		rc := r.Currency
+		if rc == "" {
+			rc = "USD"
+		}
+		if !any {
+			cur, any = rc, true
+		} else if rc != cur {
+			single = false
+		}
+		sum += r.MonthlyEquiv
+	}
+	if any && single && sum > 0 {
+		g.Subtotal = sum
+		g.SubtotalCurrency = cur
+		g.HasSubtotal = true
+	}
+}
+
+// subscriptionStatusFallbackLabel title-cases an unexpected status value so an
+// unknown bucket still renders a readable header.
+func subscriptionStatusFallbackLabel(status string) string {
+	if status == "" {
+		return "Other"
+	}
+	return strings.ToUpper(status[:1]) + status[1:]
+}
+
+// subscriptionsGroupCount renders the dimmed "N active charges" suffix on a
+// group header.
+func subscriptionsGroupCount(g SubscriptionStatusGroup) string {
+	noun := "charge"
+	if len(g.Rows) != 1 {
+		noun = "charges"
+	}
+	return fmt.Sprintf("%d %s", len(g.Rows), noun)
+}
+
+// subscriptionsRowBodyLine is the row's single body line — cadence then the next
+// renewal date ("Monthly · next Jun 28"). Falls back to a dash so the line is
+// never empty.
+func subscriptionsRowBodyLine(s SubscriptionRow) string {
+	parts := make([]string, 0, 2)
+	if s.CadenceLabel != "" {
+		parts = append(parts, s.CadenceLabel)
+	}
+	if s.NextExpected != "" {
+		parts = append(parts, "next "+s.NextExpected)
+	}
+	if len(parts) == 0 {
+		return "—"
+	}
+	return strings.Join(parts, " · ")
+}
+
+// subStatusTileBg / subStatusTileIcon / subStatusTileIconColor map a series
+// status to its leading status-tile treatment (principle #2 — status lives in
+// one color-coded tile). Active is the only vivid-success state; paused warns;
+// ended is a muted, non-error terminal state (a deliberate cancellation isn't an
+// error, so it stays neutral rather than red).
+func subStatusTileBg(status string) string {
+	switch status {
+	case service.SeriesStatusActive:
+		return "bg-success/10"
+	case service.SeriesStatusPaused:
+		return "bg-warning/10"
+	default:
+		return "bg-base-200"
+	}
+}
+
+func subStatusTileIcon(status string) string {
+	switch status {
+	case service.SeriesStatusActive:
+		return "repeat"
+	case service.SeriesStatusPaused:
+		return "pause"
+	case service.SeriesStatusCancelled:
+		return "circle-slash-2"
+	default:
+		return "repeat"
+	}
+}
+
+func subStatusTileIconColor(status string) string {
+	switch status {
+	case service.SeriesStatusActive:
+		return "text-success"
+	case service.SeriesStatusPaused:
+		return "text-warning"
+	default:
+		return "text-base-content/50"
+	}
 }

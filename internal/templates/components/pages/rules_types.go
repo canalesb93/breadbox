@@ -3,6 +3,8 @@
 package pages
 
 import (
+	"sort"
+
 	"breadbox/internal/service"
 )
 
@@ -65,6 +67,13 @@ type RulesRow struct {
 	LastHitAt  *string // RFC3339; rendered via LastHitAtRelative
 	LastHitAtRelative string
 
+	// Creator identity — drives the agent avatar on agent-authored rows
+	// (principle 7). CreatedByType is one of user / agent / system;
+	// IsSystem is the pre-derived convenience flag for the System badge.
+	CreatedByType string
+	CreatedByID   string
+	CreatedByName string
+
 	CategoryIcon  *string
 	CategoryColor *string
 
@@ -97,6 +106,8 @@ func BuildRulesRow(r service.TransactionRuleResponse) RulesRow {
 		Name:             r.Name,
 		Enabled:          r.Enabled,
 		IsSystem:         r.CreatedByType == "system",
+		CreatedByType:    r.CreatedByType,
+		CreatedByName:    r.CreatedByName,
 		HitCount:         r.HitCount,
 		Priority:         r.Priority,
 		LastHitAt:        r.LastHitAt,
@@ -105,6 +116,9 @@ func BuildRulesRow(r service.TransactionRuleResponse) RulesRow {
 		ExpiresAt:        r.ExpiresAt,
 		ConditionSummary: service.ConditionSummary(r.Conditions),
 		ActionsCount:     len(r.Actions),
+	}
+	if r.CreatedByID != nil {
+		row.CreatedByID = *r.CreatedByID
 	}
 
 	row.IsMatchAll = r.Conditions.Field == "" && len(r.Conditions.And) == 0 && len(r.Conditions.Or) == 0 && r.Conditions.Not == nil
@@ -127,4 +141,70 @@ func BuildRulesRow(r service.TransactionRuleResponse) RulesRow {
 	}
 
 	return row
+}
+
+// RulesStageGroup is one pipeline-stage bucket of rules, the grouping axis
+// for the /rules surface. Rules execute in priority order during sync, so
+// grouping by stage makes the page read as the pipeline it drives. Order
+// is the canonical stage index (0=baseline … 3=override) — the pipeline's
+// execution order, top to bottom.
+type RulesStageGroup struct {
+	Slug        string
+	Label       string
+	Description string
+	Order       int
+	Rules       []RulesRow
+}
+
+// RuleStage maps a rule's numeric pipeline priority to its canonical stage
+// bucket (slug, label, one-line description). The DSL names four stages —
+// baseline(0) / standard(10) / refinement(50) / override(100) — but
+// `priority` is a free 0..1000 integer, so each named stage owns the
+// half-open range up to the next one. Kept in lock-step with
+// docs/rule-dsl.md → "Priority as pipeline stage".
+func RuleStage(priority int) (slug, label, desc string) {
+	switch {
+	case priority < 10:
+		return "baseline", "Baseline", "Foundation — broad, early classifications"
+	case priority < 50:
+		return "standard", "Standard", "The default rule stage"
+	case priority < 100:
+		return "refinement", "Refinement", "Reacts to baseline & standard output"
+	default:
+		return "override", "Override", "Final say — runs last"
+	}
+}
+
+// ruleStageOrder is the canonical execution order of the named stages,
+// driving both the group sort and RulesStageGroup.Order.
+var ruleStageOrder = map[string]int{
+	"baseline":   0,
+	"standard":   1,
+	"refinement": 2,
+	"override":   3,
+}
+
+// GroupRulesByStage buckets rows into their pipeline stage, preserving the
+// caller's row order within each bucket (so the active sort still governs
+// intra-stage ordering) and returning the groups in pipeline-execution
+// order (baseline → override). Empty stages are omitted. Pure and
+// order-stable so the IA decision is pinned by a unit test rather than
+// vibes (mirrors GroupAccountsByConnection).
+func GroupRulesByStage(rows []RulesRow) []RulesStageGroup {
+	bySlug := make(map[string]*RulesStageGroup)
+	for _, r := range rows {
+		slug, label, desc := RuleStage(r.Priority)
+		g, ok := bySlug[slug]
+		if !ok {
+			g = &RulesStageGroup{Slug: slug, Label: label, Description: desc, Order: ruleStageOrder[slug]}
+			bySlug[slug] = g
+		}
+		g.Rules = append(g.Rules, r)
+	}
+	out := make([]RulesStageGroup, 0, len(bySlug))
+	for _, g := range bySlug {
+		out = append(out, *g)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Order < out[j].Order })
+	return out
 }

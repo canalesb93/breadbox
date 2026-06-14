@@ -2,15 +2,16 @@ package components
 
 // CategoriesSkeleton renders a placeholder mirroring the layout of the
 // /categories page — a filter search input, the "N top-level categories"
-// helper line, and a divided card with parent rows plus a few expanded
-// subcategory groups underneath. Sized to match the real component so a
-// future swap-in (AJAX refresh, picker preview, adjacent panel) doesn't
-// shift layout.
+// helper line, and a stack of per-group cards. Each group card is a daisy
+// `list` of list-rows: an emphasized parent row (color tile + name/descriptor
+// stack + overflow slot) followed by indented subcategory rows. Sized to
+// match the real component so a future swap-in (AJAX refresh, picker preview,
+// adjacent panel) doesn't shift layout.
 //
 // /categories is a full-SSR page today; this primitive is exposed in
-// /design#loading so it's ready for the eventual AJAX swap and
-// discoverable to anyone wiring loading states for adjacent
-// category-centric panels (e.g. the category picker).
+// /design#loading so it's ready for the eventual AJAX swap and discoverable
+// to anyone wiring loading states for adjacent category-centric panels (e.g.
+// the category picker).
 //
 // Uses the daisy `skeleton` primitive (per .claude/rules/daisyui.md, the
 // hand-rolled `bb-skeleton*` family is being retired).
@@ -22,66 +23,38 @@ templ CategoriesSkeleton() {
 		<div class="px-1">
 			<div class="skeleton h-2.5 w-32"></div>
 		</div>
-		<!-- Categories list card -->
-		<div class="bb-card overflow-hidden">
-			<div class="divide-y divide-base-300/40">
-				@categoriesSkeletonParent(true, 3)
-				@categoriesSkeletonParent(false, 0)
-				@categoriesSkeletonParent(true, 2)
-				@categoriesSkeletonParent(false, 0)
-				@categoriesSkeletonParent(false, 0)
-			</div>
+		<!-- Per-group cards: a parent lead row over indented subcategory rows -->
+		<div class="flex flex-col gap-3">
+			@categoriesSkeletonGroup(3)
+			@categoriesSkeletonGroup(0)
+			@categoriesSkeletonGroup(2)
 		</div>
 	</div>
 }
 
-// categoriesSkeletonParent mirrors one top-level category row: large icon
-// tile + chevron + display name + optional child-count badge + overflow
-// menu. When `childCount > 0`, a sub-list of indented child rows is
-// rendered below it to match the expanded state.
-templ categoriesSkeletonParent(expanded bool, childCount int) {
-	<div>
-		<!-- Parent row -->
-		<div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3">
-			<!-- Large icon tile -->
-			<div class="skeleton w-9 h-9 sm:w-10 sm:h-10 rounded-xl shrink-0"></div>
-			<div class="flex items-center gap-2 min-w-0 flex-1">
-				<!-- Chevron placeholder -->
-				<div class="skeleton w-3.5 h-3.5 rounded shrink-0"></div>
-				<!-- Display name -->
+// categoriesSkeletonGroup mirrors one group card: the parent list-row plus
+// `childCount` indented subcategory list-rows.
+templ categoriesSkeletonGroup(childCount int) {
+	<ul class="list rounded-xl bg-base-100 border border-base-300 overflow-hidden">
+		<!-- Parent lead row -->
+		<li class="list-row items-center">
+			<div class="skeleton w-9 h-9 rounded-xl shrink-0"></div>
+			<div class="min-w-0 space-y-1.5">
 				<div class="skeleton h-3.5 w-40 sm:w-48"></div>
-				if childCount > 0 {
-					<!-- Child-count pill -->
-					<div class="skeleton h-4 w-6 rounded-full shrink-0"></div>
-				}
+				<div class="skeleton h-2.5 w-24"></div>
 			</div>
-			<!-- Overflow menu -->
-			<div class="skeleton h-6 w-6 rounded shrink-0"></div>
-		</div>
-		if expanded && childCount > 0 {
-			<!-- Expanded subcategory list -->
-			<div class="border-t border-base-300/30 bg-base-200/20">
-				for i := 0; i < childCount; i++ {
-					@categoriesSkeletonChild()
-				}
-			</div>
+			<div class="skeleton h-6 w-6 ml-auto self-center"></div>
+		</li>
+		for i := 0; i < childCount; i++ {
+			<!-- Indented subcategory row -->
+			<li class="list-row items-center pl-12 sm:pl-14">
+				<div class="skeleton w-8 h-8 rounded-xl shrink-0"></div>
+				<div class="min-w-0 space-y-1.5">
+					<div class="skeleton h-3 w-28 sm:w-36"></div>
+					<div class="skeleton h-2.5 w-20"></div>
+				</div>
+				<div class="skeleton h-6 w-6 ml-auto self-center"></div>
+			</li>
 		}
-	</div>
-}
-
-// categoriesSkeletonChild mirrors one subcategory row: indented padding,
-// small icon tile, display name, and trailing overflow-menu slot. Width
-// of the name placeholder is narrower than the parent so the skeleton
-// reads as a real hierarchy at a glance.
-templ categoriesSkeletonChild() {
-	<div class="flex items-center gap-3 sm:gap-4 pl-10 sm:pl-14 pr-4 sm:pr-5 py-2.5">
-		<!-- Small icon tile -->
-		<div class="skeleton w-7 h-7 sm:w-8 sm:h-8 rounded-lg shrink-0"></div>
-		<div class="flex items-center gap-2 min-w-0 flex-1">
-			<!-- Subcategory name (narrower than parent) -->
-			<div class="skeleton h-3 w-28 sm:w-36"></div>
-		</div>
-		<!-- Overflow menu -->
-		<div class="skeleton h-6 w-6 rounded shrink-0"></div>
-	</div>
+	</ul>
 }

@@ -160,6 +160,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionCards() },
 		},
 		{
+			Slug:        "collapsible-section",
+			Title:       "Collapsible section",
+			Description: "components.CollapsibleSection — a quiet disclosure (lucide glyph + label + optional right-slot indicator) toggling its body with a rotating chevron. Alpine `{ open }` state so default-open is data-driven; the body uses x-show (kept in the DOM) so form inputs inside a collapsed section still submit. Backs the /transactions filter drawer's When/Where/What/Tags/Search sections — open when they hold an active filter, collapsed with a count/dot indicator otherwise.",
+			Group:       "layout",
+			Render:      func() templ.Component { return SectionCollapsibleSection() },
+		},
+		{
 			Slug:        "empty-states",
 			Title:       "Empty states",
 			Description: "Standard no-data and no-results patterns. Use components.EmptyState.",
@@ -285,6 +292,13 @@ func DesignSections() []DesignSection {
 			Render:      func() templ.Component { return SectionRecurringChips() },
 		},
 		{
+			Slug:        "recurring-ledger",
+			Title:       "Recurring ledger",
+			Description: "The /recurring charge ledger after its table → grouped-list-row migration: rows grouped by status (Active → Paused → Ended) under quiet label lines, a single-currency monthly subtotal on the Active header, a leading status tile (success/warning/muted), name + type/renewal/price chips, a cadence·next-renewal body line, the amount, and an overflow menu (View · Pause/Resume · Cancel). Same list-row shape as /accounts and /rules.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionRecurringLedger() },
+		},
+		{
 			Slug:        "recurring-detail",
 			Title:       "Recurring detail panels",
 			Description: "Detection-forward panels for the recurring-series detail page: SeriesDetectionPanel (match-strength badge + plain-language summary + match-window range viz, with a no-amount variant), the standalone SeriesMatchWindow amount-axis viz, SeriesEvidenceTimeline (charge timeline with matched/prior/projected markers + price-change inset, read-only and unlinkable variants), and SeriesFactStrip (read-only derived facts). Money values carry data-private so privacy mode obfuscates them. The handler assembles the values; these are pure presentation.",
@@ -353,6 +367,13 @@ func DesignSections() []DesignSection {
 			Description: "components.ReportsTable + ReportTableRow + ReportPriorityBadge — the agent-reports index (/reports). A clean daisy table: Agent (name + time, primary dot for unread), Status (soft priority badge or em-dash), Summary (the title), and a trailing mark-read action. The whole row links to the report; the body lives on the detail page. The priority chip is reused on the report detail header.",
 			Group:       "data",
 			Render:      func() templ.Component { return SectionReportsTable() },
+		},
+		{
+			Slug:        "rules-list",
+			Title:       "Rules index",
+			Description: "The /rules surface as grouped list-rows (table retired). Rules group by pipeline stage (baseline → override) via GroupRulesByStage, each stage a quiet label line over an AgentRunRowList card. The leading control is the enabled toggle (enabled/disabled IS the status — no separate tile); disabled rows dim. Name (title) + System/Expired badges + agent avatar, the action summary as the one body line, hits + last-hit as right metadata, and an OverflowMenu outside the row link.",
+			Group:       "data",
+			Render:      func() templ.Component { return SectionRulesList() },
 		},
 		{
 			Slug:        "agent-run-chat",

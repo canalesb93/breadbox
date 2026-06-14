@@ -302,7 +302,7 @@ templ seriesFieldLabel(label string) {
 
 // seriesDetailBadges is the EntityHeader badge row: status + type + (candidate) confidence.
 templ seriesDetailBadges(s SubscriptionRow) {
-	<span class={ "badge badge-soft badge-sm", "badge-" + s.StatusTone }>{ s.StatusLabel }</span>
+	<span class={ seriesStatusBadgeClass(s.StatusTone) }>{ s.StatusLabel }</span>
 	@components.SeriesTypeChip(s.TypeLabel, "sm")
 	if s.Status == "candidate" {
 		@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
@@ -405,6 +405,17 @@ func seriesTypeIcon(t string) string {
 	default:
 		return "repeat"
 	}
+}
+
+// seriesStatusBadgeClass renders the header status chip. The neutral tone
+// (cancelled / unknown) maps to badge-ghost rather than badge-soft
+// badge-neutral — a soft neutral badge reads as invisible gray-on-gray on
+// the dark theme (per the vivid-only badge rule). Vivid tones stay soft.
+func seriesStatusBadgeClass(tone string) string {
+	if tone == "neutral" || tone == "" {
+		return "badge badge-ghost badge-sm"
+	}
+	return "badge badge-soft badge-sm badge-" + tone
 }
 
 func seriesStatusIconTone(status string) components.IconTone {

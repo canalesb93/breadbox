@@ -11,6 +11,16 @@ import (
 // via TemplateRenderer.RenderWithTempl — tags are purely configuration,
 // no per-tag analytics beyond a usage count linking to the filtered
 // transactions view.
+//
+// IA (Workflows-DNA surface language): tags are list-rows grouped by the
+// one axis that matters for "coordinating work on transactions" — whether
+// the tag is attached to anything. The In-use bucket leads (busiest tags
+// first); the Unused bucket sinks last. Each group is a quiet label line
+// over a card of list-rows. A row leads with the tag's own color/icon tile
+// (the shared bb-tx-avatar data-color mechanism, color sourced from the
+// tag), names the tag as the title (+ slug muted when it differs), carries
+// one body line (usage count · description), and ends with an OverflowMenu
+// rendered OUTSIDE the row link. The whole row links to the tag edit page.
 templ Tags(p TagsProps) {
 	<!-- Component factory. Loaded synchronously (no defer) so the
 	     Alpine.data() registration runs before Alpine — itself deferred from
@@ -28,15 +38,10 @@ templ Tags(p TagsProps) {
 			XModel:      "filter",
 		})
 		if len(p.Tags) > 0 {
-			<div class="text-xs text-base-content/40 px-1">
-				{ fmt.Sprintf("%d tags", len(p.Tags)) }
-			</div>
-			<div class="bb-card overflow-hidden">
-				<div class="divide-y divide-base-300/40">
-					for _, t := range p.Tags {
-						@tagListRow(t)
-					}
-				</div>
+			<div class="flex flex-col gap-5">
+				for _, g := range BuildTagGroups(p.Tags) {
+					@tagGroup(g)
+				}
 			</div>
 		} else {
 			@tagsEmpty()
@@ -50,73 +55,120 @@ templ Tags(p TagsProps) {
 	</div>
 }
 
-// tagListRow renders one tag as a horizontal row: chip preview (natural
-// width), slug + optional description, usage count, then an
-// actions slot. No fixed column widths — the chip sizes to its content so
-// longer names like "Needs Enrichment" don't get truncated the way they
-// did in the old w-32 column.
-templ tagListRow(t TagRow) {
+// tagGroup renders one bucket: a quiet label line (name · count) above the
+// tag list-rows in their own card. The wrapper carries the combined search
+// index so the Alpine filter hides the whole group — label included — when
+// no member row matches.
+templ tagGroup(g TagGroup) {
 	<div
+		data-search={ g.Search }
+		x-show="!filter || ($el.dataset.search || '').includes(filter.toLowerCase())"
+		class="flex flex-col gap-2"
+	>
+		<div class="flex items-center gap-2 px-1 min-w-0">
+			<span class="text-sm font-medium text-base-content shrink-0">{ g.Label }</span>
+			<span class="text-xs text-base-content/40 shrink-0">{ g.CountLabel }</span>
+		</div>
+		@components.AgentRunRowList() {
+			for _, t := range g.Rows {
+				@tagListRow(t)
+			}
+		}
+	</div>
+}
+
+// tagListRow renders one tag as a daisy list-row: a leading color/icon tile
+// (the tag's identity), the display name as title with the slug muted when
+// it differs, a single body line (usage count · description), and a trailing
+// overflow menu rendered outside the row's navigation anchor so the kebab
+// isn't swallowed by the row link. The whole row links to the tag edit page.
+templ tagListRow(t TagRow) {
+	<li
+		class="list-row transition-colors hover:bg-base-200/40 items-center"
 		data-search={ tagSearchIndex(t) }
 		x-show="!filter || ($el.dataset.search || '').includes(filter.toLowerCase())"
-		class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3"
 	>
-		<!-- Chip preview — natural width, capped so it can't monopolize the row -->
-		<div class="shrink-0 min-w-0 max-w-[10rem] sm:max-w-[14rem]">
-			@components.TagChip(components.TagChipData{
-				Slug:        t.Slug,
-				DisplayName: t.DisplayName,
-				Color:       t.Color,
-				Icon:        t.Icon,
-			})
-		</div>
-		<!-- Slug + optional description -->
-		<div class="flex-1 min-w-0">
-			<code class="font-mono text-xs text-base-content/60 bg-base-200/50 px-1.5 py-0.5 rounded">{ t.Slug }</code>
-			if t.Description != "" {
-				<p data-user-content class="text-xs text-base-content/50 mt-1 line-clamp-1">{ t.Description }</p>
-			}
-		</div>
-		<!-- Transaction count (always visible; desktop gets the "txns" label) -->
-		<div class="shrink-0 text-right tabular-nums">
-			if t.TransactionCount > 0 {
-				<a
-					href={ templ.SafeURL(fmt.Sprintf("/transactions?tags=%s", t.Slug)) }
-					class="inline-flex items-baseline gap-1 text-xs text-base-content/70 hover:text-base-content"
-					title="View transactions"
-				>
-					<span class="font-medium">{ strconv.FormatInt(t.TransactionCount, 10) }</span>
-					<span class="text-base-content/40 hidden sm:inline">{ tagCountLabel(t.TransactionCount) }</span>
-				</a>
-			} else {
-				<span class="text-xs text-base-content/25">&mdash;</span>
-			}
-		</div>
-		<!-- Actions — single always-visible kebab menu so edit/delete are
-		     reachable on every viewport (mouse, touch, keyboard). Matches
-		     the pattern used on /rules and /agents row menus. -->
-		<div class="shrink-0 flex items-center">
+		<a
+			class="contents no-underline focus:outline-none"
+			href={ templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)) }
+		>
+			@tagColorTile(t)
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="truncate text-sm font-medium text-base-content">{ t.DisplayName }</span>
+					if tagShowSlug(t) {
+						<code class="font-mono text-xs text-base-content/45 shrink-0">{ t.Slug }</code>
+					}
+					if t.Lifecycle == "ephemeral" {
+						<span class="badge badge-ghost badge-xs shrink-0" title="Ephemeral: a temporary work tag, not a durable label">Ephemeral</span>
+					}
+				</div>
+				<div class="mt-0.5 text-xs text-base-content/45 truncate">
+					<span>{ tagUsagePhrase(t.TransactionCount) }</span>
+					if t.Description != "" {
+						<span class="text-base-content/30"> &middot; </span>
+						<span data-user-content>{ t.Description }</span>
+					}
+				</div>
+			</div>
+		</a>
+		<div class="shrink-0 self-center">
 			@components.OverflowMenu(components.OverflowMenuProps{
 				AriaLabel: fmt.Sprintf("Tag %s actions", t.Slug),
-				Size:      "xs",
-				Items: []components.OverflowMenuItem{
-					{
-						Label:     "Edit",
-						Icon:      "pencil",
-						Href:      templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)),
-						AriaLabel: fmt.Sprintf("Edit tag %s", t.Slug),
-					},
-					{
-						Label:       "Delete",
-						Icon:        "trash-2",
-						OnClick:     fmt.Sprintf("deleteTag('%s', '%s', '%s')", jsEscape(t.ID), jsEscape(t.Slug), strconv.FormatInt(t.TransactionCount, 10)),
-						Destructive: true,
-						AriaLabel:   fmt.Sprintf("Delete tag %s", t.Slug),
-					},
-				},
+				Size:      "sm",
+				Items:     tagRowItems(t),
 			})
 		</div>
-	</div>
+	</li>
+}
+
+// tagColorTile renders the leading identity tile using the tag's own color +
+// icon via the shared bb-tx-avatar data-color mechanism (`--avatar-color`
+// drives the color-mix background + glyph tint). Colorless/iconless tags fall
+// back to the neutral `bb-tx-avatar--uncategorized` tile with a tag glyph —
+// the same shape /categories uses, so the two config-taxonomy pages read
+// identically.
+templ tagColorTile(t TagRow) {
+	if t.Color != nil || t.Icon != nil {
+		<div class="bb-tx-avatar" style={ tagTileColorStyle(t.Color) }>
+			@components.LucideIcon(tagTileIcon(t), "w-4 h-4")
+		</div>
+	} else {
+		<div class="bb-tx-avatar bb-tx-avatar--uncategorized">
+			@components.LucideIcon("tag", "w-4 h-4")
+		</div>
+	}
+}
+
+// tagRowItems builds the trailing overflow-menu items for one tag row: Edit,
+// an optional "View transactions" deep-link (only when the tag is attached to
+// anything — preserves the filtered-transactions affordance the old count
+// link carried, now that the row itself navigates to edit), and Delete.
+func tagRowItems(t TagRow) []components.OverflowMenuItem {
+	items := []components.OverflowMenuItem{
+		{
+			Label:     "Edit",
+			Icon:      "pencil",
+			Href:      templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)),
+			AriaLabel: fmt.Sprintf("Edit tag %s", t.Slug),
+		},
+	}
+	if t.TransactionCount > 0 {
+		items = append(items, components.OverflowMenuItem{
+			Label:     "View transactions",
+			Icon:      "receipt",
+			Href:      templ.SafeURL(fmt.Sprintf("/transactions?tags=%s", t.Slug)),
+			AriaLabel: fmt.Sprintf("View transactions tagged %s", t.Slug),
+		})
+	}
+	items = append(items, components.OverflowMenuItem{
+		Label:       "Delete",
+		Icon:        "trash-2",
+		OnClick:     fmt.Sprintf("deleteTag('%s', '%s', '%s')", jsEscape(t.ID), jsEscape(t.Slug), strconv.FormatInt(t.TransactionCount, 10)),
+		Destructive: true,
+		AriaLabel:   fmt.Sprintf("Delete tag %s", t.Slug),
+	})
+	return items
 }
 
 templ tagsEmpty() {

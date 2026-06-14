@@ -1,26 +1,34 @@
 package components
 
-// StatTile is the canonical 4-up dashboard metric tile: a tinted icon
-// square on the left, big tabular-nums value + small label on the right,
-// optional secondary description line. Replaces the hand-rolled
-// `bb-card p-4 + flex items-center gap-3 + w-9 h-9 rounded-lg bg-{tone}/10`
-// block currently duplicated across rule_detail / logs / feed /
-// connection_detail / getting_started (see audit #17).
+// StatTile is the canonical dashboard metric tile, in the Mintlify-clean
+// style: a plain hairline-bordered box, airy padding, a small muted label
+// on top, a big plain number below (default ink — never a tone color),
+// and an optional tiny delta line + secondary description under it.
 //
-// Custom shell rather than daisy `stat` — daisy enforces value-below-label
-// typography and `place-self: end` for `stat-figure`, both of which
-// fight the icon-tile-on-left shape we already ship. See the agent
-// rationale in PR description.
+// This is deliberately RESTRAINED — no icon tile, no tone fill, no tint,
+// no left-accent. The number speaks; status is quiet. See the
+// "House style — restraint over decoration (Mintlify-clean)" section of
+// the design-system skill and the "Stat cards" note in
+// docs/components.md.
+//
+// The Icon and Tone props are kept for caller source-compatibility but are
+// intentional NO-OPS in the rendering — the clean tile shows neither. New
+// callers should leave them unset.
 //
 // Props:
-//   - Icon:        Lucide name. Optional — omit for label-only tiles.
-//   - Label:       required. Rendered as small uppercase metadata.
-//   - Value:       required. Caller formats (CommaInt, fmt.Sprintf, etc).
-//   - Description: optional secondary line below the value.
-//   - Tone:        "neutral" (default), "primary", "success", "warning",
-//                  "error", "info". Drives icon-tile bg + icon color only.
+//   - Label:       required. Small muted label, rendered on top.
+//   - Value:       required. The big plain number. Caller formats it
+//                  (CommaInt, fmt.Sprintf, money helpers, …).
+//   - Description: optional secondary muted line under the value.
+//   - Delta:       optional tiny delta line (e.g. "45.7% vs previous"),
+//                  rendered with a small directional arrow under the value.
+//   - DeltaDir:    "up" (success-ish) / "down" (error-ish) /
+//                  "neutral" (muted, default). Drives the delta arrow +
+//                  color. Only meaningful when Delta is set.
 //   - Href:        optional. When set, the tile becomes an <a> with
-//                  bb-card--interactive hover.
+//                  bb-card--interactive hover + a keyboard focus-visible
+//                  primary ring (principle #8 — interaction states).
+//   - Icon / Tone: NO-OPS. Retained for caller compatibility only.
 
 type StatTileTone string
 
@@ -33,13 +41,28 @@ const (
 	StatToneInfo    StatTileTone = "info"
 )
 
+// StatTileDeltaDir drives the optional delta line's arrow + semantic color.
+type StatTileDeltaDir string
+
+const (
+	StatDeltaUp      StatTileDeltaDir = "up"      // success-ish
+	StatDeltaDown    StatTileDeltaDir = "down"    // error-ish
+	StatDeltaNeutral StatTileDeltaDir = "neutral" // muted (default)
+)
+
 type StatTileProps struct {
+	// Icon and Tone are retained for caller compatibility but are no-ops
+	// in the Mintlify-clean rendering (no icon tile, no tone fill).
 	Icon        string
+	Tone        StatTileTone
 	Label       string
 	Value       string
 	Description string
-	Tone        StatTileTone
-	Href        templ.SafeURL // optional; if set, tile becomes a link
+	// Delta / DeltaDir render an optional tiny "↓ 45.7% vs previous"-style
+	// line under the value. Leave Delta empty to render nothing.
+	Delta    string
+	DeltaDir StatTileDeltaDir
+	Href     templ.SafeURL // optional; if set, tile becomes a link
 	// ValuePrivateKind / DescriptionPrivateKind opt the tile into the
 	// client-side privacy mode: when non-empty, the value / description is
 	// marked with `data-private="<kind>"` (typically "amount" for money
@@ -49,76 +72,63 @@ type StatTileProps struct {
 	DescriptionPrivateKind string
 }
 
-func statTileBg(t StatTileTone) string {
-	switch t {
-	case StatTonePrimary:
-		return "bg-primary/10"
-	case StatToneSuccess:
-		return "bg-success/10"
-	case StatToneWarning:
-		return "bg-warning/10"
-	case StatToneError:
-		return "bg-error/10"
-	case StatToneInfo:
-		return "bg-info/10"
+func statTileDeltaIcon(d StatTileDeltaDir) string {
+	switch d {
+	case StatDeltaUp:
+		return "arrow-up"
+	case StatDeltaDown:
+		return "arrow-down"
 	default:
-		return "bg-base-200/60"
+		return "minus"
 	}
 }
 
-func statTileIcon(t StatTileTone) string {
-	switch t {
-	case StatTonePrimary:
-		return "text-primary"
-	case StatToneSuccess:
+func statTileDeltaColor(d StatTileDeltaDir) string {
+	switch d {
+	case StatDeltaUp:
 		return "text-success"
-	case StatToneWarning:
-		return "text-warning"
-	case StatToneError:
+	case StatDeltaDown:
 		return "text-error"
-	case StatToneInfo:
-		return "text-info"
 	default:
-		return "text-base-content opacity-40"
+		return "text-base-content/40"
 	}
 }
 
 templ StatTile(p StatTileProps) {
 	if p.Href != "" {
-		<a href={ p.Href } class="bb-card bb-card--interactive p-4 no-underline block">
+		<a href={ p.Href } class="bb-card bb-card--interactive p-5 no-underline block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
 			@statTileBody(p)
 		</a>
 	} else {
-		<div class="bb-card p-4">
+		<div class="bb-card p-5">
 			@statTileBody(p)
 		</div>
 	}
 }
 
 templ statTileBody(p StatTileProps) {
-	<div class="flex items-center gap-2.5 sm:gap-3">
-		if p.Icon != "" {
-			<div class={ "w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0", statTileBg(p.Tone) }>
-				@LucideIcon(p.Icon, "w-4 h-4 "+statTileIcon(p.Tone))
+	<div class="min-w-0">
+		<div class="text-xs font-medium text-base-content/50 truncate">{ p.Label }</div>
+		<div
+			class="text-2xl sm:text-3xl font-semibold tabular-nums text-base-content leading-tight mt-1.5 truncate"
+			if p.ValuePrivateKind != "" {
+				data-private={ p.ValuePrivateKind }
+			}
+		>{ p.Value }</div>
+		if p.Delta != "" {
+			<div class={ "flex items-center gap-1 text-xs mt-1.5", statTileDeltaColor(p.DeltaDir) }>
+				@LucideIcon(statTileDeltaIcon(p.DeltaDir), "w-3 h-3 shrink-0")
+				<span class="truncate">{ p.Delta }</span>
 			</div>
 		}
-		<div class="min-w-0 flex-1">
+		if p.Description != "" {
 			<div
-				class="text-xl sm:text-2xl font-semibold tabular-nums leading-none truncate"
-				if p.ValuePrivateKind != "" {
-					data-private={ p.ValuePrivateKind }
+				class="text-xs text-base-content/45 mt-1 truncate"
+				if p.DescriptionPrivateKind != "" {
+					data-private={ p.DescriptionPrivateKind }
 				}
-			>{ p.Value }</div>
-			<div class="text-[0.65rem] sm:text-xs text-base-content/40 mt-1 uppercase tracking-wider truncate">{ p.Label }</div>
-			if p.Description != "" {
-				<div
-					class="text-[0.65rem] text-base-content/45 mt-0.5 truncate"
-					if p.DescriptionPrivateKind != "" {
-						data-private={ p.DescriptionPrivateKind }
-					}
-				>{ p.Description }</div>
-			}
-		</div>
+			>{ p.Description }</div>
+		}
 	</div>
 }
 

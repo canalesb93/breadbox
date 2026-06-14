@@ -16,14 +16,19 @@ func connectionsCountLabel(n int) string {
 	return fmt.Sprintf("%d banks", n)
 }
 
-// connectionsSubtitle is the count line that sits in the PageHeader
-// subtitle slot. Empty when there are no connections so the subtitle
-// row collapses.
+// connectionsSubtitle is the quiet at-a-glance line in the PageHeader
+// subtitle slot: "N banks", with "· M need attention" appended in the same
+// muted ink when any connection wants action. Plain text — never a hero or
+// summary card. Empty when there are no connections so the row collapses.
 func connectionsSubtitle(p ConnectionsProps) string {
 	if len(p.Connections) == 0 {
 		return ""
 	}
-	return connectionsCountLabel(len(p.Connections))
+	base := connectionsCountLabel(len(p.Connections))
+	if att := connectionsNeedsAttentionCount(p.Connections); att > 0 {
+		return fmt.Sprintf("%s · %d need attention", base, att)
+	}
+	return base
 }
 
 // connectionsAccountSuffix renders the trailing "account"/"accounts"
@@ -41,13 +46,6 @@ func connectionsAccountSuffix(n int64, compact bool) string {
 		return "account"
 	}
 	return "accounts"
-}
-
-// connectionsHumanize replaces underscores with spaces so subtype slugs like
-// "credit_card" render as "credit card". Mirrors the funcMap "humanize"
-// helper in admin/templates.go.
-func connectionsHumanize(s string) string {
-	return strings.ReplaceAll(s, "_", " ")
 }
 
 // connectionsLinkActionURL builds a templ.SafeURL for the account-link form

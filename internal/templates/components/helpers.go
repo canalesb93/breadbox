@@ -236,6 +236,12 @@ func StatusBadge(status string) string {
 // pages via @templ.Raw so every sync-status pill on the dashboard, logs,
 // and detail pages stays aligned. Unknown statuses render the raw value
 // inside a ghost badge with HTML-escaping.
+//
+// Terminal statuses (success / error / unknown) render as a soft daisy
+// badge. The live `in_progress` state is deliberately NOT a badge — badges
+// are terminal/categorical only (design-system principle #2,
+// feedback_no_badge_for_loading) — so it renders as an inline spinner +
+// muted text that reads as "still running" rather than a finished state.
 func SyncBadge(status string) string {
 	switch status {
 	case "success":
@@ -243,7 +249,7 @@ func SyncBadge(status string) string {
 	case "error":
 		return `<span class="badge badge-soft badge-error badge-sm">error</span>`
 	case "in_progress":
-		return `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`
+		return `<span class="inline-flex items-center gap-1.5 text-sm text-base-content/60"><span class="loading loading-spinner loading-xs"></span>In progress</span>`
 	default:
 		return `<span class="badge badge-ghost badge-sm">` + html.EscapeString(status) + `</span>`
 	}
