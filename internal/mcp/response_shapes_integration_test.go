@@ -562,6 +562,31 @@ func TestListTransactionRulesLeanDefault(t *testing.T) {
 	requireKeys(t, "list_transaction_rules(all).rules[0]", ruleAll, "id", "name", "conditions", "actions", "created_at")
 }
 
+// TestQueryTransactionRulesShape pins that query_transaction_rules shares the
+// lean-by-default projection and accepts the richer filter/sort knobs.
+func TestQueryTransactionRulesShape(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Default (no fields) → summary projection, same as the list mirror.
+	res, _, err := f.svc.handleQueryTransactionRules(f.ctx, nil, queryTransactionRulesInput{})
+	out := decodeToolResult[map[string]any](t, "query_transaction_rules", res, err)
+	requireKeys(t, "query_transaction_rules", out, "rules")
+	rules := asArray(t, "query_transaction_rules.rules", out["rules"])
+	if len(rules) == 0 {
+		t.Fatal("expected at least the seeded rule")
+	}
+	rule := asObject(t, "query_transaction_rules.rules[0]", rules[0])
+	requireKeys(t, "query_transaction_rules.rules[0]", rule, "id", "name", "enabled", "priority", "trigger", "hit_count")
+	requireAbsent(t, "query_transaction_rules.rules[0]", rule, "conditions", "actions", "created_at", "short_id")
+
+	// An explicit sort is accepted and suppresses the cursor (single top-N page).
+	resSorted, _, errSorted := f.svc.handleQueryTransactionRules(f.ctx, nil, queryTransactionRulesInput{SortBy: "hit_count"})
+	outSorted := decodeToolResult[map[string]any](t, "query_transaction_rules(sorted)", resSorted, errSorted)
+	if nc, ok := outSorted["next_cursor"].(string); ok && nc != "" {
+		t.Errorf("explicit sort_by must not emit next_cursor, got %q", nc)
+	}
+}
+
 // TestPreviewRuleResponseShape pins `sample_matches` (not `sample`) + sample
 // row fields (transaction_id, not id).
 func TestPreviewRuleResponseShape(t *testing.T) {

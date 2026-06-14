@@ -862,6 +862,30 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		argN++
 	}
 
+	if params.Trigger != nil && *params.Trigger != "" {
+		// Normalize the on_update alias to on_change for filtering, but also
+		// match rows still stored under the legacy value so neither spelling
+		// hides the other.
+		trig := *params.Trigger
+		if trig == "on_change" || trig == "on_update" {
+			whereClauses = append(whereClauses, fmt.Sprintf("tr.trigger IN ($%d, $%d)", argN, argN+1))
+			args = append(args, "on_change", "on_update")
+			argN += 2
+		} else {
+			whereClauses = append(whereClauses, fmt.Sprintf("tr.trigger = $%d", argN))
+			args = append(args, trig)
+			argN++
+		}
+	}
+
+	if params.OnlyUnused {
+		whereClauses = append(whereClauses, "tr.hit_count = 0")
+	} else if params.MinHitCount != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("tr.hit_count >= $%d", argN))
+		args = append(args, *params.MinHitCount)
+		argN++
+	}
+
 	if params.Search != nil && *params.Search != "" {
 		mode := ""
 		if params.SearchMode != nil {
@@ -945,8 +969,13 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		}, nil
 	}
 
-	// Cursor-based pagination (API/MCP)
-	if params.Cursor != "" {
+	// Cursor-based pagination (API/MCP). The cursor key is (created_at, id), so
+	// it is only correct for the default created-at-descending ordering. When
+	// the caller asks for an explicit sort (hit_count, last_hit_at, name,
+	// priority), we return a single top-N page and emit no next_cursor rather
+	// than paginate against a key that doesn't match the ORDER BY.
+	cursorEligible := params.SortBy == ""
+	if cursorEligible && params.Cursor != "" {
 		cursorTime, cursorIDStr, err := decodeTimestampCursor(params.Cursor)
 		if err != nil {
 			return nil, ErrInvalidCursor
@@ -996,7 +1025,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	rules := s.convertRuleRows(ctx, scanned)
 
 	var nextCursor string
-	if hasMore && len(scanned) > 0 {
+	if cursorEligible && hasMore && len(scanned) > 0 {
 		last := scanned[len(scanned)-1]
 		nextCursor = encodeTimestampCursor(last.createdAt.Time.UTC(), formatUUID(last.id))
 	}
@@ -1540,13 +1569,13 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		// Per transaction: fold rules to determine net action intents, mirroring
 		// the sync resolver. Category: last-writer-wins. Tags: net-diff.
 		type txnIntent struct {
-			txnID          pgtype.UUID
-			catID          pgtype.UUID
-			catSlug        string
-			catRule        *compiledRule
-			tagAdds        map[string]*compiledRule // slug → first rule that added it
-			tagRemoves     map[string]*compiledRule
-			matchingRules  []*compiledRule // every rule whose condition matched (for rule_applied)
+			txnID         pgtype.UUID
+			catID         pgtype.UUID
+			catSlug       string
+			catRule       *compiledRule
+			tagAdds       map[string]*compiledRule // slug → first rule that added it
+			tagRemoves    map[string]*compiledRule
+			matchingRules []*compiledRule // every rule whose condition matched (for rule_applied)
 		}
 		var intents []txnIntent
 		rowCount := 0
@@ -1741,8 +1770,8 @@ type RulePreviewMatch struct {
 
 // RulePreviewResult contains the results of a rule preview/dry-run.
 type RulePreviewResult struct {
-	MatchCount   int64              `json:"match_count"`
-	TotalScanned int64              `json:"total_scanned"`
+	MatchCount    int64              `json:"match_count"`
+	TotalScanned  int64              `json:"total_scanned"`
 	SampleMatches []RulePreviewMatch `json:"sample_matches"`
 }
 
@@ -1973,10 +2002,10 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		for rows.Next() {
 			rowCount++
 			var (
-				id           pgtype.UUID
-				tctx         TransactionContext
-				date         pgtype.Date
-				catSlug      string
+				id      pgtype.UUID
+				tctx    TransactionContext
+				date    pgtype.Date
+				catSlug string
 			)
 			if err := rows.Scan(&id, &tctx.Name, &tctx.MerchantName, &tctx.Amount,
 				&tctx.CategoryPrimary, &tctx.CategoryDetailed,
@@ -2045,22 +2074,22 @@ func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]i
 // is populated at response time by looking up the set_category action's slug
 // (no JOINed category columns).
 type ruleRow struct {
-	id             pgtype.UUID
-	shortID        string
-	name           string
-	conditions     []byte // NULL -> nil -> match-all
-	actions        []byte
-	trigger        string
-	priority       int32
-	enabled        bool
-	expiresAt      pgtype.Timestamptz
-	createdByType  string
-	createdByID    pgtype.Text
-	createdByName  string
-	hitCount       int32
-	lastHitAt      pgtype.Timestamptz
-	createdAt      pgtype.Timestamptz
-	updatedAt      pgtype.Timestamptz
+	id            pgtype.UUID
+	shortID       string
+	name          string
+	conditions    []byte // NULL -> nil -> match-all
+	actions       []byte
+	trigger       string
+	priority      int32
+	enabled       bool
+	expiresAt     pgtype.Timestamptz
+	createdByType string
+	createdByID   pgtype.Text
+	createdByName string
+	hitCount      int32
+	lastHitAt     pgtype.Timestamptz
+	createdAt     pgtype.Timestamptz
+	updatedAt     pgtype.Timestamptz
 }
 
 // scanDest returns a slice of pointers for use with rows.Scan.
@@ -2456,12 +2485,12 @@ type RuleApplicationRow struct {
 
 // RuleStats contains aggregate stats about a rule's impact.
 type RuleStats struct {
-	TotalApplications    int64  `json:"total_applications"`
-	UniqueTransactions   int64  `json:"unique_transactions"`
-	FirstAppliedAt       string `json:"first_applied_at,omitempty"`
-	LastAppliedAt        string `json:"last_applied_at,omitempty"`
-	SyncApplications     int64  `json:"sync_applications"`
-	RetroApplications    int64  `json:"retro_applications"`
+	TotalApplications  int64  `json:"total_applications"`
+	UniqueTransactions int64  `json:"unique_transactions"`
+	FirstAppliedAt     string `json:"first_applied_at,omitempty"`
+	LastAppliedAt      string `json:"last_applied_at,omitempty"`
+	SyncApplications   int64  `json:"sync_applications"`
+	RetroApplications  int64  `json:"retro_applications"`
 }
 
 // GetRuleStats returns aggregate stats about a rule's applications, sourced
