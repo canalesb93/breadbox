@@ -43,7 +43,6 @@ func AgentsSettingsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			"query_transactions":            "Transactions",
 			"count_transactions":            "Transactions",
 			"transaction_summary":           "Transactions",
-			"merchant_summary":              "Transactions",
 			"list_categories":               "Categories",
 			"export_categories":             "Categories",
 			"import_categories":             "Categories",

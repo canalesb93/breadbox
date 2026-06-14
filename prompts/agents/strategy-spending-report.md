@@ -15,16 +15,14 @@ Help the family understand where their money went, how spending changed, and whe
 1. Read `breadbox://overview` for context (accounts, users, date range, data freshness).
 2. Use `transaction_summary` with `group_by=category` for the target period (default: last 30 days).
 3. Use `transaction_summary` with `group_by=category_month` to compare against the prior period.
-4. Use `merchant_summary` with `spending_only=true` to identify top merchants.
-5. Use `merchant_summary` with `min_count=2` to surface recurring charges and subscriptions.
-6. Query notable individual transactions if anything stands out (`fields=core,category`).
-7. Check `get_sync_status` — note any stale connections that might make data incomplete.
-8. Submit the report.
+4. Query notable individual transactions if anything stands out (`query_transactions` with `fields=core,category`); scan that sample for merchants that recur or for unusually large charges.
+5. Check `get_sync_status` — note any stale connections that might make data incomplete.
+6. Submit the report.
 
 ## Multi-user families
 
 - Default to a family-wide report unless asked for per-user breakdown
-- For per-user analysis, filter `transaction_summary` and `merchant_summary` by `user_id`
+- For per-user analysis, filter `transaction_summary` by `user_id`
 - Note in the report whether it's family-wide or per-user
 - When reporting family-wide, call out any per-user anomalies worth mentioning
 

@@ -287,14 +287,13 @@ var workflowPresets = []WorkflowPreset{
 		Name:        "Monthly Close",
 		Category:    "Insights & Reports",
 		Icon:        "calendar-check",
-		Description: "A month-end summary of where the money went — by category and top merchants.",
+		Description: "A month-end summary of where the money went — by category and trend.",
 		PromptBlocks: []string{
 			"strategy-spending-report",
-			"merchant-analysis",
 		},
 		ToolScope:        "read_only",
 		ScheduleCron:     "0 8 1 * *", // 1st of the month at 08:00 (canonical "Monthly" — drawer-selectable)
-		EstCostPerRunUSD: 0.07,        // a full month of activity + merchant breakdown
+		EstCostPerRunUSD: 0.07,        // a full month of activity
 	},
 
 	// ── Alerts & Anomalies ──────────────────────────────────────────────────
@@ -310,7 +309,6 @@ var workflowPresets = []WorkflowPreset{
 		Description: "Flags unusually large individual charges relative to your normal spending, right after each sync.",
 		PromptBlocks: []string{
 			"strategy-large-charge-sentinel",
-			"merchant-analysis",
 		},
 		ToolScope:             "read_write", // tags flagged charges for human review
 		TriggerOnSyncComplete: true,

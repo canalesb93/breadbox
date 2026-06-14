@@ -14,7 +14,7 @@ Flag individual transactions whose amount is large enough, relative to the famil
 
 1. Read `breadbox://overview` for baseline context (accounts, users, currency, freshness).
 2. List the largest recent debits: `query_transactions` with `sort_by=amount`, `sort_order=desc` over the lookback window (default: last 7 days). Remember amount sign — positive = money out.
-3. Establish "normal" for context: `transaction_summary` with `group_by=category` gives a per-category baseline; `merchant_summary` surfaces a merchant's typical charge. A $400 grocery run is unusual; a $400 flight is not.
+3. Establish "normal" for context: `transaction_summary` with `group_by=category` gives a per-category baseline; `query_transactions(search="<merchant>")` surfaces a merchant's recent charges so you can judge what's typical. A $400 grocery run is unusual; a $400 flight is not.
 4. For each candidate, decide whether it is genuinely out of pattern:
    - Significantly above the typical charge for that merchant or category, OR
    - A new large charge in a category that is normally small, OR

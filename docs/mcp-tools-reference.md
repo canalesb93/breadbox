@@ -68,19 +68,6 @@ Aggregated spending totals. Default date range: 30 days.
 | `user_id` | string | Filter by user |
 | `category_slug` | string | Filter by category |
 
-### merchant_summary (Read)
-
-Merchant-level statistics. Default date range: 90 days.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `min_count` | int | Minimum transaction count (use 2 for recurring, 3 for subscriptions) |
-| `spending_only` | bool | Exclude credits/refunds |
-| `search` | string | Search merchant names |
-| `exclude_search` | string | Exclude matching merchants |
-
-Plus same date/account/user filters as `transaction_summary`.
-
 ---
 
 ## Account & Status Tools

@@ -13,9 +13,10 @@ Flag transactions or patterns that merit the family's attention. Every flagged i
 ## Steps
 
 1. Read `breadbox://overview` for baseline context.
-2. Compare recent vs historical merchant activity:
-   - `merchant_summary` for last 30 days vs prior 30 days
-   - Look for: new merchants (`first_date` in recent window), unusual totals, unexpected recurring charges
+2. Compare recent vs historical spending:
+   - `transaction_summary` with `group_by=category_month` for the last 30 days vs the prior 30 days
+   - Scan a `query_transactions` sample over the recent window for merchant names absent from the prior window
+   - Look for: categories with unusual jumps, new merchants, unexpected recurring charges
 3. Find large transactions: `query_transactions` with `sort_by=amount`, `sort_order=desc` for the recent period.
 4. Check for duplicates: same amount + same day + same account but different transaction IDs.
 5. If account links exist, verify dedup via `list_transaction_matches` — look for unmatched pairs.
