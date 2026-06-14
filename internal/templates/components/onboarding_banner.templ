@@ -1,89 +1,197 @@
 package components
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
-// OnboardingBannerProps drives the home-feed "Finish setting up" banner — a
-// compact, dismissible progress strip that surfaces incomplete onboarding in
-// context instead of behind a separate page. The handler computes it from the
-// shared onboarding progress and only renders the banner while setup is
-// incomplete and the guide hasn't been dismissed.
+// OnboardingStep is one row of the "Finish setting up" checklist. The banner
+// is self-sufficient — every step links to its own action — so onboarding
+// works without the dedicated Getting Started page.
+type OnboardingStep struct {
+	Title    string
+	Desc     string
+	CTALabel string
+	CTAHref  string
+	Done     bool
+	Active   bool // the first incomplete step — carries the highlighted CTA
+	Optional bool
+}
+
+// OnboardingBannerProps drives the home-feed "Finish setting up" card — a
+// dismissible, collapsible Mintlify-style checklist that surfaces incomplete
+// onboarding in context. The handler computes it from the shared onboarding
+// progress and only renders the card while setup is incomplete and the guide
+// hasn't been dismissed.
 type OnboardingBannerProps struct {
-	// CompletedSteps / TotalSteps drive the segmented progress bar and the
-	// "N of M" count.
 	CompletedSteps int
 	TotalSteps     int
 
-	// NextStepLabel is the short, action-first label for the first incomplete
-	// step (e.g. "Connect your bank"), shown as the headline action.
-	NextStepLabel string
-
-	// TimeRemaining is the rough estimate ("~5 min left"); empty hides it.
+	// TimeRemaining is the rough estimate ("~5 min left"); empty hides the
+	// subtitle's time clause.
 	TimeRemaining string
 
-	// ContinueHref is where the primary CTA points (defaults to
-	// /getting-started when empty).
-	ContinueHref string
+	// Steps is the full checklist (done + pending), rendered in order.
+	Steps []OnboardingStep
 
-	// CSRFToken authorizes the inline dismiss form (POST /getting-started/dismiss).
+	// CSRFToken authorizes the inline dismiss ("Hide") form.
 	CSRFToken string
 }
 
-// OnboardingBanner renders the "Finish setting up" banner. Restrained,
-// Mintlify-clean chrome: a hairline card, a quiet segmented progress bar, the
-// next action as the headline, and a primary "Continue setup" CTA plus a
-// dismiss. No hero tile, no tone fills.
+// OnboardingBanner renders the "Finish setting up" card, modeled on
+// Mintlify's dashboard widget: a circular progress ring, a "N/M complete"
+// badge, and a collapsible step checklist. Two distinct affordances —
+//
+//   - "Hide" permanently dismisses the guide (server-side, POST .../dismiss).
+//   - the whole header toggles the checklist open/closed; the collapse state
+//     persists in localStorage, and hovering the header highlights the
+//     chevron so the entire banner reads as the collapse control.
 templ OnboardingBanner(p OnboardingBannerProps) {
-	<div class="bb-card p-4 mb-6 flex items-center gap-4">
-		<div class="min-w-0 flex-1">
-			<div class="flex items-center gap-2 flex-wrap">
-				<span class="text-sm font-semibold text-base-content">Finish setting up</span>
-				<span class="text-xs text-base-content/45 tabular-nums">
-					{ strconv.Itoa(p.CompletedSteps) } of { strconv.Itoa(p.TotalSteps) }
+	<div
+		class="bb-card mb-6 overflow-hidden"
+		x-data="{ open: localStorage.getItem('bb-onboarding-collapsed') !== '1', toggle() { this.open = !this.open; localStorage.setItem('bb-onboarding-collapsed', this.open ? '0' : '1') } }"
+	>
+		<!-- Header — the whole row is the collapse toggle; group-hover lifts the
+		     chevron so hovering anywhere reads as hovering the control. -->
+		<div
+			@click="toggle()"
+			class="group flex items-center gap-3.5 p-4 cursor-pointer select-none"
+		>
+			@onboardingProgressRing(p.CompletedSteps, p.TotalSteps)
+			<div class="min-w-0 flex-1">
+				<div class="flex items-center gap-2 flex-wrap">
+					<span class="text-sm font-semibold text-base-content">Finish setting up</span>
+					<span class="badge badge-ghost badge-sm tabular-nums">{ strconv.Itoa(p.CompletedSteps) }/{ strconv.Itoa(p.TotalSteps) } complete</span>
+				</div>
+				<div class="text-xs text-base-content/55 mt-0.5">
+					Connect your accounts to get the most out of Breadbox
 					if p.TimeRemaining != "" {
 						{ " · " + p.TimeRemaining }
 					}
-				</span>
-			</div>
-			if p.NextStepLabel != "" {
-				<div class="mt-0.5 text-xs text-base-content/55">
-					Next: <span class="text-base-content/80 font-medium">{ p.NextStepLabel }</span>
 				</div>
-			}
-			<!-- Segmented progress: one filled bar per completed step. -->
-			<div class="mt-2 flex items-center gap-1" aria-hidden="true">
-				for i := 0; i < p.TotalSteps; i++ {
-					<span class={ "h-1 flex-1 rounded-full", onboardingSegmentClass(i < p.CompletedSteps) }></span>
-				}
 			</div>
-		</div>
-		<div class="flex items-center gap-1.5 shrink-0">
-			<a href={ onboardingContinueHref(p.ContinueHref) } class="btn btn-primary btn-sm gap-1.5">
-				Continue setup
-				@LucideIcon("arrow-right", "w-4 h-4")
-			</a>
-			<form method="POST" action="/getting-started/dismiss" class="contents">
+			<form method="POST" action="/getting-started/dismiss" class="contents" @click.stop>
 				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
-				<button type="submit" class="btn btn-ghost btn-sm btn-square" aria-label="Dismiss setup guide" title="Dismiss — re-open from Settings">
-					@LucideIcon("x", "w-4 h-4")
-				</button>
+				<button type="submit" class="btn btn-ghost btn-sm shrink-0" title="Hide — re-open from Settings">Hide</button>
 			</form>
+			<button
+				type="button"
+				@click.stop="toggle()"
+				class="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/40 group-hover:text-base-content/80"
+				:aria-label="open ? 'Collapse setup checklist' : 'Expand setup checklist'"
+				:aria-expanded="open"
+			>
+				<span class="transition-transform duration-200" :class="open ? 'rotate-180' : ''">
+					@LucideIcon("chevron-down", "w-4 h-4")
+				</span>
+			</button>
+		</div>
+		<!-- Checklist — collapses below the header. -->
+		<div x-show="open" x-collapse>
+			<ul class="px-4 pb-2 flex flex-col">
+				for _, s := range p.Steps {
+					@onboardingStepRow(s)
+				}
+			</ul>
 		</div>
 	</div>
 }
 
-// onboardingSegmentClass tints a progress segment: filled segments take the
-// primary ink, the rest a quiet track.
-func onboardingSegmentClass(filled bool) string {
-	if filled {
-		return "bg-primary"
-	}
-	return "bg-base-300"
+// onboardingStepRow renders one checklist row: a status glyph, the step title
+// (struck through + receded when done, emphasized when active), a short
+// description, and the highlighted CTA on the active step only.
+templ onboardingStepRow(s OnboardingStep) {
+	<li class="flex items-start gap-3 py-2.5 border-t border-base-200/70">
+		<span class={ onboardingStepGlyphClass(s) }>
+			@LucideIcon(onboardingStepGlyph(s), "w-[18px] h-[18px]")
+		</span>
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2 flex-wrap">
+				<span class={ onboardingStepTitleClass(s) }>{ s.Title }</span>
+				if s.Optional {
+					<span class="badge badge-ghost badge-xs shrink-0">Optional</span>
+				}
+			</div>
+			if s.Desc != "" {
+				<div class="text-xs text-base-content/45 mt-0.5">{ s.Desc }</div>
+			}
+		</div>
+		if s.Active && s.CTAHref != "" {
+			<a href={ templ.SafeURL(s.CTAHref) } class="btn btn-primary btn-xs gap-1 shrink-0 self-center" @click.stop>
+				{ s.CTALabel }
+				@LucideIcon("arrow-right", "w-3.5 h-3.5")
+			</a>
+		}
+	</li>
 }
 
-// onboardingContinueHref defaults the CTA target to the walkthrough page.
-func onboardingContinueHref(href string) templ.SafeURL {
-	if href == "" {
-		return templ.SafeURL("/getting-started")
+// onboardingProgressRing renders the Mintlify-style circular progress donut:
+// a quiet track ring with a primary arc proportional to completion.
+templ onboardingProgressRing(completed, total int) {
+	<svg class="w-9 h-9 shrink-0 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+		<circle cx="18" cy="18" r="15" fill="none" style="stroke: var(--color-base-200)" stroke-width="3"></circle>
+		<circle
+			cx="18"
+			cy="18"
+			r="15"
+			fill="none"
+			style="stroke: var(--color-primary)"
+			stroke-width="3"
+			stroke-linecap="round"
+			stroke-dasharray={ onboardingRingDash(completed, total) }
+		></circle>
+	</svg>
+}
+
+// onboardingRingDash returns the stroke-dasharray ("arc gap") that fills the
+// ring to the completion fraction. Circumference for r=15 is 2·π·15 ≈ 94.25.
+func onboardingRingDash(completed, total int) string {
+	const circumference = 94.25
+	frac := 0.0
+	if total > 0 {
+		frac = float64(completed) / float64(total)
 	}
-	return templ.SafeURL(href)
+	return fmt.Sprintf("%.2f %.2f", frac*circumference, circumference)
+}
+
+// onboardingStepGlyph picks the status icon: a filled check when done, a
+// target dot for the active step, a hollow circle for pending steps.
+func onboardingStepGlyph(s OnboardingStep) string {
+	switch {
+	case s.Done:
+		return "circle-check"
+	case s.Active:
+		return "circle-dot"
+	default:
+		return "circle"
+	}
+}
+
+// onboardingStepGlyphClass tints the status glyph: done reads success-green
+// (Mintlify's positive check), active draws the primary accent, pending is
+// faint.
+func onboardingStepGlyphClass(s OnboardingStep) string {
+	base := "shrink-0 mt-0.5 "
+	switch {
+	case s.Done:
+		return base + "text-success"
+	case s.Active:
+		return base + "text-primary"
+	default:
+		return base + "text-base-content/25"
+	}
+}
+
+// onboardingStepTitleClass styles the title: done recedes (line-through),
+// active reads strongest, pending is muted.
+func onboardingStepTitleClass(s OnboardingStep) string {
+	base := "text-sm min-w-0 truncate "
+	switch {
+	case s.Done:
+		return base + "text-base-content/40 line-through"
+	case s.Active:
+		return base + "font-medium text-base-content"
+	default:
+		return base + "text-base-content/70"
+	}
 }

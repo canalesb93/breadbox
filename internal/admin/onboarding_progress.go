@@ -123,38 +123,54 @@ func computeOnboardingProgress(ctx context.Context, a *app.App) OnboardingProgre
 	}
 }
 
-// onboardingBannerProps builds the home-feed "Finish setting up" banner from
-// the progress, or returns nil when the banner should not show — setup is
-// complete or the guide was dismissed. Keeping the show/hide decision here
-// means callers just assign the result to FeedProps.Onboarding.
+// onboardingStepDef is the static definition of one onboarding step — its
+// label and the direct action the banner links to. CTA targets mirror the
+// /getting-started walkthrough so the banner stays a faithful, self-sufficient
+// stand-in once that page is retired.
+type onboardingStepDef struct {
+	title    string
+	desc     string
+	ctaLabel string
+	ctaHref  string
+	optional bool
+}
+
+// onboardingStepDefs is the fixed step order (matches OnboardingProgress's
+// 1-based ActiveStep and the per-step done flags resolved below).
+var onboardingStepDefs = []onboardingStepDef{
+	{title: "Configure a bank provider", desc: "Set up Plaid, Teller, or SimpleFIN to link accounts — or import a CSV.", ctaLabel: "Configure", ctaHref: "/settings/providers"},
+	{title: "Add a household member", desc: "Add the people whose accounts you track. Optional unless you share finances.", ctaLabel: "Add member", ctaHref: "/household/new", optional: true},
+	{title: "Connect your bank", desc: "Link a bank account to start syncing accounts and transactions.", ctaLabel: "Connect bank", ctaHref: "/connections/new"},
+	{title: "Run your first sync", desc: "Your first sync runs automatically — check the logs if it doesn't start.", ctaLabel: "View logs", ctaHref: "/logs"},
+	{title: "Set up AI agents", desc: "Create an API key so AI agents can query your finances via MCP.", ctaLabel: "Set up", ctaHref: "/workflows"},
+}
+
+// onboardingBannerProps builds the home-feed "Finish setting up" checklist
+// card from the progress, or returns nil when the banner should not show —
+// setup is complete or the guide was dismissed. Keeping the show/hide decision
+// here means callers just assign the result to FeedProps.Onboarding.
 func onboardingBannerProps(p OnboardingProgress, csrfToken string) *components.OnboardingBannerProps {
 	if p.AllComplete || p.Dismissed {
 		return nil
 	}
+	done := []bool{p.HasProvider, p.HasMember, p.HasConnection, p.HasSync, p.HasAPIKey}
+	steps := make([]components.OnboardingStep, 0, len(onboardingStepDefs))
+	for i, def := range onboardingStepDefs {
+		steps = append(steps, components.OnboardingStep{
+			Title:    def.title,
+			Desc:     def.desc,
+			CTALabel: def.ctaLabel,
+			CTAHref:  def.ctaHref,
+			Done:     done[i],
+			Active:   p.ActiveStep == i+1, // ActiveStep is 1-based
+			Optional: def.optional,
+		})
+	}
 	return &components.OnboardingBannerProps{
 		CompletedSteps: p.CompletedSteps,
 		TotalSteps:     p.TotalSteps,
-		NextStepLabel:  onboardingStepLabel(p.ActiveStep),
 		TimeRemaining:  p.TimeRemaining,
+		Steps:          steps,
 		CSRFToken:      csrfToken,
-	}
-}
-
-// onboardingStepLabel maps a 1-based step index to the short, action-first
-// label the banner shows as "Next: …". Index 0 (all complete) returns "".
-func onboardingStepLabel(step int) string {
-	switch step {
-	case 1:
-		return "Configure a bank provider"
-	case 2:
-		return "Add a household member"
-	case 3:
-		return "Connect your bank"
-	case 4:
-		return "Run your first sync"
-	case 5:
-		return "Set up an automation"
-	default:
-		return ""
 	}
 }
