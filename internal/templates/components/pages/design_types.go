@@ -480,6 +480,13 @@ func DesignSections() []DesignSection {
 
 		// ── Onboarding ──────────────────────────────────────────────
 		{
+			Slug:        "onboarding-banner",
+			Title:       "Onboarding banner",
+			Description: "The home-feed \"Finish setting up\" checklist card — the self-sufficient onboarding surface that replaced the dedicated /getting-started page. Progress ring, N/M badge, collapsible step list with per-step CTAs, and a dismiss control. Use components.OnboardingBanner.",
+			Group:       "onboarding",
+			Render:      func() templ.Component { return SectionOnboardingBanner() },
+		},
+		{
 			Slug:        "onboarding-hero",
 			Title:       "Onboarding hero",
 			Description: "The /getting-started banner: a circular ProgressRing + a headline that warms up by progress toward an all-set celebration, with a time-remaining estimate. Use components.OnboardingHero + components.ProgressRing.",

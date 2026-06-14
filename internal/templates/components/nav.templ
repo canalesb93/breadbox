@@ -50,10 +50,6 @@ type NavProps struct {
 // native tooltip when the rail is collapsed.
 templ Nav(p NavProps) {
 	<nav class="bb-sidebar-nav">
-		if p.ShowGettingStarted {
-			<div class="bb-sidebar-section">Setup</div>
-			@navLink("/getting-started", "compass", "Getting Started", navActive(p.CurrentPage, "getting-started"))
-		}
 		<div class="bb-sidebar-section">Overview</div>
 		@navLink("/", "rss", "Feed", navActive(p.CurrentPage, "feed"))
 		@navLink("/transactions", "receipt", "Transactions", navActive(p.CurrentPage, "transactions"))

@@ -55,9 +55,10 @@ Concretely:
   units once; they were reverted. Don't reintroduce them.)
 - **No left-accent-tinted cards.** Do **not** put a status-tinted vertical
   accent bar / colored left rail on cards, stat tiles, or content blocks. The
-  left-edge highlight is reserved **strictly** for genuine *selection*
-  affordances (the `j/k` keyboard-focused row). Everywhere else: a plain
-  hairline-bordered `bb-card`, no tint.
+  left-edge highlight is reserved **strictly** for the `j/k` keyboard **cursor**
+  (its spine — see "The j/k cursor" below; note that *selection itself* gets a
+  bg wash, not a bar). Everywhere else: a plain hairline-bordered `bb-card`, no
+  tint.
 - **Status is a small icon + a quiet pill** — e.g. a green check with
   "Connected" / "Live" — never a big tinted panel or a wash of color across a
   card. Color is a small accent, not a fill.
@@ -126,6 +127,41 @@ surfaces feel calm.
    re-roll press feedback for `.btn`** — `input.css` already ships the Nova
    `:active` translate; a real daisy button is covered. This rule is app-wide:
    a control with no hover and no focus state is a bug, not a style choice.
+
+---
+
+## The j/k cursor — spine vs. ring, and cursor ≠ selected
+
+Principle #8's keyboard dimension has a specific idiom for the **parked
+`j/k` cursor** — the persistent "you are here" row that `j`/`k` step
+through a list (distinct from momentary tab `:focus-visible`). It takes
+one of two shapes by surface, and on a surface that *also* has
+multi-select it must never blur into a selected row.
+
+**Two treatments, by surface shape:**
+
+- **Full-bleed ledger** (`.bb-tx-row`, e.g. `/transactions`) → a
+  **solid-primary left spine** (`inset 3px 0 0 primary`). Flush rows have
+  a square left edge the bar can sit flush against.
+- **Carded list-rows** (`.list-row`, e.g. `/categories`, `/rules`,
+  `/recurring`) → an **inset ring** that inherits the card radius
+  (`inset 0 0 0 2px primary; border-radius: inherit`). A left bar would
+  poke past the card's rounded corners, so the cursor wraps the row.
+
+**The spine/ring IS the cursor — reserved for it.** On a surface that
+also supports multi-select (only the tx ledger today), three row states
+must stay visually distinct:
+
+- **j/k cursor** = the solid-primary spine; nothing else draws one.
+- **selected** (bulk toggle) = checked checkbox + a `bg-primary/10`
+  wash, **no spine**.
+- **hover** = a quiet **gray** spine (`base-content 18%`), never primary.
+
+So the cursor's spine has to outrank both selected and hover. It's
+written at doubled specificity — `.bb-tx-row.bb-tx-row--focused` (0,2,0)
+— to beat `[data-tx-selected]` and `:hover`, otherwise their box-shadows
+would hide the cursor bar. Reference impl: the `.bb-tx-row` state block
+plus `.list-row.bb-tx-row--focused` in `input.css`.
 
 ---
 
