@@ -3,6 +3,7 @@ package pgconv
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -29,14 +30,21 @@ func ParseUUID(s string) (pgtype.UUID, error) {
 }
 
 // NumericToFloat returns the float64 value of a pgtype.Numeric. Returns
-// (0, false) when the numeric is NULL, NaN, or fails to convert (e.g. overflow).
-// Callers that need to distinguish those cases should use Float64Value directly.
+// (0, false) when the numeric is NULL, NaN, ±Infinity, or fails to convert
+// (e.g. overflow). Callers that need to distinguish those cases should use
+// Float64Value directly.
+//
+// The non-finite guard is load-bearing: pgx's Float64Value reports a NaN or
+// ±Inf numeric as a *valid* float (NaN/±Inf, no error), and Postgres NUMERIC
+// admits 'NaN'/'Infinity' literals. Letting one through would poison a money
+// amount and then fail the whole response at json.Marshal, which rejects
+// non-finite floats. We collapse all of them to (0, false) here instead.
 func NumericToFloat(n pgtype.Numeric) (float64, bool) {
-	if !n.Valid || n.NaN {
+	if !n.Valid || n.NaN || n.InfinityModifier != pgtype.Finite {
 		return 0, false
 	}
 	f, err := n.Float64Value()
-	if err != nil || !f.Valid {
+	if err != nil || !f.Valid || math.IsNaN(f.Float64) || math.IsInf(f.Float64, 0) {
 		return 0, false
 	}
 	return f.Float64, true
