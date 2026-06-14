@@ -25,6 +25,13 @@ package components
 //   - SubtitleHideOnMobile: when true, applies `hidden sm:block` so the
 //               subtitle disappears on small screens (used on dense
 //               list pages where the subtitle is decorative).
+//   - ActionsInline: when true, the title and trailing action(s) stay on
+//               the SAME row on mobile (title left, actions right) instead
+//               of the default behaviour of stacking the actions below the
+//               title. Use this when the trailing action collapses to a
+//               compact icon button on mobile — stacking leaves it orphaned
+//               on its own line. Pages with a wide labelled primary action
+//               (e.g. "Connect Bank") should keep the default stack.
 //
 // Conventions:
 //   - Single back-affordance rule: the breadcrumb above this header is
@@ -50,6 +57,10 @@ type PageHeaderProps struct {
 	Subtitle             string
 	Icon                 string // optional Lucide icon name
 	SubtitleHideOnMobile bool
+	// ActionsInline keeps the trailing action(s) on the title's row on
+	// mobile instead of stacking them below. Best for compact icon-only
+	// actions; leave false for wide labelled primary buttons.
+	ActionsInline bool
 	// Leading is an optional visual rendered immediately left of the
 	// title block (e.g. an identity avatar). Nil keeps the classic
 	// title-only layout.
@@ -67,7 +78,7 @@ type PageHeaderProps struct {
 }
 
 templ PageHeader(p PageHeaderProps) {
-	<div class="bb-page-header">
+	<div class={ "bb-page-header", templ.KV("flex-row items-center", p.ActionsInline) }>
 		if p.Leading != nil {
 			<div class="flex items-center gap-3 min-w-0">
 				@p.Leading
