@@ -150,7 +150,6 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
                             │ provider_category_detailed│
                             │ provider_category_confidence│
                             │ provider_payment_channel│
-                            │ provider_raw (JSONB) │
                             │ pending              │
                             │ deleted_at           │
                             │ created_at           │
@@ -418,11 +417,18 @@ Plaid `account_id` values are globally unique across all items and institutions.
 | `provider_category_detailed` | `TEXT` | Yes | `NULL` | Granular subcategory from the provider (e.g., `FOOD_AND_DRINK_RESTAURANTS`, `TRANSPORTATION_GAS_AND_FUEL` for Plaid). Can be used as a stable identifier. |
 | `provider_category_confidence` | `TEXT` | Yes | `NULL` | Provider's confidence in the category assignment. One of: `VERY_HIGH`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`. |
 | `provider_payment_channel` | `TEXT` | Yes | `NULL` | Channel used to make the payment. One of: `online`, `in store`, `other`. `NULL` if the provider does not provide this field. |
-| `provider_raw` | `JSONB` | Yes | `NULL` | Unmodified provider payload for this transaction. Populated by the Plaid, Teller, and CSV adapters during upsert. Useful for debugging, replaying enrichment, and accessing fields that Breadbox does not yet model as typed columns. Large — do not `SELECT *` it on list endpoints. |
 | `pending` | `BOOLEAN` | No | `FALSE` | Whether the transaction has settled. `TRUE` = pending (not yet cleared). `FALSE` = posted. Pending transactions may change details or be replaced entirely when they post. |
 | `deleted_at` | `TIMESTAMPTZ` | Yes | `NULL` | Soft-delete timestamp. `NULL` means the transaction is active. Set to the current time when Plaid includes this `transaction_id` in the `removed` array of a `/transactions/sync` response. Soft-deleted transactions are excluded from API responses by default but are never hard-deleted. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Timestamp when this row was first inserted into Breadbox. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Timestamp of the last upsert (update from Plaid's `modified` array or first insert). |
+
+> **Raw provider payload moved to a satellite table.** The unmodified provider
+> payload (formerly `transactions.provider_raw JSONB`) now lives in
+> `transaction_provider_payloads` (1:1, keyed by `transaction_id`,
+> `ON DELETE CASCADE`). This keeps the heavy JSONB off the frequently-scanned
+> `transactions` row. It is write-mostly (populated by the Plaid/Teller/CSV
+> adapters during upsert) and retrieved on demand via join for debugging and
+> enrichment replay — never selected on list endpoints.
 
 #### Primary Key
 

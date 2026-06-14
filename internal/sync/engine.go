@@ -643,14 +643,27 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderCategoryConfidence:   pgconv.TextPtrIfNotEmpty(txn.CategoryConfidence),
 		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
-		ProviderRaw:                  txn.Raw,
 		// merchant_key: the normalized recurring-series detection anchor, set at
 		// sync time so going-forward rows are immediately groupable. NULL when no
 		// usable merchant signal (excluded from auto-detection). See merchantkey.go.
 		MerchantKey: pgconv.TextIfNotEmpty(MerchantKey(merchantName, txn.Name)),
 	}
 
-	return q.UpsertTransaction(ctx, params)
+	row, err := q.UpsertTransaction(ctx, params)
+	if err != nil {
+		return db.Transaction{}, err
+	}
+	// Raw provider payload lives in a 1:1 satellite table to keep the hot ledger
+	// lean. Written in the same sync tx, only when a payload is present.
+	if len(txn.Raw) > 0 {
+		if err := q.UpsertTransactionProviderPayload(ctx, db.UpsertTransactionProviderPayloadParams{
+			TransactionID: row.ID,
+			ProviderRaw:   txn.Raw,
+		}); err != nil {
+			return db.Transaction{}, fmt.Errorf("upsert provider payload for %s: %w", txn.ExternalID, err)
+		}
+	}
+	return row, nil
 }
 
 // applyRulesToTransaction evaluates rules against a transaction and applies

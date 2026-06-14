@@ -245,12 +245,20 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 			ProviderPaymentChannel:  pgconv.Text("other"),
 			Pending:                 false,
 			CategoryID:              categoryID,
-			ProviderRaw:             providerRaw,
 		})
 		if err != nil {
 			result.SkippedCount++
 			result.SkipReasons = append(result.SkipReasons, fmt.Sprintf("row %d: database error: %s", rowNum, err.Error()))
 			continue
+		}
+		// Raw CSV row payload lives in the 1:1 satellite table (off the hot ledger).
+		if len(providerRaw) > 0 {
+			if err := s.Queries.UpsertTransactionProviderPayload(ctx, db.UpsertTransactionProviderPayloadParams{
+				TransactionID: txn.ID,
+				ProviderRaw:   providerRaw,
+			}); err != nil {
+				s.Logger.Warn("csv import: failed to store provider payload", "txn", txn.ShortID, "error", err)
+			}
 		}
 
 		// Determine if this was an insert or update by comparing timestamps.

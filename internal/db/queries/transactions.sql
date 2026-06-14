@@ -7,9 +7,9 @@ INSERT INTO transactions (
   amount, iso_currency_code, date, authorized_date,
   datetime, authorized_datetime, provider_name, provider_merchant_name,
   provider_category_primary, provider_category_detailed, provider_category_confidence,
-  provider_payment_channel, pending, category_id, provider_raw, merchant_key
+  provider_payment_channel, pending, category_id, merchant_key
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
 )
 ON CONFLICT (provider_transaction_id) DO UPDATE SET
   account_id = EXCLUDED.account_id,
@@ -28,7 +28,6 @@ ON CONFLICT (provider_transaction_id) DO UPDATE SET
   provider_category_confidence = EXCLUDED.provider_category_confidence,
   provider_payment_channel = EXCLUDED.provider_payment_channel,
   pending = EXCLUDED.pending,
-  provider_raw = COALESCE(EXCLUDED.provider_raw, transactions.provider_raw),
   category_id = CASE
     WHEN transactions.category_override <> 'none' THEN transactions.category_id
     WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
