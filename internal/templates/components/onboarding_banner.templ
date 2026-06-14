@@ -55,7 +55,7 @@ templ OnboardingBanner(p OnboardingBannerProps) {
 		     chevron so hovering anywhere reads as hovering the control. -->
 		<div
 			@click="toggle()"
-			class="group flex items-center gap-3.5 p-4 cursor-pointer select-none"
+			class="group flex items-center gap-3.5 p-4 cursor-pointer select-none transition-colors hover:bg-base-200/40"
 		>
 			@onboardingProgressRing(p.CompletedSteps, p.TotalSteps)
 			<div class="min-w-0 flex-1">
@@ -72,12 +72,12 @@ templ OnboardingBanner(p OnboardingBannerProps) {
 			</div>
 			<form method="POST" action="/getting-started/dismiss" class="contents" @click.stop>
 				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
-				<button type="submit" class="btn btn-ghost btn-sm shrink-0" title="Hide — re-open from Settings">Hide</button>
+				<button type="submit" class="btn btn-secondary btn-sm shrink-0" title="Hide — re-open from Settings">Hide</button>
 			</form>
 			<button
 				type="button"
 				@click.stop="toggle()"
-				class="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/40 group-hover:text-base-content/80"
+				class="btn btn-secondary btn-sm btn-square shrink-0"
 				:aria-label="open ? 'Collapse setup checklist' : 'Expand setup checklist'"
 				:aria-expanded="open"
 			>
