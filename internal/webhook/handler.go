@@ -22,6 +22,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// maxWebhookBodyBytes caps the inbound webhook payload. Provider webhooks
+// (Plaid, Teller) are small JSON documents — a few KB at most — so 1 MiB is a
+// generous ceiling. The endpoint is public and unauthenticated, so an unbounded
+// io.ReadAll would let any caller force the server to buffer (and SHA-256) an
+// arbitrarily large body: a trivial memory-pressure DoS. http.MaxBytesReader
+// bounds the read, matching the cap every other body-reading handler applies.
+const maxWebhookBodyBytes = 1 << 20 // 1 MiB
+
 // NewHandler returns an http.HandlerFunc that processes inbound provider webhooks.
 func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, queries *db.Queries, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +45,8 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 			return
 		}
 
+		// Bound the read: the endpoint is public, so never buffer an unbounded body.
+		r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes)
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			logger.Error("failed to read webhook body", "error", err)
