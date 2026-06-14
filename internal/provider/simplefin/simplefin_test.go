@@ -309,6 +309,22 @@ func TestWindows(t *testing.T) {
 	}
 }
 
+func TestWindowsNonPositiveMaxDays(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	from := now.AddDate(0, 0, -30)
+	// A zero or negative maxDays must not loop forever (zero span never
+	// advances `start`). It collapses to a single window spanning the range.
+	for _, maxDays := range []int{0, -1} {
+		ws := windows(from, now, maxDays)
+		if len(ws) != 1 {
+			t.Fatalf("maxDays=%d: windows = %d, want 1", maxDays, len(ws))
+		}
+		if !ws[0].start.Equal(from) || !ws[0].end.Equal(now) {
+			t.Errorf("maxDays=%d: window = [%v, %v), want [%v, %v)", maxDays, ws[0].start, ws[0].end, from, now)
+		}
+	}
+}
+
 func TestErrorStrings(t *testing.T) {
 	var set accountSet
 	if err := json.Unmarshal([]byte(`{"errors":["plain warning"],"errlist":[{"code":"con.mfa","msg":"MFA needed"}]}`), &set); err != nil {

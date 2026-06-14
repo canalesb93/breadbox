@@ -658,6 +658,14 @@ func TestParseDuration(t *testing.T) {
 		{"0d", true},
 		{"0h", true},
 		{"-0w", true},
+		// Large-but-valid expiries stay accepted (well under the ~292y ceiling).
+		{"3650d", false},  // ~10 years
+		{"36500d", false}, // ~100 years
+		// Overflow guard: numbers that would wrap time.Duration to a negative
+		// value (silently producing a past expires_at) are rejected, not wrapped.
+		{"200000d", true},
+		{"99999999h", true},
+		{"99999w", true},
 	}
 
 	for _, tt := range tests {

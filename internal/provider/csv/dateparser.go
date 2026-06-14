@@ -22,7 +22,15 @@ var dateFormats = []string{
 }
 
 // DetectDateFormat samples the first 20 non-empty values and picks the format
-// that successfully parses at least 90% of them.
+// that parses the most of them, requiring at least 90% coverage. Among formats
+// that meet the threshold, the one with the highest coverage wins; ties are
+// broken by dateFormats priority order (so US MM/DD stays the default for
+// ambiguous data). Preferring the highest-coverage format matters when a stricter
+// format crosses the threshold first but a more permissive sibling parses every
+// row — e.g. a file of mostly zero-padded "01/15/2024" dates with a few unpadded
+// "1/5/2024" rows: "01/02/2006" parses only the padded majority while "1/2/2006"
+// parses all of them. Picking the broader format avoids silently skipping the
+// non-conforming rows at import time.
 func DetectDateFormat(samples []string) (string, error) {
 	// Collect up to 20 non-empty samples.
 	var cleaned []string
@@ -42,6 +50,8 @@ func DetectDateFormat(samples []string) (string, error) {
 		threshold = 1
 	}
 
+	bestFormat := ""
+	bestScore := 0
 	for _, format := range dateFormats {
 		successCount := 0
 		for _, s := range cleaned {
@@ -49,9 +59,14 @@ func DetectDateFormat(samples []string) (string, error) {
 				successCount++
 			}
 		}
-		if successCount >= threshold {
-			return format, nil
+		// Strict > keeps the earliest format on ties, preserving priority order.
+		if successCount >= threshold && successCount > bestScore {
+			bestFormat = format
+			bestScore = successCount
 		}
+	}
+	if bestFormat != "" {
+		return bestFormat, nil
 	}
 
 	return "", fmt.Errorf("could not detect date format — none of the supported formats parsed 90%% of sample values")

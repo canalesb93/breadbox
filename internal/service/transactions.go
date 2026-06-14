@@ -363,6 +363,10 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN++
 	}
 
+	// Sort direction drives both the keyset cursor comparison and the ORDER BY
+	// tiebreak below — they must agree for cursor pagination to be correct.
+	ascending := params.SortOrder != nil && *params.SortOrder == "asc"
+
 	// Offset takes precedence over cursor — random-access pagination for the
 	// admin UI. External REST clients keep using the stable cursor path.
 	if params.Offset == 0 && params.Cursor != "" {
@@ -374,7 +378,17 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		if err != nil {
 			return nil, ErrInvalidCursor
 		}
-		buf.WriteString(" AND (t.date, t.id) < ($")
+		// The keyset comparison must follow the sort direction: descending
+		// pages walk toward older rows (< cursor), ascending pages toward
+		// newer rows (> cursor). A cursor is only ever emitted for the date
+		// sort, so (t.date, t.id) is always the leading sort key here.
+		cmp := "<"
+		if ascending {
+			cmp = ">"
+		}
+		buf.WriteString(" AND (t.date, t.id) ")
+		buf.WriteString(cmp)
+		buf.WriteString(" ($")
 		buf.WriteString(strconv.Itoa(argN))
 		buf.WriteString(", $")
 		buf.WriteString(strconv.Itoa(argN + 1))
@@ -397,15 +411,20 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	sortDir := "DESC"
-	if params.SortOrder != nil && *params.SortOrder == "asc" {
+	tiebreakDir := "DESC"
+	if ascending {
 		sortDir = "ASC"
+		// The id tiebreak must share the primary direction so the (date, id)
+		// keyset cursor comparison above stays consistent with the ordering.
+		tiebreakDir = "ASC"
 	}
 
 	buf.WriteString(" ORDER BY ")
 	buf.WriteString(sortCol)
 	buf.WriteByte(' ')
 	buf.WriteString(sortDir)
-	buf.WriteString(", t.id DESC")
+	buf.WriteString(", t.id ")
+	buf.WriteString(tiebreakDir)
 
 	// Fetch one extra to detect has_more
 	buf.WriteString(" LIMIT $")

@@ -54,6 +54,18 @@ func TestDetectDateFormat(t *testing.T) {
 			want:    "2006-01-02",
 		},
 		{
+			// Mostly zero-padded US dates with a single unpadded row. The strict
+			// "01/02/2006" format crosses the 90% threshold on the padded majority,
+			// but the permissive "1/2/2006" parses every row — it must win so the
+			// unpadded row is not silently skipped at import time.
+			name: "mixed padded/unpadded prefers broader format",
+			samples: []string{
+				"01/15/2024", "02/15/2024", "03/15/2024", "04/15/2024", "05/15/2024",
+				"06/15/2024", "07/15/2024", "08/15/2024", "09/15/2024", "1/5/2024",
+			},
+			want: "1/2/2006",
+		},
+		{
 			name:    "empty samples",
 			samples: []string{},
 			wantErr: true,

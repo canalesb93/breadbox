@@ -2345,16 +2345,27 @@ func parseDuration(s string) (time.Duration, error) {
 		return 0, fmt.Errorf("duration must be positive (got %d)", num)
 	}
 
+	var unitDur time.Duration
 	switch unit {
 	case "h":
-		return time.Duration(num) * time.Hour, nil
+		unitDur = time.Hour
 	case "d":
-		return time.Duration(num) * 24 * time.Hour, nil
+		unitDur = 24 * time.Hour
 	case "w":
-		return time.Duration(num) * 7 * 24 * time.Hour, nil
+		unitDur = 7 * 24 * time.Hour
 	default:
 		return 0, fmt.Errorf("unknown duration unit %q (use h, d, or w)", unit)
 	}
+
+	// Guard against int64 nanosecond overflow: a large-but-Atoi-valid number
+	// (e.g. "200000d") would silently wrap to a negative time.Duration, making
+	// expires_at land in the *past* — the rule would be created already-expired,
+	// the opposite of the long expiry requested. Reject it with a clear error.
+	const maxInt64 = 1<<63 - 1
+	if int64(num) > maxInt64/int64(unitDur) {
+		return 0, fmt.Errorf("duration too large: %s exceeds the maximum supported expiry (~292 years)", s)
+	}
+	return time.Duration(num) * unitDur, nil
 }
 
 // ConditionSummary returns a human-readable summary of a condition tree.

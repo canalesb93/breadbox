@@ -363,13 +363,6 @@ func buildProviderConfigResponse(a *app.App) providerConfigResponse {
 	}
 }
 
-func stringFromPtr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return strings.TrimSpace(*s)
-}
-
 // nilSafeString returns *s without any trimming, or "" when s is nil.
 func nilSafeString(s *string) string {
 	if s == nil {

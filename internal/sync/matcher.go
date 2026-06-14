@@ -259,17 +259,22 @@ func nameSimilarityScore(depName, depMerchant, priName, priMerchant string) (int
 		}
 	}
 
-	// Exact name match.
-	if strings.EqualFold(depName, priName) {
+	// Exact name match. Guard against empty names: EqualFold("", "") is true,
+	// which would manufacture a "name" match out of two missing names.
+	if depName != "" && priName != "" && strings.EqualFold(depName, priName) {
 		return 2, []string{"name"}
 	}
 
-	// Name contains or is contained.
-	depNameLower := strings.ToLower(depName)
-	priNameLower := strings.ToLower(priName)
-	if strings.Contains(depNameLower, priNameLower) ||
-		strings.Contains(priNameLower, depNameLower) {
-		return 1, []string{"name"}
+	// Name contains or is contained. Guard against empty names:
+	// strings.Contains(x, "") is always true, so an empty name on either side
+	// would falsely substring-match every counterpart.
+	if depName != "" && priName != "" {
+		depNameLower := strings.ToLower(depName)
+		priNameLower := strings.ToLower(priName)
+		if strings.Contains(depNameLower, priNameLower) ||
+			strings.Contains(priNameLower, depNameLower) {
+			return 1, []string{"name"}
+		}
 	}
 
 	// No name similarity — still valid (date + amount matched).
@@ -301,17 +306,21 @@ func nameSimilarityScoreLowered(
 		}
 	}
 
-	// Exact name match.
-	if strings.EqualFold(depName, priName) {
+	// Exact name match. Guard against empty names: EqualFold("", "") is true,
+	// which would manufacture a "name" match out of two missing names.
+	if depName != "" && priName != "" && strings.EqualFold(depName, priName) {
 		return 2, []string{"name"}
 	}
 
 	// Name contains or is contained. Reuse the pre-lowered depName and
-	// lower priName on demand.
-	priNameLower := strings.ToLower(priName)
-	if strings.Contains(depNameLower, priNameLower) ||
-		strings.Contains(priNameLower, depNameLower) {
-		return 1, []string{"name"}
+	// lower priName on demand. Guard against empty names: strings.Contains(x, "")
+	// is always true, so an empty name on either side would falsely match.
+	if depName != "" && priName != "" {
+		priNameLower := strings.ToLower(priName)
+		if strings.Contains(depNameLower, priNameLower) ||
+			strings.Contains(priNameLower, depNameLower) {
+			return 1, []string{"name"}
+		}
 	}
 
 	// No name similarity — still valid (date + amount matched).

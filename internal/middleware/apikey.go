@@ -91,8 +91,13 @@ func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 
 func extractBearerToken(r *http.Request) string {
 	auth := r.Header.Get("Authorization")
-	if strings.HasPrefix(auth, "Bearer ") {
-		return strings.TrimPrefix(auth, "Bearer ")
+	// RFC 6750 §2.1 / RFC 7235 §2.1: the auth-scheme is case-insensitive, so
+	// accept "bearer"/"BEARER"/etc. Trim surrounding whitespace from the
+	// credential — token68 never contains spaces, so a stray space is a client
+	// quirk, not part of the token.
+	const prefix = "Bearer "
+	if len(auth) >= len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {
+		return strings.TrimSpace(auth[len(prefix):])
 	}
 	return ""
 }

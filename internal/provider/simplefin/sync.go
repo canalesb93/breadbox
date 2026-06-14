@@ -112,6 +112,13 @@ func windows(from, to time.Time, maxDays int) []window {
 	if !from.Before(to) {
 		return nil
 	}
+	// A non-positive maxDays would make the per-iteration span zero, so `start`
+	// would never advance — an infinite loop that also grows `out` without
+	// bound. Guard by collapsing to a single window covering the whole range;
+	// callers always pass the maxWindowDays const, so this is purely defensive.
+	if maxDays <= 0 {
+		return []window{{start: from, end: to}}
+	}
 	var out []window
 	span := time.Duration(maxDays) * 24 * time.Hour
 	for start := from; start.Before(to); {

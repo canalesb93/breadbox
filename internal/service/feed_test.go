@@ -7,6 +7,50 @@ import (
 	"time"
 )
 
+// TestDecodeRuleHitCounts pins the on-disk shape of the `sync_logs.rule_hits`
+// column. It is written by RuleResolver.HitCountsJSON as a flat
+// {ruleUUID: count} object — NOT an array of {rule_id,count} objects. A prior
+// version of the feed parser unmarshalled into a []struct, which silently
+// failed against the real object payload and suppressed every rule-outcome
+// line on the home feed.
+func TestDecodeRuleHitCounts(t *testing.T) {
+	id1 := "11111111-1111-1111-1111-111111111111"
+	id2 := "22222222-2222-2222-2222-222222222222"
+
+	t.Run("canonical map payload", func(t *testing.T) {
+		got := decodeRuleHitCounts([]byte(`{"` + id1 + `":3,"` + id2 + `":1}`))
+		if len(got) != 2 {
+			t.Fatalf("expected 2 entries, got %d (%v)", len(got), got)
+		}
+		if got[id1] != 3 || got[id2] != 1 {
+			t.Fatalf("unexpected counts: %v", got)
+		}
+	})
+
+	t.Run("empty and blank payloads yield nil", func(t *testing.T) {
+		for _, p := range []string{"", "{}", "[]"} {
+			if got := decodeRuleHitCounts([]byte(p)); got != nil {
+				t.Fatalf("payload %q: expected nil, got %v", p, got)
+			}
+		}
+	})
+
+	t.Run("malformed json yields nil", func(t *testing.T) {
+		if got := decodeRuleHitCounts([]byte(`not json`)); got != nil {
+			t.Fatalf("expected nil for malformed json, got %v", got)
+		}
+	})
+
+	t.Run("legacy array shape is rejected, not parsed", func(t *testing.T) {
+		// The shape the old parser expected. It is never written by the
+		// resolver; decoding it into the map must fail closed (nil) rather
+		// than silently succeed.
+		if got := decodeRuleHitCounts([]byte(`[{"rule_id":"` + id1 + `","count":2}]`)); got != nil {
+			t.Fatalf("expected nil for legacy array shape, got %v", got)
+		}
+	})
+}
+
 // TestFilterFeedEvents covers the chip-driven post-filter applied by
 // `ListFeedEvents` over its grouped output. The pipeline that produces the
 // input slice is integration-tested elsewhere; this unit test pins the

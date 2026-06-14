@@ -322,9 +322,12 @@ func formatCommentSummary(actor, content string) string {
 	if i := strings.IndexAny(preview, "\r\n"); i >= 0 {
 		preview = preview[:i] + "…"
 	}
-	const max = 120
-	if len(preview) > max {
-		preview = preview[:max] + "…"
+	// Rune-aware truncation: slicing on bytes would split a multibyte
+	// character mid-rune and emit invalid UTF-8 into the timeline summary
+	// (mirrors truncateNotifyBody's rune-safe budget).
+	const maxRunes = 120
+	if r := []rune(preview); len(r) > maxRunes {
+		preview = string(r[:maxRunes]) + "…"
 	}
 	switch {
 	case actor == "" && preview == "":

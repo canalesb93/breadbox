@@ -743,6 +743,56 @@ func TestListTransactions_SortDateAsc(t *testing.T) {
 	}
 }
 
+// --- ListTransactions: ascending cursor pagination round-trip ---
+
+// Following next_cursor under sort_order=asc must walk forward to newer rows.
+// Regression guard: the keyset comparison previously always used "<" (the
+// descending direction), so an ascending cursor returned rows *before* the
+// page — duplicate/stuck pagination.
+func TestListTransactions_AscendingCursorPagination(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d1", "Day1", 100, "2025-01-10")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d2", "Day2", 100, "2025-01-11")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d3", "Day3", 100, "2025-01-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d4", "Day4", 100, "2025-01-13")
+
+	sortOrder := "asc"
+
+	page1, err := svc.ListTransactions(ctx, service.TransactionListParams{SortOrder: &sortOrder, Limit: 2})
+	if err != nil {
+		t.Fatalf("page1: unexpected error: %v", err)
+	}
+	if len(page1.Transactions) != 2 {
+		t.Fatalf("page1: expected 2 rows, got %d", len(page1.Transactions))
+	}
+	if page1.Transactions[0].ProviderName != "Day1" || page1.Transactions[1].ProviderName != "Day2" {
+		t.Fatalf("page1: expected [Day1 Day2], got [%s %s]",
+			page1.Transactions[0].ProviderName, page1.Transactions[1].ProviderName)
+	}
+	if !page1.HasMore || page1.NextCursor == "" {
+		t.Fatalf("page1: expected HasMore with a cursor, got HasMore=%v cursor=%q", page1.HasMore, page1.NextCursor)
+	}
+
+	page2, err := svc.ListTransactions(ctx, service.TransactionListParams{
+		SortOrder: &sortOrder,
+		Limit:     2,
+		Cursor:    page1.NextCursor,
+	})
+	if err != nil {
+		t.Fatalf("page2: unexpected error: %v", err)
+	}
+	if len(page2.Transactions) != 2 {
+		t.Fatalf("page2: expected 2 rows, got %d", len(page2.Transactions))
+	}
+	if page2.Transactions[0].ProviderName != "Day3" || page2.Transactions[1].ProviderName != "Day4" {
+		t.Fatalf("page2: expected [Day3 Day4] (forward from cursor), got [%s %s]",
+			page2.Transactions[0].ProviderName, page2.Transactions[1].ProviderName)
+	}
+}
+
 // --- ListTransactions: max_amount filter ---
 
 func TestListTransactions_MaxAmountFilter(t *testing.T) {

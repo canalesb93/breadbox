@@ -141,6 +141,31 @@ func TestNumericToFloat_NaN(t *testing.T) {
 	}
 }
 
+func TestNumericToFloat_PositiveInfinity(t *testing.T) {
+	// Postgres NUMERIC admits 'Infinity'; pgx surfaces it as a *valid* +Inf
+	// float (no error), so the conversion must reject it rather than let +Inf
+	// leak into a money amount and later blow up json.Marshal.
+	n := pgtype.Numeric{InfinityModifier: pgtype.Infinity, Valid: true}
+	got, ok := NumericToFloat(n)
+	if ok {
+		t.Errorf("NumericToFloat(+Inf): expected ok=false, got (%v, true)", got)
+	}
+	if got != 0 {
+		t.Errorf("NumericToFloat(+Inf) = %v, want 0", got)
+	}
+}
+
+func TestNumericToFloat_NegativeInfinity(t *testing.T) {
+	n := pgtype.Numeric{InfinityModifier: pgtype.NegativeInfinity, Valid: true}
+	got, ok := NumericToFloat(n)
+	if ok {
+		t.Errorf("NumericToFloat(-Inf): expected ok=false, got (%v, true)", got)
+	}
+	if got != 0 {
+		t.Errorf("NumericToFloat(-Inf) = %v, want 0", got)
+	}
+}
+
 func TestTextPtr_Valid(t *testing.T) {
 	got := TextPtr(pgtype.Text{String: "hello", Valid: true})
 	if got == nil || *got != "hello" {

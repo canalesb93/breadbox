@@ -340,6 +340,42 @@ func TestEvaluateCondition_BoolNeq(t *testing.T) {
 	}
 }
 
+// TestEvaluateCondition_BoolStringValues guards parity with the write-time
+// validator (service.ValidateCondition uses strconv.ParseBool) and the
+// service-side preview evaluator. A rule stored with a string bool value like
+// "1" or "t" passes validation as "true"; the sync resolver must agree, or the
+// rule fires on the opposite set of transactions from what preview promised.
+func TestEvaluateCondition_BoolStringValues(t *testing.T) {
+	truthy := []string{"true", "True", "TRUE", "1", "t", "T"}
+	for _, v := range truthy {
+		cc := mustCompile(t, &Condition{Field: "pending", Op: "eq", Value: v})
+		if !evaluateCondition(cc, TransactionContext{Pending: true}) {
+			t.Errorf("value %q: expected eq to match a pending=true transaction", v)
+		}
+		if evaluateCondition(cc, TransactionContext{Pending: false}) {
+			t.Errorf("value %q: expected eq to fail a pending=false transaction", v)
+		}
+	}
+
+	falsy := []string{"false", "False", "0", "f", "F"}
+	for _, v := range falsy {
+		cc := mustCompile(t, &Condition{Field: "pending", Op: "eq", Value: v})
+		if !evaluateCondition(cc, TransactionContext{Pending: false}) {
+			t.Errorf("value %q: expected eq to match a pending=false transaction", v)
+		}
+		if evaluateCondition(cc, TransactionContext{Pending: true}) {
+			t.Errorf("value %q: expected eq to fail a pending=true transaction", v)
+		}
+	}
+
+	// A non-bool-parseable string is treated as false (no panic, no match
+	// against a true field).
+	cc := mustCompile(t, &Condition{Field: "pending", Op: "eq", Value: "maybe"})
+	if evaluateCondition(cc, TransactionContext{Pending: true}) {
+		t.Error(`value "maybe": expected unparseable bool string to not match pending=true`)
+	}
+}
+
 func TestEvaluateCondition_InSeries(t *testing.T) {
 	cc := mustCompile(t, &Condition{Field: "in_series", Op: "eq", Value: true})
 

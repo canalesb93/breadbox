@@ -3,7 +3,9 @@
 package service
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // EnrichAnnotations is the canonical home of the dedup + summary logic that
@@ -424,6 +426,41 @@ func TestEnrichAnnotations_CommentSummaryTruncatesLongBodies(t *testing.T) {
 	tail := []rune(got.Summary)
 	if len(tail) == 0 || tail[len(tail)-1] != '…' {
 		t.Errorf("Summary should end with ellipsis, got %q", got.Summary)
+	}
+}
+
+// A long multibyte comment body must truncate on a rune boundary, never
+// mid-character — byte slicing at the 120 budget would split a multibyte
+// rune and emit invalid UTF-8 into the timeline summary.
+func TestEnrichAnnotations_CommentSummaryTruncatesMultibyteOnRuneBoundary(t *testing.T) {
+	// One ASCII byte followed by 3-byte runes shifts the rune grid so the
+	// 120-byte budget lands *inside* a rune — a byte slice at [:120] would
+	// split it and corrupt the UTF-8; a rune slice cuts cleanly.
+	body := "a" + strings.Repeat("世", 200)
+	rows := []Annotation{{
+		ID:        "c1",
+		Kind:      "comment",
+		ActorName: "Alice",
+		Payload:   map[string]interface{}{"content": body},
+		CreatedAt: "2026-04-04T12:00:00Z",
+	}}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	got := out[0].Summary
+
+	if !utf8.ValidString(got) {
+		t.Fatalf("Summary is not valid UTF-8 (rune split mid-character): %q", got)
+	}
+	if !strings.HasPrefix(got, "Alice commented: ") {
+		t.Errorf("Summary lost its prefix: %q", got)
+	}
+	if r := []rune(got); r[len(r)-1] != '…' {
+		t.Errorf("Summary should end with ellipsis, got %q", got)
+	}
+	// The preview must be exactly 120 runes of content plus the ellipsis —
+	// proving we truncated on a rune boundary, not a byte one.
+	preview := strings.TrimPrefix(got, "Alice commented: ")
+	if rc := utf8.RuneCountInString(preview); rc != 121 {
+		t.Errorf("preview rune count = %d, want 121 (120 + ellipsis)", rc)
 	}
 }
 

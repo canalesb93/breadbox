@@ -226,6 +226,59 @@ func TestEvaluateGroup_AnalyzeGroupAgreesWithReason(t *testing.T) {
 	}
 }
 
+// --- next-date projection (nextExpectedDate / addMonthsClamped) ---
+
+func TestNextExpectedDate(t *testing.T) {
+	cases := []struct {
+		name     string
+		cadence  string
+		lastSeen string
+		want     string // "" means expect an invalid (NULL) date
+	}{
+		{"weekly", SeriesCadenceWeekly, "2026-01-15", "2026-01-22"},
+		{"biweekly", SeriesCadenceBiweekly, "2026-01-15", "2026-01-29"},
+		{"monthly mid-month", SeriesCadenceMonthly, "2026-01-15", "2026-02-15"},
+		// Jan 31 has no Feb 31 — must clamp to Feb 28, not overflow to Mar 3.
+		{"monthly 31st clamps to Feb", SeriesCadenceMonthly, "2026-01-31", "2026-02-28"},
+		// Leap-year February keeps the 29th.
+		{"monthly 31st clamps to leap Feb", SeriesCadenceMonthly, "2024-01-31", "2024-02-29"},
+		// Jan 30 + 1mo also clamps (Feb has no 30th).
+		{"monthly 30th clamps to Feb", SeriesCadenceMonthly, "2026-01-30", "2026-02-28"},
+		// Quarterly off Nov 30 lands in Feb (no Feb 30) — clamp, don't roll to March.
+		{"quarterly Nov30 clamps to Feb", SeriesCadenceQuarterly, "2025-11-30", "2026-02-28"},
+		{"quarterly clean", SeriesCadenceQuarterly, "2026-01-15", "2026-04-15"},
+		{"semiannual", SeriesCadenceSemiannual, "2026-01-31", "2026-07-31"},
+		{"semiannual Aug31 clamps to Feb", SeriesCadenceSemiannual, "2025-08-31", "2026-02-28"},
+		// Annual off a leap day clamps to Feb 28 the next year.
+		{"annual leap-day clamps", SeriesCadenceAnnual, "2024-02-29", "2025-02-28"},
+		{"annual clean", SeriesCadenceAnnual, "2026-03-15", "2027-03-15"},
+		{"irregular → NULL", SeriesCadenceIrregular, "2026-01-15", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := nextExpectedDate(tc.cadence, mkDate(tc.lastSeen))
+			if tc.want == "" {
+				if got.Valid {
+					t.Errorf("expected NULL date, got %s", got.Time.Format("2006-01-02"))
+				}
+				return
+			}
+			if !got.Valid {
+				t.Fatalf("expected %s, got NULL", tc.want)
+			}
+			if g := got.Time.Format("2006-01-02"); g != tc.want {
+				t.Errorf("nextExpectedDate(%s, %s) = %s, want %s", tc.cadence, tc.lastSeen, g, tc.want)
+			}
+		})
+	}
+}
+
+func TestNextExpectedDate_InvalidLastSeen(t *testing.T) {
+	if got := nextExpectedDate(SeriesCadenceMonthly, pgtype.Date{}); got.Valid {
+		t.Errorf("invalid lastSeen should yield NULL, got %s", got.Time.Format("2006-01-02"))
+	}
+}
+
 // --- recurring type inference (inferSeriesType) ---
 
 func TestInferSeriesType(t *testing.T) {

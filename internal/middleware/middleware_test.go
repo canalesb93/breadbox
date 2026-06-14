@@ -183,8 +183,16 @@ func TestExtractBearerToken(t *testing.T) {
 		{"valid bearer", "Bearer mytoken123", "mytoken123"},
 		{"empty header", "", ""},
 		{"no bearer prefix", "Basic abc123", ""},
-		{"bearer lowercase", "bearer mytoken", ""},
+		// RFC 6750 §2.1 / RFC 7235 §2.1: auth-scheme is case-insensitive.
+		{"bearer lowercase", "bearer mytoken", "mytoken"},
+		{"bearer uppercase", "BEARER mytoken", "mytoken"},
+		{"bearer mixed case", "BeArEr mytoken", "mytoken"},
+		// Internal spaces are preserved; only surrounding whitespace is trimmed.
 		{"bearer with spaces in token", "Bearer tok en", "tok en"},
+		{"token with surrounding whitespace", "Bearer   mytoken  ", "mytoken"},
+		{"scheme only", "Bearer", ""},
+		{"scheme with trailing space only", "Bearer ", ""},
+		{"prefix without separating space", "Bearerish mytoken", ""},
 	}
 
 	for _, tt := range tests {
