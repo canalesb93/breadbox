@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/pgconv"
@@ -940,7 +941,19 @@ func toBool(v interface{}) bool {
 	case bool:
 		return val
 	case string:
-		return strings.EqualFold(val, "true")
+		// Mirror the write-time validator (service.ValidateCondition parses
+		// bool values with strconv.ParseBool) and the service-side preview
+		// evaluator, so a rule that passed validation evaluates the same way
+		// here at sync time. ParseBool accepts "1"/"t"/"T"/"true"/… as true and
+		// "0"/"f"/"F"/"false"/… as false; the previous EqualFold(val,"true")
+		// check silently treated validator-accepted forms like "1" and "t" as
+		// false, making such a rule fire on the opposite set of transactions
+		// from what preview promised.
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return false
+		}
+		return b
 	case float64:
 		return val != 0
 	default:
