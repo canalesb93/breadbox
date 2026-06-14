@@ -93,6 +93,23 @@ function configureRuntimeEnv(spec: JobSpec): void {
   // when set; we set both so the cli.js init path can pick whichever
   // it consults first.
   process.env.CLAUDE_CONFIG_DIR = scratch;
+
+  // Analysis tooling: the SDK's Bash tool aborts with "No suitable shell
+  // found" when SHELL is unset, and its Grep tool spawns a vendored ripgrep
+  // that isn't embedded in our Bun --compile bundle (ENOENT). The Docker
+  // image sets both env vars and installs bash + ripgrep; here we default
+  // them defensively so non-Docker installs (the per-user worktree binary at
+  // ~/.breadbox/agent-bin) also get a working shell + system rg. Only set
+  // when unset so an operator override always wins.
+  if (!process.env.SHELL) {
+    process.env.SHELL = existsSync("/bin/bash") ? "/bin/bash" : "/bin/sh";
+  }
+  // Prefer the system ripgrep (on PATH) over the SDK's bundled copy, which is
+  // absent from the compiled sidecar. Harmless where a system rg is present;
+  // where it isn't, Grep was already broken via the missing vendored binary.
+  if (process.env.USE_BUILTIN_RIPGREP === undefined) {
+    process.env.USE_BUILTIN_RIPGREP = "0";
+  }
 }
 
 async function main() {

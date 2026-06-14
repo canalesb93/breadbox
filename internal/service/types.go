@@ -40,31 +40,31 @@ type TransactionCategoryInfo struct {
 }
 
 type TransactionResponse struct {
-	ID                  string                   `json:"id"`
-	ShortID             string                   `json:"short_id"`
-	AccountID           *string                  `json:"account_id"`
-	AccountName         *string                  `json:"account_name"`
-	UserName            *string                  `json:"user_name"`
-	AttributedUserID    *string                  `json:"attributed_user_id,omitempty"`
-	AttributedUserName  *string                  `json:"attributed_user_name,omitempty"`
-	EffectiveUserID     *string                  `json:"effective_user_id,omitempty"`
-	Amount              float64                  `json:"amount"`
-	IsoCurrencyCode     *string                  `json:"iso_currency_code"`
-	Date                string                   `json:"date"`
-	AuthorizedDate      *string                  `json:"authorized_date"`
-	Datetime            *string                  `json:"datetime"`
-	AuthorizedDatetime  *string                  `json:"authorized_datetime"`
+	ID                         string                   `json:"id"`
+	ShortID                    string                   `json:"short_id"`
+	AccountID                  *string                  `json:"account_id"`
+	AccountName                *string                  `json:"account_name"`
+	UserName                   *string                  `json:"user_name"`
+	AttributedUserID           *string                  `json:"attributed_user_id,omitempty"`
+	AttributedUserName         *string                  `json:"attributed_user_name,omitempty"`
+	EffectiveUserID            *string                  `json:"effective_user_id,omitempty"`
+	Amount                     float64                  `json:"amount"`
+	IsoCurrencyCode            *string                  `json:"iso_currency_code"`
+	Date                       string                   `json:"date"`
+	AuthorizedDate             *string                  `json:"authorized_date"`
+	Datetime                   *string                  `json:"datetime"`
+	AuthorizedDatetime         *string                  `json:"authorized_datetime"`
 	ProviderName               string                   `json:"provider_name"`
 	ProviderMerchantName       *string                  `json:"provider_merchant_name"`
 	Category                   *TransactionCategoryInfo `json:"category"`
-	CategoryOverride           string                     `json:"category_override"`
+	CategoryOverride           string                   `json:"category_override"`
 	ProviderCategoryPrimary    *string                  `json:"provider_category_primary"`
 	ProviderCategoryDetailed   *string                  `json:"provider_category_detailed"`
 	ProviderCategoryConfidence *string                  `json:"provider_category_confidence"`
 	ProviderPaymentChannel     *string                  `json:"provider_payment_channel"`
-	Pending             bool                     `json:"pending"`
-	CreatedAt           string                   `json:"created_at"`
-	UpdatedAt           string                   `json:"updated_at"`
+	Pending                    bool                     `json:"pending"`
+	CreatedAt                  string                   `json:"created_at"`
+	UpdatedAt                  string                   `json:"updated_at"`
 
 	// Tags attached to this transaction (slug list). Empty slice when none are
 	// attached. Populated by ListTransactions / GetTransaction.
@@ -88,17 +88,17 @@ type TransactionListResult struct {
 }
 
 type TransactionListParams struct {
-	Cursor           string
+	Cursor string
 	// Offset enables random-access pagination (LIMIT/OFFSET) — used by the
 	// admin page-numbered pagination. Cursor pagination remains the default
 	// for external REST clients; when Offset > 0 the service ignores Cursor.
-	Offset           int
-	Limit            int
-	StartDate        *time.Time
-	EndDate          *time.Time
-	AccountID        *string
-	UserID           *string
-	CategorySlug     *string
+	Offset       int
+	Limit        int
+	StartDate    *time.Time
+	EndDate      *time.Time
+	AccountID    *string
+	UserID       *string
+	CategorySlug *string
 	// Multi-select variants. When non-empty they take precedence over the
 	// singular `AccountID` / `CategorySlug` fields above and produce an OR
 	// match across every value in the list (parent categories still include
@@ -122,11 +122,11 @@ type TransactionListParams struct {
 }
 
 type TransactionCountParams struct {
-	StartDate        *time.Time
-	EndDate          *time.Time
-	AccountID        *string
-	UserID           *string
-	CategorySlug     *string
+	StartDate    *time.Time
+	EndDate      *time.Time
+	AccountID    *string
+	UserID       *string
+	CategorySlug *string
 	// Multi-select variants — see TransactionListParams.
 	AccountIDs       []string
 	CategorySlugs    []string
@@ -398,13 +398,13 @@ type AdminAccountDetail struct {
 // accounts (always single-element today).
 type AccountDetailResponse struct {
 	AccountResponse
-	DisplayName        *string                  `json:"display_name"`
-	Excluded           bool                     `json:"excluded"`
-	Provider           string                   `json:"provider,omitempty"`
-	UserName           string                   `json:"connection_user_name,omitempty"`
-	ConnectionShortID  string                   `json:"connection_short_id,omitempty"`
-	Balances           []AccountBalance         `json:"balances"`
-	RecentTransactions []TransactionResponse    `json:"recent_transactions"`
+	DisplayName        *string               `json:"display_name"`
+	Excluded           bool                  `json:"excluded"`
+	Provider           string                `json:"provider,omitempty"`
+	UserName           string                `json:"connection_user_name,omitempty"`
+	ConnectionShortID  string                `json:"connection_short_id,omitempty"`
+	Balances           []AccountBalance      `json:"balances"`
+	RecentTransactions []TransactionResponse `json:"recent_transactions"`
 }
 
 // AccountBalance represents a balance in a single currency. Today every
@@ -495,7 +495,7 @@ type ActivityEntry struct {
 	CategoryColor *string `json:"category_color,omitempty"`
 	CategoryIcon  *string `json:"category_icon,omitempty"`
 	RuleName      string  `json:"rule_name,omitempty"`
-	RuleID       string `json:"rule_id,omitempty"`
+	RuleID        string  `json:"rule_id,omitempty"`
 	// RuleShortID is the rule's 8-char short_id used to build the
 	// /rules/<short_id> link target on rule_applied timeline rows. The
 	// rule detail route accepts either UUID or short_id, but the
@@ -509,8 +509,8 @@ type ActivityEntry struct {
 	// "category" it renders the category chip from CategoryName +
 	// CategoryColor + CategoryIcon.
 	ActionField string `json:"action_field,omitempty"`
-	CommentID    string `json:"comment_id,omitempty"`
-	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
+	CommentID   string `json:"comment_id,omitempty"`
+	TagSlug     string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
 
 	// TagDisplayName, TagColor and TagIcon drive the rendered tag-chip on
 	// tag_added / tag_removed timeline rows. Empty/nil when the tag no
@@ -578,9 +578,9 @@ type TransactionRuleResponse struct {
 	Name    string `json:"name"`
 	// Conditions may be a zero-value Condition{} to mean "match all transactions"
 	// (stored as NULL in the DB).
-	Conditions    Condition    `json:"conditions"`
-	Actions       []RuleAction `json:"actions"`
-	Trigger       string       `json:"trigger"`
+	Conditions Condition    `json:"conditions"`
+	Actions    []RuleAction `json:"actions"`
+	Trigger    string       `json:"trigger"`
 	// CategorySlug/CategoryName/CategoryIcon/CategoryColor are derived from the
 	// first set_category action in Actions (kept for admin UI convenience).
 	// Category info is no longer a denormalized column on transaction_rules —
@@ -610,11 +610,24 @@ type TransactionRuleListParams struct {
 	// CreatorType filters by the rule's creator. Accepted values:
 	// "user", "agent", "system". Other values (or nil) leave the
 	// dimension unfiltered. Used by the admin list page's "Type"
-	// filter; the public REST API does not expose this knob.
+	// filter and the query_transaction_rules MCP tool.
 	CreatorType *string
-	// SortBy drives the ORDER BY clause for the offset-paginated path (admin UI).
-	// Accepted values: "created_at" (default), "hit_count", "last_hit_at", "priority", "name".
-	// Ignored by the cursor-paginated path (API), which must stay stable on (date, id).
+	// Trigger filters by the rule's firing trigger. Accepted values:
+	// "on_create", "on_change" (alias "on_update"), "always". nil leaves
+	// the dimension unfiltered.
+	Trigger *string
+	// MinHitCount filters to rules whose hit_count is >= this value. Use to
+	// surface high-impact rules. nil leaves the dimension unfiltered.
+	MinHitCount *int
+	// OnlyUnused filters to rules that have never fired (hit_count = 0). Use
+	// to surface dead/over-specific rules worth pruning. Ignored when false.
+	OnlyUnused bool
+	// SortBy drives the ORDER BY clause. Accepted values: "priority" (default),
+	// "created_at", "hit_count", "last_hit_at", "name". Honored by BOTH the
+	// offset-paginated path (admin UI) and the cursor-paginated path (API/MCP).
+	// Cursor pagination is only emitted for the default ordering — see
+	// ListTransactionRules; an explicit non-default SortBy returns a single
+	// top-N page with no next_cursor.
 	SortBy string
 	// SortDir is "asc" or "desc". Empty → per-column default (desc for most, asc for name/priority).
 	SortDir string
@@ -733,8 +746,8 @@ type MerchantSummaryRow struct {
 }
 
 type MerchantSummaryResult struct {
-	Merchants []MerchantSummaryRow  `json:"merchants"`
-	Totals    MerchantSummaryTotals `json:"totals"`
+	Merchants []MerchantSummaryRow   `json:"merchants"`
+	Totals    MerchantSummaryTotals  `json:"totals"`
 	Filters   MerchantSummaryFilters `json:"filters"`
 }
 

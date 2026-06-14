@@ -68,19 +68,6 @@ Aggregated spending totals. Default date range: 30 days.
 | `user_id` | string | Filter by user |
 | `category_slug` | string | Filter by category |
 
-### merchant_summary (Read)
-
-Merchant-level statistics. Default date range: 90 days.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `min_count` | int | Minimum transaction count (use 2 for recurring, 3 for subscriptions) |
-| `spending_only` | bool | Exclude credits/refunds |
-| `search` | string | Search merchant names |
-| `exclude_search` | string | Exclude matching merchants |
-
-Plus same date/account/user filters as `transaction_summary`.
-
 ---
 
 ## Account & Status Tools
@@ -341,6 +328,26 @@ List rules with optional filters and cursor pagination. **Lean by default** (`fi
 | `enabled` | bool | Filter by enabled status |
 | `fields` | string | Field selection. Alias: `summary` (default). `all` → full definition incl. `conditions`/`actions`. |
 | `cursor` | string | Pagination cursor |
+| `limit` | int | Results per page (default 50, max 500) |
+
+### query_transaction_rules (Read)
+
+The filterable/sortable analogue of `query_transactions`, for the rule set. Same lean-by-default `summary` projection as `list_transaction_rules`, but adds trigger / creator / hit-count filters and sorting so you can ask targeted questions — "which rules never fire?", "highest-impact rules for groceries", "agent-created rules" — instead of dumping the whole roster. To check whether **one** merchant is already covered before creating a rule, prefer `find_matching_rules`; use this when you want a filtered *slice* of rules or coverage analytics.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `category_slug` | string | Filter to rules whose `set_category` action targets this slug |
+| `enabled` | bool | Filter by enabled status |
+| `trigger` | string | `on_create` \| `on_change` (alias `on_update`) \| `always` |
+| `creator_type` | string | `user` \| `agent` \| `system` |
+| `search` | string | Substring / words / fuzzy search on rule name |
+| `search_mode` | string | `contains` (default) \| `words` \| `fuzzy` |
+| `min_hit_count` | int | Only rules with `hit_count >= n` (surfaces high-impact rules) |
+| `only_unused` | bool | Only rules that have never fired (`hit_count = 0`) — dead/over-specific rules worth pruning |
+| `sort_by` | string | `priority` (default, pipeline order) \| `hit_count` \| `last_hit_at` \| `created_at` \| `name` |
+| `sort_order` | string | `asc` \| `desc` (per-column default otherwise) |
+| `fields` | string | Field selection. Alias: `summary` (default). `all` → full definition. |
+| `cursor` | string | Pagination cursor. Only valid with the default `priority` sort; an explicit `sort_by` returns a single top-N page with no `next_cursor`. |
 | `limit` | int | Results per page (default 50, max 500) |
 
 ### update_transaction_rule (Write)

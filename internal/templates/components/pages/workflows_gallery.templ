@@ -867,18 +867,7 @@ templ workflowCustomDrawer() {
 				Loading…
 			</div>
 			<div x-show="!custom.loading" x-cloak class="flex-1 overflow-y-auto p-5 space-y-5">
-				<div>
-					<div class="text-sm font-medium mb-1.5">Prompt</div>
-					<textarea
-						name="prompt"
-						x-model="custom.prompt"
-						rows="10"
-						required
-						class="textarea textarea-bordered w-full text-sm font-mono leading-relaxed"
-						placeholder="The full instructions sent on every run. Describe the goal, what to look at, and how to act — e.g. &#34;Review new transactions, flag anything over $200 that isn't a known merchant, and write a short report.&#34;"
-					></textarea>
-					<div class="text-xs text-base-content/40 mt-1">This is the entire workflow prompt — there's no template behind it.</div>
-				</div>
+				@workflowCustomPromptField()
 				<div>
 					<div class="text-sm font-medium mb-2">When should the workflow run?</div>
 					<div class="grid grid-cols-1 gap-2">
@@ -963,4 +952,80 @@ templ workflowCustomDrawer() {
 			}
 		</form>
 	}
+}
+
+// workflowCustomPromptField is the hero of the custom drawer: the prompt IS the
+// whole workflow, so instead of a cramped inline textarea it gets a bold,
+// full-width surface that hands authoring off to the global prompt modal
+// (#bb-prompt-modal in base.html) and its Markdown Edit/Preview flow. The raw
+// value lives in custom.prompt and rides to the server in a hidden field; the
+// modal writes back through editPrompt()'s onSaved callback. Two states:
+//
+//   - empty   : the same framed card, but its body is a bold centered
+//               call-to-action that opens straight into the editor
+//               (editPrompt(true)). Tints error-red when a save was attempted
+//               with no prompt (custom.promptError).
+//   - filled  : a framed card with a faded monospace excerpt and Preview / Edit
+//               actions (editPrompt(false) / editPrompt(true)); the excerpt
+//               itself is clickable, with a hover hint, and opens the editor.
+//
+// Both states share the same frame + "Prompt" header so the field reads as one
+// document that's either empty or full, never two different shapes.
+templ workflowCustomPromptField() {
+	<div>
+		// Hidden carrier — keeps `prompt` in the form's FormData. Not `required`
+		// (a hidden required control can't be focused, which silently blocks
+		// submit); submitCustom() validates non-empty in JS instead.
+		<textarea name="prompt" x-model="custom.prompt" class="hidden" aria-hidden="true" tabindex="-1"></textarea>
+		<div
+			x-bind:class="custom.promptError ? 'border-error' : 'border-base-300'"
+			class="rounded-xl border overflow-hidden bg-base-100"
+		>
+			// Header — identical across states; the right slot only carries the
+			// Preview / Edit actions once there's a prompt to act on.
+			<div class="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-base-300 bg-base-200/40">
+				<span class="flex items-center gap-2 text-xs font-medium text-base-content/70 min-w-0">
+					@components.LucideIcon("file-text", "w-3.5 h-3.5 shrink-0")
+					<span class="truncate">Prompt</span>
+					<span class="badge badge-ghost badge-xs shrink-0">Markdown</span>
+				</span>
+				<div x-show="custom.prompt.trim()" class="flex items-center gap-1 shrink-0">
+					<button type="button" @click="editPrompt(false)" class="btn btn-ghost btn-xs gap-1.5">
+						@components.LucideIcon("eye", "w-3.5 h-3.5")
+						Preview
+					</button>
+					<button type="button" @click="editPrompt(true)" class="btn btn-primary btn-xs gap-1.5">
+						@components.LucideIcon("pencil", "w-3.5 h-3.5")
+						Edit
+					</button>
+				</div>
+			</div>
+			// Empty body — a quiet placeholder that reads like an empty editor
+			// field; click anywhere to compose.
+			<button
+				type="button"
+				x-show="!custom.prompt.trim()"
+				@click="editPrompt(true)"
+				class="flex min-h-28 w-full cursor-pointer items-start gap-2 px-4 py-3.5 text-left text-sm text-base-content/40 transition-colors hover:bg-base-200/40 hover:text-base-content/60"
+			>
+				@components.LucideIcon("pencil", "w-4 h-4 mt-0.5 shrink-0")
+				<span>The full instructions sent on every run. Click to compose it in Markdown, with live preview.</span>
+			</button>
+			// Filled body — clickable monospace excerpt; hover highlights it.
+			<button
+				type="button"
+				x-show="custom.prompt.trim()"
+				x-cloak
+				@click="editPrompt(true)"
+				class="relative block w-full max-h-44 cursor-pointer overflow-hidden text-left transition-colors hover:bg-base-200/50"
+				aria-label="Edit prompt"
+			>
+				<pre class="px-4 py-3.5 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words text-base-content/80" x-text="custom.prompt"></pre>
+				// Fade the bottom of the excerpt into the card so the clipped
+				// text doesn't end in a hard line.
+				<span class="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-base-100 via-base-100/85 to-transparent"></span>
+			</button>
+		</div>
+		<p x-show="custom.promptError" x-cloak class="text-xs text-error mt-1.5">A prompt is required — open the editor and add instructions.</p>
+	</div>
 }

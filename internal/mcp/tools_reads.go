@@ -50,6 +50,28 @@ type listTransactionRulesInput struct {
 	Fields       string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Alias: summary (name,enabled,priority,trigger,category,hit_count,last_hit_at; the default — omits the conditions and actions trees). Default when omitted: summary. Pass fields=all for every field including the full conditions/actions. id is always included."`
 }
 
+// queryTransactionRulesInput is the rich, filterable/sortable query over the
+// rule set — the rules analogue of query_transactions. It is lean-by-default
+// (summary projection) like list_transaction_rules, but adds trigger / creator
+// / hit-count filters and sorting so an agent can ask targeted questions ("which
+// rules never fire?", "highest-impact rules for groceries", "agent-created
+// rules") instead of dumping the whole roster and scanning it.
+type queryTransactionRulesInput struct {
+	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter to rules whose set_category action targets this category slug."`
+	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status (true=enabled only, false=disabled only)."`
+	Trigger      string `json:"trigger,omitempty" jsonschema:"Filter by firing trigger: on_create, on_change (alias on_update), always."`
+	CreatorType  string `json:"creator_type,omitempty" jsonschema:"Filter by who created the rule: user, agent, system."`
+	Search       string `json:"search,omitempty" jsonschema:"Search by rule name. Comma-separated values are ORed."`
+	SearchMode   string `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
+	MinHitCount  *int   `json:"min_hit_count,omitempty" jsonschema:"Filter to rules whose hit_count is >= this value — surfaces high-impact rules. Ignored when only_unused=true."`
+	OnlyUnused   *bool  `json:"only_unused,omitempty" jsonschema:"When true, return only rules that have never fired (hit_count=0) — dead or over-specific rules worth pruning."`
+	SortBy       string `json:"sort_by,omitempty" jsonschema:"Sort: priority (default, pipeline execution order), hit_count, last_hit_at, created_at, name."`
+	SortOrder    string `json:"sort_order,omitempty" jsonschema:"Sort direction: asc or desc. Default per column (desc for hit_count/last_hit_at/created_at, asc for priority/name)."`
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
+	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result. Only valid with the default priority sort; an explicit sort_by returns a single top-N page with no next_cursor."`
+	Fields       string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Alias: summary (name,enabled,priority,trigger,category,hit_count,last_hit_at; the default — omits the conditions and actions trees). Default when omitted: summary. Pass fields=all for every field including the full conditions/actions. id is always included."`
+}
+
 // --- Handlers ---
 
 func (s *MCPServer) handleListAccounts(_ context.Context, _ *mcpsdk.CallToolRequest, input listAccountsInput) (*mcpsdk.CallToolResult, any, error) {
@@ -124,14 +146,7 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 	// Lean-by-default: the rule roster omits the conditions/actions trees (the
 	// heavy, deeply-nested part) unless the caller asks. Pass fields=all to
 	// inspect or audit full rule definitions.
-	fieldsRaw := input.Fields
-	switch fieldsRaw {
-	case "":
-		fieldsRaw = service.DefaultRuleFields
-	case "all":
-		fieldsRaw = "" // ParseRuleFields("") → nil → full struct
-	}
-	fieldSet, err := service.ParseRuleFields(fieldsRaw)
+	fieldSet, err := parseRuleFieldsDefault(input.Fields)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -140,7 +155,59 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
+	return ruleListResult(result, fieldSet)
+}
 
+func (s *MCPServer) handleQueryTransactionRules(_ context.Context, _ *mcpsdk.CallToolRequest, input queryTransactionRulesInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	params := service.TransactionRuleListParams{
+		Limit:        input.Limit,
+		Cursor:       input.Cursor,
+		CategorySlug: optStr(input.CategorySlug),
+		Enabled:      input.Enabled,
+		Trigger:      optStr(input.Trigger),
+		CreatorType:  optStr(input.CreatorType),
+		Search:       optStr(input.Search),
+		MinHitCount:  input.MinHitCount,
+		SortBy:       input.SortBy,
+		SortDir:      input.SortOrder,
+	}
+	if input.OnlyUnused != nil {
+		params.OnlyUnused = *input.OnlyUnused
+	}
+	var err error
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	fieldSet, err := parseRuleFieldsDefault(input.Fields)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	result, err := s.svc.ListTransactionRules(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return ruleListResult(result, fieldSet)
+}
+
+// parseRuleFieldsDefault resolves the shared lean-by-default fields contract for
+// the rule list/query tools: "" → summary projection, "all" → full struct.
+func parseRuleFieldsDefault(raw string) (map[string]bool, error) {
+	switch raw {
+	case "":
+		raw = service.DefaultRuleFields
+	case "all":
+		raw = "" // ParseRuleFields("") → nil → full struct
+	}
+	return service.ParseRuleFields(raw)
+}
+
+// ruleListResult shapes a rule list result, applying the field projection when
+// one is requested. Shared by list_transaction_rules and query_transaction_rules.
+func ruleListResult(result *service.TransactionRuleListResult, fieldSet map[string]bool) (*mcpsdk.CallToolResult, any, error) {
 	if fieldSet != nil {
 		projected := make([]map[string]any, len(result.Rules))
 		for i, r := range result.Rules {
