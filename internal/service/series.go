@@ -1677,17 +1677,41 @@ func nextExpectedDate(cadence string, lastSeen pgtype.Date) pgtype.Date {
 	case SeriesCadenceBiweekly:
 		next = d.AddDate(0, 0, 14)
 	case SeriesCadenceMonthly:
-		next = d.AddDate(0, 1, 0)
+		next = addMonthsClamped(d, 1)
 	case SeriesCadenceQuarterly:
-		next = d.AddDate(0, 3, 0)
+		next = addMonthsClamped(d, 3)
 	case SeriesCadenceSemiannual:
-		next = d.AddDate(0, 6, 0)
+		next = addMonthsClamped(d, 6)
 	case SeriesCadenceAnnual:
-		next = d.AddDate(1, 0, 0)
+		next = addMonthsClamped(d, 12)
 	default:
 		return pgtype.Date{}
 	}
 	return pgconv.Date(next)
+}
+
+// addMonthsClamped adds whole months to d, clamping the day-of-month to the last
+// valid day of the target month instead of letting it overflow into the
+// following month. Go's time.AddDate normalizes Jan 31 + 1 month to Mar 3 (Feb
+// has no 31st), which would make a subscription billed on the 31st skip its
+// renewal month entirely. Clamping keeps the projection in the right month
+// (Jan 31 + 1 month → Feb 28/29). Day-based cadences (weekly/biweekly) don't go
+// through here and are unaffected.
+func addMonthsClamped(d time.Time, months int) time.Time {
+	y, m, day := d.Date()
+	// Normalizing the month arithmetic onto day 1 lets time.Date roll month
+	// overflow into years without disturbing the day-of-month.
+	target := time.Date(y, m+time.Month(months), 1, 0, 0, 0, 0, d.Location())
+	if last := lastDayOfMonth(target.Year(), target.Month()); day > last {
+		day = last
+	}
+	return time.Date(target.Year(), target.Month(), day, 0, 0, 0, 0, d.Location())
+}
+
+// lastDayOfMonth returns the number of days in the given year/month. Day 0 of
+// the following month resolves to the last day of the requested month.
+func lastDayOfMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
 // seriesRenewalHealth derives the renewal-health bucket and signed days-until
