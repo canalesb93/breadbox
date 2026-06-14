@@ -75,7 +75,7 @@ templ OnboardingBanner(p OnboardingBannerProps) {
 				</div>
 			</div>
 			<form method="POST" action="/getting-started/dismiss" class="contents" @click.stop>
-				<input type="hidden" name="csrf_token" value={ p.CSRFToken }/>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 				<button type="submit" class="btn btn-secondary btn-sm shrink-0" title="Hide — re-open from Settings">Hide</button>
 			</form>
 			<button

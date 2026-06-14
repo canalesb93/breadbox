@@ -121,7 +121,7 @@ templ privacyControlButton(value, icon, label string) {
 templ userMenuLogoutForm(logoutFormID, csrfToken string) {
 	<form id={ logoutFormID } method="POST" action="/logout" class="hidden">
 		if csrfToken != "" {
-			<input type="hidden" name="csrf_token" value={ csrfToken }/>
+			<input type="hidden" name="_csrf" value={ csrfToken }/>
 		}
 	</form>
 }
