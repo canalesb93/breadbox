@@ -133,17 +133,19 @@ templ onboardingStepRow(s OnboardingStep) {
 }
 
 // onboardingProgressRing renders the Mintlify-style circular progress donut:
-// a quiet track ring with a primary arc proportional to completion.
+// a thicker arc over a track that keeps contrast against the gray tray. The
+// track is a base-content tint (not base-200, which now matches the tray) so
+// the incomplete portion stays legible in both themes.
 templ onboardingProgressRing(completed, total int) {
-	<svg class="w-9 h-9 shrink-0 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
-		<circle cx="18" cy="18" r="15" fill="none" style="stroke: var(--color-base-200)" stroke-width="3"></circle>
+	<svg class="w-10 h-10 shrink-0 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+		<circle cx="18" cy="18" r="15" fill="none" style="stroke: color-mix(in oklab, var(--color-base-content) 15%, transparent)" stroke-width="4"></circle>
 		<circle
 			cx="18"
 			cy="18"
 			r="15"
 			fill="none"
 			style="stroke: var(--color-primary)"
-			stroke-width="3"
+			stroke-width="4"
 			stroke-linecap="round"
 			stroke-dasharray={ onboardingRingDash(completed, total) }
 		></circle>
