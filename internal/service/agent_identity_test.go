@@ -11,7 +11,7 @@ import (
 
 // TestMintRunAPIKey_CarriesDefinitionIdentity is the core of the
 // identity-convergence fix: a minted per-run key must carry the agent's
-// DISPLAY name (def.Name) as actor_name and a durable agent_definition_id
+// DISPLAY name (def.Name) as actor_name and a durable workflow_id
 // link, so every write the run makes resolves to one canonical identity
 // (definition name + slug-seeded avatar) instead of the SDK's clientInfo.
 func TestMintRunAPIKey_CarriesDefinitionIdentity(t *testing.T) {
@@ -33,8 +33,8 @@ func TestMintRunAPIKey_CarriesDefinitionIdentity(t *testing.T) {
 	if !key.ActorName.Valid || key.ActorName.String != def.Name {
 		t.Errorf("actor_name = %q, want def.Name %q", key.ActorName.String, def.Name)
 	}
-	if !key.AgentDefinitionID.Valid {
-		t.Fatalf("agent_definition_id not set on minted run key")
+	if !key.WorkflowID.Valid {
+		t.Fatalf("workflow_id not set on minted run key")
 	}
 
 	// The key resolves to the definition's slug — the avatar seed shared
@@ -73,7 +73,7 @@ func TestResolveAgentSlugForActor_NonAgentKey(t *testing.T) {
 }
 
 // TestResolveAgentSlugForActor_FallbackFromKeyName covers the
-// slug-from-name fallback: an agent key with NO agent_definition_id link
+// slug-from-name fallback: an agent key with NO workflow_id link
 // (definition deleted via ON DELETE SET NULL, or a run key minted before
 // the FK existed) still resolves to its slug from the immutable key name,
 // so the agent's avatar keeps rendering instead of falling to the bot tile.
@@ -85,7 +85,7 @@ func TestResolveAgentSlugForActor_FallbackFromKeyName(t *testing.T) {
 		Name:      "agent:orphan-slug:Run99",
 		Scope:     "full_access",
 		ActorType: "agent",
-		// deliberately no AgentDefinitionID — simulates a deleted/pre-FK link
+		// deliberately no WorkflowID — simulates a deleted/pre-FK link
 	})
 	if err != nil {
 		t.Fatalf("CreateAPIKey: %v", err)

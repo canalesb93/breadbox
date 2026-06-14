@@ -211,7 +211,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	argN := 1
 
 	buf.WriteString("SELECT t.id, t.short_id, t.provider_transaction_id, t.provider_pending_transaction_id, " +
-		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
+		"t.amount, t.iso_currency_code, t.date, t.authorized_date, " +
 		"t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name, " +
 		"t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence, " +
 		"t.provider_payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
@@ -436,7 +436,6 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			pendingTransactionID   pgtype.Text
 			amount                 pgtype.Numeric
 			isoCurrencyCode        pgtype.Text
-			unofficialCurrencyCode pgtype.Text
 			date                   pgtype.Date
 			authorizedDate         pgtype.Date
 			datetime               pgtype.Timestamptz
@@ -471,7 +470,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 
 		if err := rows.Scan(
 			&id, &shortID, &externalTransactionID, &pendingTransactionID,
-			&amount, &isoCurrencyCode, &unofficialCurrencyCode,
+			&amount, &isoCurrencyCode,
 			&date, &authorizedDate, &datetime, &authorizedDatetime,
 			&name, &merchantName, &categoryPrimary, &categoryDetailed,
 			&categoryConfidence, &paymentChannel, &pending,

@@ -30,7 +30,7 @@ func TestFireSyncCompleteAgents_OnlyFiresEligible(t *testing.T) {
 
 	fired := make(chan string, 4)
 	runner := agent.RunnerFunc(func(_ context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
-		fired <- spec.AgentDefinitionID
+		fired <- spec.WorkflowID
 		return agent.RunResult{Status: agent.StatusSuccess, DurationMs: 1}, nil
 	})
 	orch := service.NewOrchestrator(svc, runner, 3, encKey, slog.Default())
@@ -118,7 +118,7 @@ func TestFireSyncCompleteAgents_DebouncesRecentRun(t *testing.T) {
 
 	// A recent non-skipped run anchors the debounce window.
 	if _, err := pool.Exec(context.Background(),
-		`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,started_at)
+		`INSERT INTO workflow_runs (workflow_id,"trigger",status,started_at)
 		 VALUES ($1,'webhook','success', NOW())`, def.ID); err != nil {
 		t.Fatalf("seed recent run: %v", err)
 	}

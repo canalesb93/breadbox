@@ -63,8 +63,8 @@ func AgentRunLiveHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 
 		// Enrich with agent identity so the stats panel renders the
 		// same label set as the initial server render.
-		if run.AgentDefinitionID != nil {
-			if def, derr := svc.GetAgentDefinition(ctx, *run.AgentDefinitionID); derr == nil {
+		if run.WorkflowID != nil {
+			if def, derr := svc.GetAgentDefinition(ctx, *run.WorkflowID); derr == nil {
 				row.AgentSlug = def.Slug
 				row.AgentName = def.Name
 			}

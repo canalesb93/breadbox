@@ -39,7 +39,7 @@ func TestT11_FireSyncCompleteAgents_DebounceWindow(t *testing.T) {
 	// Seed a recent non-skipped run for the within-window agent.
 	// started_at = NOW() places it squarely inside PostSyncDebounceWindow.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, started_at)
 		 VALUES ($1, 'webhook', 'success', NOW())`,
 		defInWindow.ID,
 	); err != nil {
@@ -51,7 +51,7 @@ func TestT11_FireSyncCompleteAgents_DebounceWindow(t *testing.T) {
 	// even under slow test-execution clock drift.
 	oldAge := 2 * service.PostSyncDebounceWindow
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, started_at)
 		 VALUES ($1, 'webhook', 'success', NOW() - $2::interval)`,
 		defOutWindow.ID, oldAge.String(),
 	); err != nil {
@@ -61,7 +61,7 @@ func TestT11_FireSyncCompleteAgents_DebounceWindow(t *testing.T) {
 	// Channel buffered to 4 to catch unexpected extra fires without blocking.
 	fired := make(chan string, 4)
 	runner := agent.RunnerFunc(func(_ context.Context, spec agent.JobSpec, _ agent.EventHandler) (agent.RunResult, error) {
-		fired <- spec.AgentDefinitionID
+		fired <- spec.WorkflowID
 		return agent.RunResult{Status: agent.StatusSuccess, DurationMs: 1}, nil
 	})
 	orch := service.NewOrchestrator(svc, runner, 3, encKey, slog.Default())
@@ -107,7 +107,7 @@ func TestT11_FireSyncCompleteAgents_SkippedRunDoesNotDebounce(t *testing.T) {
 	// Seed a skipped run inside the debounce window.
 	// A skipped status must NOT suppress the next sync-complete dispatch.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, started_at)
 		 VALUES ($1, 'webhook', 'skipped', NOW())`,
 		def.ID,
 	); err != nil {

@@ -53,7 +53,7 @@ func TestT10_SpendCeilingEnforcement_ManualRunReturnsError(t *testing.T) {
 	// Seed two completed runs whose costs sum to $0.13 — over the ceiling.
 	for _, cost := range []string{"0.07", "0.06"} {
 		if _, err := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+			`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 			 VALUES ($1, 'cron', 'success', $2, NOW())`,
 			def.ID, cost,
 		); err != nil {
@@ -98,7 +98,7 @@ func TestT10_SpendCeilingEnforcement_CronPathLeavesSkippedRow(t *testing.T) {
 	// Seed a run at exactly the ceiling amount. The gate condition is spent >= ceiling,
 	// so $0.05 spent against a $0.05 ceiling must block the next run.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 		 VALUES ($1, 'cron', 'success', $2, NOW())`,
 		def.ID, "0.05",
 	); err != nil {
@@ -152,7 +152,7 @@ func TestT10_SpendCeilingEnforcement_UnsetCeilingNoCap(t *testing.T) {
 	// Seed a large spend. If checkHouseholdCeiling correctly returns nil for
 	// an unset key, this spend must not block the run.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 		 VALUES ($1, 'cron', 'success', $2, NOW())`,
 		def.ID, "999.99",
 	); err != nil {
@@ -191,7 +191,7 @@ func TestT10_SpendCeilingEnforcement_ZeroCeilingNoCap(t *testing.T) {
 
 	// Seed spend that would block a naive zero-ceiling implementation.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 		 VALUES ($1, 'cron', 'success', $2, NOW())`,
 		def.ID, "50.00",
 	); err != nil {
@@ -227,7 +227,7 @@ func TestT10_SpendCeilingEnforcement_SpendUnderCeilingAllowsRun(t *testing.T) {
 
 	// Seed $0.10 worth of runs — well under the $1.00 ceiling.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 		 VALUES ($1, 'cron', 'success', $2, NOW())`,
 		def.ID, "0.10",
 	); err != nil {
@@ -267,7 +267,7 @@ func TestT10_SpendCeilingEnforcement_SkippedRunsExcludedFromSpend(t *testing.T) 
 	// Insert a skipped run with an inflated cost value. In practice skipped
 	// rows carry no real cost, but this explicitly guards the exclusion logic.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 		 VALUES ($1, 'cron', 'skipped', $2, NOW())`,
 		def.ID, "5.00",
 	); err != nil {
@@ -276,7 +276,7 @@ func TestT10_SpendCeilingEnforcement_SkippedRunsExcludedFromSpend(t *testing.T) 
 
 	// Also insert a small real-cost run well under the ceiling.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO workflow_runs (agent_definition_id, "trigger", status, total_cost_usd, started_at)
+		`INSERT INTO workflow_runs (workflow_id, "trigger", status, total_cost_usd, started_at)
 		 VALUES ($1, 'cron', 'success', $2, NOW())`,
 		def.ID, "0.02",
 	); err != nil {

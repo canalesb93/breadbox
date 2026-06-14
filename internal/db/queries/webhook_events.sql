@@ -8,3 +8,7 @@ UPDATE webhook_events SET status = $2, error_message = $3 WHERE id = $1;
 
 -- name: CountWebhookEvents :one
 SELECT COUNT(*) FROM webhook_events;
+
+-- name: DeleteWebhookEventsOlderThan :execresult
+DELETE FROM webhook_events
+WHERE created_at < $1;

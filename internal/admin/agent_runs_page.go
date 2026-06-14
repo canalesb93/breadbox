@@ -54,8 +54,8 @@ func AgentRunDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr 
 		systemPrompt := ""
 		userPrompt := ""
 		var defSlug, defName string
-		if run.AgentDefinitionID != nil {
-			if def, derr := svc.GetAgentDefinition(ctx, *run.AgentDefinitionID); derr == nil {
+		if run.WorkflowID != nil {
+			if def, derr := svc.GetAgentDefinition(ctx, *run.WorkflowID); derr == nil {
 				defSlug = def.Slug
 				defName = def.Name
 				userPrompt = def.Prompt

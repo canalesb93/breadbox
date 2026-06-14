@@ -630,7 +630,7 @@ func TestHouseholdCostSince(t *testing.T) {
 
 	ins := func(status string, cost string, age string) {
 		_, err := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,total_cost_usd,started_at)
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status,total_cost_usd,started_at)
 			 VALUES ($1,'cron',$2,$3, NOW() - $4::interval)`,
 			def.ID, status, cost, age)
 		if err != nil {
@@ -664,7 +664,7 @@ func TestRunOrSkip_HouseholdCeiling(t *testing.T) {
 	}
 	for _, c := range []string{"0.07", "0.06"} {
 		if _, err := pool.Exec(ctx,
-			`INSERT INTO workflow_runs (agent_definition_id,"trigger",status,total_cost_usd,started_at)
+			`INSERT INTO workflow_runs (workflow_id,"trigger",status,total_cost_usd,started_at)
 			 VALUES ($1,'cron','success',$2, NOW())`, def.ID, c); err != nil {
 			t.Fatalf("insert run: %v", err)
 		}

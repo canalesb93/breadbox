@@ -58,3 +58,14 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
 SELECT * FROM mcp_tool_calls
 WHERE session_id = $1
 ORDER BY created_at ASC;
+
+-- name: DeleteMcpToolCallsOlderThan :execresult
+DELETE FROM mcp_tool_calls
+WHERE created_at < $1;
+
+-- name: DeleteMcpSessionsOlderThan :execresult
+DELETE FROM mcp_sessions
+WHERE mcp_sessions.created_at < $1
+  AND NOT EXISTS (
+    SELECT 1 FROM mcp_tool_calls WHERE session_id = mcp_sessions.id
+  );

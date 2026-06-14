@@ -152,7 +152,7 @@ func TestCreateAndCompleteAgentRun(t *testing.T) {
 
 	d := mustCreateDefinition(t, q, "qry-run-"+t.Name(), true)
 	run, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{
-		AgentDefinitionID: d.ID,
+		WorkflowID: d.ID,
 		Trigger:           "manual",
 	})
 	if err != nil {
@@ -196,11 +196,11 @@ func TestCountInProgressAgentRuns(t *testing.T) {
 	ctx := context.Background()
 
 	d := mustCreateDefinition(t, q, "qry-count-"+t.Name(), true)
-	r1, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{AgentDefinitionID: d.ID, Trigger: "manual"})
+	r1, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{WorkflowID: d.ID, Trigger: "manual"})
 	if err != nil {
 		t.Fatalf("CreateAgentRun r1: %v", err)
 	}
-	if _, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{AgentDefinitionID: d.ID, Trigger: "cron"}); err != nil {
+	if _, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{WorkflowID: d.ID, Trigger: "cron"}); err != nil {
 		t.Fatalf("CreateAgentRun r2: %v", err)
 	}
 
@@ -245,7 +245,7 @@ func TestDeleteAgentRunsOlderThan(t *testing.T) {
 	d := mustCreateDefinition(t, q, "qry-cleanup-"+t.Name(), true)
 	// Insert a deliberately-old completed run via direct SQL.
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO workflow_runs (agent_definition_id, "trigger", status, started_at, completed_at)
+		INSERT INTO workflow_runs (workflow_id, "trigger", status, started_at, completed_at)
 		VALUES ($1, 'manual', 'success', NOW() - INTERVAL '31 days', NOW() - INTERVAL '31 days')
 	`, d.ID); err != nil {
 		t.Fatalf("insert old run: %v", err)

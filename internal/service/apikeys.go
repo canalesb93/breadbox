@@ -32,11 +32,11 @@ type CreateAPIKeyParams struct {
 	Scope     string
 	ActorType string // "user" | "agent" | "system"; defaults to "user"
 	ActorName string // optional display name, falls back to Name
-	// AgentDefinitionID links a per-run agent key back to the
+	// WorkflowID links a per-run agent key back to the
 	// agent_definition it runs for (UUID string; empty for non-agent
 	// keys). Set by MintRunAPIKey so all of an agent's activity resolves
 	// to one canonical identity. See GetAgentIdentityByApiKeyID.
-	AgentDefinitionID string
+	WorkflowID string
 }
 
 // CreateAPIKey mints a new API key and returns the full record plus the
@@ -90,10 +90,10 @@ func (s *Service) CreateAPIKey(ctx context.Context, p CreateAPIKeyParams) (*Crea
 		actorName = pgtype.Text{String: p.ActorName, Valid: true}
 	}
 	var agentDefID pgtype.UUID
-	if p.AgentDefinitionID != "" {
+	if p.WorkflowID != "" {
 		var err error
-		if agentDefID, err = pgconv.ParseUUID(p.AgentDefinitionID); err != nil {
-			return nil, fmt.Errorf("invalid agent_definition_id: %w", err)
+		if agentDefID, err = pgconv.ParseUUID(p.WorkflowID); err != nil {
+			return nil, fmt.Errorf("invalid workflow_id: %w", err)
 		}
 	}
 	apiKey, err := s.Queries.CreateApiKey(ctx, db.CreateApiKeyParams{
@@ -103,7 +103,7 @@ func (s *Service) CreateAPIKey(ctx context.Context, p CreateAPIKeyParams) (*Crea
 		Scope:             scope,
 		ActorType:         actorType,
 		ActorName:         actorName,
-		AgentDefinitionID: agentDefID,
+		WorkflowID: agentDefID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
@@ -196,7 +196,7 @@ func (s *Service) ValidateAPIKey(ctx context.Context, key string) (*db.ApiKey, e
 
 // ResolveAgentSlugForActor returns the agent_definition slug an actor
 // (an api_keys UUID) runs for, when that key is a per-run agent key
-// linked to a definition (set at mint via agent_definition_id). The slug
+// linked to a definition (set at mint via workflow_id). The slug
 // is the avatar seed, so an agent's robot is identical everywhere its
 // activity surfaces. ok=false for non-agent actors, external mcp-client
 // identities, and keys with no definition link.
@@ -211,7 +211,7 @@ func (s *Service) ResolveAgentSlugForActor(ctx context.Context, actorID string) 
 	if row, rerr := s.Queries.GetAgentIdentityByApiKeyID(ctx, uid); rerr == nil {
 		return row.Slug, true
 	}
-	// No live definition link — the key's agent_definition_id is NULL
+	// No live definition link — the key's workflow_id is NULL
 	// because the definition was deleted (ON DELETE SET NULL) or the run
 	// key predates the column. Recover the slug from the immutable key
 	// name ("agent:<slug>:<runID>") so the agent's avatar still renders.

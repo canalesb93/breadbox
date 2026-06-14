@@ -73,14 +73,14 @@ CRUD mutations on agent_definitions call `svc.OnDefinitionChanged()` which the o
 
 ### Run-key attribution — the run key IS the actor
 
-Every write a run makes must be attributed to its minted run key (`agent:<slug>:<runID>`, `actor_type='agent'`, `actor_name=def.Name`, `agent_definition_id=def.ID`), NOT to the MCP `clientInfo`. The Claude Agent SDK presents a generic shared `clientInfo` ("claude-code") on every connection; if attribution falls back to it, every agent collapses onto one identity and the feed shows one session under several names + avatars.
+Every write a run makes must be attributed to its minted run key (`agent:<slug>:<runID>`, `actor_type='agent'`, `actor_name=def.Name`, `workflow_id=def.ID`), NOT to the MCP `clientInfo`. The Claude Agent SDK presents a generic shared `clientInfo` ("claude-code") on every connection; if attribution falls back to it, every agent collapses onto one identity and the feed shows one session under several names + avatars.
 
 Two load-bearing pieces enforce this:
 
 1. `AssembleJobSpec` passes the run key in `BREADBOX_API_KEY`; `runMCPStdio` (`internal/cli/mcp.go`) binds it as the actor floor via `ValidateAPIKey`. If you change how the sidecar reaches MCP, keep the run key as the bound actor.
 2. `MCPServer.rebindActorFromClientInfo` (`internal/mcp/server.go`) is gated on `service.AgentRunShortIDFromContext(ctx) == ""` — it upgrades anonymous stdio / external clients to a per-`clientInfo` key but **never** clobbers a real run key. Don't remove that guard.
 
-`api_keys.agent_definition_id` (set at mint) is the durable link; `Service.ResolveAgentSlugForActor` / `GetAgentIdentityByApiKeyID` resolve any agent actor → its definition (name + slug avatar). Render an agent's identity through these, not through the raw stamped `actor_name`.
+`api_keys.workflow_id` (set at mint) is the durable link; `Service.ResolveAgentSlugForActor` / `GetAgentIdentityByApiKeyID` resolve any agent actor → its workflow (name + slug avatar). Render an agent's identity through these, not through the raw stamped `actor_name`.
 
 ## Tests + CI
 

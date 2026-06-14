@@ -28,7 +28,7 @@ const AuthConfigSchema = z.object({
 export const JobSpecSchema = z.object({
   // Identity (forwarded for log correlation; not sent to the SDK)
   runId: z.string().optional().default(""),
-  agentDefinitionId: z.string().optional().default(""),
+  workflowId: z.string().optional().default(""),
 
   // Prompt
   prompt: z.string().min(1),

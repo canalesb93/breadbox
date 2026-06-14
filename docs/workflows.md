@@ -156,7 +156,7 @@ When `flag_only` is chosen, a directive is appended to the prompt that explicitl
 |---|---|---|
 | `id` | `UUID` | Primary key |
 | `short_id` | `TEXT` | 8-char base62 alias |
-| `agent_definition_id` | `UUID` | FK -> `workflows.id`; `SET NULL` on delete (history preserved) |
+| `workflow_id` | `UUID` | FK -> `workflows.id`; `SET NULL` on delete (history preserved) |
 | `trigger` | `TEXT` | `manual` \| `cron` \| `webhook` |
 | `status` | `TEXT` | `in_progress` \| `success` \| `error` \| `skipped` |
 | `started_at` | `TIMESTAMPTZ` | |

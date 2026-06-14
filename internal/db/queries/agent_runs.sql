@@ -1,5 +1,5 @@
 -- name: CreateAgentRun :one
-INSERT INTO workflow_runs (agent_definition_id, "trigger", model, status, started_at)
+INSERT INTO workflow_runs (workflow_id, "trigger", model, status, started_at)
 VALUES ($1, $2, $3, 'in_progress', NOW())
 RETURNING *;
 
@@ -11,13 +11,13 @@ SELECT * FROM workflow_runs WHERE short_id = $1;
 
 -- name: GetLatestAgentRun :one
 SELECT * FROM workflow_runs
-WHERE agent_definition_id = $1
+WHERE workflow_id = $1
 ORDER BY started_at DESC
 LIMIT 1;
 
 -- name: ListAgentRuns :many
 SELECT * FROM workflow_runs
-WHERE agent_definition_id = $1
+WHERE workflow_id = $1
 ORDER BY started_at DESC
 LIMIT $2 OFFSET $3;
 
@@ -69,21 +69,21 @@ WHERE id = $1;
 -- the operator knows to raise max_turns / max_budget_usd or split the
 -- prompt.
 WITH ranked AS (
-    SELECT agent_definition_id, hit_cap,
+    SELECT workflow_id, hit_cap,
            ROW_NUMBER() OVER (
-               PARTITION BY agent_definition_id
+               PARTITION BY workflow_id
                ORDER BY started_at DESC
            ) AS rn
     FROM workflow_runs
-    WHERE agent_definition_id IS NOT NULL
+    WHERE workflow_id IS NOT NULL
       AND status != 'skipped'
 )
-SELECT agent_definition_id,
+SELECT workflow_id,
        COUNT(*) FILTER (WHERE hit_cap IS NOT NULL)::int AS cap_count,
        COUNT(*)::int                                     AS run_count
 FROM ranked
 WHERE rn <= 5
-GROUP BY agent_definition_id;
+GROUP BY workflow_id;
 
 -- name: GetAgentRecentErrorStats :many
 -- Per-definition "is this agent broken right now?" signal: error count
@@ -91,21 +91,21 @@ GROUP BY agent_definition_id;
 -- lock) are excluded — they aren't agent failures. The admin list
 -- renders a warning pill when error_count >= 3.
 WITH ranked AS (
-    SELECT agent_definition_id, status,
+    SELECT workflow_id, status,
            ROW_NUMBER() OVER (
-               PARTITION BY agent_definition_id
+               PARTITION BY workflow_id
                ORDER BY started_at DESC
            ) AS rn
     FROM workflow_runs
-    WHERE agent_definition_id IS NOT NULL
+    WHERE workflow_id IS NOT NULL
       AND status != 'skipped'
 )
-SELECT agent_definition_id,
+SELECT workflow_id,
        COUNT(*) FILTER (WHERE status = 'error')::int AS error_count,
        COUNT(*)::int                                  AS run_count
 FROM ranked
 WHERE rn <= 5
-GROUP BY agent_definition_id;
+GROUP BY workflow_id;
 
 -- name: CountWorkflowsWithFailedLastRun :one
 -- Sidebar failure badge: how many preset-instantiated workflows have a most
@@ -114,15 +114,15 @@ GROUP BY agent_definition_id;
 -- to gallery workflows (excludes hand-authored agent definitions). Not gated on
 -- enabled — a paused-but-failing workflow still shows its dot on the card.
 WITH last_run AS (
-    SELECT DISTINCT ON (agent_definition_id)
-           agent_definition_id, status
+    SELECT DISTINCT ON (workflow_id)
+           workflow_id, status
     FROM workflow_runs
-    WHERE agent_definition_id IS NOT NULL
-    ORDER BY agent_definition_id, started_at DESC
+    WHERE workflow_id IS NOT NULL
+    ORDER BY workflow_id, started_at DESC
 )
 SELECT COUNT(*)::bigint
 FROM workflows w
-JOIN last_run lr ON lr.agent_definition_id = w.id
+JOIN last_run lr ON lr.workflow_id = w.id
 WHERE w.source_template IS NOT NULL
   AND lr.status = 'error';
 
@@ -132,14 +132,14 @@ WHERE w.source_template IS NOT NULL
 -- (no real cost incurred) but includes errored runs (often DO incur
 -- partial cost).
 SELECT
-    agent_definition_id,
+    workflow_id,
     COUNT(*)::int                                        AS run_count,
     COALESCE(SUM(total_cost_usd), 0)::numeric(10,4)      AS total_cost_usd
 FROM workflow_runs
-WHERE agent_definition_id IS NOT NULL
+WHERE workflow_id IS NOT NULL
   AND started_at >= NOW() - INTERVAL '30 days'
   AND status != 'skipped'
-GROUP BY agent_definition_id;
+GROUP BY workflow_id;
 
 -- name: SetAgentRunNote :one
 UPDATE workflow_runs
@@ -161,7 +161,7 @@ SELECT r.short_id      AS run_short_id,
        d.slug          AS agent_slug,
        d.name          AS agent_name
 FROM workflow_runs r
-JOIN workflows d ON d.id = r.agent_definition_id
+JOIN workflows d ON d.id = r.workflow_id
 WHERE r.status = 'error'
   AND r.started_at >= NOW() - ($1::int * INTERVAL '1 hour')
 ORDER BY r.started_at DESC
@@ -191,13 +191,13 @@ RETURNING *;
 -- rows don't shadow earlier prefixes — only runs that actually carried a
 -- prefix are eligible. Used by the admin "Use last prefix" button on the
 -- Run now dialog to pre-fill the operator's prior context.
-SELECT DISTINCT ON (agent_definition_id)
-       agent_definition_id, prompt_prefix
+SELECT DISTINCT ON (workflow_id)
+       workflow_id, prompt_prefix
 FROM workflow_runs
-WHERE agent_definition_id IS NOT NULL
+WHERE workflow_id IS NOT NULL
   AND prompt_prefix IS NOT NULL
   AND prompt_prefix <> ''
-ORDER BY agent_definition_id, started_at DESC;
+ORDER BY workflow_id, started_at DESC;
 
 -- name: CleanupOrphanedAgentRuns :execresult
 UPDATE workflow_runs
@@ -248,7 +248,7 @@ SELECT
         WHERE status != 'skipped' AND duration_ms IS NOT NULL
     ), 0)::float8 / 1000.0)::float8                        AS avg_duration_seconds
 FROM workflow_runs
-WHERE agent_definition_id = $1;
+WHERE workflow_id = $1;
 
 -- GetHouseholdCostSince sums total_cost_usd across ALL agent definitions
 -- for runs started at/after the given instant, excluding skipped rows.
@@ -265,7 +265,7 @@ WHERE started_at >= sqlc.arg(since)
 -- name: ExistsRecentRunForDefinition :one
 SELECT EXISTS(
     SELECT 1 FROM workflow_runs
-    WHERE agent_definition_id = sqlc.arg(definition_id)
+    WHERE workflow_id = sqlc.arg(definition_id)
       AND started_at >= sqlc.arg(since)
       AND status <> 'skipped'
 ) AS run_exists;
