@@ -1,0 +1,30 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// SectionOnboardingBanner renders the home-feed "Finish setting up" checklist
+// card — the self-sufficient onboarding surface that replaced the dedicated
+// /getting-started page. Shown here with mock progress (2/5 complete): the
+// first two steps are Done, the third is Active (carries the highlighted CTA),
+// the optional household step is pending + Optional, and the last step is a
+// plain pending row. The whole header toggles the checklist; "Hide" POSTs to
+// the dismiss route (inert in the sandbox).
+templ SectionOnboardingBanner() {
+	<div class="flex flex-col gap-6">
+		@designExample("Onboarding banner — in progress", "2 of 5 complete. The progress ring fills to the fraction, the active step (Connect your bank) carries the primary CTA, done steps strike through, and the optional member step shows the Optional badge. Click the header to collapse.") {
+			@components.OnboardingBanner(components.OnboardingBannerProps{
+				CompletedSteps: 2,
+				TotalSteps:     5,
+				TimeRemaining:  "~6 min left",
+				CSRFToken:      "preview",
+				Steps: []components.OnboardingStep{
+					{Title: "Configure a bank provider", Desc: "Set up Plaid, Teller, or SimpleFIN — or import a CSV.", CTALabel: "Configure", CTAHref: "/settings/providers", Done: true},
+					{Title: "Add a household member", Desc: "Add the people whose accounts you track.", CTALabel: "Add member", CTAHref: "/household/new", Done: true, Optional: true},
+					{Title: "Connect your bank", Desc: "Link a bank account to start syncing accounts and transactions.", CTALabel: "Connect bank", CTAHref: "/connections/new", Active: true},
+					{Title: "Run your first sync", Desc: "Your first sync runs automatically — check the logs if it doesn't start.", CTALabel: "View logs", CTAHref: "/logs"},
+					{Title: "Set up AI agents", Desc: "Create an API key so AI agents can query your finances via MCP.", CTALabel: "Set up", CTAHref: "/workflows"},
+				},
+			})
+		}
+	</div>
+}
