@@ -171,6 +171,38 @@ var nameSimilarityCases = []nameSimilarityCase{
 		wantFieldLen: 1,
 		wantField:    "merchant_name",
 	},
+	{
+		// Regression: strings.Contains(x, "") is always true, so an empty
+		// primary name must NOT manufacture a substring "name" match.
+		name:         "empty primary name does not substring-match",
+		depName:      "STARBUCKS STORE",
+		depMerchant:  "",
+		priName:      "",
+		priMerchant:  "",
+		wantScore:    0,
+		wantFieldLen: 0,
+	},
+	{
+		// Mirror: an empty dependent name must not substring-match a real name.
+		name:         "empty dependent name does not substring-match",
+		depName:      "",
+		depMerchant:  "",
+		priName:      "STARBUCKS STORE",
+		priMerchant:  "",
+		wantScore:    0,
+		wantFieldLen: 0,
+	},
+	{
+		// Regression: EqualFold("", "") is true, so two empty names must NOT
+		// produce a score-2 exact "name" match.
+		name:         "both names empty is no match",
+		depName:      "",
+		depMerchant:  "",
+		priName:      "",
+		priMerchant:  "",
+		wantScore:    0,
+		wantFieldLen: 0,
+	},
 }
 
 func TestNameSimilarityScore(t *testing.T) {
@@ -345,6 +377,20 @@ func TestPickBestCandidate(t *testing.T) {
 			},
 			wantNil: false,
 			wantIdx: 2,
+		},
+		{
+			// Regression: before the empty-name guard, a candidate with an
+			// empty name scored 1 (Contains(dep, "") == true) and beat a
+			// genuinely-unrelated candidate scoring 0 — a false auto-match.
+			// Now both score 0, so the pair is ambiguous and skipped.
+			name:        "empty-name candidate no longer wins false match",
+			depName:     "STARBUCKS",
+			depMerchant: "",
+			candidates: []matchCandidate{
+				{Name: "", MerchantName: ""},
+				{Name: "UNRELATED MERCHANT", MerchantName: ""},
+			},
+			wantNil: true,
 		},
 		{
 			name:        "three-way tie at top score returns nil",
