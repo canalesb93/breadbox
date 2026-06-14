@@ -1805,10 +1805,14 @@
     box-shadow: inset 2px 0 0 transparent;
     transition: background-color 0.12s ease, box-shadow 0.16s ease;
   }
+  /* Selected (bulk toggle) reads from the checked checkbox + a fuller primary
+     bg wash — and carries NO left spine. The left spine is reserved
+     exclusively for the j/k cursor (.bb-tx-row--focused) so "selected" and
+     "current row" never look alike in bulk-select mode. */
   .bb-tx-row[data-tx-selected] {
-    @apply bg-primary/5;
-    --bb-row-bg: color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100));
-    box-shadow: inset 2px 0 0 color-mix(in oklab, var(--color-primary) 55%, transparent);
+    @apply bg-primary/10;
+    --bb-row-bg: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
+    box-shadow: inset 2px 0 0 transparent;
   }
 
   /*
@@ -1850,10 +1854,22 @@
     transition: background-color 0.12s ease, border-color 0.12s ease;
   }
 
+  /* Hover keeps a left spine too, but a quiet GRAY one (a reduced version of
+     the j/k cursor's solid-primary spine) so it never reads as the keyboard
+     cursor. The cursor (.bb-tx-row--focused) wins by source order below. */
   .bb-tx-row:hover {
     @apply bg-base-200/40;
     --bb-row-bg: color-mix(in oklab, var(--color-base-200) 40%, var(--color-base-100));
-    box-shadow: inset 2px 0 0 color-mix(in oklab, var(--color-primary) 30%, transparent);
+    box-shadow: inset 2px 0 0 color-mix(in oklab, var(--color-base-content) 18%, transparent);
+  }
+
+  /* Hovering a SELECTED row must not wash away the selection — keep the
+     primary selected bg (this rule's higher specificity wins the colour over
+     the plain :hover above); the spine is left to the cascade, so it shows the
+     quiet gray hover spine, or the solid-primary cursor spine when focused. */
+  .bb-tx-row[data-tx-selected]:hover {
+    @apply bg-primary/10;
+    --bb-row-bg: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
   }
 
   /* On hover the amount leans into full base-content weight and the avatar
@@ -1885,10 +1901,22 @@
     animation: bb-tx-flash 0.7s ease-out;
   }
 
-  .bb-tx-row--focused {
+  /* The j/k cursor — the ONLY state with a solid-primary left spine. The bar
+     applies whether or not the row is also selected, so the current row stays
+     findable in bulk-select mode. The bg wash is suppressed when the row is
+     selected so the cursor bar overlays the stronger selected wash rather than
+     replacing it with a lighter one. */
+  /* Doubled `.bb-tx-row.bb-tx-row--focused` (specificity 0,2,0) so the cursor
+     spine outranks both `[data-tx-selected]` (0,2,0, earlier) and `:hover`
+     (0,1,1) — otherwise a selected or hovered row's box-shadow would hide the
+     cursor bar. Carded list-rows have their own `.list-row.bb-tx-row--focused`
+     ring rule and are unaffected. */
+  .bb-tx-row.bb-tx-row--focused {
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+  .bb-tx-row--focused:not([data-tx-selected]) {
     @apply bg-primary/5;
     --bb-row-bg: color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100));
-    box-shadow: inset 3px 0 0 var(--color-primary);
   }
 
   /* ── Carded list-row j/k cursor ──
@@ -1909,13 +1937,13 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .bb-tx-row--focused {
+    :root:not([data-theme="light"]) .bb-tx-row--focused:not([data-tx-selected]) {
       @apply bg-primary/10;
       --bb-row-bg: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
     }
   }
 
-  [data-theme="dark"] .bb-tx-row--focused {
+  [data-theme="dark"] .bb-tx-row--focused:not([data-tx-selected]) {
     @apply bg-primary/10;
     --bb-row-bg: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
   }
