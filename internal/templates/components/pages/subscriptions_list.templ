@@ -211,10 +211,13 @@ templ subscriptionsCandidateRow(s SubscriptionRow) {
 			<!-- Disclosure toggle sits OUTSIDE the nav anchor so expanding the
 			     evidence never navigates to the detail page. @click.stop keeps the
 			     click off the row; type=button keeps it out of any enclosing form. -->
+			<!-- Hidden on mobile: the narrow row has only room for amount +
+			     reject + confirm (else the candidate name gets squeezed out);
+			     on phones the evidence is one tap away on the detail page. -->
 			<button
 				type="button"
 				@click.stop="peek = !peek"
-				class="btn btn-ghost btn-xs gap-1 text-base-content/50 hover:text-base-content"
+				class="btn btn-ghost btn-xs gap-1 text-base-content/50 hover:text-base-content hidden sm:inline-flex"
 				:class="peek ? 'text-base-content' : ''"
 				:aria-expanded="peek"
 				title="Why detected?"
