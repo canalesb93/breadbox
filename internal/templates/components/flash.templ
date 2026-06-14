@@ -7,7 +7,7 @@ package components
 templ Flash(flashType, message string) {
 	<div
 		role="alert"
-		class={ "alert", flashClass(flashType), "rounded-xl", "mb-6" }
+		class={ "alert", "alert-soft", flashClass(flashType), "rounded-xl", "mb-6" }
 		data-bb-flash={ flashType }
 		data-bb-flash-message={ message }
 	>

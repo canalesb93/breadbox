@@ -26,7 +26,7 @@ templ Users(p UsersProps) {
 			Action:               usersAddMemberAction(),
 		})
 		if p.Created {
-			<div role="alert" class="alert alert-success mb-6">
+			<div role="alert" class="alert alert-soft alert-success mb-6">
 				@components.LucideIcon("check-circle", "w-5 h-5")
 				<span>Member created. <button type="button" @click="$store.drawers.open('connect-bank')" class="link font-medium">Connect a bank for them</button></span>
 			</div>

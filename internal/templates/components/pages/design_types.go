@@ -408,7 +408,7 @@ func DesignSections() []DesignSection {
 		{
 			Slug:        "alerts",
 			Title:       "Alerts & flash",
-			Description: "Page-level alert variants, inline bb-form-error, soft alerts.",
+			Description: "Soft-only alert variants (never fully-colored) and inline bb-form-error.",
 			Group:       "feedback",
 			Render:      func() templ.Component { return SectionAlerts() },
 		},

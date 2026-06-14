@@ -91,7 +91,7 @@ document.addEventListener('alpine:init', function () {
           return self._swapBody(html, tab);
         }).catch(function (err) {
           clearTimeout(skeletonTimer);
-          bodyEl.innerHTML = '<div class="alert alert-error rounded-xl text-sm">' +
+          bodyEl.innerHTML = '<div class="alert alert-soft alert-error rounded-xl text-sm">' +
             'Could not load settings: ' + (err && err.message ? err.message : 'unknown error') +
             '</div>';
         });

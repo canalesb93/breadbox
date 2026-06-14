@@ -327,30 +327,24 @@ templ SectionRecurringDetail() {
 // ─── Alerts ────────────────────────────────────────────────────────────
 templ SectionAlerts() {
 	<div class="flex flex-col gap-6">
-		@designExample("Page-level alerts", "role=\"alert\" + rounded-xl + mb-6. Use the matching alert-{type} color.") {
+		@designExample("Alerts (soft only)", "role=\"alert\" + alert-soft + rounded-xl + mb-6. Always soft — never the fully-colored alert-{type}.") {
 			<div class="flex flex-col gap-3">
-				<div role="alert" class="alert alert-success">
+				<div role="alert" class="alert alert-soft alert-success">
 					@components.LucideIcon("check-circle", "w-5 h-5")
 					<span>Backup created successfully.</span>
 				</div>
-				<div role="alert" class="alert alert-info">
+				<div role="alert" class="alert alert-soft alert-info">
 					@components.LucideIcon("info", "w-5 h-5")
 					<span>Sync starts in 5 minutes.</span>
 				</div>
-				<div role="alert" class="alert alert-warning">
+				<div role="alert" class="alert alert-soft alert-warning">
 					@components.LucideIcon("alert-triangle", "w-5 h-5")
 					<span>2 connections need reauth.</span>
 				</div>
-				<div role="alert" class="alert alert-error">
+				<div role="alert" class="alert alert-soft alert-error">
 					@components.LucideIcon("x-circle", "w-5 h-5")
 					<span>Failed to revoke API key.</span>
 				</div>
-			</div>
-		}
-		@designExample("Soft variant", "Less prominent — embed inside content rather than over page chrome.") {
-			<div role="alert" class="alert alert-warning alert-soft">
-				@components.LucideIcon("alert-triangle", "w-5 h-5")
-				<span>Read-only keys cannot trigger syncs.</span>
 			</div>
 		}
 		@designExample("Inline form error (bb-form-error)", "Tighter than alert; sits flush inside a form card.") {

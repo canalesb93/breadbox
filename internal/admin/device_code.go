@@ -31,10 +31,10 @@ var deviceCodePageTmpl = template.Must(template.New("device-code").Parse(`<!doct
   <main class="card w-full max-w-md bg-base-100 shadow-lg">
     <div class="card-body">
       <h1 class="card-title text-2xl mb-2">Approve CLI access</h1>
-      {{if .Flash}}<div class="alert alert-{{.FlashType}} mb-3">{{.Flash}}</div>{{end}}
-      {{if .Error}}<div class="alert alert-error mb-3">{{.Error}}</div>{{end}}
+      {{if .Flash}}<div class="alert alert-soft alert-{{.FlashType}} mb-3">{{.Flash}}</div>{{end}}
+      {{if .Error}}<div class="alert alert-soft alert-error mb-3">{{.Error}}</div>{{end}}
       {{if .Approved}}
-        <div class="alert alert-success">
+        <div class="alert alert-soft alert-success">
           <div>
             <p class="font-semibold">Approved.</p>
             <p>The CLI that printed code <code>{{.DisplayCode}}</code> can finish logging in now.
@@ -42,7 +42,7 @@ var deviceCodePageTmpl = template.Must(template.New("device-code").Parse(`<!doct
           </div>
         </div>
       {{else if .Denied}}
-        <div class="alert alert-warning">
+        <div class="alert alert-soft alert-warning">
           <p>Denied. The CLI will exit with an error.</p>
         </div>
       {{else}}
