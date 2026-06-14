@@ -24,7 +24,7 @@ func benchBuildListTransactionsQuery(params benchListParams) (string, []any) {
 	argN := 1
 
 	buf.WriteString("SELECT t.id, t.short_id, t.account_id, t.external_transaction_id, t.pending_transaction_id, " +
-		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
+		"t.amount, t.iso_currency_code, t.date, t.authorized_date, " +
 		"t.datetime, t.authorized_datetime, t.name, t.merchant_name, " +
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
 		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
