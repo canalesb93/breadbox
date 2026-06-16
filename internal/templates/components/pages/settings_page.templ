@@ -17,6 +17,12 @@ import (
 // body swap; without it they fall back to ordinary navigations that
 // re-render the page.
 templ SettingsPage(p SettingsPageProps) {
+	// settings.js registers the `settingsAutoSave` Alpine factory (and the
+	// bbSettingsScrollToHash helper settings_page.js calls). It MUST load
+	// before settings_page.js and before Alpine's deferred init fires, or
+	// every auto-save control on every tab silently no-ops — `x-data="settingsAutoSave"`
+	// resolves to an empty component and the change→submit listener never attaches.
+	<script src="/static/js/admin/components/settings.js"></script>
 	<script src="/static/js/admin/components/settings_page.js"></script>
 	<div
 		x-data="settingsPage"
