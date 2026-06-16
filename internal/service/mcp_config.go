@@ -6,10 +6,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 )
+
+// normalizeNewlines collapses CRLF (and lone CR) to LF. HTML form submission
+// normalizes textarea line endings to CRLF, so a prompt saved through the
+// settings form would otherwise be stored with \r\n and never byte-match the
+// LF-only built-in default constants — leaving every prompt stuck showing
+// "Customized" even right after a reset-to-default. Canonicalizing on write
+// keeps stored == default when the user saves the default verbatim.
+func normalizeNewlines(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
+}
 
 // MCPConfig represents the MCP permission and instruction settings.
 type MCPConfig struct {
@@ -82,6 +93,7 @@ func (s *Service) SaveMCPDisabledTools(ctx context.Context, tools []string) erro
 
 // SaveMCPInstructions saves server instructions.
 func (s *Service) SaveMCPInstructions(ctx context.Context, instructions string) error {
+	instructions = normalizeNewlines(instructions)
 	if len(instructions) > 20000 {
 		return fmt.Errorf("instructions exceed maximum length of 20,000 characters")
 	}
@@ -93,6 +105,7 @@ func (s *Service) SaveMCPInstructions(ctx context.Context, instructions string) 
 
 // SaveMCPReviewGuidelines saves review guidelines (served via breadbox://review-guidelines).
 func (s *Service) SaveMCPReviewGuidelines(ctx context.Context, guidelines string) error {
+	guidelines = normalizeNewlines(guidelines)
 	if len(guidelines) > 30000 {
 		return fmt.Errorf("review guidelines exceed maximum length of 30,000 characters")
 	}
@@ -104,6 +117,7 @@ func (s *Service) SaveMCPReviewGuidelines(ctx context.Context, guidelines string
 
 // SaveMCPReportFormat saves report format guidelines (served via breadbox://report-format).
 func (s *Service) SaveMCPReportFormat(ctx context.Context, format string) error {
+	format = normalizeNewlines(format)
 	if len(format) > 20000 {
 		return fmt.Errorf("report format exceeds maximum length of 20,000 characters")
 	}
