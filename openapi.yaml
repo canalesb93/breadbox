@@ -2980,27 +2980,6 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-  /api/v1/workflows/prompt-blocks:
-    get:
-      tags: [Workflows]
-      summary: List the embedded agent prompt-block library
-      description: |
-        Returns every parsed block under `prompts/agents/*.md` — id,
-        title, one-line description, taxonomic group (`strategy` /
-        `depth` / `integration` / `knowledge`), and full markdown
-        content. Backs the v2 SPA's assembly-bench prompt builder at
-        `/v2/prompts/build`. The block set is fixed at build time;
-        editing requires a redeploy. The `default-system-prompt` block
-        is excluded — it's injected by `AssembleJobSpec` as the SDK
-        system prompt, not composed into user prompts.
-      responses:
-        "200":
-          description: Bare JSON array of `{id, title, description, group, content}`.
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { type: object, additionalProperties: true }
   /api/v1/workflow-presets:
     get:
       tags: [Workflows]

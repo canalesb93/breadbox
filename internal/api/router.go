@@ -127,7 +127,6 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/workflows", ListAgentDefinitionsHandler(svc))
 		r.Get("/workflows/settings", GetAgentSettingsHandler(svc, a))
 		r.Get("/workflows/status", AgentSubsystemStatusHandler(svc))
-		r.Get("/workflows/prompt-blocks", ListPromptBlocksHandler(svc))
 		r.Get("/workflows/runs", ListAllAgentRunsHandler(svc))
 		r.Get("/workflows/runs/recent-errors", ListRecentErroredAgentRunsHandler(svc))
 		r.Get("/workflows/runs/{shortId}", GetAgentRunHandler(svc))
