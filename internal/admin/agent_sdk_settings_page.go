@@ -14,7 +14,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
-// AgentSDKSettingsPageHandler serves GET /settings/workflows (or wherever
+// AgentSDKSettingsPageHandler serves GET /settings/agents (or wherever
 // router.go wires it) — the v1 admin "Workflows settings" tab for the
 // Claude Agent SDK runner. Distinct from the existing MCP settings page
 // at /settings/mcp (which lives in agents_settings.templ and configures
@@ -87,10 +87,10 @@ func AgentSDKSettingsPageHandler(a *app.App, svc *service.Service, sm *scs.Sessi
 			HouseholdSpend30dStr: formatHouseholdSpend(spend),
 		}
 
-		data := BaseTemplateData(r, sm, "workflows-settings", "Workflows settings")
+		data := BaseTemplateData(r, sm, "agents-settings", "Agents")
 		data["CSRFToken"] = props.CSRFToken
 		data["Flash"] = nil
-		renderSettingsTab(tr, w, r, data, pages.SettingsTabWorkflows, pages.AgentSDKSettings(props))
+		renderSettingsTab(tr, w, r, data, pages.SettingsTabAgents, pages.AgentSDKSettings(props))
 	}
 }
 

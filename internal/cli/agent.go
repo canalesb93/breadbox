@@ -247,7 +247,7 @@ func runAgentTest(parent context.Context) error {
 		case errors.Is(err, agent.ErrAuthNotConfigured):
 			fmt.Fprintln(os.Stdout, "  ✗ auth          not configured")
 			fmt.Fprintln(os.Stdout, "")
-			fmt.Fprintln(os.Stdout, "Open the admin Settings → Agents (/settings/workflows) and paste an Anthropic credential.")
+			fmt.Fprintln(os.Stdout, "Open the admin Settings → Agents (/settings/agents) and paste an Anthropic credential.")
 			fmt.Fprintln(os.Stdout, "For a subscription token: run `claude setup-token` on any machine, then paste the sk-ant-oat01-… into Settings.")
 			return silentlyFail(err)
 		case errors.Is(err, agent.ErrBinaryNotFound):

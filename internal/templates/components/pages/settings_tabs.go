@@ -19,7 +19,7 @@ const (
 	SettingsTabGeneral       = components.SettingsModalTabGeneral
 	SettingsTabSystem        = components.SettingsModalTabSystem
 	SettingsTabProviders     = components.SettingsModalTabProviders
-	SettingsTabWorkflows     = components.SettingsModalTabWorkflows
+	SettingsTabAgents        = components.SettingsModalTabAgents
 	SettingsTabNotifications = components.SettingsModalTabNotifications
 	SettingsTabMCP           = components.SettingsModalTabMCP
 	SettingsTabConnectors    = components.SettingsModalTabConnectors

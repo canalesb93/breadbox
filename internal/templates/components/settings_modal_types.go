@@ -13,7 +13,7 @@ const (
 	SettingsModalTabGeneral       = "general"
 	SettingsModalTabSystem        = "system"
 	SettingsModalTabProviders     = "providers"
-	SettingsModalTabWorkflows     = "workflows"
+	SettingsModalTabAgents        = "agents"
 	SettingsModalTabNotifications = "notifications"
 	SettingsModalTabMCP           = "mcp"
 	SettingsModalTabConnectors    = "connectors"

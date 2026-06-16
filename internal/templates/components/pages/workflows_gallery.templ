@@ -32,7 +32,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 					<div class="font-semibold text-sm">Set up the agent runtime first</div>
 					<div class="text-xs opacity-80">Configure an Anthropic API key in Settings to actually run these workflows. You can still enable presets — they'll stay paused until the runtime is ready.</div>
 				</div>
-				<a href="/settings/workflows" class="btn btn-sm btn-ghost">Configure</a>
+				<a href="/settings/agents" class="btn btn-sm btn-ghost">Configure</a>
 			</div>
 		}
 		if p.Spend.Show {
@@ -43,7 +43,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 						<div class="font-semibold text-sm">Workflows paused — spend ceiling reached</div>
 						<div class="text-xs opacity-80">30-day spend { p.Spend.SpentStr } has reached your ceiling ({ p.Spend.CeilingStr }). New runs are paused until spend ages out of the window or you raise the ceiling.</div>
 					</div>
-					<a href="/settings/workflows" class="btn btn-sm btn-ghost">Adjust</a>
+					<a href="/settings/agents" class="btn btn-sm btn-ghost">Adjust</a>
 				</div>
 			} else {
 				<div role="alert" class="alert alert-soft alert-warning rounded-xl mt-4 mb-2">
@@ -52,7 +52,7 @@ templ WorkflowsGallery(p WorkflowsGalleryProps) {
 						<div class="font-semibold text-sm">Approaching spend ceiling</div>
 						<div class="text-xs opacity-80">{ p.Spend.PctStr } used — { p.Spend.SpentStr } of { p.Spend.CeilingStr } in the last 30 days.</div>
 					</div>
-					<a href="/settings/workflows" class="btn btn-sm btn-ghost">Adjust</a>
+					<a href="/settings/agents" class="btn btn-sm btn-ghost">Adjust</a>
 				</div>
 			}
 		}
@@ -181,7 +181,7 @@ templ workflowReconfigureDrawer() {
 				<div x-show="reconfigure.connectors.length > 0" x-cloak>
 					<div class="text-sm font-medium mb-1">Connectors</div>
 					<div class="text-xs text-base-content/40 mb-2">
-						Extra MCP servers this workflow can call. Manage them in <a class="link link-hover" href="/settings/workflows">Workflows settings</a>.
+						Extra MCP servers this workflow can call. Manage them in <a class="link link-hover" href="/settings/agents">Agents settings</a>.
 					</div>
 					<input type="hidden" name="connectors_present" value="1"/>
 					<div class="space-y-2">

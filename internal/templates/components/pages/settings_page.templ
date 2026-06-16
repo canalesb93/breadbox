@@ -55,11 +55,13 @@ templ settingsPageRail(p SettingsPageProps) {
 				<div class="bb-settings-rail__group-label">Workspace</div>
 				@settingsRailItem(p, "general", "sliders-horizontal", "General")
 				@settingsRailItem(p, "system", "cpu", "System")
-				<div class="bb-settings-rail__group-label">Integrations</div>
-				@settingsRailItem(p, "providers", "plug", "Providers")
-				@settingsRailItem(p, "workflows", "sparkles", "Workflows")
-				@settingsRailItem(p, "connectors", "cable", "Connectors")
 				@settingsRailItem(p, "notifications", "bell", "Notifications")
+				<div class="bb-settings-rail__group-label">Data</div>
+				@settingsRailItem(p, "providers", "plug", "Providers")
+				@settingsRailItem(p, "backups", "hard-drive", "Backups")
+				<div class="bb-settings-rail__group-label">AI &amp; Agents</div>
+				@settingsRailItem(p, "agents", "bot", "Agents")
+				@settingsRailItem(p, "connectors", "cable", "Connectors")
 				@settingsRailItem(p, "mcp", "brand:model-context-protocol", "MCP")
 			}
 			if p.IsEditor {
@@ -69,8 +71,7 @@ templ settingsPageRail(p SettingsPageProps) {
 				@settingsRailItem(p, "api-keys", "key-round", "API Keys")
 			}
 			if p.IsAdmin {
-				<div class="bb-settings-rail__group-label">Maintenance</div>
-				@settingsRailItem(p, "backups", "hard-drive", "Backups")
+				<div class="bb-settings-rail__group-label">Support</div>
 				@settingsRailItem(p, "developer", "bug", "Developer")
 				@settingsRailItem(p, "help", "life-buoy", "Help")
 			}
