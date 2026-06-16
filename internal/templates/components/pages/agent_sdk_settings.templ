@@ -6,13 +6,27 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// AgentSDKSettings renders the Agents tab — auth + sidecar + execution
-// limits for Claude Agent SDK runs. Distinct from AgentsSettings
-// ("MCP Settings"). See .claude/rules/settings.md.
+// AgentSDKSettings renders the Workflows settings tab as a compact Agent
+// SDK directory: one row per pluggable agent SDK inside a single section.
+// Each row opens that SDK's configuration drawer — authentication,
+// runtime paths, and execution ceilings live in the slide-over
+// (components.Drawer), keyed `agent-sdk-<id>` on the global
+// $store.drawers store.
 //
-// All POST targets sit under /-/workflows/* (admin-scoped). The handler
-// resolves masked credential display strings before render so the templ
-// stays free of nil-handling.
+// Read-only state lives on the page, not in the drawer: a Status section
+// (readiness probe) sits above the directory and a Diagnostics section
+// (smoke test / cleanup) sits below it. Only the editable configuration
+// form is tucked into the drawer.
+//
+// Today there is one SDK (Claude Agent SDK); the directory shape is
+// deliberate so additional SDKs (OpenRouter, etc.) drop in as one more
+// row + one more drawer without reshaping the page. See
+// .claude/rules/settings.md and the Providers tab for the same pattern.
+//
+// All POST targets sit under /-/workflows/* (admin-scoped). Plaintext
+// credentials never leave the server — only the masked display string
+// surfaces as a placeholder. Submitting an empty token field is the
+// "keep current value" signal.
 templ AgentSDKSettings(p AgentSDKSettingsProps) {
 	<script src="/static/js/admin/components/agent_sdk_settings.js"></script>
 	<div>
@@ -32,233 +46,254 @@ templ AgentSDKSettings(p AgentSDKSettingsProps) {
 				<span>{ p.FormSuccess }</span>
 			</div>
 		}
-		<div class="space-y-6">
-			@agentSDKStatusSection(p.Status)
-			@agentSDKConfigSection(p)
-			@agentSDKDiagnosticsSection(p.CSRFToken)
-		</div>
+		@agentSDKStatusSection(p.Status)
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "bot",
+			Title:   "Agent SDK",
+			Caption: "How your workflows authenticate and run — configuration opens in a side panel",
+		}) {
+			@agentSDKRow(p.Status)
+		}
+		@agentSDKDiagnosticsSection(p.CSRFToken)
+		// The Claude SDK drawer. Position-independent (fixed), so rendering
+		// it after the sections is fine; it shows only when its id is open.
+		@agentSDKClaudeDrawer(p)
 	</div>
 }
 
 // ---------------------------------------------------------------------
-// Status
+// Status section (page-level readiness probe)
 // ---------------------------------------------------------------------
+
+// agentSDKStatusSection surfaces the side-effect-free readiness probe
+// (auth + binary location) as a page-level section above the directory,
+// with status badges inline within their rows per settings.md.
 templ agentSDKStatusSection(s AgentSDKStatusProps) {
 	@components.SettingsSection(components.SettingsSectionProps{
 		Icon:    "activity",
 		Title:   "Status",
-		Caption: "Side-effect-free probe of auth + binary location",
+		Caption: "Authentication and sidecar readiness",
 	}) {
-		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "Auth configured",
-			Caption: agentSDKAuthCaption(s),
-		}) {
-			if s.AuthConfigured {
-				<span class="badge badge-soft badge-success badge-sm">Yes</span>
-			} else {
-				<span class="badge badge-soft badge-error badge-sm">No</span>
-			}
+		@components.SettingsRow(components.SettingsRowProps{Label: "Authentication"}) {
+			@agentSDKStatusBadge(s.AuthConfigured, "Configured", "Not set")
 		}
-		@components.SettingsRow(components.SettingsRowProps{
-			Label:   "Sidecar binary",
-			Caption: agentSDKBinaryCaption(s),
-		}) {
-			if s.BinaryPresent {
-				<span class="badge badge-soft badge-success badge-sm">Present</span>
-			} else {
-				<span class="badge badge-soft badge-error badge-sm">Missing</span>
+		if s.BinaryPresent && s.BinaryPath != "" {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Sidecar binary", Caption: s.BinaryPath}) {
+				@agentSDKStatusBadge(true, "Present", "Missing")
+			}
+		} else {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Sidecar binary", Caption: "Not found on PATH or at ~/.breadbox/agent-bin/"}) {
+				@agentSDKStatusBadge(false, "Present", "Missing")
 			}
 		}
 		if !s.Ready {
-			@agentSDKSetupHintRow()
+			@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+				<p class="text-xs text-base-content/50">
+					See <a class="link link-hover" href="https://docs.breadbox.sh/guides/multi-agent-reviewer" target="_blank" rel="noopener">docs.breadbox.sh</a> { "for" } setup instructions.
+				</p>
+			}
 		}
 	}
 }
 
-templ agentSDKSetupHintRow() {
-	@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-		@agentSDKSetupHintBody()
+// agentSDKStatusBadge renders a soft success/error badge for a boolean
+// readiness flag.
+templ agentSDKStatusBadge(ok bool, okLabel, badLabel string) {
+	if ok {
+		<span class="badge badge-soft badge-success badge-sm">{ okLabel }</span>
+	} else {
+		<span class="badge badge-soft badge-error badge-sm">{ badLabel }</span>
 	}
-}
-
-templ agentSDKSetupHintBody() {
-	<p class="text-xs text-base-content/60">
-		See <a class="link link-hover" href="https://docs.breadbox.sh/guides/multi-agent-reviewer" target="_blank" rel="noopener">docs.breadbox.sh</a> { "for" } setup instructions.
-	</p>
-}
-
-func agentSDKAuthCaption(s AgentSDKStatusProps) string {
-	if s.AuthConfigured {
-		return ""
-	}
-	return "Set a subscription token or API key below"
-}
-
-func agentSDKBinaryCaption(s AgentSDKStatusProps) string {
-	if s.BinaryPresent {
-		return s.BinaryPath
-	}
-	return "Not found on PATH or at ~/.breadbox/agent-bin/"
 }
 
 // ---------------------------------------------------------------------
-// Configuration form
+// Directory row
 // ---------------------------------------------------------------------
-templ agentSDKConfigSection(p AgentSDKSettingsProps) {
-	<div x-data={ "{ authMode: " + jsString(p.Form.AuthMode) + " }" }>
-		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:    "settings",
-			Title:   "Configuration",
-			Caption: "Authentication, sidecar paths, and per-run limits",
-			Form: &components.SettingsSectionFormProps{
-				Action:    "/-/workflows/settings",
-				CSRFToken: p.CSRFToken,
-			},
-			Footer: agentSDKConfigFooter(),
-		}) {
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Authentication",
-				Caption: "Choose how the sidecar authenticates with Anthropic",
-				Stack:   true,
-			}) {
-				<div class="space-y-3">
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-						<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'subscription' && 'bg-base-200/60 ring-primary/40'">
-							<input
-								type="radio"
-								name="auth_mode"
-								value="subscription"
-								class="radio radio-sm radio-primary mt-0.5 shrink-0"
-								x-model="authMode"
-								if p.Form.AuthMode == "subscription" {
-									checked
-								}
-							/>
-							@components.BrandIcon("claude", "w-5 h-5 mt-0.5 shrink-0")
-							<div class="min-w-0 flex-1">
-								<div class="text-sm font-medium">Subscription token <span class="badge badge-soft badge-success badge-xs ml-1">recommended</span></div>
-								<div class="text-xs text-base-content/50 mt-0.5">Generate from <code class="text-xs">claude setup-token</code>. Charges your Claude Pro / Max subscription.</div>
-							</div>
-						</label>
-						<label class="flex items-start gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'api_key' && 'bg-base-200/60 ring-primary/40'">
-							<input
-								type="radio"
-								name="auth_mode"
-								value="api_key"
-								class="radio radio-sm radio-primary mt-0.5 shrink-0"
-								x-model="authMode"
-								if p.Form.AuthMode == "api_key" {
-									checked
-								}
-							/>
-							@components.BrandIcon("anthropic", "w-5 h-5 mt-0.5 shrink-0")
-							<div class="min-w-0 flex-1">
-								<div class="text-sm font-medium">API key</div>
-								<div class="text-xs text-base-content/50 mt-0.5">From <a class="link link-hover" href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — pay-as-you-go.</div>
-							</div>
-						</label>
-					</div>
-					<div x-show="authMode === 'subscription'" x-cloak>
-						@agentSDKMaskedInput("subscription_token", "Subscription token", p.Form.SubscriptionTokenDisplay, p.FieldErrors["subscription_token"])
-					</div>
-					<div x-show="authMode === 'api_key'" x-cloak>
-						@agentSDKMaskedInput("anthropic_api_key", "Anthropic API key", p.Form.AnthropicAPIKeyDisplay, p.FieldErrors["anthropic_api_key"])
-					</div>
-				</div>
-			}
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Runtime path",
-				Caption: "Override default lookup — empty uses discovery chain",
-				Stack:   true,
-				For:     "runtime_path",
-			}) {
-				<input
-					id="runtime_path"
-					type="text"
-					name="runtime_path"
-					value={ p.Form.RuntimePath }
-					placeholder="auto"
-					class="bb-form-input font-mono"
-				/>
-				if p.FieldErrors["runtime_path"] != "" {
-					<p class="text-xs text-error mt-1">{ p.FieldErrors["runtime_path"] }</p>
-				}
-			}
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Transcript directory",
-				Caption: "Where to persist NDJSON transcripts",
-				Stack:   true,
-				For:     "transcript_dir",
-			}) {
-				<input
-					id="transcript_dir"
-					type="text"
-					name="transcript_dir"
-					value={ p.Form.TranscriptDir }
-					placeholder="transcripts/agents"
-					class="bb-form-input font-mono"
-				/>
-				if p.FieldErrors["transcript_dir"] != "" {
-					<p class="text-xs text-error mt-1">{ p.FieldErrors["transcript_dir"] }</p>
-				}
-			}
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Max concurrent runs",
-				Caption: "Concurrent SDK runs across all definitions. 1–50.",
-				For:     "max_concurrent",
-			}) {
-				<input
-					id="max_concurrent"
-					type="number"
-					name="max_concurrent"
-					value={ strconv.Itoa(p.Form.MaxConcurrent) }
-					min="1"
-					max="50"
-					class="input input-sm w-24"
-				/>
-			}
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Household spend ceiling",
-				Caption: "Pause all workflow runs once 30-day spend reaches this (USD). Empty = no cap.",
-				For:     "global_max_budget_usd",
-			}) {
-				<div class="flex items-center gap-2">
-					<span class="text-sm text-base-content/50">$</span>
+
+// agentSDKRow is the single Claude-Agent-SDK entry in the directory. The
+// whole row is the affordance — it opens `agent-sdk-claude` — so a brand
+// mark on the left is legitimate (the action-list exception in
+// settings.md).
+templ agentSDKRow(s AgentSDKStatusProps) {
+	<button
+		type="button"
+		class="bb-settings-row bb-settings-row--link w-full text-left"
+		@click="$store.drawers.open('agent-sdk-claude')"
+	>
+		@components.BrandIcon("claude", "w-5 h-5 shrink-0")
+		<div class="bb-settings-row__main">
+			<div class="bb-settings-row__label">Claude Agents SDK</div>
+			<p class="bb-settings-row__caption">Anthropic's Claude Agent SDK — subscription token or API key</p>
+		</div>
+		<div class="bb-settings-row__control">
+			<div class="flex items-center gap-2.5">
+				@agentSDKRowStatus(s)
+				@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content opacity-40 shrink-0")
+			</div>
+		</div>
+	</button>
+}
+
+// agentSDKRowStatus is the compact right-side state indicator. Detail
+// (binary path, setup hint) lives in the drawer; the row shows just the
+// categorical state so the directory stays scannable.
+templ agentSDKRowStatus(s AgentSDKStatusProps) {
+	if !s.AuthConfigured {
+		<span class="text-xs text-base-content/40 whitespace-nowrap">Not configured</span>
+	} else if !s.BinaryPresent {
+		<span class="inline-flex items-center gap-1.5 text-xs text-base-content/60 whitespace-nowrap">
+			<span class="status status-sm status-warning"></span>
+			Setup incomplete
+		</span>
+	} else {
+		<span class="inline-flex items-center gap-1.5 text-xs text-base-content/60 whitespace-nowrap">
+			<span class="status status-sm status-success"></span>
+			Ready
+		</span>
+	}
+}
+
+// ---------------------------------------------------------------------
+// Claude SDK drawer
+// ---------------------------------------------------------------------
+
+// agentSDKClaudeDrawer is the full Claude Agent SDK configuration
+// slide-over: a status summary, the auth-mode + credential form, runtime
+// + execution ceilings, and a diagnostics block. The form POSTs every
+// field together to /-/workflows/settings; the handler treats absent
+// fields as "leave untouched" so the drawer can grow/shrink safely.
+templ agentSDKClaudeDrawer(p AgentSDKSettingsProps) {
+	@components.Drawer(components.DrawerProps{
+		ID:    "agent-sdk-claude",
+		Title: "Claude Agents SDK",
+		Size:  "lg",
+	}) {
+		<form
+			method="POST"
+			action="/-/workflows/settings"
+			autocomplete="off"
+			class="flex flex-col h-full"
+			x-data={ "{ authMode: " + jsString(p.Form.AuthMode) + " }" }
+		>
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				BrandIcon: "claude",
+				Title:     "Claude Agents SDK",
+				Subtitle:  "Authentication, runtime, and spend controls",
+			})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				@agentSDKAuthFields(p)
+				@providerDrawerDivider()
+				@providerField(providerFieldProps{Label: "Runtime path", For: "runtime_path", Hint: "Override default lookup — empty uses the discovery chain."}) {
 					<input
-						id="global_max_budget_usd"
-						type="number"
-						name="global_max_budget_usd"
-						value={ p.Form.GlobalMaxBudgetUSDStr }
-						step="0.01"
-						min="0"
-						max="1000"
-						placeholder="no cap"
-						class="input input-sm w-28"
+						id="runtime_path"
+						type="text"
+						name="runtime_path"
+						value={ p.Form.RuntimePath }
+						placeholder="auto"
+						class="bb-form-input font-mono"
 					/>
-				</div>
-			}
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Spent (last 30 days)",
-				Caption: "Rolling total across every workflow run; skipped runs excluded.",
-			}) {
-				<span class="text-sm tabular-nums text-base-content/80">{ p.HouseholdSpend30dStr }</span>
-			}
-			if p.FieldErrors["max_concurrent"] != "" || p.FieldErrors["global_max_budget_usd"] != "" {
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					if p.FieldErrors["max_concurrent"] != "" {
-						<p class="text-xs text-error">Max concurrent: { p.FieldErrors["max_concurrent"] }</p>
-					}
-					if p.FieldErrors["global_max_budget_usd"] != "" {
-						<p class="text-xs text-error">Global max budget: { p.FieldErrors["global_max_budget_usd"] }</p>
+					if p.FieldErrors["runtime_path"] != "" {
+						<p class="text-xs text-error mt-1">{ p.FieldErrors["runtime_path"] }</p>
 					}
 				}
+				@providerField(providerFieldProps{Label: "Max concurrent runs", For: "max_concurrent", Hint: "Concurrent SDK runs across all definitions. 1–50."}) {
+					<input
+						id="max_concurrent"
+						type="number"
+						name="max_concurrent"
+						value={ strconv.Itoa(p.Form.MaxConcurrent) }
+						min="1"
+						max="50"
+						class="input input-sm w-24"
+					/>
+					if p.FieldErrors["max_concurrent"] != "" {
+						<p class="text-xs text-error mt-1">{ p.FieldErrors["max_concurrent"] }</p>
+					}
+				}
+				@providerField(providerFieldProps{Label: "Household spend ceiling", For: "global_max_budget_usd", Hint: "Pause all workflow runs once 30-day spend reaches this (USD). Empty = no cap."}) {
+					<div class="flex items-center gap-2">
+						<span class="text-sm text-base-content/50">$</span>
+						<input
+							id="global_max_budget_usd"
+							type="number"
+							name="global_max_budget_usd"
+							value={ p.Form.GlobalMaxBudgetUSDStr }
+							step="0.01"
+							min="0"
+							max="1000"
+							placeholder="no cap"
+							class="input input-sm w-28"
+						/>
+					</div>
+					<p class="text-xs text-base-content/45 mt-1.5">
+						Spent (last 30 days): <span class="tabular-nums text-base-content/70">{ p.HouseholdSpend30dStr }</span>
+					</p>
+					if p.FieldErrors["global_max_budget_usd"] != "" {
+						<p class="text-xs text-error mt-1">{ p.FieldErrors["global_max_budget_usd"] }</p>
+					}
+				}
+			</div>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm">Save settings</button>
 			}
-		}
-	</div>
+		</form>
+	}
 }
 
-templ agentSDKConfigFooter() {
-	<button type="submit" class="btn btn-primary btn-sm">Save settings</button>
+// ---------------------------------------------------------------------
+// Authentication fields
+// ---------------------------------------------------------------------
+templ agentSDKAuthFields(p AgentSDKSettingsProps) {
+	<div class="space-y-3">
+		<div class="text-xs font-medium text-base-content/60">Authentication</div>
+		<div class="space-y-3">
+			<label class="flex items-center gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'subscription' && 'bg-base-200/60 ring-primary/40'">
+				<input
+					type="radio"
+					name="auth_mode"
+					value="subscription"
+					class="radio radio-sm radio-primary shrink-0"
+					x-model="authMode"
+					if p.Form.AuthMode == "subscription" {
+						checked
+					}
+				/>
+				@components.BrandIcon("claude", "w-5 h-5 shrink-0")
+				<div class="min-w-0 flex-1">
+					<div class="flex items-center gap-2 flex-wrap">
+						<span class="text-sm font-medium">Subscription token</span>
+						<span class="badge badge-soft badge-success badge-xs">recommended</span>
+					</div>
+					<div class="text-xs text-base-content/50 mt-0.5">Generate from <code class="text-xs">claude setup-token</code> — charges your Claude Pro / Max subscription.</div>
+				</div>
+			</label>
+			<label class="flex items-center gap-3 p-3 rounded-xl ring-1 ring-base-content/10 cursor-pointer hover:bg-base-200/50 transition-colors" :class="authMode === 'api_key' && 'bg-base-200/60 ring-primary/40'">
+				<input
+					type="radio"
+					name="auth_mode"
+					value="api_key"
+					class="radio radio-sm radio-primary shrink-0"
+					x-model="authMode"
+					if p.Form.AuthMode == "api_key" {
+						checked
+					}
+				/>
+				@components.BrandIcon("anthropic", "w-5 h-5 shrink-0")
+				<div class="min-w-0 flex-1">
+					<div class="text-sm font-medium">API key</div>
+					<div class="text-xs text-base-content/50 mt-0.5">From <a class="link link-hover" href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — pay-as-you-go.</div>
+				</div>
+			</label>
+		</div>
+		<div x-show="authMode === 'subscription'" x-cloak>
+			@agentSDKMaskedInput("subscription_token", "Subscription token", p.Form.SubscriptionTokenDisplay, p.FieldErrors["subscription_token"])
+		</div>
+		<div x-show="authMode === 'api_key'" x-cloak>
+			@agentSDKMaskedInput("anthropic_api_key", "Anthropic API key", p.Form.AnthropicAPIKeyDisplay, p.FieldErrors["anthropic_api_key"])
+		</div>
+	</div>
 }
 
 // agentSDKMaskedInput renders a credential input that uses the masked
@@ -297,97 +332,121 @@ templ agentSDKMaskedInput(name, label, maskedDisplay, fieldErr string) {
 // ---------------------------------------------------------------------
 // Diagnostics
 // ---------------------------------------------------------------------
+
+// agentSDKDiagnosticsSection is the page-level diagnostics section — a
+// separate Alpine scope (agentSDKDiagnostics) wrapped in a stacked
+// settings row so its buttons + result panels flow full-width. The
+// buttons are type="button" + AJAX, independent of the drawer form.
 templ agentSDKDiagnosticsSection(csrfToken string) {
-	<div x-data="agentSDKDiagnostics" data-csrf={ csrfToken }>
-		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:    "stethoscope",
-			Title:   "Diagnostics",
-			Caption: "Validate the setup without scheduling a real run",
-		}) {
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Smoke test",
-				Caption: "Calls the SDK with a tiny prompt (~5¢ ceiling)",
-			}) {
-				<button
-					type="button"
-					class="btn btn-secondary btn-sm"
-					@click="runSmokeTest()"
-					:disabled="smokeState === 'loading'"
-				>
-					<span x-show="smokeState !== 'loading'" class="flex items-center gap-1.5">
-						@components.LucideIcon("zap", "w-4 h-4")
-						Run smoke test
-					</span>
-					<span x-show="smokeState === 'loading'" x-cloak class="flex items-center gap-1.5">
-						<span class="loading loading-spinner loading-xs"></span> Running…
-					</span>
-				</button>
-			}
-			@components.SettingsRow(components.SettingsRowProps{
-				Label:   "Cleanup now",
-				Caption: "Applies retention policy immediately",
-			}) {
-				<button
-					type="button"
-					class="btn btn-ghost btn-sm"
-					@click="runCleanup()"
-					:disabled="cleanupState === 'loading'"
-				>
-					<span x-show="cleanupState !== 'loading'" class="flex items-center gap-1.5">
-						@components.LucideIcon("broom", "w-4 h-4")
-						Run cleanup
-					</span>
-					<span x-show="cleanupState === 'loading'" x-cloak class="flex items-center gap-1.5">
-						<span class="loading loading-spinner loading-xs"></span> Cleaning…
-					</span>
-				</button>
-			}
-			<template x-if="smokeState === 'ok' && smokeResult">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div class="rounded-lg bg-base-200/60 p-4 space-y-2">
-						<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Smoke test result</div>
-						<dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Auth mode</dt><dd class="font-mono text-xs" x-text="smokeResult.auth_mode"></dd></div>
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Model</dt><dd class="font-mono text-xs" x-text="smokeResult.model"></dd></div>
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Duration</dt><dd class="font-mono text-xs" x-text="(smokeResult.duration_ms || 0) + ' ms'"></dd></div>
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Cost</dt><dd class="font-mono text-xs" x-text="'$' + (smokeResult.total_cost_usd || 0).toFixed(4)"></dd></div>
-							<div class="flex justify-between gap-3 sm:col-span-2"><dt class="text-base-content/50">Binary path</dt><dd class="font-mono text-xs truncate text-right" x-text="smokeResult.binary_path || '—'"></dd></div>
-						</dl>
-						<div x-show="smokeResult.response" class="pt-2 mt-2 border-t border-base-300">
-							<div class="text-xs text-base-content/50 mb-1">Response</div>
-							<pre class="text-xs font-mono whitespace-pre-wrap" x-text="smokeResult.response"></pre>
-						</div>
-					</div>
-				}
-			</template>
-			<template x-if="smokeState === 'error' && smokeError">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div role="alert" class="alert alert-error alert-soft rounded-xl">
-						@components.LucideIcon("circle-x", "w-4 h-4")
-						<span x-text="'Smoke test failed: ' + smokeError"></span>
-					</div>
-				}
-			</template>
-			<template x-if="cleanupState === 'ok' && cleanupResult">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div class="rounded-lg bg-base-200/60 p-4 space-y-2">
-						<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Cleanup result</div>
-						<dl class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 text-sm">
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Runs deleted</dt><dd class="font-mono text-xs" x-text="cleanupResult.runs_deleted ?? 0"></dd></div>
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Transcripts deleted</dt><dd class="font-mono text-xs" x-text="cleanupResult.transcripts_deleted ?? 0"></dd></div>
-							<div class="flex justify-between gap-3"><dt class="text-base-content/50">Retention days</dt><dd class="font-mono text-xs" x-text="cleanupResult.retention_days ?? '—'"></dd></div>
-						</dl>
-					</div>
-				}
-			</template>
-			<template x-if="cleanupState === 'error' && cleanupError">
-				@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
-					<div role="alert" class="alert alert-error alert-soft rounded-xl">
-						@components.LucideIcon("circle-x", "w-4 h-4")
-						<span x-text="'Cleanup failed: ' + cleanupError"></span>
-					</div>
-				}
-			</template>
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "stethoscope",
+		Title:   "Diagnostics",
+		Caption: "Validate the setup without scheduling a real run",
+	}) {
+		@components.SettingsRow(components.SettingsRowProps{Stack: true}) {
+			@agentSDKDiagnosticsBody(csrfToken)
 		}
+	}
+}
+
+// agentSDKDiagnosticsBody holds the diagnostics Alpine island (buttons +
+// result/error panels). Kept separate so the section wrapper above stays
+// declarative.
+templ agentSDKDiagnosticsBody(csrfToken string) {
+	<div x-data="agentSDKDiagnostics" data-csrf={ csrfToken } class="space-y-3">
+		<div class="flex flex-wrap items-center gap-2">
+			// Run smoke test is a menu: it lists the pluggable agent SDKs
+			// (today just Claude Agent SDK) so the action names the API it
+			// exercises. Selecting one runs that SDK's smoke test. Uses
+			// daisy 5's `.dropdown[popover]` (popover API + anchor
+			// positioning) so the menu renders in the top layer and escapes
+			// the surrounding settings card's `overflow-hidden` clip — same
+			// mechanism as components.OverflowMenu.
+			<button
+				type="button"
+				popovertarget="bb-smoke-test-menu"
+				class="btn btn-secondary btn-sm"
+				:class="smokeState === 'loading' && 'btn-disabled'"
+				:aria-disabled="smokeState === 'loading'"
+				style="anchor-name:--bb-smoke-test-anchor"
+			>
+				<span x-show="smokeState !== 'loading'" class="flex items-center gap-1.5">
+					@components.LucideIcon("zap", "w-4 h-4")
+					Run smoke test
+					@components.LucideIcon("chevron-down", "w-3.5 h-3.5 opacity-60")
+				</span>
+				<span x-show="smokeState === 'loading'" x-cloak class="flex items-center gap-1.5">
+					<span class="loading loading-spinner loading-xs"></span> Running…
+				</span>
+			</button>
+			<ul
+				id="bb-smoke-test-menu"
+				popover="auto"
+				class="dropdown dropdown-start menu bg-base-100 rounded-xl shadow-lg border border-base-300 min-w-56 p-1"
+				style="position-anchor:--bb-smoke-test-anchor"
+			>
+				<li class="menu-title text-xs">Test an API</li>
+				<li>
+					<a @click="runSmokeTest('Claude Agent SDK'); $el.closest('[popover]')?.hidePopover()">
+						@components.BrandIcon("claude", "w-4 h-4 shrink-0")
+						Claude Agent SDK
+					</a>
+				</li>
+			</ul>
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm"
+				@click="runCleanup()"
+				:disabled="cleanupState === 'loading'"
+			>
+				<span x-show="cleanupState !== 'loading'" class="flex items-center gap-1.5">
+					@components.LucideIcon("broom", "w-4 h-4")
+					Run cleanup
+				</span>
+				<span x-show="cleanupState === 'loading'" x-cloak class="flex items-center gap-1.5">
+					<span class="loading loading-spinner loading-xs"></span> Cleaning…
+				</span>
+			</button>
+		</div>
+		<p class="text-xs text-base-content/40">Smoke test calls the SDK with a tiny prompt (~5¢ ceiling). Cleanup applies the retention policy immediately.</p>
+		<template x-if="smokeState === 'ok' && smokeResult">
+			<div class="rounded-lg bg-base-200/60 p-4 space-y-2">
+				<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Smoke test result</div>
+				<dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+					<div class="flex justify-between gap-3 sm:col-span-2"><dt class="text-base-content/50">API</dt><dd class="text-xs font-medium" x-text="smokeSdk || '—'"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Auth mode</dt><dd class="font-mono text-xs" x-text="smokeResult.auth_mode"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Model</dt><dd class="font-mono text-xs" x-text="smokeResult.model"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Duration</dt><dd class="font-mono text-xs" x-text="(smokeResult.duration_ms || 0) + ' ms'"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Cost</dt><dd class="font-mono text-xs" x-text="'$' + (smokeResult.total_cost_usd || 0).toFixed(4)"></dd></div>
+					<div class="flex justify-between gap-3 sm:col-span-2"><dt class="text-base-content/50">Binary path</dt><dd class="font-mono text-xs truncate text-right" x-text="smokeResult.binary_path || '—'"></dd></div>
+				</dl>
+				<div x-show="smokeResult.response" class="pt-2 mt-2 border-t border-base-300">
+					<div class="text-xs text-base-content/50 mb-1">Response</div>
+					<pre class="text-xs font-mono whitespace-pre-wrap" x-text="smokeResult.response"></pre>
+				</div>
+			</div>
+		</template>
+		<template x-if="smokeState === 'error' && smokeError">
+			<div role="alert" class="alert alert-error alert-soft rounded-xl">
+				@components.LucideIcon("circle-x", "w-4 h-4")
+				<span x-text="'Smoke test failed: ' + smokeError"></span>
+			</div>
+		</template>
+		<template x-if="cleanupState === 'ok' && cleanupResult">
+			<div class="rounded-lg bg-base-200/60 p-4 space-y-2">
+				<div class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Cleanup result</div>
+				<dl class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 text-sm">
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Runs deleted</dt><dd class="font-mono text-xs" x-text="cleanupResult.runs_deleted ?? 0"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Transcripts deleted</dt><dd class="font-mono text-xs" x-text="cleanupResult.transcripts_deleted ?? 0"></dd></div>
+					<div class="flex justify-between gap-3"><dt class="text-base-content/50">Retention days</dt><dd class="font-mono text-xs" x-text="cleanupResult.retention_days ?? '—'"></dd></div>
+				</dl>
+			</div>
+		</template>
+		<template x-if="cleanupState === 'error' && cleanupError">
+			<div role="alert" class="alert alert-error alert-soft rounded-xl">
+				@components.LucideIcon("circle-x", "w-4 h-4")
+				<span x-text="'Cleanup failed: ' + cleanupError"></span>
+			</div>
+		</template>
 	</div>
 }
