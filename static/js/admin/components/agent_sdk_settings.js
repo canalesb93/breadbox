@@ -11,6 +11,7 @@ document.addEventListener('alpine:init', function () {
       smokeState: 'idle',
       smokeResult: null,
       smokeError: null,
+      smokeSdk: null,
       cleanupState: 'idle',
       cleanupResult: null,
       cleanupError: null,
@@ -30,8 +31,9 @@ document.addEventListener('alpine:init', function () {
         });
       },
 
-      runSmokeTest: function () {
+      runSmokeTest: function (sdkLabel) {
         var self = this;
+        this.smokeSdk = sdkLabel || 'Claude Agent SDK';
         this.smokeState = 'loading';
         this.smokeResult = null;
         this.smokeError = null;
