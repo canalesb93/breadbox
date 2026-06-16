@@ -603,7 +603,7 @@
      brackets them. Flatter than .bb-card (no shadow) so it reads as a
      quiet container, not a raised panel. */
   .bb-settings-card {
-    @apply rounded-xl border border-base-300 bg-base-100 overflow-hidden;
+    @apply rounded-xl border border-base-300 bg-base-100;
   }
   .bb-settings-card--danger {
     @apply border-error/25 bg-error/[0.025];
@@ -626,6 +626,16 @@
      reveals. */
   .bb-settings-row {
     @apply flex items-center justify-between gap-4 px-4 sm:px-5 py-3.5 min-h-[3rem];
+  }
+  /* The card no longer clips with overflow-hidden (so row tooltips can escape
+     its bounds), so round whichever child sits at the top/bottom edge — keeps a
+     `--link` row's hover background, the footer's tint, and the hairline
+     dividers flush with the card's rounded border instead of poking past it. */
+  .bb-settings-card > :first-child {
+    @apply rounded-t-xl;
+  }
+  .bb-settings-card > :last-child {
+    @apply rounded-b-xl;
   }
   .bb-settings-card > .bb-settings-row + .bb-settings-row,
   .bb-settings-card__body > .bb-settings-row + .bb-settings-row,
