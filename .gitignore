@@ -64,6 +64,7 @@ transcripts/
 # Claude Code worktrees and task locks
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.claude/port-locks/
 
 # MCP config (contains API key)
 .mcp.json
