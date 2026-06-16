@@ -285,7 +285,7 @@ func UpdateAgentRunNoteAdminHandler(svc *service.Service, sm *scs.SessionManager
 func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			FlashRedirect(w, r, sm, "error", "Invalid form data.", "/settings/workflows")
+			FlashRedirect(w, r, sm, "error", "Invalid form data.", "/settings/agents")
 			return
 		}
 
@@ -316,7 +316,7 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 		if v := strings.TrimSpace(r.FormValue("max_concurrent")); v != "" {
 			n, err := strconv.Atoi(v)
 			if err != nil || n < 1 || n > 50 {
-				FlashRedirect(w, r, sm, "error", "Max concurrent must be a whole number between 1 and 50.", "/settings/workflows")
+				FlashRedirect(w, r, sm, "error", "Max concurrent must be a whole number between 1 and 50.", "/settings/agents")
 				return
 			}
 			params.MaxConcurrent = &n
@@ -324,7 +324,7 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 		if v := strings.TrimSpace(r.FormValue("global_max_budget_usd")); v != "" {
 			f, err := strconv.ParseFloat(v, 64)
 			if err != nil || f < 0 {
-				FlashRedirect(w, r, sm, "error", "Global max budget must be a non-negative number.", "/settings/workflows")
+				FlashRedirect(w, r, sm, "error", "Global max budget must be a non-negative number.", "/settings/agents")
 				return
 			}
 			params.GlobalMaxBudgetUSD = &f
@@ -333,11 +333,11 @@ func UpdateAgentSDKSettingsAdminHandler(a *app.App, svc *service.Service, sm *sc
 			params.GlobalMaxBudgetUSD = &zero
 		}
 		if _, err := svc.UpdateAgentSettings(r.Context(), params, a.Config.EncryptionKey, a.Config.DataDir); err != nil {
-			FlashRedirect(w, r, sm, "error", "Failed to save settings: "+err.Error(), "/settings/workflows")
+			FlashRedirect(w, r, sm, "error", "Failed to save settings: "+err.Error(), "/settings/agents")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Agent settings saved.")
-		http.Redirect(w, r, "/settings/workflows", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/agents", http.StatusSeeOther)
 	}
 }
 
