@@ -130,36 +130,12 @@ func jsonResourceResult(uri string, v any) (*mcpsdk.ReadResourceResult, error) {
 	}, nil
 }
 
-func (s *MCPServer) handleCategoriesResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
-	cats, err := s.svc.ListCategories(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list categories: %w", err)
-	}
-	return jsonResourceResult("breadbox://categories", map[string]any{"categories": cats})
-}
-
 func (s *MCPServer) handleAccountsResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
 	accts, err := s.svc.ListAccounts(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("list accounts: %w", err)
 	}
 	return jsonResourceResult("breadbox://accounts", map[string]any{"accounts": accts})
-}
-
-func (s *MCPServer) handleUsersResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
-	users, err := s.svc.ListUsers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list users: %w", err)
-	}
-	return jsonResourceResult("breadbox://users", map[string]any{"users": users})
-}
-
-func (s *MCPServer) handleTagsResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
-	tags, err := s.svc.ListTags(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list tags: %w", err)
-	}
-	return jsonResourceResult("breadbox://tags", map[string]any{"tags": tags})
 }
 
 func (s *MCPServer) handleSyncStatusResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
@@ -170,20 +146,9 @@ func (s *MCPServer) handleSyncStatusResource(ctx context.Context, _ *mcpsdk.Read
 	return jsonResourceResult("breadbox://sync-status", map[string]any{"connections": conns})
 }
 
-// rulesResourceLimit caps the rules resource payload. The rule list is small
-// in practice (households tend to have tens, not thousands of rules), but the
-// cap keeps the resource bounded and predictable.
-const rulesResourceLimit = 200
-
-func (s *MCPServer) handleRulesResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
-	result, err := s.svc.ListTransactionRules(ctx, service.TransactionRuleListParams{
-		Limit: rulesResourceLimit,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list rules: %w", err)
-	}
-	return jsonResourceResult("breadbox://rules", result)
-}
+// The categories / tags / users / rules reference resources were retired as
+// duplicates of get_reference(kind=…) — see registerResources. Their read
+// paths still exist as the get_reference tool handlers in tools_reads.go.
 
 // resourceAnnotations builds the standard *mcpsdk.Annotations payload used on
 // every Breadbox resource. lastModifiedFn returns the timestamp the client

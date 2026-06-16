@@ -601,15 +601,19 @@ Calls `GET /api/v1/categories`. Returns the same `[]CategoryPair` response.
 
 ## 4. MCP Resources
 
-MCP resources are passive context documents the LLM can read, similar to files. They do not execute queries at call time in the same on-demand way tools do.
+MCP resources are passive context documents the LLM can read, similar to files. They do not execute queries at call time in the same on-demand way tools do. They're registered via `s.registerResources()` in `internal/mcp/server.go`, with handlers in `internal/mcp/resources.go`.
 
-All three resources are registered via `s.registerResources()` in `internal/mcp/server.go`, with handlers in `internal/mcp/resources.go`.
+Bounded reference data (accounts, categories, tags, users, sync status, rules) is read through the **`get_reference(kind=…)` tool**, not resources — only snapshot-like / static-doc resources remain (the lookup-table resources were retired as tool duplicates). The resources that stay:
 
 | Resource URI | MIME Type | Description |
 |---|---|---|
-| `breadbox://overview` | `application/json` | Live dataset summary (users, connections, accounts, transactions, spending) |
+| `breadbox://overview` | `application/json` | Live dataset summary (also `get_reference(kind=overview)`) |
+| `breadbox://accounts` | `application/json` | Bank accounts (also `get_reference(kind=accounts)`) |
+| `breadbox://sync-status` | `application/json` | Connection sync status (also `get_reference(kind=sync_status)`) |
 | `breadbox://review-guidelines` | `text/markdown` | Guidelines for reviewing transactions and creating rules |
 | `breadbox://report-format` | `text/markdown` | Report structure templates and formatting guidelines |
+| `breadbox://rule-dsl` | `text/markdown` | Condition grammar / action types for authoring rules |
+| `breadbox://transaction/{short_id}`, `breadbox://account/{short_id}`, `breadbox://user/{short_id}` | `application/json` | Per-entity drilldown templates |
 
 ### Resource: `breadbox://overview`
 

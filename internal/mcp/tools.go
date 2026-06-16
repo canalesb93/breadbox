@@ -22,7 +22,7 @@ type queryTransactionsInput struct {
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). See breadbox://categories for the slug list."`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). See get_reference(kind=categories) for the slug list."`
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
 	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
@@ -30,7 +30,7 @@ type queryTransactionsInput struct {
 	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
-	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics). See breadbox://tags for the available vocabulary."`
+	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics). See get_reference(kind=tags) for the available vocabulary."`
 	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`

@@ -958,79 +958,16 @@ func TestUpdateTransactionsHandler_ResetCategoryShape(t *testing.T) {
 // optional service-layer params without copy-pasting the &s pattern.
 func ptrString(s string) *string { return &s }
 
-// TestRulesResourceShape pins the breadbox://rules resource against the
-// service.TransactionRuleListResult contract introduced when the rule listing
-// moved from a tool to a live resource. The shape is what agents branch on
-// when picking duplicate-detection logic, and the limit cap is what keeps the
-// resource bounded under household-scale rule counts. The test asserts:
-//   - the JSON envelope mirrors TransactionRuleListResult (rules, has_more, total)
-//   - rule rows go through compactIDsBytes (id is the 8-char short, no short_id sibling)
-//   - the underlying ListTransactionRules call carries the rulesResourceLimit cap
-func TestRulesResourceShape(t *testing.T) {
-	f := seedFixtures(t)
-
-	// seedFixtures already inserted one rule. Read the resource directly.
-	res, err := f.svc.handleRulesResource(f.ctx, nil)
-	if err != nil {
-		t.Fatalf("handleRulesResource: %v", err)
-	}
-	if res == nil || len(res.Contents) == 0 {
-		t.Fatal("expected a content block")
-	}
-	c := res.Contents[0]
-	if c.URI != "breadbox://rules" {
-		t.Errorf("URI = %q, want breadbox://rules", c.URI)
-	}
-	if c.MIMEType != "application/json" {
-		t.Errorf("MIMEType = %q, want application/json", c.MIMEType)
-	}
-
-	var out map[string]any
-	if err := json.Unmarshal([]byte(c.Text), &out); err != nil {
-		t.Fatalf("unmarshal rules resource: %v\nraw=%s", err, c.Text)
-	}
-	requireKeys(t, "breadbox://rules", out, "rules", "has_more", "total")
-
-	rules := asArray(t, "breadbox://rules.rules", out["rules"])
-	if len(rules) == 0 {
-		t.Fatal("expected at least the seeded rule")
-	}
-	rule := asObject(t, "breadbox://rules.rules[0]", rules[0])
-	requireKeys(t, "breadbox://rules.rules[0]", rule, "id", "name", "trigger", "priority")
-	// compactIDsBytes must collapse the id/short_id pair: id should be the
-	// 8-char short, and short_id must not appear on the row.
-	requireAbsent(t, "breadbox://rules.rules[0]", rule, "short_id")
-	id, _ := rule["id"].(string)
-	if len(id) != 8 {
-		t.Errorf("rule id = %q (len=%d); expected 8-char short_id", id, len(id))
-	}
-
-	// Verify the resource handler honors the 200-cap by exercising the same
-	// service call with the same params and asserting the cap surfaces. We
-	// don't actually create 200+ rules (expensive); instead we confirm the
-	// limit value travels through to the service layer by calling the service
-	// directly with the documented cap and ensuring it doesn't raise.
-	if _, err := f.svc.svc.ListTransactionRules(f.ctx, service.TransactionRuleListParams{
-		Limit: rulesResourceLimit,
-	}); err != nil {
-		t.Errorf("ListTransactionRules with rulesResourceLimit=%d failed: %v", rulesResourceLimit, err)
-	}
-	if rulesResourceLimit != 200 {
-		t.Errorf("rulesResourceLimit drift: got %d, want 200", rulesResourceLimit)
-	}
-}
-
 // TestReferenceMirrorTools_ParityWithResources locks the dual-surface
-// contract: each bounded reference resource (breadbox://accounts,
-// ://categories, ://tags, ://users, ://sync-status, ://rules, ://overview) has
-// a tool mirror (list_accounts / list_categories / list_tags / list_users /
-// get_sync_status / list_transaction_rules / get_overview) that returns the
-// SAME payload via the SAME service call. A regression that diverges them —
-// e.g. forgetting to wrap one in the resource envelope, or pointing the tool
-// at a different service method — would let one surface drift from the other.
-// Both surfaces are user-discoverable today (resources via Claude.ai's
-// paperclip menu, tools via Inspector + clients without resource support), so
-// drift is observable and bad.
+// contract for the reference datasets that still have BOTH a resource and a
+// get_reference tool path: breadbox://accounts, ://sync-status, ://overview.
+// Each pair must return the SAME payload via the SAME service call. A
+// regression that diverges them — e.g. forgetting the resource envelope, or
+// pointing the tool at a different service method — would let one surface
+// drift from the other.
+//
+// (categories / tags / users / rules were retired as resources — they're
+// read-only via get_reference now, so there's no pair left to compare.)
 //
 // The parity test reads each pair, ignores envelope keys (resource handlers
 // always wrap in {"<entity>": [...]}), and compares the inner payload byte-
@@ -1041,12 +978,12 @@ func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
 
 	cases := []struct {
 		name        string
-		envelopeKey string // key inside the JSON envelope; "" means top-level (overview, rules)
+		envelopeKey string // key inside the JSON envelope; "" means top-level (overview)
 		toolFn      func() (*mcpsdk.CallToolResult, any, error)
 		resourceFn  func() (*mcpsdk.ReadResourceResult, error)
 	}{
 		{
-			name:        "list_accounts <-> breadbox://accounts",
+			name:        "get_reference(accounts) <-> breadbox://accounts",
 			envelopeKey: "accounts",
 			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
 				return f.svc.handleListAccounts(f.ctx, nil, listAccountsInput{})
@@ -1056,37 +993,7 @@ func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
 			},
 		},
 		{
-			name:        "list_categories <-> breadbox://categories",
-			envelopeKey: "categories",
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				return f.svc.handleListCategories(f.ctx, nil, listCategoriesInput{})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleCategoriesResource(f.ctx, nil)
-			},
-		},
-		{
-			name:        "list_tags <-> breadbox://tags",
-			envelopeKey: "tags",
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				return f.svc.handleListTags(f.ctx, nil, listTagsInput{})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleTagsResource(f.ctx, nil)
-			},
-		},
-		{
-			name:        "list_users <-> breadbox://users",
-			envelopeKey: "users",
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				return f.svc.handleListUsers(f.ctx, nil, listUsersInput{})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleUsersResource(f.ctx, nil)
-			},
-		},
-		{
-			name:        "get_sync_status <-> breadbox://sync-status",
+			name:        "get_reference(sync_status) <-> breadbox://sync-status",
 			envelopeKey: "connections",
 			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
 				return f.svc.handleGetSyncStatus(f.ctx, nil, getSyncStatusInput{})
@@ -1096,25 +1003,7 @@ func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
 			},
 		},
 		{
-			name:        "list_transaction_rules <-> breadbox://rules",
-			envelopeKey: "", // both surfaces return the same {rules, has_more, total} object
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				// list_transaction_rules is lean-by-default (summary projection,
-				// no conditions/actions trees). The resource has no fields knob
-				// and returns the full payload, so parity is asserted against
-				// the tool's full mode (fields=all) — that's the invariant that
-				// must hold: same service call, same full shape.
-				return f.svc.handleListTransactionRules(f.ctx, nil, listTransactionRulesInput{
-					Limit:  rulesResourceLimit,
-					Fields: "all",
-				})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleRulesResource(f.ctx, nil)
-			},
-		},
-		{
-			name:        "get_overview <-> breadbox://overview",
+			name:        "get_reference(overview) <-> breadbox://overview",
 			envelopeKey: "", // both surfaces return the same OverviewStats shape
 			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
 				return f.svc.handleGetOverview(f.ctx, nil, getOverviewInput{})

@@ -71,7 +71,7 @@ Aggregated spending totals. Default date range: 30 days.
 
 ### get_reference (Read)
 
-One tool that reads any bounded reference dataset by `kind` — the single mirror of the `breadbox://` reference resources, for clients that don't support MCP resources. (Folds the former `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `get_sync_status`, and `list_transaction_rules` tools.)
+One tool that reads any bounded reference dataset by `kind`. (Folds the former `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `get_sync_status`, and `list_transaction_rules` tools.) `overview`, `accounts`, and `sync_status` are also exposed as `breadbox://` resources for clients with an attach UI; `categories`, `tags`, `users`, and `rules` are tool-only (their resources were retired as duplicates).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -148,7 +148,7 @@ Import categories from TSV format. Creates or updates categories.
 
 ### list_tags (Read)
 
-The tag vocabulary is read via `get_reference(kind=tags)` (or the `breadbox://tags` resource).
+The tag vocabulary is read via `get_reference(kind=tags)`.
 
 ### add_transaction_tag (Write)
 
@@ -318,7 +318,7 @@ Returns `{ created, failed, rules: [{rule, retroactive_matches?}], errors }` so 
 
 ### list_transaction_rules (Read)
 
-The rule roster is read via `get_reference(kind=rules)` (lean `summary` projection; `fields=all` for full `conditions`/`actions`) or the `breadbox://rules` resource. For filtered/sorted analysis use `query_transaction_rules` below.
+The rule roster is read via `get_reference(kind=rules)` (lean `summary` projection; `fields=all` for full `conditions`/`actions`). For filtered/sorted analysis use `query_transaction_rules` below.
 
 ### query_transaction_rules (Read)
 

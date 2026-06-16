@@ -1,15 +1,18 @@
 Breadbox is a self-hosted financial-data aggregator server for households. It syncs transactions and other data via Plaid, Teller, or CSV imports into one unified database and exposes tools and resources for reviewing, enriching and interacting with financial data.
 
 ## Where to Start
-Read `breadbox://overview` first (or call `get_overview` if your client doesn't support resources). Use resources and tools to interact with the data.
+Read `get_reference(kind=overview)` first (or the `breadbox://overview` resource if your client supports resources) for a household snapshot, then use the tools and resources to interact with the data.
 
-Bounded reference data has both a resource and a tool mirror with the same payload — pick whichever your client supports:
-- `breadbox://accounts` ↔ `list_accounts`
-- `breadbox://categories` ↔ `list_categories`
-- `breadbox://tags` ↔ `list_tags`
-- `breadbox://users` ↔ `list_users`
-- `breadbox://sync-status` ↔ `get_sync_status`
-- `breadbox://rules` ↔ `list_transaction_rules`
+Bounded reference data is read through one tool — `get_reference(kind=…)`:
+- `get_reference(kind=overview)` — household snapshot (scope, freshness, review backlog)
+- `get_reference(kind=accounts)` — bank accounts (optional `user_id` filter)
+- `get_reference(kind=categories)` — the category taxonomy (source of `category_slug` values)
+- `get_reference(kind=tags)` — the tag vocabulary
+- `get_reference(kind=users)` — household members
+- `get_reference(kind=sync_status)` — per-connection sync status / freshness
+- `get_reference(kind=rules)` — the transaction-rule roster (lean; `fields=all` for full)
+
+A few of these are also exposed as resources for clients with a resource/attach UI — `breadbox://overview`, `breadbox://accounts`, `breadbox://sync-status` — with the same payload as the matching `get_reference` kind.
 
 Per-entity drilldowns are exposed as resource templates (resolve a single short_id):
 - `breadbox://transaction/{short_id}` — full transaction + recent annotations

@@ -397,7 +397,7 @@ func (s *MCPServer) buildToolRegistry() {
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transactions", Title: "Query Transactions", Classification: ToolRead,
-			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own. Pass count_only=true to get just {\"count\": N} for the same filters (no rows) — use it to size a result set or compare counts across ranges before paginating.",
+			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see get_reference(kind=categories) for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own. Pass count_only=true to get just {\"count\": N} for the same filters (no rows) — use it to size a result set or compare counts across ranges before paginating.",
 		}, s.handleQueryTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "transaction_summary", Title: "Spending Summary", Classification: ToolRead,
@@ -434,8 +434,8 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleListAnnotations, s),
 
 		// --- Rules ---
-		// See breadbox://rule-dsl for the condition grammar and breadbox://rules
-		// for the current ruleset.
+		// See breadbox://rule-dsl for the condition grammar and
+		// get_reference(kind=rules) for the current ruleset.
 		makeToolDefLogged(ToolSpec{
 			Name: "create_transaction_rule", Title: "Create Rule", Classification: ToolWrite,
 			Description: "Create one or more transaction rules for automatic categorization, tagging, or commenting. Pass `rules`: an array of 1..100 rule specs (a single rule is just a one-element array). Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) per rule instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category — author such pipelines in one call. Set apply_retroactively=true on a rule to immediately back-fill it against existing transactions. Before creating, read the rules roster (get_reference kind=rules) to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Returns the created rules plus any per-item errors so a partial batch is recoverable. Full DSL: breadbox://rule-dsl.",
@@ -675,33 +675,6 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 	}, s.handleAccountsResource)
 
 	server.AddResource(&mcpsdk.Resource{
-		Name:        "Categories",
-		Title:       "Category Taxonomy",
-		URI:         "breadbox://categories",
-		Description: "Two-level category taxonomy keyed by slug. Source for valid category_slug values when categorizing or authoring rules.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceAssistantOnly, 0.5, liveResourceModTime),
-	}, s.handleCategoriesResource)
-
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Tags",
-		Title:       "Tag Vocabulary",
-		URI:         "breadbox://tags",
-		Description: "Current tag vocabulary keyed by slug. The 'needs-review' tag is the review-queue handle.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceAssistantOnly, 0.5, liveResourceModTime),
-	}, s.handleTagsResource)
-
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Users",
-		Title:       "Household Members",
-		URI:         "breadbox://users",
-		Description: "Household members with their roles (admin, editor, viewer).",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceAssistantOnly, 0.5, liveResourceModTime),
-	}, s.handleUsersResource)
-
-	server.AddResource(&mcpsdk.Resource{
 		Name:        "Sync Status",
 		Title:       "Connection Sync Status",
 		URI:         "breadbox://sync-status",
@@ -710,14 +683,11 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
 	}, s.handleSyncStatusResource)
 
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Rules",
-		Title:       "Transaction Rules",
-		URI:         "breadbox://rules",
-		Description: "Currently registered transaction rules with their conditions, actions, trigger, priority, hit_count, and last_hit_at. Read before authoring new rules to avoid duplicates and to spot stale or never-matching rules.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
-	}, s.handleRulesResource)
+	// The categories / tags / users / rules reference resources were retired —
+	// they were exact duplicates of get_reference(kind=…) and, being pure
+	// agent-facing lookup tables (not human-attach material), carried no load on
+	// the resource surface. Read them via get_reference. overview / accounts /
+	// sync-status stay because a human plausibly attaches those snapshots.
 
 	// Workflow guides — markdown, user-overridable via app_config.
 	server.AddResource(&mcpsdk.Resource{
@@ -768,7 +738,7 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Name:        "Account",
 		Title:       "Account Detail",
 		URITemplate: "breadbox://account/{short_id}",
-		Description: "Single bank account with balance, currency, and the most recent 25 transactions. short_id is the 8-char base62 id surfaced by list_accounts.",
+		Description: "Single bank account with balance, currency, and the most recent 25 transactions. short_id is the 8-char base62 id surfaced by get_reference(kind=accounts).",
 		MIMEType:    "application/json",
 		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
 	}, s.handleAccountTemplate)
@@ -777,7 +747,7 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Name:        "Household Member",
 		Title:       "Household Member Detail",
 		URITemplate: "breadbox://user/{short_id}",
-		Description: "Single household member with their connected accounts. short_id is the 8-char base62 id surfaced by list_users.",
+		Description: "Single household member with their connected accounts. short_id is the 8-char base62 id surfaced by get_reference(kind=users).",
 		MIMEType:    "application/json",
 		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
 	}, s.handleUserTemplate)

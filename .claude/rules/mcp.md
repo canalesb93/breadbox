@@ -98,12 +98,14 @@ When folding a tool, prefer reusing the existing service methods from the compou
 
 ## Reference data: dual surface (resources + one tool)
 
-Bounded reference data is exposed two ways:
+Bounded reference data is read through **one tool**, `get_reference(kind=…)`, dispatching on `kind` (`overview` \| `accounts` \| `categories` \| `tags` \| `users` \| `sync_status` \| `rules`) to the per-kind handlers in `tools_reads.go` (`handleGetOverview`, `handleListAccounts`, …). Optional `user_id` (accounts) and `fields` (rules) ride through. Filtered/sorted rule analysis stays in `query_transaction_rules`; `get_reference kind=rules` returns the lean roster.
 
-- **Resources (preferred)** — `breadbox://overview`, `://accounts`, `://categories`, `://tags`, `://users`, `://rules`, `://sync-status`. Surfaced in Claude.ai's paperclip menu and the Inspector resource picker. Application-driven, user-controlled.
-- **`get_reference` tool (compat)** — a single tool that dispatches on `kind` (`overview` \| `accounts` \| `categories` \| `tags` \| `users` \| `sync_status` \| `rules`) to the same per-kind handler the matching resource uses. Kept because not every MCP client implements the resources/* methods. Optional `user_id` (accounts) and `fields` (rules) ride through. Filtered/sorted rule analysis stays in `query_transaction_rules`; `get_reference kind=rules` returns the lean roster.
+A **subset** is also exposed as `resources/*` for clients with a resource/attach UI (Claude.ai's paperclip menu, the Inspector picker), sharing the same service-layer call path so payloads stay in sync:
 
-Both surfaces share the same service-layer call path (no logic duplication), so payload shape stays in sync. The per-kind handlers (`handleGetOverview`, `handleListAccounts`, …) still live in `tools_reads.go` — `get_reference` dispatches to them. When adding a new bounded reference resource, add a resource handler in `resources.go` and a new `kind` branch in `handleGetReference`.
+- `breadbox://overview`, `breadbox://accounts`, `breadbox://sync-status` — kept because a human plausibly attaches these snapshots.
+- `breadbox://categories`, `://tags`, `://users`, `://rules` were **retired** — pure agent-facing lookup tables that no one attaches, and exact duplicates of the `get_reference` kinds. Read them via the tool.
+
+So a new reference dataset gets a `kind` branch in `handleGetReference` by default; add a parallel resource handler in `resources.go` only if it's something a user would attach in chat (snapshot-like), not for pure lookup tables.
 
 ## Resource templates (drill-downs)
 
