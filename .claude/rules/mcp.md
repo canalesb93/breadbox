@@ -102,8 +102,8 @@ Bounded reference data is read through **one tool**, `get_reference(kind=…)`, 
 
 A **subset** is also exposed as `resources/*` for clients with a resource/attach UI (Claude.ai's paperclip menu, the Inspector picker), sharing the same service-layer call path so payloads stay in sync:
 
-- `breadbox://overview`, `breadbox://accounts`, `breadbox://sync-status` — kept because a human plausibly attaches these snapshots.
-- `breadbox://categories`, `://tags`, `://users`, `://rules` were **retired** — pure agent-facing lookup tables that no one attaches, and exact duplicates of the `get_reference` kinds. Read them via the tool.
+- `breadbox://overview`, `breadbox://sync-status` — kept because a human plausibly attaches these snapshots.
+- `breadbox://accounts`, `://categories`, `://tags`, `://users`, `://rules` were **retired** — exact duplicates of the `get_reference` kinds (and mostly pure agent-facing lookups no one attaches). Read them via the tool.
 
 So a new reference dataset gets a `kind` branch in `handleGetReference` by default; add a parallel resource handler in `resources.go` only if it's something a user would attach in chat (snapshot-like), not for pure lookup tables.
 

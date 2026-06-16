@@ -664,16 +664,6 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Annotations: resourceAnnotations(audienceUserAndAssistant, 1.0, liveResourceModTime),
 	}, s.handleOverviewResource)
 
-	// Live state resources — replace what would otherwise be list_* tool calls.
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Accounts",
-		Title:       "Bank Accounts",
-		URI:         "breadbox://accounts",
-		Description: "Bank accounts (checking, savings, credit cards, loans, investments) with balances, institution names, and currency.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.6, liveResourceModTime),
-	}, s.handleAccountsResource)
-
 	server.AddResource(&mcpsdk.Resource{
 		Name:        "Sync Status",
 		Title:       "Connection Sync Status",
@@ -683,11 +673,11 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
 	}, s.handleSyncStatusResource)
 
-	// The categories / tags / users / rules reference resources were retired —
-	// they were exact duplicates of get_reference(kind=…) and, being pure
-	// agent-facing lookup tables (not human-attach material), carried no load on
-	// the resource surface. Read them via get_reference. overview / accounts /
-	// sync-status stay because a human plausibly attaches those snapshots.
+	// The accounts / categories / tags / users / rules reference resources were
+	// retired — they were exact duplicates of get_reference(kind=…) and pure
+	// agent-facing lookups, carrying no load on the resource surface. Read them
+	// via get_reference. Only overview + sync-status stay as data resources
+	// (a human plausibly attaches those snapshots).
 
 	// Workflow guides — markdown, user-overridable via app_config.
 	server.AddResource(&mcpsdk.Resource{

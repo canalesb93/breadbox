@@ -12,7 +12,7 @@ Bounded reference data is read through one tool — `get_reference(kind=…)`:
 - `get_reference(kind=sync_status)` — per-connection sync status / freshness
 - `get_reference(kind=rules)` — the transaction-rule roster (lean; `fields=all` for full)
 
-A few of these are also exposed as resources for clients with a resource/attach UI — `breadbox://overview`, `breadbox://accounts`, `breadbox://sync-status` — with the same payload as the matching `get_reference` kind.
+A couple of these are also exposed as resources for clients with a resource/attach UI — `breadbox://overview` and `breadbox://sync-status` — with the same payload as the matching `get_reference` kind.
 
 Per-entity drilldowns are exposed as resource templates (resolve a single short_id):
 - `breadbox://transaction/{short_id}` — full transaction + recent annotations

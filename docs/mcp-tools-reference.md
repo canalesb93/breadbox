@@ -71,7 +71,7 @@ Aggregated spending totals. Default date range: 30 days.
 
 ### get_reference (Read)
 
-One tool that reads any bounded reference dataset by `kind`. (Folds the former `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `get_sync_status`, and `list_transaction_rules` tools.) `overview`, `accounts`, and `sync_status` are also exposed as `breadbox://` resources for clients with an attach UI; `categories`, `tags`, `users`, and `rules` are tool-only (their resources were retired as duplicates).
+One tool that reads any bounded reference dataset by `kind`. (Folds the former `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `get_sync_status`, and `list_transaction_rules` tools.) `overview` and `sync_status` are also exposed as `breadbox://` resources for clients with an attach UI; `accounts`, `categories`, `tags`, `users`, and `rules` are tool-only (their resources were retired as duplicates).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|

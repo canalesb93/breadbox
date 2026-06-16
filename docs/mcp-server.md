@@ -608,7 +608,6 @@ Bounded reference data (accounts, categories, tags, users, sync status, rules) i
 | Resource URI | MIME Type | Description |
 |---|---|---|
 | `breadbox://overview` | `application/json` | Live dataset summary (also `get_reference(kind=overview)`) |
-| `breadbox://accounts` | `application/json` | Bank accounts (also `get_reference(kind=accounts)`) |
 | `breadbox://sync-status` | `application/json` | Connection sync status (also `get_reference(kind=sync_status)`) |
 | `breadbox://review-guidelines` | `text/markdown` | Guidelines for reviewing transactions and creating rules |
 | `breadbox://report-format` | `text/markdown` | Report structure templates and formatting guidelines |

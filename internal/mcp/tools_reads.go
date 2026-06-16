@@ -11,14 +11,14 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Tools in this file mirror the bounded reference resources registered in
-// resources.go (breadbox://accounts, ://categories, ://tags, ://users,
-// ://sync-status, ://rules, ://overview). Resources are the preferred surface
-// for application-driven hosts (Claude.ai's paperclip menu, Inspector), but
-// not every MCP client implements the resources/* methods — clients without
-// resource support need tool fallbacks for the same reads. Each handler here
-// calls into the same service path the matching resource handler uses, with
-// a tool-shaped envelope.
+// Tools in this file back the bounded reference reads, surfaced to agents
+// through get_reference(kind=…). They're the canonical (and for most kinds,
+// only) way to read this data: accounts, categories, tags, users, sync status,
+// and the rule roster. A subset (overview, sync-status) is ALSO exposed as a
+// breadbox:// resource for hosts with an attach UI (Claude.ai's paperclip menu,
+// Inspector); those resource handlers in resources.go call the same service
+// path, so the two surfaces never drift. Each handler here returns a
+// tool-shaped envelope.
 
 // --- Input types ---
 

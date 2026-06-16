@@ -130,14 +130,6 @@ func jsonResourceResult(uri string, v any) (*mcpsdk.ReadResourceResult, error) {
 	}, nil
 }
 
-func (s *MCPServer) handleAccountsResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
-	accts, err := s.svc.ListAccounts(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("list accounts: %w", err)
-	}
-	return jsonResourceResult("breadbox://accounts", map[string]any{"accounts": accts})
-}
-
 func (s *MCPServer) handleSyncStatusResource(ctx context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
 	conns, err := s.svc.ListConnections(ctx, nil)
 	if err != nil {
@@ -146,9 +138,10 @@ func (s *MCPServer) handleSyncStatusResource(ctx context.Context, _ *mcpsdk.Read
 	return jsonResourceResult("breadbox://sync-status", map[string]any{"connections": conns})
 }
 
-// The categories / tags / users / rules reference resources were retired as
-// duplicates of get_reference(kind=…) — see registerResources. Their read
-// paths still exist as the get_reference tool handlers in tools_reads.go.
+// The accounts / categories / tags / users / rules reference resources were
+// retired as duplicates of get_reference(kind=…) — see registerResources.
+// Their read paths still exist as the get_reference tool handlers in
+// tools_reads.go.
 
 // resourceAnnotations builds the standard *mcpsdk.Annotations payload used on
 // every Breadbox resource. lastModifiedFn returns the timestamp the client

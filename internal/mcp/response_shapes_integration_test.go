@@ -960,14 +960,13 @@ func ptrString(s string) *string { return &s }
 
 // TestReferenceMirrorTools_ParityWithResources locks the dual-surface
 // contract for the reference datasets that still have BOTH a resource and a
-// get_reference tool path: breadbox://accounts, ://sync-status, ://overview.
-// Each pair must return the SAME payload via the SAME service call. A
-// regression that diverges them — e.g. forgetting the resource envelope, or
-// pointing the tool at a different service method — would let one surface
-// drift from the other.
+// get_reference tool path: breadbox://sync-status and ://overview. Each pair
+// must return the SAME payload via the SAME service call. A regression that
+// diverges them — e.g. forgetting the resource envelope, or pointing the tool
+// at a different service method — would let one surface drift from the other.
 //
-// (categories / tags / users / rules were retired as resources — they're
-// read-only via get_reference now, so there's no pair left to compare.)
+// (accounts / categories / tags / users / rules were retired as resources —
+// they're read-only via get_reference now, so there's no pair left to compare.)
 //
 // The parity test reads each pair, ignores envelope keys (resource handlers
 // always wrap in {"<entity>": [...]}), and compares the inner payload byte-
@@ -982,16 +981,6 @@ func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
 		toolFn      func() (*mcpsdk.CallToolResult, any, error)
 		resourceFn  func() (*mcpsdk.ReadResourceResult, error)
 	}{
-		{
-			name:        "get_reference(accounts) <-> breadbox://accounts",
-			envelopeKey: "accounts",
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				return f.svc.handleListAccounts(f.ctx, nil, listAccountsInput{})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleAccountsResource(f.ctx, nil)
-			},
-		},
 		{
 			name:        "get_reference(sync_status) <-> breadbox://sync-status",
 			envelopeKey: "connections",
