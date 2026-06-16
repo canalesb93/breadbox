@@ -717,6 +717,19 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		tctx.InSeries = true
 		tctx.SeriesShortID = resolver.SeriesShortID(dbTxn.SeriesID)
 	}
+	// Seed the metadata blob so conditions on field="metadata.<key>" can read
+	// the transaction's current enrichment values, and so chaining rules see
+	// earlier-stage set_metadata / remove_metadata writes. A new transaction
+	// starts from {} (DEFAULT); re-synced rows carry their persisted blob.
+	if len(dbTxn.Metadata) > 0 {
+		var meta map[string]any
+		if err := json.Unmarshal(dbTxn.Metadata, &meta); err == nil {
+			tctx.Metadata = meta
+		} else {
+			e.logger.Warn("unmarshal transaction metadata for rule evaluation failed; continuing without metadata context",
+				"transaction_id", pgconv.FormatUUID(dbTxn.ID), "err", err)
+		}
+	}
 
 	// For changed transactions, load the current tag slugs so tag-based
 	// conditions can match. New transactions start with empty tags (any tags
@@ -832,7 +845,46 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		}
 	}
 
+	// set_metadata / remove_metadata: merge net changes into the metadata JSONB
+	// in a single UPDATE within the sync tx. Removes and sets are disjoint
+	// (the resolver net-diffs them), so `(metadata - removeKeys) || setObj`
+	// applies both unambiguously. Like assign_series, metadata writes don't emit
+	// a dedicated timeline annotation — the rule's hit_count records the firing.
+	if len(result.MetadataSet) > 0 || len(result.MetadataRemove) > 0 {
+		if err := e.applyMetadataFromRule(ctx, tx, dbTxn.ID, result.MetadataSet, result.MetadataRemove); err != nil {
+			return result.Sources, err
+		}
+	}
+
 	return result.Sources, nil
+}
+
+// applyMetadataFromRule applies a rule's net set_metadata / remove_metadata
+// intents to a transaction's metadata blob in a single UPDATE, sharing the sync
+// tx. Set keys overwrite, remove keys delete; the two sets are disjoint by
+// resolver construction.
+func (e *Engine) applyMetadataFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, set map[string]any, remove []string) error {
+	setJSON := "{}"
+	if len(set) > 0 {
+		b, err := json.Marshal(set)
+		if err != nil {
+			return fmt.Errorf("marshal rule metadata set: %w", err)
+		}
+		setJSON = string(b)
+	}
+	removeKeys := remove
+	if removeKeys == nil {
+		removeKeys = []string{}
+	}
+	_, err := tx.Exec(ctx,
+		`UPDATE transactions
+		   SET metadata = (metadata - $2::text[]) || $3::jsonb, updated_at = NOW()
+		 WHERE id = $1 AND deleted_at IS NULL`,
+		txnID, removeKeys, setJSON)
+	if err != nil {
+		return fmt.Errorf("apply rule metadata: %w", err)
+	}
+	return nil
 }
 
 // loadTagSlugsInTx returns the current tag slugs for a transaction using the
