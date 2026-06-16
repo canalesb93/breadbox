@@ -67,9 +67,9 @@ Good descriptions are load-bearing — they're the only documentation agents see
 
 `MCPServerConfig.Instructions` is domain-rich onboarding: data model overview, amount conventions, category system, recommended query patterns. Templates in `internal/mcp/templates.go` (`spend_review`, `monthly_analysis`, `reporting`) are presets users can load and edit. User-edited text stored as `mcp_custom_instructions` in `app_config`.
 
-## Resource
+## No MCP resources
 
-`breadbox://overview` returns live stats: users, accounts by type, connections with counts, 30-day spending summary with top 5 categories, pending transaction count.
+The `resources/*` surface (and resource templates) was retired entirely — it was invisible on clients that can't `resources/list` (e.g. Claude.ai), so everything is a tool. Don't re-add `AddResource` / `AddResourceTemplate`; add a read tool instead. See "Reference data" and "Guidance docs" below.
 
 ## Permissions admin page
 
@@ -96,23 +96,17 @@ Several writes are deliberately compound so the registry stays small and an agen
 
 When folding a tool, prefer reusing the existing service methods from the compound handler over re-implementing the write — the MCP layer is where the consolidation lives.
 
-## Reference data: dual surface (resources + one tool)
+## Reference data: one tool per dataset
 
-Bounded reference data is read through **one tool**, `get_reference(kind=…)`, dispatching on `kind` (`overview` \| `accounts` \| `categories` \| `tags` \| `users` \| `sync_status` \| `rules`) to the per-kind handlers in `tools_reads.go` (`handleGetOverview`, `handleListAccounts`, …). Optional `user_id` (accounts) and `fields` (rules) ride through. Filtered/sorted rule analysis stays in `query_transaction_rules`; `get_reference kind=rules` returns the lean roster.
+Bounded reference data is read through dedicated tools, handlers in `tools_reads.go`:
 
-A **subset** is also exposed as `resources/*` for clients with a resource/attach UI (Claude.ai's paperclip menu, the Inspector picker), sharing the same service-layer call path so payloads stay in sync:
+- `get_overview` (`handleGetOverview`)
+- `list_accounts` (`handleListAccounts`; optional `user_id`)
+- `list_categories`, `list_tags`, `list_users`, `get_sync_status`
+- `list_transaction_rules` (`handleListTransactionRules`; lean `summary` by default, `fields=all` for full). Filtered/sorted rule analysis lives in `query_transaction_rules`.
 
-- `breadbox://overview`, `breadbox://sync-status` — kept because a human plausibly attaches these snapshots.
-- `breadbox://accounts`, `://categories`, `://tags`, `://users`, `://rules` were **retired** — exact duplicates of the `get_reference` kinds (and mostly pure agent-facing lookups no one attaches). Read them via the tool.
+To add a new reference dataset, register a new read tool here — there's no resource counterpart to keep in sync anymore.
 
-So a new reference dataset gets a `kind` branch in `handleGetReference` by default; add a parallel resource handler in `resources.go` only if it's something a user would attach in chat (snapshot-like), not for pure lookup tables.
+## Guidance docs: `get_reference(kind=…)`
 
-## Resource templates (drill-downs)
-
-Per-entity detail views are exposed as MCP resource templates registered with `Server.AddResourceTemplate`:
-
-- `breadbox://transaction/{short_id}` — `{transaction, annotations}`
-- `breadbox://account/{short_id}` — `{account, recent_transactions}` (capped at 25)
-- `breadbox://user/{short_id}` — `{user, accounts}`
-
-Template handlers parse the trailing `{short_id}` via `extractTemplateParam`, resolve through the standard service `Get*` methods (which accept either UUID or short_id), and return `mcpsdk.ResourceNotFoundError(uri)` on miss. URIs come back to chat as clickable items via `resource_link` content blocks emitted by tools (planned in a follow-up PR).
+The near-static markdown that teaches an agent how to drive the server — formerly `breadbox://` markdown resources — is served by the `get_reference` tool (`handleGetReference` in `tools_reads.go`). `kind` ∈ `instructions` | `rule-dsl` | `review-guidelines` | `report-format`; it returns a markdown text block. `instructions` / `review-guidelines` / `report-format` honor the operator's `app_config` overrides (falling back to the embedded `prompts/mcp/*.md` defaults via the `Default*` vars in `server.go`); `rule-dsl` is the fixed grammar. Per-entity drilldowns (transaction + annotations, account + recent txns, user + accounts) are no longer a single call — reconstruct them from `query_transactions` + `list_annotations` / `list_accounts`.

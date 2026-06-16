@@ -124,10 +124,12 @@ func TestToolRegistryScopeContract(t *testing.T) {
 	}
 
 	// Anchor the explicit canonical set for read tools — this is the surface
-	// area read-only API keys are allowed to exercise. The seven bounded
-	// reference-data mirrors that shadow the breadbox:// resources for clients
-	// without resources support are folded behind get_reference(kind=…) — see
-	// tools_reads.go. count_transactions folded into query_transactions
+	// area read-only API keys are allowed to exercise. MCP resources were
+	// retired, so the bounded reference datasets are each their own tool
+	// (get_overview / list_accounts / list_categories / list_users / list_tags /
+	// get_sync_status / list_transaction_rules), and get_reference serves the
+	// operating-guidance docs (instructions / rule-dsl / review-guidelines /
+	// report-format). count_transactions folded into query_transactions
 	// (count_only=true).
 	wantReads := []string{
 		"query_transactions",
@@ -141,6 +143,13 @@ func TestToolRegistryScopeContract(t *testing.T) {
 		"get_series",
 		"explain_series_candidates",
 		"list_workflows",
+		"get_overview",
+		"list_accounts",
+		"list_categories",
+		"list_users",
+		"list_tags",
+		"get_sync_status",
+		"list_transaction_rules",
 	}
 	if len(readNames) != len(wantReads) {
 		t.Errorf("read tool count = %d, want %d (got %v)", len(readNames), len(wantReads), readNames)

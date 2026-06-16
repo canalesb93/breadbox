@@ -73,37 +73,54 @@ type queryTransactionRulesInput struct {
 	Fields       string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Alias: summary (name,enabled,priority,trigger,category,hit_count,last_hit_at; the default — omits the conditions and actions trees). Default when omitted: summary. Pass fields=all for every field including the full conditions/actions. id is always included."`
 }
 
-// getReferenceInput is the single parameterized read over the bounded
-// reference datasets. `kind` selects the dataset; the optional fields apply
-// only to the kinds that accept them (user_id → accounts, fields → rules).
+// getReferenceInput selects which operating-guidance doc to read. These are the
+// near-static markdown docs that teach an agent how to drive the server — the
+// content that used to live in `breadbox://` markdown resources before resources
+// were retired. Serving them as a tool means clients that can't read MCP
+// resources (e.g. Claude.ai) can still pull the guidance on demand.
 type getReferenceInput struct {
-	Kind   string `json:"kind" jsonschema:"required,Which reference dataset to read: overview | accounts | categories | tags | users | sync_status | rules."`
-	UserID string `json:"user_id,omitempty" jsonschema:"Only for kind=accounts: scope accounts to one household member (short ID or UUID)."`
-	Fields string `json:"fields,omitempty" jsonschema:"Only for kind=rules: comma-separated fields/aliases. Default summary projection (omits conditions/actions trees); pass fields=all for full rule definitions."`
+	Kind string `json:"kind" jsonschema:"required,Which guidance doc to read: 'instructions' (how the server is organized + conventions) | 'rule-dsl' (the full transaction-rule condition grammar, action types, and pipeline-stage semantics — read before authoring rules) | 'review-guidelines' (principles for reviewing transactions and creating rules — read before working the review queue) | 'report-format' (structure + formatting for submit_report)."`
 }
 
-// handleGetReference dispatches a get_reference call to the matching bounded
-// reference handler. It reuses the per-kind handlers (which share the same
-// service path as the breadbox:// resources), so payload shapes stay identical
-// to the resources and to the pre-fold tool mirrors.
-func (s *MCPServer) handleGetReference(ctx context.Context, req *mcpsdk.CallToolRequest, input getReferenceInput) (*mcpsdk.CallToolResult, any, error) {
+// handleGetReference returns the requested guidance doc as markdown. The
+// instructions / review-guidelines / report-format docs honor the operator's
+// app_config overrides (falling back to the embedded defaults); rule-dsl is the
+// fixed embedded grammar.
+func (s *MCPServer) handleGetReference(_ context.Context, _ *mcpsdk.CallToolRequest, input getReferenceInput) (*mcpsdk.CallToolResult, any, error) {
+	cfg, err := s.svc.GetMCPConfig(context.Background())
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	var content string
 	switch input.Kind {
-	case "overview":
-		return s.handleGetOverview(ctx, req, getOverviewInput{})
-	case "accounts":
-		return s.handleListAccounts(ctx, req, listAccountsInput{UserID: input.UserID})
-	case "categories":
-		return s.handleListCategories(ctx, req, listCategoriesInput{})
-	case "tags":
-		return s.handleListTags(ctx, req, listTagsInput{})
-	case "users":
-		return s.handleListUsers(ctx, req, listUsersInput{})
-	case "sync_status":
-		return s.handleGetSyncStatus(ctx, req, getSyncStatusInput{})
-	case "rules":
-		return s.handleListTransactionRules(ctx, req, listTransactionRulesInput{Fields: input.Fields})
+	case "instructions":
+		content = orDefault(cfg.Instructions, DefaultInstructions)
+	case "review-guidelines":
+		content = orDefault(cfg.ReviewGuidelines, DefaultReviewGuidelines)
+	case "report-format":
+		content = orDefault(cfg.ReportFormat, DefaultReportFormat)
+	case "rule-dsl":
+		content = DefaultRuleDSL
 	default:
-		return errorResult(fmt.Errorf("unknown kind %q: must be one of overview, accounts, categories, tags, users, sync_status, rules", input.Kind)), nil, nil
+		return errorResult(fmt.Errorf("unknown kind %q: must be one of instructions, rule-dsl, review-guidelines, report-format", input.Kind)), nil, nil
+	}
+	return markdownResult(content), nil, nil
+}
+
+// orDefault returns v, or def when v is empty.
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+// markdownResult wraps a guidance doc as a single markdown text content block.
+// Unlike jsonResult it does not JSON-encode or ID-compact — the payload is
+// human-readable markdown, not a data record.
+func markdownResult(md string) *mcpsdk.CallToolResult {
+	return &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: md}},
 	}
 }
 

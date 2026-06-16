@@ -36,12 +36,13 @@ func AgentsSettingsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 		// Group ordering matches the previous MCP-settings layout
 		// so user muscle memory carries over.
 		toolGroups := map[string]string{
+			"get_overview":                  "Accounts & Data",
 			"list_accounts":                 "Accounts & Data",
 			"list_users":                    "Accounts & Data",
 			"get_sync_status":               "Accounts & Data",
+			"get_reference":                 "Accounts & Data",
 			"trigger_sync":                  "Accounts & Data",
 			"query_transactions":            "Transactions",
-			"count_transactions":            "Transactions",
 			"transaction_summary":           "Transactions",
 			"list_categories":               "Categories",
 			"export_categories":             "Categories",
@@ -63,7 +64,6 @@ func AgentsSettingsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			"create_transaction_rule":       "Rules",
 			"update_transaction_rule":       "Rules",
 			"delete_transaction_rule":       "Rules",
-			"batch_create_rules":            "Rules",
 			"apply_rules":                   "Rules",
 			"preview_rule":                  "Rules",
 			"list_account_links":            "Account Links",

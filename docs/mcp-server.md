@@ -13,7 +13,7 @@ MCP tools are thin wrappers around the same service and query layer that backs t
 1. [MCP Server Configuration](#1-mcp-server-configuration)
 2. [Client Configuration](#2-client-configuration)
 3. [Tool Definitions](#3-tool-definitions)
-4. [MCP Resources](#4-mcp-resources)
+4. [Operating-Guidance Docs](#4-operating-guidance-docs)
 5. [Error Handling](#5-error-handling)
 6. [Pagination Strategy](#6-pagination-strategy)
 7. [Relationship to REST API](#7-relationship-to-rest-api)
@@ -81,7 +81,7 @@ The MCP server does not manage its own database connection. It receives the same
 
 ### Server Capabilities
 
-The server advertises tools and resources. Prompts are not used. Server instructions are provided via `ServerOptions.Instructions` (customizable from the MCP admin page, with a comprehensive default).
+The server advertises tools only — MCP resources and prompts are not used. Server instructions are provided via `ServerOptions.Instructions` (customizable from the MCP admin page, with a comprehensive default).
 
 ```go
 server := mcpsdk.NewServer(
@@ -90,7 +90,7 @@ server := mcpsdk.NewServer(
 )
 ```
 
-Three resources are registered on every server instance via `registerResources()` (see [Section 4](#4-mcp-resources)).
+The operating-guidance docs that previously shipped as resources are now served by the `get_reference` tool (see [Section 4](#4-operating-guidance-docs)).
 
 ---
 
@@ -225,11 +225,9 @@ On error, the MCP SDK's `IsError: true` flag is set and the content is:
 
 ---
 
-### Tool: `get_reference(kind=accounts)`
+### Tool: `list_accounts`
 
-Bank accounts are read via `get_reference(kind=accounts)` (optional `user_id` filter) — one of the bounded reference datasets behind the single `get_reference` tool. There is no standalone `list_accounts` tool.
-
-**Description (shown to LLM):** List all bank accounts with their current balances. Optionally filter by family member. Returns one object per account including institution, type, and balance.
+**Description (shown to LLM):** List all bank accounts with their current balances. Optionally filter by family member (`user_id`). Returns one object per account including institution, type, and balance.
 
 #### Input Schema
 
@@ -422,9 +420,9 @@ Counting is folded into `query_transactions`: pass `count_only: true` with the s
 
 ---
 
-### Tool: `get_reference(kind=users)`
+### Tool: `list_users`
 
-**Description (shown to LLM):** List all family members tracked in Breadbox. Users are labels for account ownership — they are not login accounts. Read them via `get_reference(kind=users)`; use the returned IDs to filter accounts (`get_reference(kind=accounts)`) or `query_transactions` by family member.
+**Description (shown to LLM):** List all family members tracked in Breadbox. Users are labels for account ownership — they are not login accounts. Use the returned IDs to filter `list_accounts` or `query_transactions` by family member.
 
 #### Input Schema
 
@@ -465,9 +463,7 @@ Calls `GET /api/v1/users`. Returns all users without pagination (family sizes ar
 
 ---
 
-### Tool: `get_reference(kind=sync_status)`
-
-Connection sync status is read via `get_reference(kind=sync_status)` — one of the bounded reference datasets behind the single `get_reference` tool. There is no standalone `get_sync_status` tool.
+### Tool: `get_sync_status`
 
 **Description (shown to LLM):** Returns the health status of all bank connections — whether they are syncing successfully, when they last synced, and whether any connections need re-authentication. Use this to diagnose why transactions might be missing or stale.
 
@@ -531,7 +527,7 @@ Calls `GET /api/v1/connections`. Each element in the response corresponds to one
 
 ### Tool: `trigger_sync`
 
-**Description (shown to LLM):** Manually trigger a data sync to fetch the latest transactions and balances from the bank. Syncs all connections by default, or a specific connection if `connection_id` is provided. The sync runs asynchronously — this tool returns immediately after enqueuing the sync, not after it completes. Check `get_reference(kind=sync_status)` afterward to monitor progress.
+**Description (shown to LLM):** Manually trigger a data sync to fetch the latest transactions and balances from the bank. Syncs all connections by default, or a specific connection if `connection_id` is provided. The sync runs asynchronously — this tool returns immediately after enqueuing the sync, not after it completes. Check `get_sync_status` afterward to monitor progress.
 
 #### Input Schema
 
@@ -567,13 +563,11 @@ Calls `POST /api/v1/sync` with an optional `connection_id` body parameter. The R
 
 - **Unknown `connection_id`:** Returns an error: `{ "error": "Connection conn_xxx not found." }` with `IsError: true`.
 - **Sync already in progress:** The service layer handles deduplication. A second trigger for the same connection while one is running is a no-op; the tool returns a success message indicating the sync was already underway.
-- **Connection in `error` state:** The sync is attempted. If re-authentication is required, the sync will fail again and `get_reference(kind=sync_status)` will reflect the error.
+- **Connection in `error` state:** The sync is attempted. If re-authentication is required, the sync will fail again and `get_sync_status` will reflect the error.
 
 ---
 
-### Tool: `get_reference(kind=categories)`
-
-The category taxonomy is read via `get_reference(kind=categories)` — one of the bounded reference datasets behind the single `get_reference` tool. There is no standalone `list_categories` tool.
+### Tool: `list_categories`
 
 **Description (shown to LLM):** List all transaction categories. Useful for understanding the category taxonomy before filtering transactions.
 
@@ -599,50 +593,22 @@ Calls `GET /api/v1/categories`. Returns the same `[]CategoryPair` response.
 
 ---
 
-## 4. MCP Resources
+## 4. Operating-Guidance Docs
 
-MCP resources are passive context documents the LLM can read, similar to files. They do not execute queries at call time in the same on-demand way tools do. They're registered via `s.registerResources()` in `internal/mcp/server.go`, with handlers in `internal/mcp/resources.go`.
+**MCP resources (`resources/*`) and resource templates were retired entirely.** They were invisible on clients that can't `resources/list` (e.g. Claude.ai), so everything an agent reads is now a tool. There is no `registerResources()`.
 
-Bounded reference data (accounts, categories, tags, users, sync status, rules) is read through the **`get_reference(kind=…)` tool**, not resources — only snapshot-like / static-doc resources remain (the lookup-table resources were retired as tool duplicates). The resources that stay:
+The near-static markdown that teaches an agent how to drive the server — previously the `breadbox://` markdown resources — is served by the **`get_reference(kind=…)` tool**, which returns a markdown text block:
 
-| Resource URI | MIME Type | Description |
+| `kind` | Source | Description |
 |---|---|---|
-| `breadbox://overview` | `application/json` | Live dataset summary (also `get_reference(kind=overview)`) |
-| `breadbox://sync-status` | `application/json` | Connection sync status (also `get_reference(kind=sync_status)`) |
-| `breadbox://review-guidelines` | `text/markdown` | Guidelines for reviewing transactions and creating rules |
-| `breadbox://report-format` | `text/markdown` | Report structure templates and formatting guidelines |
-| `breadbox://rule-dsl` | `text/markdown` | Condition grammar / action types for authoring rules |
-| `breadbox://transaction/{short_id}`, `breadbox://account/{short_id}`, `breadbox://user/{short_id}` | `application/json` | Per-entity drilldown templates |
+| `instructions` | `mcp_custom_instructions` → `DefaultInstructions` | Data model + conventions overview (same text as `ServerOptions.Instructions`). |
+| `rule-dsl` | `DefaultRuleDSL` (fixed) | Condition grammar, action types, pipeline-stage ordering, sync-vs-retroactive semantics. Read before authoring rules. |
+| `review-guidelines` | `mcp_review_guidelines` → `DefaultReviewGuidelines` | Principles for reviewing transactions and creating rules. Read before working the needs-review queue. |
+| `report-format` | `mcp_report_format` → `DefaultReportFormat` | Report structure + formatting for `submit_report`. |
 
-### Resource: `breadbox://overview`
+`instructions` / `review-guidelines` / `report-format` honor the operator's `app_config` override and fall back to the embedded `prompts/mcp/*.md` default (the `Default*` vars in `server.go`). The handler is `handleGetReference` in `internal/mcp/tools_reads.go`.
 
-Returns a lightweight summary of the household's financial data — users, connections with account counts, accounts by type, transaction counts, date range, 30-day spending summary with top categories, and pending transaction count. This gives an LLM ambient context about the financial state without a round-trip tool call.
-
-Backed by `service.GetOverviewStats()`.
-
-```json
-{
-  "total_accounts": 5,
-  "total_transactions": 2847,
-  "date_range": {
-    "earliest": "2024-06-15",
-    "latest": "2026-03-07"
-  },
-  "providers": ["plaid", "teller"]
-}
-```
-
-### Resource: `breadbox://review-guidelines`
-
-Returns guidelines for reviewing transactions and creating transaction rules. Agents should read this before processing any reviews or creating rules.
-
-Content is user-editable via the MCP Settings admin page (`mcp_review_guidelines` in `app_config`). Falls back to `DefaultReviewGuidelines` (a comprehensive constant in `server.go`) when no custom guidelines are saved.
-
-### Resource: `breadbox://report-format`
-
-Returns report structure templates and formatting guidelines. Agents should read this before submitting reports via the `submit_report` tool.
-
-Content is user-editable via the MCP Settings admin page (`mcp_report_format` in `app_config`). Falls back to `DefaultReportFormat` (a comprehensive constant in `server.go`) when no custom format is saved.
+Bounded reference **data** (overview, accounts, categories, tags, users, sync status, rules) is read through the dedicated read tools in [Section 3](#3-tool-definitions) (`get_overview`, `list_accounts`, …), not `get_reference`. The former per-entity drilldown templates are gone; reconstruct a transaction's detail from `query_transactions` + `list_annotations`, an account's from `list_accounts` + `query_transactions(account_id)`, etc.
 
 ---
 
@@ -782,13 +748,13 @@ Both paths call the same `service.QueryTransactions` function. The MCP tool hand
 
 | MCP Tool | REST Endpoint |
 |---|---|
-| `get_reference(kind=accounts)` | `GET /api/v1/accounts` |
+| `list_accounts` | `GET /api/v1/accounts` |
 | `query_transactions` | `GET /api/v1/transactions` |
 | `query_transactions(count_only=true)` | `GET /api/v1/transactions/count` |
-| `get_reference(kind=users)` | `GET /api/v1/users` |
-| `get_reference(kind=sync_status)` | `GET /api/v1/connections` |
+| `list_users` | `GET /api/v1/users` |
+| `get_sync_status` | `GET /api/v1/connections` |
 | `trigger_sync` | `POST /api/v1/sync` |
-| `get_reference(kind=categories)` | `GET /api/v1/categories` |
+| `list_categories` | `GET /api/v1/categories` |
 
 ### No MCP-Specific Data Access
 

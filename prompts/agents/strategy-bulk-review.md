@@ -12,7 +12,7 @@ Clear the backlog with high accuracy. Create rules for newly discovered patterns
 
 ## Steps
 
-1. `count_transactions(tags=["needs-review"])` — understand backlog size. If zero, check `get_sync_status` for freshness, report "backlog clear" and exit.
+1. `query_transactions(tags=["needs-review"], count_only=true)` — understand backlog size. If zero, check `get_sync_status` for freshness, report "backlog clear" and exit.
 2. Skim `list_transaction_rules` once for a sense of overall coverage. But to decide whether a SPECIFIC merchant already has a rule, call `find_matching_rules(merchant="<name>")` rather than re-scanning the full list per candidate — it returns just the rules that match, so you avoid creating duplicates without paying to re-read hundreds of rules each time.
 3. Process by raw provider category group, starting with the largest groups:
    a. `query_transactions(tags=["needs-review"], fields=core,category, limit up to 500)` — you can iterate with cursor pagination.

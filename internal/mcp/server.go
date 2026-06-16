@@ -77,6 +77,7 @@ var (
 	DefaultInstructions     = prompts.MCP("instructions")
 	DefaultReviewGuidelines = prompts.MCP("review-guidelines")
 	DefaultReportFormat     = prompts.MCP("report-format")
+	DefaultRuleDSL          = prompts.MCP("rule-dsl")
 )
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
@@ -327,10 +328,10 @@ func auditSessionFromContext(ctx context.Context) string {
 // buildToolRegistry populates the allTools slice with all available tools and
 // their classifications. The registry carves around what an agent does
 // (query, decide, write, configure) rather than every underlying entity.
-// Bounded reference data (accounts, categories, tags, users, sync status,
-// rules, overview) is preferred via resources — see registerResources in this
-// file — but each resource also has a tool mirror in tools_reads.go so MCP
-// clients that don't implement the resources/* methods can still read it.
+// Everything is a tool — MCP resources were retired. Bounded reference data
+// (accounts, categories, tags, users, sync status, rules, overview) is read
+// through dedicated read tools (handlers in tools_reads.go); the near-static
+// operating-guidance docs are served by get_reference(kind=…).
 func (s *MCPServer) buildToolRegistry() {
 	s.allTools = []ToolDef{
 		// Audit sessions are bound to the transport connection (MCP-Session-Id
@@ -338,16 +339,46 @@ func (s *MCPServer) buildToolRegistry() {
 		// resolves its session via resolveTransportID + ensureAuditSession in
 		// the dispatcher, so agents no longer need to call create_session.
 
-		// --- Reference data (one tool that mirrors the bounded reference resources) ---
-		// Resources are the preferred surface: breadbox://overview, ://accounts,
-		// ://categories, ://tags, ://users, ://sync-status, ://rules. get_reference
-		// is the single tool fallback for clients that don't implement resources/*
-		// — it dispatches on `kind` so the seven bounded reads share one tool slot
-		// instead of seven. Filtered/sorted rule analysis still lives in
-		// query_transaction_rules; this returns the lean roster.
+		// --- Reference data reads ---
+		// Bounded lookup datasets, each its own tool. MCP resources were retired,
+		// so these tools are the only way to read this data. get_reference (below)
+		// is a separate tool that serves the operating-guidance docs, not data.
 		makeToolDefLogged(ToolSpec{
-			Name: "get_reference", Title: "Get Reference Data", Classification: ToolRead,
-			Description: "Read a bounded reference dataset by `kind` — the single tool mirror of the breadbox:// reference resources, for clients that don't support MCP resources. kinds: 'overview' (household snapshot: scope, freshness, pending-review backlog — read once at the top of a session to ground later filters), 'accounts' (bank accounts with balance/type/currency/connection; optional user_id filter), 'categories' (the category taxonomy — use the slugs as the canonical handle on filters and writes), 'tags' (the tag vocabulary — slugs are referenced everywhere), 'users' (household members; the short_id is the user_id on filters), 'sync_status' (per-connection provider/status/last-sync/last-error — check freshness before trusting results), 'rules' (the transaction-rule roster, lean summary projection; pass fields=all for the full conditions/actions trees). For filtered/sorted rule analysis use query_transaction_rules; to check coverage for one merchant use find_matching_rules.",
+			Name: "get_overview", Title: "Household Overview", Classification: ToolRead,
+			Description: "Get a household snapshot: scope (users, accounts, currencies), freshness (latest sync, errored connections, recent transactions), and backlog (pending review queue). Read once at the top of a session to ground every later filter (account ids, currency, attribution).",
+		}, s.handleGetOverview, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "list_accounts", Title: "List Accounts", Classification: ToolRead,
+			Description: "List bank accounts. Each account carries balance, type, currency, and the connection it belongs to. Filter by user_id to scope to a specific household member.",
+		}, s.handleListAccounts, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "list_categories", Title: "List Categories", Classification: ToolRead,
+			Description: "List the category taxonomy as a flat array. Use the returned slugs (e.g. 'food_and_drink_groceries') as the canonical handle for category filters and category_slug fields on writes.",
+		}, s.handleListCategories, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "list_users", Title: "List Household Members", Classification: ToolRead,
+			Description: "List household members. Each user carries display name, role, and short_id — use the short_id as user_id on transaction filters and account scoping.",
+		}, s.handleListUsers, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "list_tags", Title: "List Tags", Classification: ToolRead,
+			Description: "List the tag vocabulary. Tags are referenced by slug everywhere (filter, add, remove). New tag slugs auto-register the first time update_transactions adds them — read this list before authoring rules to avoid accidental near-duplicates.",
+		}, s.handleListTags, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "get_sync_status", Title: "Sync Status", Classification: ToolRead,
+			Description: "Get connection sync status: provider, status (active|error|pending_reauth|disconnected), last sync time, last error. Call this before reasoning about freshness — an errored or pending_reauth connection means transactions you'd expect to be there might not be.",
+		}, s.handleGetSyncStatus, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "list_transaction_rules", Title: "List Rules", Classification: ToolRead,
+			Description: "List transaction rules (the roster). Filter by category_slug, enabled, or search by name. Lean by default: returns a summary projection (name, enabled, priority, trigger, category, hit_count) without the conditions/actions trees — pass fields=all to inspect or audit full rule definitions. For richer analysis — filter by trigger/creator/hit-count or sort by impact — use query_transaction_rules; to check whether one specific merchant is already covered, use find_matching_rules.",
+		}, s.handleListTransactionRules, s),
+
+		// --- Operating-guidance docs ---
+		// The near-static markdown that teaches an agent how to drive the server.
+		// Formerly breadbox:// markdown resources; served as a tool so clients
+		// that can't read MCP resources can still pull them.
+		makeToolDefLogged(ToolSpec{
+			Name: "get_reference", Title: "Get Guidance Doc", Classification: ToolRead,
+			Description: "Read an operating-guidance doc by `kind` — the near-static markdown that explains how to drive this server. kinds: 'instructions' (data model + conventions overview, how the surface is organized), 'rule-dsl' (the full transaction-rule condition grammar, action types, pipeline-stage ordering, and sync-vs-retroactive semantics — read before authoring rules), 'review-guidelines' (principles for reviewing transactions and creating rules — read before working the needs-review queue), 'report-format' (structure + formatting conventions for submit_report). Returns markdown. instructions/review-guidelines/report-format reflect any operator customization; rule-dsl is the fixed grammar.",
 		}, s.handleGetReference, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transaction_rules", Title: "Query Rules", Classification: ToolRead,
@@ -397,7 +428,7 @@ func (s *MCPServer) buildToolRegistry() {
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transactions", Title: "Query Transactions", Classification: ToolRead,
-			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see get_reference(kind=categories) for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own. Pass count_only=true to get just {\"count\": N} for the same filters (no rows) — use it to size a result set or compare counts across ranges before paginating.",
+			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see list_categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own. Pass count_only=true to get just {\"count\": N} for the same filters (no rows) — use it to size a result set or compare counts across ranges before paginating.",
 		}, s.handleQueryTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "transaction_summary", Title: "Spending Summary", Classification: ToolRead,
@@ -434,8 +465,8 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleListAnnotations, s),
 
 		// --- Rules ---
-		// See breadbox://rule-dsl for the condition grammar and
-		// get_reference(kind=rules) for the current ruleset.
+		// See get_reference(kind=rule-dsl) for the condition grammar and
+		// list_transaction_rules for the current ruleset.
 		makeToolDefLogged(ToolSpec{
 			Name: "create_transaction_rule", Title: "Create Rule", Classification: ToolWrite,
 			Description: "Create one or more transaction rules for automatic categorization, tagging, or commenting. Pass `rules`: an array of 1..100 rule specs (a single rule is just a one-element array). Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) per rule instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category — author such pipelines in one call. Set apply_retroactively=true on a rule to immediately back-fill it against existing transactions. Before creating, read the rules roster (get_reference kind=rules) to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Returns the created rules plus any per-item errors so a partial batch is recoverable. Full DSL: breadbox://rule-dsl.",
@@ -644,103 +675,13 @@ func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
 		td.register(server)
 	}
 
-	s.registerResources(server)
+	// MCP resources (resources/* + resource templates) were retired entirely.
+	// They were invisible on clients that can't resources/list (e.g. Claude.ai),
+	// so every read goes through tools instead: the bounded data reads are
+	// standalone tools (get_overview, list_accounts, …) and the operating-
+	// guidance docs (instructions, rule-dsl, review-guidelines, report-format)
+	// are served by get_reference(kind=…).
 	return server
-}
-
-// registerResources adds MCP resources to a server. The catalog is
-// agent-facing first: most resources are audienced to the assistant only.
-// A handful (overview, accounts, review-guidelines, report-format) are
-// dual-audience because users have a real "attach this in chat" flow for
-// them — those show up in Claude.ai's paperclip / attachment menu.
-func (s *MCPServer) registerResources(server *mcpsdk.Server) {
-	// Top-level live snapshot — read first.
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Overview",
-		Title:       "Household Overview",
-		URI:         "breadbox://overview",
-		Description: "Live summary of the dataset: users, connections, accounts, transaction counts and date range, recent spending. Read on connect for context.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 1.0, liveResourceModTime),
-	}, s.handleOverviewResource)
-
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Sync Status",
-		Title:       "Connection Sync Status",
-		URI:         "breadbox://sync-status",
-		Description: "Per-connection sync status and last-sync timestamps. Read to verify data freshness before answering questions about recent activity.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceAssistantOnly, 0.6, liveResourceModTime),
-	}, s.handleSyncStatusResource)
-
-	// The accounts / categories / tags / users / rules reference resources were
-	// retired — they were exact duplicates of get_reference(kind=…) and pure
-	// agent-facing lookups, carrying no load on the resource surface. Read them
-	// via get_reference. Only overview + sync-status stay as data resources
-	// (a human plausibly attaches those snapshots).
-
-	// Workflow guides — markdown, user-overridable via app_config.
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Review Guidelines",
-		Title:       "Transaction Review Guidelines",
-		URI:         "breadbox://review-guidelines",
-		Description: "Principles for reviewing transactions and creating rules. Read before touching the review queue.",
-		MIMEType:    "text/markdown",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.8, staticPromptModTime),
-	}, s.handleReviewGuidelinesResource)
-
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Report Format",
-		Title:       "Spending Report Format",
-		URI:         "breadbox://report-format",
-		Description: "Report structure and formatting guidelines. Read before submit_report.",
-		MIMEType:    "text/markdown",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.8, staticPromptModTime),
-	}, s.handleReportFormatResource)
-
-	// Authoring reference — only relevant when the agent is creating rules.
-	// Carrying the grammar here instead of in create_transaction_rule's
-	// description keeps tools/list lean.
-	server.AddResource(&mcpsdk.Resource{
-		Name:        "Rule DSL",
-		Title:       "Transaction Rule DSL",
-		URI:         "breadbox://rule-dsl",
-		Description: "Condition grammar, action types, priority bands, sync-vs-retroactive semantics, provider quirks. Read before authoring rules.",
-		MIMEType:    "text/markdown",
-		Annotations: resourceAnnotations(audienceAssistantOnly, 0.7, staticPromptModTime),
-	}, staticMarkdownResource("breadbox://rule-dsl", DefaultRuleDSL))
-
-	// --- Resource templates ---
-	// Drill-downs into a single entity. URIs come back from tool results as
-	// `resource_link` blocks (PR 05 in this stack) and resolve through these
-	// handlers. dual-audience so they appear in template-aware pickers as
-	// well; priority is below top-level resources.
-	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
-		Name:        "Transaction",
-		Title:       "Transaction Detail",
-		URITemplate: "breadbox://transaction/{short_id}",
-		Description: "Single transaction with its activity timeline (annotations). short_id is the 8-char base62 id surfaced everywhere by query_transactions.",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
-	}, s.handleTransactionTemplate)
-
-	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
-		Name:        "Account",
-		Title:       "Account Detail",
-		URITemplate: "breadbox://account/{short_id}",
-		Description: "Single bank account with balance, currency, and the most recent 25 transactions. short_id is the 8-char base62 id surfaced by get_reference(kind=accounts).",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
-	}, s.handleAccountTemplate)
-
-	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
-		Name:        "Household Member",
-		Title:       "Household Member Detail",
-		URITemplate: "breadbox://user/{short_id}",
-		Description: "Single household member with their connected accounts. short_id is the 8-char base62 id surfaced by get_reference(kind=users).",
-		MIMEType:    "application/json",
-		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
-	}, s.handleUserTemplate)
 }
 
 // AllToolDefs returns the full tool registry for admin display.

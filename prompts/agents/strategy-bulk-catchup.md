@@ -12,7 +12,7 @@ Shrink the `needs-review` queue as much as possible in one pass. Confidently cat
 
 ## Steps
 
-1. Read `breadbox://overview` for context (accounts, users, currency). `count_transactions(tags=["needs-review"])` to size the backlog up front so you know how much there is to clear.
+1. Call `get_overview` for context (accounts, users, currency). `query_transactions(tags=["needs-review"], count_only=true)` to size the backlog up front so you know how much there is to clear.
 2. **Work in batches.** `query_transactions(tags=["needs-review"], fields=minimal)` sorted by `category_primary` so you can clear the largest raw-category groups together. Page through the WHOLE backlog — don't stop at the first page.
 3. For each transaction, decide the category from its name, merchant, amount, and raw category fields. Lean on obvious merchant→category signals — this is a fast pass, not a deliberation.
 4. **Apply decisions in large compound writes** — `update_transactions` (max 50 operations per call): set `category_slug` AND remove the `needs-review` tag (with a terse rationale note) in one atomic op per transaction. For pre-categorized items whose category already looks right, just remove the tag with a short confirmation note.

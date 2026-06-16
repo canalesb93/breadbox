@@ -235,12 +235,11 @@ breadbox/
 │   │   └── health.go            GET /health
 │   │
 │   ├── mcp/
-│   │   ├── server.go            MCP server construction; registers tools + resources; mounts on router
-│   │   ├── tools.go             Tool handler functions (list_accounts, query_transactions, etc.)
-│   │   └── resources.go         MCP resource handlers:
-│   │                            - breadbox://overview (live dataset stats, JSON)
-│   │                            - breadbox://review-guidelines (review/rule guidelines, markdown)
-│   │                            - breadbox://report-format (report structure templates, markdown)
+│   │   ├── server.go            MCP server construction; registers tools; mounts on router (no MCP resources)
+│   │   ├── tools.go             Tool handler functions (query_transactions, update_transactions, etc.)
+│   │   └── tools_reads.go       Reference-data read tools (get_overview, list_accounts, …) +
+│   │                            get_reference (serves instructions / rule-dsl /
+│   │                            review-guidelines / report-format guidance docs as markdown)
 │   │
 │   ├── admin/
 │   │   ├── router.go            Mounts all /admin/ routes; session auth middleware

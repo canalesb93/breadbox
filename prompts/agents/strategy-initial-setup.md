@@ -8,13 +8,13 @@ You are performing the very first categorization setup for a user who just conne
 
 > [!WARNING]
 > **Safety check — do this first.**
-> 1. Read `breadbox://overview` and check `list_transaction_rules`.
+> 1. Call `get_overview` and check `list_transaction_rules`.
 > 2. If rules already exist, this is NOT a first-time setup. Inform the user: "Rules already exist — this looks like a returning account. Consider using Bulk Review instead."
 > 3. If proceeding anyway: do NOT use `apply_retroactively=true` (it would re-categorize already-reviewed transactions), skip broad `category_primary` rule creation, and treat this as a bulk review instead.
 
 ## Steps (cold start — no existing rules)
 
-1. Read `breadbox://overview` and `count_transactions(tags=["needs-review"])` to understand the backlog size. If empty, check `get_sync_status` — the account may not have synced yet. Report and exit if no data.
+1. Call `get_overview` and `query_transactions(tags=["needs-review"], count_only=true)` to understand the backlog size. If empty, check `get_sync_status` — the account may not have synced yet. Report and exit if no data.
 2. Create broad `category_primary` rules — one per raw provider category, scoped to the specific provider. Use `preview_rule` to verify each before creating. Use `apply_retroactively=true` since this is the initial cold start. Example:
 
    ```text
@@ -29,7 +29,7 @@ You are performing the very first categorization setup for a user who just conne
    "Service Charge" → bank_fees
    ```
 
-4. `count_transactions(tags=["needs-review"])` again to see what remains uncovered after the retroactive rule pass.
+4. `query_transactions(tags=["needs-review"], count_only=true)` again to see what remains uncovered after the retroactive rule pass.
 5. Process remaining tagged transactions group by group: `query_transactions(tags=["needs-review"], fields=core,category)`. Review each and apply `update_transactions` with a compound op (`category_slug` + `tags_to_remove` `needs-review` with a note), batching up to 50 per call.
 6. For miscategorized merchants, create per-merchant rules (without retroactive — they'll catch future instances).
 7. Submit a report with an overview of coverage, not a full rule listing.

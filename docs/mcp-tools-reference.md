@@ -67,26 +67,52 @@ Aggregated spending totals. Default date range: 30 days.
 
 ---
 
-## Account & Status Tools
+## Reference Data Tools
+
+> MCP resources were retired — these are plain tools (the only way to read this data).
+
+### get_overview (Read)
+
+Household snapshot: scope (users, accounts, currencies), freshness (latest sync, errored connections, recent transactions), pending-review backlog. Read once at the top of a session to ground later filters.
+
+### list_accounts (Read)
+
+Bank accounts with name, type, balances, currency, and connection. Optional `user_id` filter scopes to one household member.
+
+### list_categories (Read)
+
+The 2-level category taxonomy (slug, display name, parent, icon, color). Use the slugs as the canonical `category_slug` handle on filters and writes.
+
+### list_users (Read)
+
+Household members with role and `short_id` (the `short_id` is the `user_id` on filters).
+
+### list_tags (Read)
+
+The registered tag vocabulary (slugs). New slugs auto-register when `update_transactions` adds them.
+
+### get_sync_status (Read)
+
+Per-connection sync status (provider, `active`|`error`|`pending_reauth`|`disconnected`), last-sync time, last error. Check before trusting freshness.
+
+### list_transaction_rules (Read)
+
+The transaction-rule roster. Filter by `category_slug`, `enabled`, or name `search`. Lean `summary` projection by default (no conditions/actions trees); `fields=all` for full definitions. For trigger/creator/hit-count filters or sorting, use `query_transaction_rules`.
 
 ### get_reference (Read)
 
-One tool that reads any bounded reference dataset by `kind`. (Folds the former `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `get_sync_status`, and `list_transaction_rules` tools.) `overview` and `sync_status` are also exposed as `breadbox://` resources for clients with an attach UI; `accounts`, `categories`, `tags`, `users`, and `rules` are tool-only (their resources were retired as duplicates).
+Read an operating-guidance doc by `kind` — the near-static markdown that explains how to drive the server (formerly `breadbox://` markdown resources). Returns markdown.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `kind` | string | **Required.** One of `overview`, `accounts`, `categories`, `tags`, `users`, `sync_status`, `rules`. |
-| `user_id` | string | Only for `kind=accounts`: scope to one household member. |
-| `fields` | string | Only for `kind=rules`: `summary` (default, omits conditions/actions) or `all`. |
+| `kind` | string | **Required.** One of `instructions`, `rule-dsl`, `review-guidelines`, `report-format`. |
 
-Per kind:
-- `overview` — household snapshot (scope, freshness, pending-review backlog). Read once at the top of a session.
-- `accounts` — bank accounts with name, type, balances, connection info.
-- `categories` — the 2-level category hierarchy (slug, display name, parent, icon, color).
-- `tags` — the registered tag vocabulary.
-- `users` — household members; the `short_id` is the `user_id` on filters.
-- `sync_status` — per-connection last-sync time, status, errors.
-- `rules` — the transaction-rule roster (lean summary; `fields=all` for full definitions). For filtered/sorted rule analysis use `query_transaction_rules`.
+- `instructions` — data model + conventions overview.
+- `rule-dsl` — the transaction-rule condition grammar, action types, pipeline-stage ordering, sync-vs-retroactive semantics. Read before authoring rules.
+- `review-guidelines` — principles for reviewing transactions and creating rules. Read before working the needs-review queue.
+- `report-format` — structure + formatting conventions for `submit_report`.
+
+`instructions` / `review-guidelines` / `report-format` reflect operator customization (`app_config`); `rule-dsl` is the fixed grammar.
 
 ### list_workflows (Read)
 
@@ -148,7 +174,7 @@ Import categories from TSV format. Creates or updates categories.
 
 ### list_tags (Read)
 
-The tag vocabulary is read via `get_reference(kind=tags)`.
+The tag vocabulary — see **Reference Data Tools → `list_tags`** above.
 
 ### add_transaction_tag (Write)
 
@@ -318,7 +344,7 @@ Returns `{ created, failed, rules: [{rule, retroactive_matches?}], errors }` so 
 
 ### list_transaction_rules (Read)
 
-The rule roster is read via `get_reference(kind=rules)` (lean `summary` projection; `fields=all` for full `conditions`/`actions`). For filtered/sorted analysis use `query_transaction_rules` below.
+The rule roster — see **Reference Data Tools → `list_transaction_rules`** above. For filtered/sorted analysis use `query_transaction_rules` below.
 
 ### query_transaction_rules (Read)
 
@@ -499,12 +525,7 @@ Trigger a manual sync for all active connections.
 
 ## Resources
 
-In addition to tools, Breadbox exposes three MCP resources that provide passive context:
+Breadbox exposes **no MCP resources** — they were retired entirely (invisible on clients that can't `resources/list`). Everything is a tool:
 
-| URI | Description |
-|-----|-------------|
-| `breadbox://overview` | Live dataset summary (users, accounts, spending, pending transactions) |
-| `breadbox://review-guidelines` | Guidelines for reviewing transactions and creating rules |
-| `breadbox://report-format` | Report structure templates and formatting guidelines |
-
-Agents should read `breadbox://overview` at the start of a session for ambient context about the household's financial data.
+- Ambient context: call `get_overview` at the start of a session.
+- Operating-guidance docs (formerly `breadbox://` markdown resources): `get_reference(kind=instructions|rule-dsl|review-guidelines|report-format)`.

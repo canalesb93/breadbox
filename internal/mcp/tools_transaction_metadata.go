@@ -20,7 +20,7 @@ import (
 //   - clear everything → replace:true           (set omitted → {})
 //
 // Metadata is read back on every transaction (query_transactions, the
-// breadbox://transaction/{id} resource, GET /transactions/{id}).
+// GET /transactions/{id}).
 
 type setTransactionMetadataInput struct {
 	TransactionID string         `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction."`

@@ -91,9 +91,9 @@ If two rules can match the same transaction, the higher priority wins; ties reso
 
 ## Authoring checklist
 
-1. Read `get_reference(kind=rules)` to avoid duplicates.
+1. Read `list_transaction_rules` to avoid duplicates.
 2. `preview_rule` your conditions to verify match count and review a sample of matched transactions.
 3. Pick the right priority band for the pattern type.
 4. Use `category_slug` (never `category_id`).
 5. Prefer `contains` over exact match — bank feeds format names inconsistently.
-6. Use `batch_create_rules` (max 100) to land related rules in one call.
+6. Use `create_transaction_rule` with a `rules` array (max 100) to land related rules in one call.

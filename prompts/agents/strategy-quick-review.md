@@ -12,7 +12,7 @@ Clear 80%+ of the backlog with reasonable accuracy. Leave uncertain items tagged
 
 ## Steps
 
-1. `count_transactions(tags=["needs-review"])` — see queue size. If zero, report "queue clear" and exit.
+1. `query_transactions(tags=["needs-review"], count_only=true)` — see queue size. If zero, report "queue clear" and exit.
 2. Process the largest raw category groups first:
    a. `query_transactions(tags=["needs-review"], fields=minimal, limit up to 500)` — pull a large slice.
    b. Scan the transactions — if the category mapping is clear, call `update_transactions` in batches of up to 50 operations per call:

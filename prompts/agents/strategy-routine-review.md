@@ -12,7 +12,7 @@ Clear the `needs-review` backlog with care. Create rules for new recurring patte
 
 ## Steps
 
-1. `count_transactions(tags=["needs-review"])` — if zero, check `get_sync_status` for data freshness and report accordingly.
+1. `query_transactions(tags=["needs-review"], count_only=true)` — if zero, check `get_sync_status` for data freshness and report accordingly.
 2. `query_transactions(tags=["needs-review"], fields=core,category, limit 30)` — fetch the backlog.
 3. For each transaction with prior activity (existing category/rule applications), call `list_annotations` to see its history — respect human corrections that are recorded as prior comments.
 4. Review each transaction:

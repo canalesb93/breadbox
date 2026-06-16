@@ -12,7 +12,7 @@ Flag transactions or patterns that merit the family's attention. Every flagged i
 
 ## Steps
 
-1. Read `breadbox://overview` for baseline context.
+1. Call `get_overview` for baseline context.
 2. Compare recent vs historical spending:
    - `transaction_summary` with `group_by=category_month` for the last 30 days vs the prior 30 days
    - Scan a `query_transactions` sample over the recent window for merchant names absent from the prior window

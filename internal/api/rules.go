@@ -247,8 +247,8 @@ func ApplyAllRulesHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-// batchCreateRulesRequest mirrors the MCP `batch_create_rules` tool's input
-// shape 1:1 (snake_case, identical field names).
+// batchCreateRulesRequest mirrors the MCP `create_transaction_rule` tool's
+// `rules` array (snake_case, identical per-item field names).
 type batchCreateRulesRequest struct {
 	Rules   []batchCreateRuleItem `json:"rules"`
 	OnError string                `json:"on_error"`
@@ -256,7 +256,7 @@ type batchCreateRulesRequest struct {
 
 // batchCreateRuleItem is a single rule create payload, mirroring the
 // per-item shape used by both the single-create REST handler and the MCP
-// batch_create_rules tool.
+// create_transaction_rule tool's `rules` array.
 type batchCreateRuleItem struct {
 	Name         string               `json:"name"`
 	Conditions   *service.Condition   `json:"conditions"`
@@ -282,8 +282,8 @@ type batchCreateRuleResultError struct {
 	Message string `json:"message"`
 }
 
-// BatchCreateRulesHandler is the REST sibling of the MCP `batch_create_rules`
-// tool. Up to 50 rules per call. Per-op errors live inside `results[]`; the
+// BatchCreateRulesHandler is the REST sibling of the MCP
+// `create_transaction_rule` `rules` array. Up to 50 rules per call. Per-op errors live inside `results[]`; the
 // top-level call returns 200 unless the input itself is malformed (empty/
 // oversized rules array), in which case it returns `400 INVALID_PARAMETER`.
 //

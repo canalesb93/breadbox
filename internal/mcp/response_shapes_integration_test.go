@@ -17,7 +17,6 @@ package mcp
 // PR as the service change. New/optional fields can still be added.
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -958,90 +957,7 @@ func TestUpdateTransactionsHandler_ResetCategoryShape(t *testing.T) {
 // optional service-layer params without copy-pasting the &s pattern.
 func ptrString(s string) *string { return &s }
 
-// TestReferenceMirrorTools_ParityWithResources locks the dual-surface
-// contract for the reference datasets that still have BOTH a resource and a
-// get_reference tool path: breadbox://sync-status and ://overview. Each pair
-// must return the SAME payload via the SAME service call. A regression that
-// diverges them — e.g. forgetting the resource envelope, or pointing the tool
-// at a different service method — would let one surface drift from the other.
-//
-// (accounts / categories / tags / users / rules were retired as resources —
-// they're read-only via get_reference now, so there's no pair left to compare.)
-//
-// The parity test reads each pair, ignores envelope keys (resource handlers
-// always wrap in {"<entity>": [...]}), and compares the inner payload byte-
-// for-byte after decompressing through json.Unmarshal — payload semantics, not
-// formatting.
-func TestReferenceMirrorTools_ParityWithResources(t *testing.T) {
-	f := seedFixtures(t)
-
-	cases := []struct {
-		name        string
-		envelopeKey string // key inside the JSON envelope; "" means top-level (overview)
-		toolFn      func() (*mcpsdk.CallToolResult, any, error)
-		resourceFn  func() (*mcpsdk.ReadResourceResult, error)
-	}{
-		{
-			name:        "get_reference(sync_status) <-> breadbox://sync-status",
-			envelopeKey: "connections",
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				return f.svc.handleGetSyncStatus(f.ctx, nil, getSyncStatusInput{})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleSyncStatusResource(f.ctx, nil)
-			},
-		},
-		{
-			name:        "get_reference(overview) <-> breadbox://overview",
-			envelopeKey: "", // both surfaces return the same OverviewStats shape
-			toolFn: func() (*mcpsdk.CallToolResult, any, error) {
-				return f.svc.handleGetOverview(f.ctx, nil, getOverviewInput{})
-			},
-			resourceFn: func() (*mcpsdk.ReadResourceResult, error) {
-				return f.svc.handleOverviewResource(f.ctx, nil)
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			toolRes, _, toolErr := tc.toolFn()
-			if toolErr != nil {
-				t.Fatalf("tool: %v", toolErr)
-			}
-			toolPayload := decodeToolResult[any](t, tc.name+" tool", toolRes, toolErr)
-
-			resRes, resErr := tc.resourceFn()
-			if resErr != nil {
-				t.Fatalf("resource: %v", resErr)
-			}
-			if len(resRes.Contents) != 1 {
-				t.Fatalf("resource: expected 1 content block, got %d", len(resRes.Contents))
-			}
-			var resPayload any
-			if err := json.Unmarshal([]byte(resRes.Contents[0].Text), &resPayload); err != nil {
-				t.Fatalf("resource: unmarshal: %v", err)
-			}
-
-			if tc.envelopeKey != "" {
-				toolMap := asObject(t, "tool envelope", toolPayload)
-				resMap := asObject(t, "resource envelope", resPayload)
-				toolPayload = toolMap[tc.envelopeKey]
-				resPayload = resMap[tc.envelopeKey]
-				if toolPayload == nil {
-					t.Fatalf("tool envelope missing key %q", tc.envelopeKey)
-				}
-				if resPayload == nil {
-					t.Fatalf("resource envelope missing key %q", tc.envelopeKey)
-				}
-			}
-
-			toolBytes := mustMarshal(t, toolPayload)
-			resBytes := mustMarshal(t, resPayload)
-			if !bytes.Equal(toolBytes, resBytes) {
-				t.Errorf("payload drift between tool and resource\n  tool:     %s\n  resource: %s",
-					string(toolBytes), string(resBytes))
-			}
-		})
-	}
-}
+// The reference data reads (accounts / categories / tags / users / sync-status
+// / rules / overview) are tool-only now — MCP resources were retired entirely,
+// so there's no tool↔resource parity left to assert here. The individual tool
+// response shapes are covered by the per-tool shape tests above.
