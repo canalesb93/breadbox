@@ -4,6 +4,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
 	"breadbox/internal/service"
 
@@ -70,6 +71,40 @@ type queryTransactionRulesInput struct {
 	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result. Only valid with the default priority sort; an explicit sort_by returns a single top-N page with no next_cursor."`
 	Fields       string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Alias: summary (name,enabled,priority,trigger,category,hit_count,last_hit_at; the default — omits the conditions and actions trees). Default when omitted: summary. Pass fields=all for every field including the full conditions/actions. id is always included."`
+}
+
+// getReferenceInput is the single parameterized read over the bounded
+// reference datasets. `kind` selects the dataset; the optional fields apply
+// only to the kinds that accept them (user_id → accounts, fields → rules).
+type getReferenceInput struct {
+	Kind   string `json:"kind" jsonschema:"required,Which reference dataset to read: overview | accounts | categories | tags | users | sync_status | rules."`
+	UserID string `json:"user_id,omitempty" jsonschema:"Only for kind=accounts: scope accounts to one household member (short ID or UUID)."`
+	Fields string `json:"fields,omitempty" jsonschema:"Only for kind=rules: comma-separated fields/aliases. Default summary projection (omits conditions/actions trees); pass fields=all for full rule definitions."`
+}
+
+// handleGetReference dispatches a get_reference call to the matching bounded
+// reference handler. It reuses the per-kind handlers (which share the same
+// service path as the breadbox:// resources), so payload shapes stay identical
+// to the resources and to the pre-fold tool mirrors.
+func (s *MCPServer) handleGetReference(ctx context.Context, req *mcpsdk.CallToolRequest, input getReferenceInput) (*mcpsdk.CallToolResult, any, error) {
+	switch input.Kind {
+	case "overview":
+		return s.handleGetOverview(ctx, req, getOverviewInput{})
+	case "accounts":
+		return s.handleListAccounts(ctx, req, listAccountsInput{UserID: input.UserID})
+	case "categories":
+		return s.handleListCategories(ctx, req, listCategoriesInput{})
+	case "tags":
+		return s.handleListTags(ctx, req, listTagsInput{})
+	case "users":
+		return s.handleListUsers(ctx, req, listUsersInput{})
+	case "sync_status":
+		return s.handleGetSyncStatus(ctx, req, getSyncStatusInput{})
+	case "rules":
+		return s.handleListTransactionRules(ctx, req, listTransactionRulesInput{Fields: input.Fields})
+	default:
+		return errorResult(fmt.Errorf("unknown kind %q: must be one of overview, accounts, categories, tags, users, sync_status, rules", input.Kind)), nil, nil
+	}
 }
 
 // --- Handlers ---

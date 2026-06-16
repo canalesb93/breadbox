@@ -225,7 +225,9 @@ On error, the MCP SDK's `IsError: true` flag is set and the content is:
 
 ---
 
-### Tool: `list_accounts`
+### Tool: `get_reference(kind=accounts)`
+
+Bank accounts are read via `get_reference(kind=accounts)` (optional `user_id` filter) — one of the bounded reference datasets behind the single `get_reference` tool. There is no standalone `list_accounts` tool.
 
 **Description (shown to LLM):** List all bank accounts with their current balances. Optionally filter by family member. Returns one object per account including institution, type, and balance.
 
@@ -302,7 +304,7 @@ Calls `GET /api/v1/accounts` with the optional `user_id` query parameter. Return
 
 ### Tool: `query_transactions`
 
-**Description (shown to LLM):** Search and filter transactions. Supports date ranges, account, category, amount bounds, free-text search, and pending status. Results are cursor-paginated — default 100 per page, maximum 500. Use `count_transactions` first to understand result size before querying.
+**Description (shown to LLM):** Search and filter transactions. Supports date ranges, account, category, amount bounds, free-text search, and pending status. Results are cursor-paginated — default 100 per page, maximum 500. Pass `count_only: true` first to understand result size before querying.
 
 #### Input Schema
 
@@ -389,7 +391,7 @@ When there are no more pages:
 Each transaction object is approximately 50 tokens of JSON. At the default page size of 100, a single call returns roughly **5,000 tokens of content** before any surrounding context. At the maximum page size of 500, a single call can return **25,000 tokens**.
 
 The LLM should:
-1. Call `count_transactions` first when the result size is unknown.
+1. Call `query_transactions({ ..., count_only: true })` first when the result size is unknown.
 2. Apply date, category, and other filters to narrow results before paginating.
 3. Prefer smaller `limit` values (25–50) when only a sample or aggregate is needed.
 4. Only paginate through all results when the task genuinely requires complete data.
@@ -408,71 +410,21 @@ Calls `GET /api/v1/transactions` with all provided filters as query parameters. 
 
 ---
 
-### Tool: `count_transactions`
+### Counting transactions (`query_transactions` `count_only`)
 
-**Description (shown to LLM):** Count matching transactions without returning any transaction data. Accepts the same filters as `query_transactions`. Use this before calling `query_transactions` to understand how many results to expect and decide whether to add more filters or paginate.
-
-#### Input Schema
-
-Same as `query_transactions` **minus** `cursor` and `limit`. All parameters are optional.
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `start_date` | string (YYYY-MM-DD) | No | Count transactions on or after this date. |
-| `end_date` | string (YYYY-MM-DD) | No | Count transactions on or before this date. |
-| `account_id` | string | No | Filter to a specific account. |
-| `user_id` | string | No | Filter to accounts owned by this family member. |
-| `category` | string | No | Filter by primary category. |
-| `category_detailed` | string | No | Filter by detailed subcategory. |
-| `min_amount` | number \| null | No | Minimum transaction amount. Zero is a valid filter value. |
-| `max_amount` | number \| null | No | Maximum transaction amount. Zero is a valid filter value. |
-| `pending` | boolean | No | Filter by pending status. |
-| `search` | string | No | Full-text search over merchant name and description. |
-
-#### Example Input
-
-```json
-{
-  "start_date": "2025-01-01",
-  "end_date": "2025-01-31"
-}
-```
-
-#### Output Format
-
-```json
-{ "count": 347 }
-```
-
-#### Mapping to REST API
-
-Calls `GET /api/v1/transactions/count` with the same filter query parameters supported by `query_transactions`. The endpoint executes a `COUNT(*)` query rather than selecting rows, which is efficient even for large datasets — it does not load transaction data into memory.
-
-#### Recommended Agent Workflow
+Counting is folded into `query_transactions`: pass `count_only: true` with the same filters and it returns just `{ "count": N }` — no rows, no pagination (`cursor`/`limit`/`sort_*`/`fields` are ignored). There is no separate `count_transactions` tool.
 
 ```
-1. count_transactions({ start_date, end_date }) → { count: 347 }
-   - If count < 200: proceed to query_transactions directly
-   - If count >= 200: add more filters (category, account_id, etc.) and re-count
-   - If still large: query_transactions with pagination, processing page by page
-
-2. query_transactions({ start_date, end_date, category: "FOOD_AND_DRINK" })
-   → { data: [...100 txns], next_cursor: "...", has_more: true }
-
-3. query_transactions({ ..., cursor: "..." })
-   → { data: [...47 txns], next_cursor: null, has_more: false }
+1. query_transactions({ start_date, end_date, count_only: true }) → { count: 347 }
+   - If small: re-call without count_only to fetch rows.
+   - If large: add filters (category_slug, account_id, …) and re-count, then paginate.
 ```
-
-#### Edge Cases
-
-- **No matching transactions:** Returns `{ "count": 0 }`.
-- **Invalid parameters:** Returns an error in the same format as `query_transactions`.
 
 ---
 
-### Tool: `list_users`
+### Tool: `get_reference(kind=users)`
 
-**Description (shown to LLM):** List all family members tracked in Breadbox. Users are labels for account ownership — they are not login accounts. Use the returned IDs to filter `list_accounts` or `query_transactions` by family member.
+**Description (shown to LLM):** List all family members tracked in Breadbox. Users are labels for account ownership — they are not login accounts. Read them via `get_reference(kind=users)`; use the returned IDs to filter accounts (`get_reference(kind=accounts)`) or `query_transactions` by family member.
 
 #### Input Schema
 
@@ -513,7 +465,9 @@ Calls `GET /api/v1/users`. Returns all users without pagination (family sizes ar
 
 ---
 
-### Tool: `get_sync_status`
+### Tool: `get_reference(kind=sync_status)`
+
+Connection sync status is read via `get_reference(kind=sync_status)` — one of the bounded reference datasets behind the single `get_reference` tool. There is no standalone `get_sync_status` tool.
 
 **Description (shown to LLM):** Returns the health status of all bank connections — whether they are syncing successfully, when they last synced, and whether any connections need re-authentication. Use this to diagnose why transactions might be missing or stale.
 
@@ -577,7 +531,7 @@ Calls `GET /api/v1/connections`. Each element in the response corresponds to one
 
 ### Tool: `trigger_sync`
 
-**Description (shown to LLM):** Manually trigger a data sync to fetch the latest transactions and balances from the bank. Syncs all connections by default, or a specific connection if `connection_id` is provided. The sync runs asynchronously — this tool returns immediately after enqueuing the sync, not after it completes. Check `get_sync_status` afterward to monitor progress.
+**Description (shown to LLM):** Manually trigger a data sync to fetch the latest transactions and balances from the bank. Syncs all connections by default, or a specific connection if `connection_id` is provided. The sync runs asynchronously — this tool returns immediately after enqueuing the sync, not after it completes. Check `get_reference(kind=sync_status)` afterward to monitor progress.
 
 #### Input Schema
 
@@ -613,13 +567,15 @@ Calls `POST /api/v1/sync` with an optional `connection_id` body parameter. The R
 
 - **Unknown `connection_id`:** Returns an error: `{ "error": "Connection conn_xxx not found." }` with `IsError: true`.
 - **Sync already in progress:** The service layer handles deduplication. A second trigger for the same connection while one is running is a no-op; the tool returns a success message indicating the sync was already underway.
-- **Connection in `error` state:** The sync is attempted. If re-authentication is required, the sync will fail again and `get_sync_status` will reflect the error.
+- **Connection in `error` state:** The sync is attempted. If re-authentication is required, the sync will fail again and `get_reference(kind=sync_status)` will reflect the error.
 
 ---
 
-### Tool: `list_categories`
+### Tool: `get_reference(kind=categories)`
 
-**Description (shown to LLM):** List all distinct transaction category pairs (primary + detailed) that exist in the database. Useful for understanding the category taxonomy before filtering transactions.
+The category taxonomy is read via `get_reference(kind=categories)` — one of the bounded reference datasets behind the single `get_reference` tool. There is no standalone `list_categories` tool.
+
+**Description (shown to LLM):** List all transaction categories. Useful for understanding the category taxonomy before filtering transactions.
 
 #### Input Schema
 
@@ -760,7 +716,7 @@ The standard pattern for any transaction-based task:
 
 ```
 Step 1: Establish scope
-  → count_transactions({ start_date: "2025-01-01", end_date: "2025-01-31" })
+  → query_transactions({ start_date: "2025-01-01", end_date: "2025-01-31", count_only: true })
   ← { count: 347 }
 
 Step 2: Evaluate
@@ -768,8 +724,8 @@ Step 2: Evaluate
   - count >= 200 → narrow filters, or plan multi-page processing
 
 Step 3a: Narrow filters (if count is large)
-  → count_transactions({ start_date: "2025-01-01", end_date: "2025-01-31",
-                          category: "FOOD_AND_DRINK" })
+  → query_transactions({ start_date: "2025-01-01", end_date: "2025-01-31",
+                          category_slug: "food_and_drink", count_only: true })
   ← { count: 52 }
   → query_transactions({ start_date: "2025-01-01", end_date: "2025-01-31",
                           category: "FOOD_AND_DRINK" })
@@ -823,13 +779,13 @@ Both paths call the same `service.QueryTransactions` function. The MCP tool hand
 
 | MCP Tool | REST Endpoint |
 |---|---|
-| `list_accounts` | `GET /api/v1/accounts` |
+| `get_reference(kind=accounts)` | `GET /api/v1/accounts` |
 | `query_transactions` | `GET /api/v1/transactions` |
-| `count_transactions` | `GET /api/v1/transactions/count` |
-| `list_users` | `GET /api/v1/users` |
-| `get_sync_status` | `GET /api/v1/connections` |
+| `query_transactions(count_only=true)` | `GET /api/v1/transactions/count` |
+| `get_reference(kind=users)` | `GET /api/v1/users` |
+| `get_reference(kind=sync_status)` | `GET /api/v1/connections` |
 | `trigger_sync` | `POST /api/v1/sync` |
-| `list_categories` | `GET /api/v1/categories` |
+| `get_reference(kind=categories)` | `GET /api/v1/categories` |
 
 ### No MCP-Specific Data Access
 

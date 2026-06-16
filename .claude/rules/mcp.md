@@ -81,18 +81,29 @@ The "review queue" is just transactions tagged `needs-review`. A seeded system r
 
 Agents follow a uniform loop: `query_transactions(tags=["needs-review"])` to find work, `update_transactions(operations=[…])` to set category + remove the tag (and pair the change with a `comment` for the audit trail) atomically per transaction. Max 50 ops per call.
 
-`update_transactions` is the universal per-row write — tag adds, tag removes, category sets, category resets (`reset_category: true`), and comments all flow through it. The bare-row and bulk variants (`add_transaction_tag`, `remove_transaction_tag`, `categorize_transaction`, `reset_transaction_category`, `add_transaction_comment`, `bulk_recategorize`, `batch_categorize_transactions`) were collapsed into it during the MCP overhaul.
+`update_transactions` is the universal per-row write — tag adds, tag removes, category sets, category resets (`reset_category: true`), comments, and flag/unflag (`flagged: true|false`) all flow through it. The bare-row and bulk variants (`add_transaction_tag`, `remove_transaction_tag`, `categorize_transaction`, `reset_transaction_category`, `add_transaction_comment`, `bulk_recategorize`, `batch_categorize_transactions`, and the standalone `flag_transaction` / `unflag_transaction`) were collapsed into it.
 
 Annotations are read via `list_annotations`. Tag *vocabulary* admin (introducing, renaming, deleting tag definitions) goes through `create_tag`, `update_tag`, `delete_tag`.
 
-## Reference data: dual surface (resources + tool mirrors)
+## Consolidated write tools
+
+Several writes are deliberately compound so the registry stays small and an agent reaches for one obvious tool per entity:
+
+- `update_transactions` — see above (category, tags, comment, flag).
+- `set_transaction_metadata` — the single op over the free-form metadata JSONB column: `set` (merge keys), `unset` (delete keys), `replace:true` (swap/clear the whole blob). Absorbed `remove_`/`replace_`/`clear_transaction_metadata`.
+- `update_series` — edits a recurring series' attributes **plus** `type` (absorbed `set_series_type`) and tag membership via `tags_to_add` / `tags_to_remove` (absorbed `add_series_tag` / `remove_series_tag`). Each sub-change still calls the same service method, so the semantics (collision guards, sticky type, tag provenance) are unchanged.
+- `create_transaction_rule` — takes a `rules` array of 1..N specs (absorbed `batch_create_rules`); each spec may carry `apply_retroactively`.
+
+When folding a tool, prefer reusing the existing service methods from the compound handler over re-implementing the write — the MCP layer is where the consolidation lives.
+
+## Reference data: dual surface (resources + one tool)
 
 Bounded reference data is exposed two ways:
 
 - **Resources (preferred)** — `breadbox://overview`, `://accounts`, `://categories`, `://tags`, `://users`, `://rules`, `://sync-status`. Surfaced in Claude.ai's paperclip menu and the Inspector resource picker. Application-driven, user-controlled.
-- **Tool mirrors (compat)** — `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `list_transaction_rules`, `get_sync_status`. Same payload, called as tools. Kept because not every MCP client implements the resources/* methods — without these, those clients can't read this data at all.
+- **`get_reference` tool (compat)** — a single tool that dispatches on `kind` (`overview` \| `accounts` \| `categories` \| `tags` \| `users` \| `sync_status` \| `rules`) to the same per-kind handler the matching resource uses. Kept because not every MCP client implements the resources/* methods. Optional `user_id` (accounts) and `fields` (rules) ride through. Filtered/sorted rule analysis stays in `query_transaction_rules`; `get_reference kind=rules` returns the lean roster.
 
-Both surfaces share the same service-layer call path (no logic duplication), so payload shape stays in sync. When adding a new bounded reference resource, register both: a resource handler in `resources.go` and a tool mirror in `tools_reads.go`.
+Both surfaces share the same service-layer call path (no logic duplication), so payload shape stays in sync. The per-kind handlers (`handleGetOverview`, `handleListAccounts`, …) still live in `tools_reads.go` — `get_reference` dispatches to them. When adding a new bounded reference resource, add a resource handler in `resources.go` and a new `kind` branch in `handleGetReference`.
 
 ## Resource templates (drill-downs)
 

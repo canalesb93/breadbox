@@ -136,8 +136,17 @@ type updateSeriesInput struct {
 	ExpectedDay     *int32   `json:"expected_day,omitempty" jsonschema:"New day-of-month / day-of-week anchor (1–31). Send 0 to clear the anchor; omit to leave unchanged."`
 	CategoryID      string   `json:"category_id,omitempty" jsonschema:"New suggested category short ID or UUID. Omit to leave unchanged."`
 	UserID          string   `json:"user_id,omitempty" jsonschema:"New household-member owner short ID or UUID. Part of the dedup signature — a change is collision-guarded. Omit to leave unchanged."`
+	Type            string   `json:"type,omitempty" jsonschema:"New recurring-charge type: subscription (streaming/SaaS/memberships), bill (rent/utilities/insurance/telecom), loan (mortgage/auto/student/personal), or other. Detection infers it from the charges' category; set this to correct it. Sticky override — re-detection won't change it back. Omit to leave unchanged."`
+	TagsToAdd       []string `json:"tags_to_add,omitempty" jsonschema:"Tag slugs to attach to the series (each must already exist — create_tag first). Each tag is materialized onto every linked charge and applied to future members as they join."`
+	TagsToRemove    []string `json:"tags_to_remove,omitempty" jsonschema:"Tag slugs to detach from the series. Strips the series-inherited copies from linked charges; a tag a user added directly to a charge survives."`
 }
 
+// handleUpdateSeries is the compound series editor — it absorbs the former
+// set_series_type and add/remove_series_tag tools. Order: edit user-owned
+// fields → set type (sticky) → add tags → remove tags, then return the fresh
+// series. Each sub-change reuses the same service method the standalone tool
+// did, so the semantics (collision guards, sticky type, tag provenance) are
+// unchanged.
 func (s *MCPServer) handleUpdateSeries(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
@@ -155,18 +164,47 @@ func (s *MCPServer) handleUpdateSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 		CategoryID:      optStr(input.CategoryID),
 		UserID:          optStr(input.UserID),
 	}
-	if edit.Name == nil && edit.ExpectedAmount == nil && edit.AmountTolerance == nil &&
-		edit.Currency == nil && edit.Cadence == nil && edit.ExpectedDay == nil &&
-		edit.CategoryID == nil && edit.UserID == nil {
-		return errorResult(fmt.Errorf("provide at least one field to update")), nil, nil
+	hasEdit := edit.Name != nil || edit.ExpectedAmount != nil || edit.AmountTolerance != nil ||
+		edit.Currency != nil || edit.Cadence != nil || edit.ExpectedDay != nil ||
+		edit.CategoryID != nil || edit.UserID != nil
+	if !hasEdit && input.Type == "" && len(input.TagsToAdd) == 0 && len(input.TagsToRemove) == 0 {
+		return errorResult(fmt.Errorf("provide at least one field to update (a series attribute, type, or tags_to_add/tags_to_remove)")), nil, nil
 	}
+
+	bg := context.Background()
 	actor := service.ActorFromContext(ctx)
-	series, err := s.svc.UpdateSeries(context.Background(), input.ID, edit, actor)
-	if err != nil {
+
+	notFound := func(err error) (*mcpsdk.CallToolResult, any, error) {
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("series not found")), nil, nil
 		}
 		return errorResult(err), nil, nil
+	}
+
+	if hasEdit {
+		if _, err := s.svc.UpdateSeries(bg, input.ID, edit, actor); err != nil {
+			return notFound(err)
+		}
+	}
+	if input.Type != "" {
+		if _, err := s.svc.SetSeriesType(bg, input.ID, input.Type, actor); err != nil {
+			return notFound(err)
+		}
+	}
+	for _, slug := range input.TagsToAdd {
+		if err := s.svc.AddSeriesTag(bg, input.ID, slug, actor); err != nil {
+			return notFound(err)
+		}
+	}
+	for _, slug := range input.TagsToRemove {
+		if err := s.svc.RemoveSeriesTag(bg, input.ID, slug); err != nil {
+			return notFound(err)
+		}
+	}
+
+	series, err := s.svc.GetSeries(bg, input.ID)
+	if err != nil {
+		return notFound(err)
 	}
 	return jsonResult(series)
 }
@@ -189,75 +227,6 @@ func (s *MCPServer) handleUnlinkSeriesTransactions(ctx context.Context, _ *mcpsd
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("series not found")), nil, nil
 		}
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(series)
-}
-
-type setSeriesTypeInput struct {
-	ID   string `json:"id" jsonschema:"required,Series short ID or UUID."`
-	Type string `json:"type" jsonschema:"required,One of: subscription, bill, loan, other."`
-}
-
-func (s *MCPServer) handleSetSeriesType(ctx context.Context, _ *mcpsdk.CallToolRequest, input setSeriesTypeInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.ID == "" || input.Type == "" {
-		return errorResult(fmt.Errorf("id and type are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	series, err := s.svc.SetSeriesType(context.Background(), input.ID, input.Type, actor)
-	if err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			return errorResult(fmt.Errorf("series not found")), nil, nil
-		}
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(series)
-}
-
-type seriesTagInput struct {
-	ID      string `json:"id" jsonschema:"required,Series short ID or UUID."`
-	TagSlug string `json:"tag_slug" jsonschema:"required,Tag slug (must already exist)."`
-}
-
-func (s *MCPServer) handleAddSeriesTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input seriesTagInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.ID == "" || input.TagSlug == "" {
-		return errorResult(fmt.Errorf("id and tag_slug are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	if err := s.svc.AddSeriesTag(context.Background(), input.ID, input.TagSlug, actor); err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			return errorResult(fmt.Errorf("series not found")), nil, nil
-		}
-		return errorResult(err), nil, nil
-	}
-	series, err := s.svc.GetSeries(context.Background(), input.ID)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(series)
-}
-
-func (s *MCPServer) handleRemoveSeriesTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input seriesTagInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.ID == "" || input.TagSlug == "" {
-		return errorResult(fmt.Errorf("id and tag_slug are required")), nil, nil
-	}
-	if err := s.svc.RemoveSeriesTag(context.Background(), input.ID, input.TagSlug); err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			return errorResult(fmt.Errorf("series not found")), nil, nil
-		}
-		return errorResult(err), nil, nil
-	}
-	series, err := s.svc.GetSeries(context.Background(), input.ID)
-	if err != nil {
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(series)

@@ -50,10 +50,7 @@ Query transactions with composable filters and cursor pagination.
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps`. Omitted → `core,category` (lean default); `all` → every field. `id` always included. |
 | `cursor` | string | Pagination cursor |
 | `limit` | int | Results per page (default 50, max 500) |
-
-### count_transactions (Read)
-
-Count transactions matching filters. Same filter parameters as `query_transactions`. Returns count only — use before paginating large result sets.
+| `count_only` | bool | When true, return just `{ "count": N }` for the same filters — no rows, no pagination. `cursor`/`limit`/`sort_*`/`fields` ignored. Use before paginating large result sets, or to compare counts across ranges. |
 
 ### transaction_summary (Read)
 
@@ -72,25 +69,24 @@ Aggregated spending totals. Default date range: 30 days.
 
 ## Account & Status Tools
 
-### list_accounts (Read)
+### get_reference (Read)
 
-List all bank accounts across all connections. Returns account name, type, balances, connection info.
+One tool that reads any bounded reference dataset by `kind` — the single mirror of the `breadbox://` reference resources, for clients that don't support MCP resources. (Folds the former `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `get_sync_status`, and `list_transaction_rules` tools.)
 
-### list_users (Read)
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `kind` | string | **Required.** One of `overview`, `accounts`, `categories`, `tags`, `users`, `sync_status`, `rules`. |
+| `user_id` | string | Only for `kind=accounts`: scope to one household member. |
+| `fields` | string | Only for `kind=rules`: `summary` (default, omits conditions/actions) or `all`. |
 
-List all family members in the household.
-
-### get_sync_status (Read)
-
-Get sync status for all connections — last sync time, status, errors.
-
-### list_categories (Read)
-
-List all categories in the 2-level hierarchy. Returns slug, display name, parent, icon, color.
-
-### export_categories (Read)
-
-Export the full category tree as TSV. Useful for backup or transfer.
+Per kind:
+- `overview` — household snapshot (scope, freshness, pending-review backlog). Read once at the top of a session.
+- `accounts` — bank accounts with name, type, balances, connection info.
+- `categories` — the 2-level category hierarchy (slug, display name, parent, icon, color).
+- `tags` — the registered tag vocabulary.
+- `users` — household members; the `short_id` is the `user_id` on filters.
+- `sync_status` — per-connection last-sync time, status, errors.
+- `rules` — the transaction-rule roster (lean summary; `fields=all` for full definitions). For filtered/sorted rule analysis use `query_transaction_rules`.
 
 ### list_workflows (Read)
 
@@ -152,7 +148,7 @@ Import categories from TSV format. Creates or updates categories.
 
 ### list_tags (Read)
 
-List all registered tags.
+The tag vocabulary is read via `get_reference(kind=tags)` (or the `breadbox://tags` resource).
 
 ### add_transaction_tag (Write)
 
@@ -176,7 +172,7 @@ Remove a tag from a transaction. An optional `note` lands on the `tag_removed` a
 
 ### update_transactions (Write)
 
-Compound batch write — set category, add tags, remove tags, and attach a comment per transaction in a single atomic call. Max 50 operations per request.
+Compound batch write — set category, add tags, remove tags, attach a comment, and flag/unflag per transaction in a single atomic call. Max 50 operations per request.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -191,7 +187,8 @@ Each operation:
 | `category_slug` | string | Optional category to set. Sets `category_override='user'`. |
 | `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates tags if the slug is new. |
 | `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional — if provided, lands on the `tag_removed` annotation. |
-| `comment` | string | Optional comment annotation. |
+| `comment` | string | Optional comment annotation. When flagging, put the flag reason here. |
+| `flagged` | bool | Optional. `true` flags the transaction for human attention (sets `flagged_at`); `false` clears the flag. Omit to leave it untouched. Retrieve flagged rows with `query_transactions(flagged=true)`. Folds the former `flag_transaction` / `unflag_transaction` tools. |
 
 Use this to close a review entry: `set category + remove needs-review (with note) + comment` in one call.
 
@@ -246,7 +243,7 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, corrected via `update_series`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
 
 ### get_series (Read)
 
@@ -266,11 +263,12 @@ Create a recurring series detection missed, or link transactions to an existing 
 
 ### update_series (Write)
 
-Edit a recurring series' user-owned attributes: `name`, `expected_amount` (+ `currency`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id` (owner). Every field is optional — omit to leave unchanged. This is a deliberate override, **not** a detection proposal: it bypasses the source-precedence ladder and protects the edited values from being reverted by the next sync's re-detect. Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature, so an edit can't silently merge two series). Use `review_series` for `confirm`/`pause`/`cancel`, `set_series_type` for the type axis, and `rekey_series` for the `merchant_key` — those have their own semantics and are not editable here.
+Edit a recurring series' user-owned attributes: `name`, `expected_amount` (+ `currency`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id` (owner), `type`, and tag membership (`tags_to_add` / `tags_to_remove`). Every field is optional — omit to leave unchanged. This is a deliberate override, **not** a detection proposal: it bypasses the source-precedence ladder and protects the edited values from being reverted by the next sync's re-detect.
 
-### set_series_type (Write)
+- `type` — `subscription` (streaming/SaaS/memberships), `bill` (rent/utilities/insurance/telecom), `loan` (mortgage/auto/student/personal), or `other`. The detector infers it from the charges' dominant category at first detection; setting it here is a **sticky** override that re-detection won't revert. (Folds the former `set_series_type`; `assign_series` also accepts `type` when minting.)
+- `tags_to_add` / `tags_to_remove` — slugs (must already exist; create with `create_tag`). An added tag is materialized onto every linked charge and applied to future members; removing one strips the series-inherited copies (a tag a user added directly to a charge survives). (Folds the former `add_series_tag` / `remove_series_tag`.)
 
-Set a recurring series' `type`: `subscription` (streaming/SaaS/memberships), `bill` (rent/utilities/insurance/telecom), `loan` (mortgage/auto/student/personal), or `other`. The detector infers the type from the linked charges' dominant category at first detection; this is the correction handle. The override is **sticky** — re-detection won't revert it. (`assign_series` also accepts an optional `type` when minting.)
+Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature, so an edit can't silently merge two series). Use `review_series` for `confirm`/`pause`/`cancel` and `rekey_series` for the `merchant_key` — those have their own semantics and are not editable here.
 
 ### rekey_series (Write)
 
@@ -284,13 +282,7 @@ Break an over-grouped series in two: move `transaction_ids` (≤50, each a curre
 
 Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id`, strips the series' inherited tags from them (a tag the user added directly survives), and recomputes the series' rollups + `next_expected_date`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series. Use to remove a charge the detector wrongly swept in; use `split_series` instead when the stray charges form their own series.
 
-### add_series_tag (Write)
-
-Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it with `create_tag` first). Returns the updated series (including its `tags`).
-
-### remove_series_tag (Write)
-
-Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.
+> Series **type** and **tag** edits fold into `update_series` (`type`, `tags_to_add`, `tags_to_remove`) — there are no standalone `set_series_type` / `add_series_tag` / `remove_series_tag` tools.
 
 ---
 
@@ -302,33 +294,31 @@ The tools below are thin API skins over the DSL — the DSL doc is the source of
 
 ### create_transaction_rule (Write)
 
-Create a rule that fires during sync. Actions compose (`set_category` + `add_tag` + `add_comment` in a single rule are all valid).
+Create one or more rules that fire during sync. Pass `rules`: an array of 1..100 rule specs (a single rule is a one-element array). Authoring a chained pipeline in one call orders rules by stage so earlier-stage tag/category writes feed later-stage conditions. Actions compose within a rule (`set_category` + `add_tag` + `add_comment` are all valid). (Folds the former `batch_create_rules`.)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
+| `rules` | array | **Required.** 1..100 rule specs (fields below). |
+
+Each rule spec:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `name` | string | Human-readable rule name |
 | `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. |
 | `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`. Either this or `category_slug` is required. |
 | `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
 | `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
 | `stage` | string | **Preferred.** Semantic pipeline stage: `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
-| `priority` | int | Raw pipeline-stage integer, 0–1000. Use for fine-grained slotting within a stage. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard) if neither is provided. |
-| `enabled` | bool | Default true |
+| `priority` | int | Raw pipeline-stage integer, 0–1000. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard). |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
 | `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag`; `add_comment` is sync-only) |
 
+Returns `{ created, failed, rules: [{rule, retroactive_matches?}], errors }` so a partial batch is recoverable.
+
 ### list_transaction_rules (Read)
 
-List rules with optional filters and cursor pagination. **Lean by default** (`fields` omitted → `summary` projection): each row carries `name`, `enabled`, `priority`, `trigger`, `category_slug` / `category_display_name`, `hit_count`, `last_hit_at`, `created_by_type` — the roster view, **without** the `conditions` / `actions` trees. Pass `fields=all` to inspect or audit full rule definitions. Mirror of `breadbox://rules` (which always returns full).
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `search` | string | Substring / words / fuzzy search on rule name |
-| `category_slug` | string | Filter by target category |
-| `enabled` | bool | Filter by enabled status |
-| `fields` | string | Field selection. Alias: `summary` (default). `all` → full definition incl. `conditions`/`actions`. |
-| `cursor` | string | Pagination cursor |
-| `limit` | int | Results per page (default 50, max 500) |
+The rule roster is read via `get_reference(kind=rules)` (lean `summary` projection; `fields=all` for full `conditions`/`actions`) or the `breadbox://rules` resource. For filtered/sorted analysis use `query_transaction_rules` below.
 
 ### query_transaction_rules (Read)
 
@@ -386,9 +376,9 @@ The **inverse of `preview_rule`**: evaluates the full active rule set against a 
 
 Response: `{ matched_count, rules: [{ short_id, name, sets_category, trigger, priority, hit_count, match_all }] }`. A rule with `sets_category` already handling the merchant means **don't** create a duplicate. `match_all=true` flags conditionless rules (e.g. the seeded `needs-review` tagger) that match everything — not merchant coverage.
 
-### batch_create_rules (Write)
+### create_transaction_rule — chained pipeline example
 
-Create multiple rules in one call. Ideal for composable pipelines — use `stage` (preferred) or raw `priority` on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` resolves to priority `0 / 10 / 50 / 100`; if both `stage` and `priority` are supplied on an item, `priority` wins. Returns per-item success + errors.
+`create_transaction_rule` takes a `rules` array, so a composable pipeline lands in one call — use `stage` (preferred) or raw `priority` on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. Returns per-item success + errors.
 
 Example pipeline (3 rules that chain):
 

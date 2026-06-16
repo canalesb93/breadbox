@@ -25,7 +25,8 @@ type transactionOperationInput struct {
 	ResetCategory bool              `json:"reset_category,omitempty" jsonschema:"Clear an existing manual category override and drop the transaction back to 'uncategorized' so rules can re-categorize it. Mutually exclusive with category_slug. Use this to undo a prior categorize/update_transactions decision."`
 	TagsToAdd     []tagOpEntryInput `json:"tags_to_add,omitempty" jsonschema:"List of tags to add. Each item: {slug}. Auto-creates persistent tags if the slug is unknown."`
 	TagsToRemove  []tagOpEntryInput `json:"tags_to_remove,omitempty" jsonschema:"List of tags to remove. Each item: {slug}."`
-	Comment       *string           `json:"comment,omitempty" jsonschema:"Free-form comment written as an annotation attributed to you. Max 10000 chars. This is the canonical place to record decision context (e.g. why a tag was added or a category set) — prefer the comment over a per-tag note."`
+	Comment       *string           `json:"comment,omitempty" jsonschema:"Free-form comment written as an annotation attributed to you. Max 10000 chars. This is the canonical place to record decision context (e.g. why a tag was added or a category set) — prefer the comment over a per-tag note. When you set flagged:true, put the flag's reason here — it lands as the same comment annotation."`
+	Flagged       *bool             `json:"flagged,omitempty" jsonschema:"Flag (true) or unflag (false) this transaction for human attention, without changing its category. flagged:true is the 'look at this' escape hatch when you're unsure — pair it with a comment for the reason; retrieve flagged rows later with query_transactions(flagged=true). flagged:false clears the flag. Omit to leave the flag untouched. Idempotent: re-flagging refreshes the timestamp."`
 }
 
 // tagOpEntryInput is a single tag add/remove entry.
@@ -97,6 +98,7 @@ func (s *MCPServer) handleUpdateTransactions(ctx context.Context, _ *mcpsdk.Call
 			CategorySlug:  op.CategorySlug,
 			ResetCategory: op.ResetCategory,
 			Comment:       op.Comment,
+			Flagged:       op.Flagged,
 		}
 		for _, t := range op.TagsToAdd {
 			ops[i].TagsToAdd = append(ops[i].TagsToAdd, service.UpdateTransactionsTagOp{Slug: t.Slug})

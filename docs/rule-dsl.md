@@ -253,7 +253,7 @@ For `set_category`, the **last rule to match wins** (higher-priority stage has f
 
 ### Stage vs priority in API inputs
 
-`create_transaction_rule`, `update_transaction_rule`, and `batch_create_rules` (both MCP and REST) accept a semantic `stage` string alongside the raw `priority` integer. Agents should prefer `stage` so rules from different sources compose predictably on the same shared values.
+`create_transaction_rule` (MCP — takes a `rules` array of 1..N specs), `update_transaction_rule`, and the REST `POST /rules/batch` endpoint accept a semantic `stage` string alongside the raw `priority` integer. Agents should prefer `stage` so rules from different sources compose predictably on the same shared values.
 
 - Supply `stage` (`"baseline"` | `"standard"` | `"refinement"` | `"override"`) — resolves to `0 / 10 / 50 / 100`.
 - Supply raw `priority` — used as-is. Useful for fine-grained ordering inside a stage.

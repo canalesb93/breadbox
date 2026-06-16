@@ -28,6 +28,11 @@ type UpdateTransactionsOp struct {
 	TagsToAdd     []UpdateTransactionsTagOp
 	TagsToRemove  []UpdateTransactionsTagOp
 	Comment       *string
+	// Flagged toggles the transaction's flagged_at marker: true sets it to
+	// NOW(), false clears it. nil leaves the flag untouched. The flag's reason,
+	// if any, rides in Comment (the same comment annotation the standalone flag
+	// tool wrote before flag/unflag were folded into this op).
+	Flagged *bool
 }
 
 // UpdateTransactionsTagOp is a single tag add/remove entry.
@@ -381,6 +386,25 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 			}); err != nil {
 				return fmt.Errorf("write comment annotation: %w", err)
 			}
+		}
+	}
+
+	// 5. Flag / unflag. flagged=true sets flagged_at=NOW(), false clears it.
+	// The reason (if any) rode in via op.Comment above. Idempotent: re-flagging
+	// refreshes the timestamp.
+	if op.Flagged != nil {
+		var sql string
+		if *op.Flagged {
+			sql = "UPDATE transactions SET flagged_at = NOW() WHERE id = $1 AND deleted_at IS NULL"
+		} else {
+			sql = "UPDATE transactions SET flagged_at = NULL WHERE id = $1 AND deleted_at IS NULL"
+		}
+		tag, err := tx.Exec(ctx, sql, txnUID)
+		if err != nil {
+			return fmt.Errorf("update flag: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("%w: transaction not found", ErrNotFound)
 		}
 	}
 

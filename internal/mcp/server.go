@@ -338,38 +338,17 @@ func (s *MCPServer) buildToolRegistry() {
 		// resolves its session via resolveTransportID + ensureAuditSession in
 		// the dispatcher, so agents no longer need to call create_session.
 
-		// --- Reference data (mirrors resources for clients without resource support) ---
+		// --- Reference data (one tool that mirrors the bounded reference resources) ---
 		// Resources are the preferred surface: breadbox://overview, ://accounts,
-		// ://categories, ://tags, ://users, ://sync-status, ://rules. These tool
-		// mirrors keep clients that don't implement resources/* unblocked.
+		// ://categories, ://tags, ://users, ://sync-status, ://rules. get_reference
+		// is the single tool fallback for clients that don't implement resources/*
+		// — it dispatches on `kind` so the seven bounded reads share one tool slot
+		// instead of seven. Filtered/sorted rule analysis still lives in
+		// query_transaction_rules; this returns the lean roster.
 		makeToolDefLogged(ToolSpec{
-			Name: "get_overview", Title: "Household Overview", Classification: ToolRead,
-			Description: "Get a household snapshot: scope (users, accounts, currencies), freshness (latest sync, errored connections, recent transactions), and backlog (pending review queue). Mirror of breadbox://overview — call this when your client doesn't support MCP resources, or when you want the snapshot inline as a tool result. Read once at the top of a session to ground every later filter (account ids, currency, attribution).",
-		}, s.handleGetOverview, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "list_accounts", Title: "List Accounts", Classification: ToolRead,
-			Description: "List bank accounts. Mirror of breadbox://accounts. Each account carries balance, type, currency, and the connection it belongs to. Filter by user_id to scope to a specific household member.",
-		}, s.handleListAccounts, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "list_categories", Title: "List Categories", Classification: ToolRead,
-			Description: "List the category taxonomy as a flat array. Mirror of breadbox://categories. Use the returned slugs (e.g. 'food_and_drink_groceries') as the canonical handle for category filters and category_slug fields on writes.",
-		}, s.handleListCategories, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "list_users", Title: "List Household Members", Classification: ToolRead,
-			Description: "List household members. Mirror of breadbox://users. Each user carries display name, role, and short_id — use the short_id as user_id on transaction filters and account scoping.",
-		}, s.handleListUsers, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "list_tags", Title: "List Tags", Classification: ToolRead,
-			Description: "List the tag vocabulary. Mirror of breadbox://tags. Tags are referenced by slug everywhere (filter, add, remove). New tag slugs auto-register the first time update_transactions adds them — read this list before authoring rules to avoid accidental near-duplicates.",
-		}, s.handleListTags, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "get_sync_status", Title: "Sync Status", Classification: ToolRead,
-			Description: "Get connection sync status: provider, status (active|error|pending_reauth|disconnected), last sync time, last error. Mirror of breadbox://sync-status. Call this before reasoning about freshness — an errored or pending_reauth connection means transactions you'd expect to be there might not be.",
-		}, s.handleGetSyncStatus, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "list_transaction_rules", Title: "List Rules", Classification: ToolRead,
-			Description: "List transaction rules (the roster). Filter by category_slug, enabled, or search by name. Lean by default: returns a summary projection (name, enabled, priority, trigger, category, hit_count) without the conditions/actions trees — pass fields=all to inspect or audit full rule definitions. Mirror of breadbox://rules. For richer analysis — filter by trigger/creator/hit-count or sort by impact — use query_transaction_rules; to check whether one specific merchant is already covered, use find_matching_rules.",
-		}, s.handleListTransactionRules, s),
+			Name: "get_reference", Title: "Get Reference Data", Classification: ToolRead,
+			Description: "Read a bounded reference dataset by `kind` — the single tool mirror of the breadbox:// reference resources, for clients that don't support MCP resources. kinds: 'overview' (household snapshot: scope, freshness, pending-review backlog — read once at the top of a session to ground later filters), 'accounts' (bank accounts with balance/type/currency/connection; optional user_id filter), 'categories' (the category taxonomy — use the slugs as the canonical handle on filters and writes), 'tags' (the tag vocabulary — slugs are referenced everywhere), 'users' (household members; the short_id is the user_id on filters), 'sync_status' (per-connection provider/status/last-sync/last-error — check freshness before trusting results), 'rules' (the transaction-rule roster, lean summary projection; pass fields=all for the full conditions/actions trees). For filtered/sorted rule analysis use query_transaction_rules; to check coverage for one merchant use find_matching_rules.",
+		}, s.handleGetReference, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transaction_rules", Title: "Query Rules", Classification: ToolRead,
 			Description: "Query and analyze the rule set — the rules analogue of query_transactions. Filter by category_slug, enabled, trigger (on_create|on_change|always), creator_type (user|agent|system), name search, min_hit_count, or only_unused (rules that have never fired). Sort by priority (default, pipeline order), hit_count, last_hit_at, created_at, or name. Lean by default (summary projection: name, enabled, priority, trigger, category, hit_count, last_hit_at — no conditions/actions trees); pass fields=all for the full definitions. Use this to audit coverage and prune dead rules (only_unused=true) without dumping the whole roster. To check coverage for ONE merchant before creating a rule, prefer find_matching_rules. Cursor pagination applies only to the default priority sort; an explicit sort_by returns a single top-N page (raise limit, max 500).",
@@ -400,12 +379,8 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleAssignSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_series", Title: "Edit Recurring Series", Classification: ToolWrite,
-			Description: "Edit a recurring series' user-owned attributes: name, expected_amount (+ currency, amount_tolerance), cadence, expected_day, category_id, user_id (owner). Every field is optional — omit to leave unchanged. This is a deliberate override, not a detection proposal: it bypasses the precedence ladder and protects the edited values from being reverted by the next sync's re-detect. Editing cadence re-derives next_expected_date. Changing currency or owner is collision-guarded (they're part of the dedup signature). Use review_series for confirm/pause/cancel, set_series_type for the type axis, and rekey_series for the merchant_key — those have their own semantics and are NOT editable here.",
+			Description: "Edit a recurring series' user-owned attributes in one call: name, expected_amount (+ currency, amount_tolerance), cadence, expected_day, category_id, user_id (owner), type (subscription|bill|loan|other), and tag membership (tags_to_add / tags_to_remove). Every field is optional — omit to leave unchanged. This is a deliberate override, not a detection proposal: it bypasses the precedence ladder and protects the edited values from being reverted by the next sync's re-detect (the type override is likewise sticky). Editing cadence re-derives next_expected_date. Changing currency or owner is collision-guarded (they're part of the dedup signature). Tags must already exist (create_tag); an added tag is materialized onto every linked charge and applied to future members, a removed tag strips the series-inherited copies (a tag a user added directly survives). Use review_series for confirm/pause/cancel and rekey_series for the merchant_key — those have their own semantics and are NOT editable here.",
 		}, s.handleUpdateSeries, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "set_series_type", Title: "Set Recurring Type", Classification: ToolWrite,
-			Description: "Set a recurring series' type: subscription (streaming/SaaS/memberships), bill (rent/utilities/insurance/telecom), loan (mortgage/auto/student/personal), or other. Detection infers the type from the charges' category on first detection; use this to correct it. The override is sticky — re-detection won't change it back.",
-		}, s.handleSetSeriesType, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "rekey_series", Title: "Re-key Recurring Series", Classification: ToolWrite,
 			Description: "Correct a series' merchant_key when detection grouped it under a wrong or fallback key (e.g. 'payment' → 'spotify'). Repoints the series and its linked transactions to the new key. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects historical grouping — future charges still key off the provider name.",
@@ -418,24 +393,12 @@ func (s *MCPServer) buildToolRegistry() {
 			Name: "unlink_series_transactions", Title: "Unlink Charges from Series", Classification: ToolWrite,
 			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id, strips the series' inherited tags from them (a tag the user added directly survives), and recomputes the series' rollups + next expected date. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series. Use to remove a charge the detector wrongly swept in; use split_series instead when the stray charges form their own series.",
 		}, s.handleUnlinkSeriesTransactions, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "add_series_tag", Title: "Tag Recurring Series", Classification: ToolWrite,
-			Description: "Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it first with create_tag).",
-		}, s.handleAddSeriesTag, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "remove_series_tag", Title: "Untag Recurring Series", Classification: ToolWrite,
-			Description: "Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.",
-		}, s.handleRemoveSeriesTag, s),
 
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transactions", Title: "Query Transactions", Classification: ToolRead,
-			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own.",
+			Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (see breadbox://categories for the slug list); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Responses are lean by default — a compact field set (core,category) is returned unless you pass fields=all or an explicit field/alias list. When every row shares one currency, iso_currency_code is returned once at the top level instead of on each row; otherwise each row carries its own. Pass count_only=true to get just {\"count\": N} for the same filters (no rows) — use it to size a result set or compare counts across ranges before paginating.",
 		}, s.handleQueryTransactions, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "count_transactions", Title: "Count Transactions", Classification: ToolRead,
-			Description: "Count transactions matching optional filters. Same filters as query_transactions except cursor, limit, sort_by, and sort_order. Use this to get totals before paginating, or to compare counts across date ranges or categories.",
-		}, s.handleCountTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "transaction_summary", Title: "Spending Summary", Classification: ToolRead,
 			Description: "Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
@@ -455,41 +418,14 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleUpdateTransactions, s),
 
 		// --- Transaction metadata (free-form JSONB enrichment store) ---
-		// Four deliberately-scoped ops; each touches ONLY the metadata column and
-		// names exactly what it does so an agent can't clobber sibling keys or
-		// other fields. Metadata is returned on every transaction read.
+		// One compound op (set / unset / replace) that touches ONLY the metadata
+		// column, so an agent can't clobber sibling keys or first-class fields.
+		// Metadata is returned on every transaction read.
 		makeToolDefLogged(ToolSpec{
 			Name: "set_transaction_metadata", Title: "Set Transaction Metadata", Classification: ToolWrite,
-			Description: "Upsert ONE key in a transaction's free-form metadata JSONB store, leaving every other key untouched. Creates the key if absent, overwrites if present. The value may be any JSON value (string, number, boolean, object, array). Use slug-like keys, max 128 chars (e.g. 'tax_deductible', 'trip', 'reimbursable_by'). Metadata is a place for enrichment your household cares about that isn't a first-class field — it is NOT a substitute for category or tags. Returned on every transaction read (query_transactions, the transaction resource). Example: {\"transaction_id\":\"k7Xm9pQ2\",\"key\":\"tax_deductible\",\"value\":true}.",
+			Description: "Write a transaction's free-form metadata JSONB store. `set` upserts key→value pairs (MERGE — keys you don't list stay untouched); `unset` deletes keys (no-op if absent); `replace:true` makes the result EXACTLY the set object (clears every pre-existing key first), and replace:true with set omitted clears all metadata. Keys are slug-like, max 128 chars (e.g. 'tax_deductible', 'trip'); values may be any JSON. Metadata is for household enrichment that isn't a first-class field — it is NOT a substitute for category or tags. Returned on every transaction read (query_transactions, the transaction resource). Examples: merge → {\"transaction_id\":\"k7Xm9pQ2\",\"set\":{\"tax_deductible\":true}}; remove a key → {\"transaction_id\":\"k7Xm9pQ2\",\"unset\":[\"trip\"]}; replace all → {\"transaction_id\":\"k7Xm9pQ2\",\"replace\":true,\"set\":{\"trip\":\"q2\"}}; clear → {\"transaction_id\":\"k7Xm9pQ2\",\"replace\":true}.",
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
 		}, s.handleSetTransactionMetadata, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "remove_transaction_metadata", Title: "Remove Transaction Metadata Key", Classification: ToolWrite,
-			Description: "Delete ONE key from a transaction's metadata JSONB store. No-op (still succeeds) if the key isn't present. Other keys are untouched.",
-			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleRemoveTransactionMetadata, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "replace_transaction_metadata", Title: "Replace Transaction Metadata", Classification: ToolWrite,
-			Description: "Atomically replace the ENTIRE metadata object on a transaction. Use to write a structured payload in one call. Pass {} to clear all keys. Prefer set_transaction_metadata when you only mean to change one key — replace overwrites everything.",
-			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleReplaceTransactionMetadata, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "clear_transaction_metadata", Title: "Clear Transaction Metadata", Classification: ToolWrite,
-			Description: "Reset a transaction's metadata to the empty object {}, removing all keys. Equivalent to replace_transaction_metadata with {}.",
-			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleClearTransactionMetadata, s),
-
-		// --- Flag (surface a transaction for human attention) ---
-		makeToolDefLogged(ToolSpec{
-			Name: "flag_transaction", Title: "Flag Transaction", Classification: ToolWrite,
-			Description: "Flag a transaction for human attention (sets flagged_at) without changing its category. Pass an optional `reason` — it's recorded as a comment annotation on the timeline. This is the 'look at this' escape hatch: when you auto-categorize but are unsure, or spot something worth a human glance, flag it instead of guessing. Retrieve flagged transactions with query_transactions(flagged=true). Idempotent: re-flagging refreshes the timestamp.",
-			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleFlagTransaction, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "unflag_transaction", Title: "Unflag Transaction", Classification: ToolWrite,
-			Description: "Clear the flag on a transaction (sets flagged_at = NULL). No-op if it isn't flagged.",
-			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
-		}, s.handleUnflagTransaction, s),
 
 		// --- Activity timeline ---
 		makeToolDefLogged(ToolSpec{
@@ -502,12 +438,8 @@ func (s *MCPServer) buildToolRegistry() {
 		// for the current ruleset.
 		makeToolDefLogged(ToolSpec{
 			Name: "create_transaction_rule", Title: "Create Rule", Classification: ToolWrite,
-			Description: "Create a transaction rule for automatic categorization, tagging, or commenting. Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category. Before creating, read breadbox://rules to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Full DSL: breadbox://rule-dsl.",
+			Description: "Create one or more transaction rules for automatic categorization, tagging, or commenting. Pass `rules`: an array of 1..100 rule specs (a single rule is just a one-element array). Rules match condition trees against transactions during sync and fire in pipeline-stage order (priority ASC — lower = earlier). Pass `stage` (one of baseline|standard|refinement|override) per rule instead of a raw priority so rules from different agents compose predictably; stage resolves to priority 0/10/50/100. Earlier-stage rules' tag and category mutations feed later-stage rules' conditions, so rules compose: rule A tags 'coffee', rule B conditioned on tags-contains-coffee sets category — author such pipelines in one call. Set apply_retroactively=true on a rule to immediately back-fill it against existing transactions. Before creating, read the rules roster (get_reference kind=rules) to avoid duplicates; prefer `contains` over exact matches (bank feeds format merchant names inconsistently). Returns the created rules plus any per-item errors so a partial batch is recoverable. Full DSL: breadbox://rule-dsl.",
 		}, s.handleCreateTransactionRule, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "batch_create_rules", Title: "Create Rules in Batch", Classification: ToolWrite,
-			Description: "Create multiple transaction rules at once. More efficient than looping create_transaction_rule. Ideal for composable pipelines — use `stage` (baseline|standard|refinement|override) on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` is preferred over raw `priority` for cross-agent consistency; if both are supplied, priority wins. Each item follows the same shape as create_transaction_rule. Returns created rules plus any per-item errors so partial success is recoverable.",
-		}, s.handleBatchCreateRules, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_transaction_rule", Title: "Update Rule", Classification: ToolWrite,
 			Description: "Update a transaction rule's fields. Every field is optional; omit to leave unchanged. Pass conditions={} to explicitly clear conditions (match-all). Pass actions=[...] to replace the entire action set (rules must retain at least one action). Pass expires_at=\"\" to clear expiry. Pass `stage` (baseline|standard|refinement|override) to re-slot a rule into the pipeline without guessing a numeric priority. See breadbox://rule-dsl.",

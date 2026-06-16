@@ -800,7 +800,7 @@ CHECK (actor_type IN ('user', 'agent', 'system'))
 | `iso_currency_code` | `TEXT` | Yes | `NULL` | Currency for the amounts. Part of the dedup signature. |
 | `category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. SET NULL on delete. Advisory suggested category. |
 | `status` | `TEXT` | No | `'active'` | `active`/`paused`/`cancelled`/`candidate`. Changed via verdicts, not raw edits. |
-| `type` | `TEXT` | No | `'subscription'` | `subscription`/`bill`/`loan`/`other`. Inferred from members' dominant category at first detection; sticky override via `set_series_type`. |
+| `type` | `TEXT` | No | `'subscription'` | `subscription`/`bill`/`loan`/`other`. Inferred from members' dominant category at first detection; sticky override via `update_series` (`type`). |
 | `detection_source` | `TEXT` | No | `'deterministic'` | `deterministic`/`agent`/`user`/`rule` — who last shaped the row. The precedence ladder (deterministic < rule < agent < user) protects higher-ranked writes from being clobbered by re-detection. |
 | `confidence` | `TEXT` | No | `'auto'` | `auto` (unreviewed candidate) / `confirmed` (adjudicated, fields frozen to rollups) / `rejected` (sticky — never re-proposed at this signature). |
 | `confirmed_by_type` | `TEXT` | Yes | `NULL` | `user` or `agent` — who adjudicated. A user's confirmation outranks a later agent write. |
@@ -854,7 +854,7 @@ There is **no** unique constraint on the dedup signature `(merchant_key, iso_cur
 
 #### Field ownership (edit surface)
 
-User/agent-editable (via `PATCH /series/{id}` / `update_series`, protected from re-detection): `name`, `expected_amount` (+ `iso_currency_code`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id`. `type` is edited via `set_series_type`; `merchant_key` via `rekey_series`; `status`/`confidence` via verdicts (`review_series`). Detector-owned (read-only): `detection_source`, `last_amount`, `last_seen_date`, `occurrence_count`, `detection_signals`. Derived (read-only): `next_expected_date`.
+User/agent-editable (via `PATCH /series/{id}` / `update_series`, protected from re-detection): `name`, `expected_amount` (+ `iso_currency_code`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id`, `type`, and tag membership (`tags_to_add`/`tags_to_remove`). `merchant_key` is edited via `rekey_series`; `status`/`confidence` via verdicts (`review_series`). Detector-owned (read-only): `detection_source`, `last_amount`, `last_seen_date`, `occurrence_count`, `detection_signals`. Derived (read-only): `next_expected_date`.
 
 ---
 

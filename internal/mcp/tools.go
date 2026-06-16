@@ -37,23 +37,7 @@ type queryTransactionsInput struct {
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, provider_name"`
 	SortOrder     string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
 	Fields        string   `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Aliases: minimal (provider_name,amount,date), core (id,date,amount,provider_name,iso_currency_code), category (category,provider_category_primary,provider_category_detailed), timestamps (created_at,updated_at,datetime,authorized_datetime). Default when omitted: core,category (a compact projection). Pass fields=all for every field. id is always included."`
-}
-
-type countTransactionsInput struct {
-	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
-	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
-	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
-	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Flagged       *bool    `json:"flagged,omitempty" jsonschema:"Filter to flagged transactions (true) or unflagged (false). Omit to return both. Use flagged=true to retrieve transactions an agent or you have flagged for attention."`
-	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant. Comma-separated values are ORed."`
-	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
-	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
-	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics)."`
-	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
+	CountOnly     bool     `json:"count_only,omitempty" jsonschema:"When true, return only {\"count\": N} for the given filters — no rows, no pagination. cursor/limit/sort_by/sort_order/fields are ignored. Use to size a result set or compare counts across date ranges or categories before paginating."`
 }
 
 type transactionSummaryInput struct {
@@ -119,6 +103,31 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
 		return errorResult(err), nil, nil
+	}
+
+	// count_only short-circuit: same filters, just the total. Absorbs the
+	// former standalone count_transactions tool.
+	if input.CountOnly {
+		count, err := s.svc.CountTransactionsFiltered(ctx, service.TransactionCountParams{
+			StartDate:     params.StartDate,
+			EndDate:       params.EndDate,
+			AccountID:     params.AccountID,
+			UserID:        params.UserID,
+			CategorySlug:  params.CategorySlug,
+			MinAmount:     params.MinAmount,
+			MaxAmount:     params.MaxAmount,
+			Pending:       params.Pending,
+			Flagged:       params.Flagged,
+			Search:        params.Search,
+			SearchMode:    params.SearchMode,
+			ExcludeSearch: params.ExcludeSearch,
+			Tags:          params.Tags,
+			AnyTag:        params.AnyTag,
+		})
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+		return jsonResult(map[string]int64{"count": count})
 	}
 
 	// Lean-by-default: an omitted fields param returns a compact projection
@@ -232,38 +241,6 @@ func currencyString(v any) (string, bool) {
 	return "", false
 }
 
-func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToolRequest, input countTransactionsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	params := service.TransactionCountParams{
-		AccountID:     optStr(input.AccountID),
-		UserID:        optStr(input.UserID),
-		CategorySlug:  optStr(input.CategorySlug),
-		MinAmount:     input.MinAmount,
-		MaxAmount:     input.MaxAmount,
-		Pending:       input.Pending,
-		Flagged:       input.Flagged,
-		Search:        optStr(input.Search),
-		ExcludeSearch: optStr(input.ExcludeSearch),
-		Tags:          input.Tags,
-		AnyTag:        input.AnyTag,
-	}
-
-	var err error
-	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	count, err := s.svc.CountTransactionsFiltered(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(map[string]int64{"count": count})
-}
-
 // handleTransactionSummary aggregates totals over a window.
 //
 // Example call (last month grouped by category):
@@ -314,6 +291,12 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
+	Rules []ruleSpecInput `json:"rules" jsonschema:"required,Array of 1..100 rules to create (a single rule is a one-element array). Authoring a composable pipeline in one call orders rules by stage so earlier-stage tag/category writes feed later-stage conditions. Example — tag, then categorize the tagged, then flag the expensive: [{\"name\":\"Tag coffee shops\",\"stage\":\"baseline\",\"conditions\":{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"coffee\"}]},{\"name\":\"Categorize coffee\",\"stage\":\"standard\",\"conditions\":{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},\"category_slug\":\"food_and_drink_coffee\"}]"`
+}
+
+// ruleSpecInput is one rule in a create_transaction_rule call. Same shape the
+// single-rule and batch tools used before they were folded into one array.
+type ruleSpecInput struct {
 	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
 	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition tree. Omit or pass {} to match every transaction. Leaf: {\"field\":\"...\",\"op\":\"...\",\"value\":...}. Combinators: {\"and\":[...]}, {\"or\":[...]}, {\"not\":{...}} (nest freely, max depth 10). Fields: provider_name provider_merchant_name amount provider_category_primary provider_category_detailed category(assigned slug, live-updated by earlier-stage rules) pending provider account_id account_name user_id user_name tags. Ops: string/category=eq|neq|contains|not_contains|matches(RE2)|in; numeric=eq|neq|gt|gte|lt|lte; bool=eq|neq; tags=contains|not_contains|in. Nested example: {\"or\":[{\"and\":[{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},{\"field\":\"amount\",\"op\":\"gte\",\"value\":5}]},{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"}]}. Full spec: docs/rule-dsl.md."`
 	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"}. Actions compose: a rule can set a category AND add a tag AND add a comment in the same match. add_comment fires only at sync time (not on retroactive apply). remove_tag net-diffs against add_tag within the same sync pass. If omitted, use category_slug instead."`
@@ -340,21 +323,6 @@ type updateTransactionRuleInput struct {
 
 type deleteTransactionRuleInput struct {
 	ID string `json:"id" jsonschema:"required,UUID of the rule to delete"`
-}
-
-type batchCreateRulesInput struct {
-	Rules []batchRuleItem `json:"rules" jsonschema:"required,Array of rules to create. Ideal for composable pipelines. Example — tagging then categorizing then flagging: [{\"name\":\"Tag coffee shops\",\"priority\":0,\"conditions\":{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"coffee\"}]},{\"name\":\"Categorize coffee-tagged\",\"priority\":10,\"conditions\":{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},\"actions\":[{\"type\":\"set_category\",\"category_slug\":\"food_and_drink_coffee\"}]},{\"name\":\"Flag expensive coffee\",\"priority\":50,\"conditions\":{\"and\":[{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},{\"field\":\"amount\",\"op\":\"gt\",\"value\":15}]},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"expensive\"}]}]"`
-}
-
-type batchRuleItem struct {
-	Name         string              `json:"name" jsonschema:"required,Human-readable rule name"`
-	Actions      []map[string]string `json:"actions,omitempty" jsonschema:"Actions array (typed — same format as create_transaction_rule)"`
-	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for set_category action. Either actions or category_slug required."`
-	Conditions   map[string]any      `json:"conditions,omitempty" jsonschema:"Condition tree as JSON object. Omit or {} for match-all."`
-	Trigger      string              `json:"trigger,omitempty" jsonschema:"on_create (default), on_change, or always. 'on_update' accepted as alias for on_change."`
-	Stage        string              `json:"stage,omitempty" jsonschema:"Semantic pipeline stage: baseline | standard (default) | refinement | override — resolves to priority 0/10/50/100. Prefer over raw priority for cross-agent consistency. If both are supplied, priority wins."`
-	Priority     int                 `json:"priority,omitempty" jsonschema:"Raw priority integer. Prefer 'stage' for shared vocabulary. Defaults to 10 (standard)."`
-	ExpiresIn    string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }
 
 type applyRulesInput struct {
@@ -403,45 +371,75 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.Name == "" {
-		return errorResult(fmt.Errorf("name is required")), nil, nil
+	if len(input.Rules) == 0 {
+		return errorResult(fmt.Errorf("rules array is required and must not be empty")), nil, nil
 	}
-	if len(input.Actions) == 0 && input.CategorySlug == "" {
-		return errorResult(fmt.Errorf("either actions or category_slug is required")), nil, nil
-	}
-
-	conditions, err := parseConditions(input.Conditions)
-	if err != nil {
-		return errorResult(err), nil, nil
+	if len(input.Rules) > 100 {
+		return errorResult(fmt.Errorf("maximum 100 rules per call")), nil, nil
 	}
 
 	actor := service.ActorFromContext(ctx)
+	created := make([]map[string]any, 0, len(input.Rules))
+	var errs []map[string]string
 
-	rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
-		Name:         input.Name,
-		Conditions:   conditions,
-		Actions:      convertMCPActions(input.Actions),
-		CategorySlug: input.CategorySlug,
-		Trigger:      input.Trigger,
-		Priority:     input.Priority,
-		Stage:        input.Stage,
-		ExpiresIn:    input.ExpiresIn,
-		Actor:        actor,
-	})
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	resp := map[string]any{"rule": rule}
-	if input.ApplyRetroactively {
-		count, err := s.svc.ApplyRuleRetroactively(ctx, rule.ID)
-		if err != nil {
-			resp["retroactive_error"] = err.Error()
-		} else {
-			resp["retroactive_matches"] = count
+	for i, r := range input.Rules {
+		if r.Name == "" || (len(r.Actions) == 0 && r.CategorySlug == "") {
+			errs = append(errs, map[string]string{
+				"index": strconv.Itoa(i),
+				"name":  r.Name,
+				"error": "name and either actions or category_slug are required",
+			})
+			continue
 		}
+
+		conditions, err := parseConditions(r.Conditions)
+		if err != nil {
+			errs = append(errs, map[string]string{
+				"index": strconv.Itoa(i),
+				"name":  r.Name,
+				"error": err.Error(),
+			})
+			continue
+		}
+
+		rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+			Name:         r.Name,
+			Conditions:   conditions,
+			Actions:      convertMCPActions(r.Actions),
+			CategorySlug: r.CategorySlug,
+			Trigger:      r.Trigger,
+			Priority:     r.Priority,
+			Stage:        r.Stage,
+			ExpiresIn:    r.ExpiresIn,
+			Actor:        actor,
+		})
+		if err != nil {
+			errs = append(errs, map[string]string{
+				"index": strconv.Itoa(i),
+				"name":  r.Name,
+				"error": err.Error(),
+			})
+			continue
+		}
+
+		entry := map[string]any{"rule": rule}
+		if r.ApplyRetroactively {
+			count, aerr := s.svc.ApplyRuleRetroactively(ctx, rule.ID)
+			if aerr != nil {
+				entry["retroactive_error"] = aerr.Error()
+			} else {
+				entry["retroactive_matches"] = count
+			}
+		}
+		created = append(created, entry)
 	}
-	return jsonResult(resp)
+
+	return jsonResult(map[string]any{
+		"created": len(created),
+		"failed":  len(errs),
+		"rules":   created,
+		"errors":  errs,
+	})
 }
 
 func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
@@ -563,71 +561,6 @@ func (s *MCPServer) handleFindMatchingRules(ctx context.Context, _ *mcpsdk.CallT
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(result)
-}
-
-func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchCreateRulesInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if len(input.Rules) == 0 {
-		return errorResult(fmt.Errorf("rules array is required and must not be empty")), nil, nil
-	}
-	if len(input.Rules) > 100 {
-		return errorResult(fmt.Errorf("maximum 100 rules per batch")), nil, nil
-	}
-
-	actor := service.ActorFromContext(ctx)
-	var created []service.TransactionRuleResponse
-	var errors []map[string]string
-
-	for i, r := range input.Rules {
-		if r.Name == "" || (len(r.Actions) == 0 && r.CategorySlug == "") {
-			errors = append(errors, map[string]string{
-				"index": strconv.Itoa(i),
-				"error": "name and either actions or category_slug are required",
-			})
-			continue
-		}
-
-		// Empty conditions == match-all.
-		conditions, err := parseConditions(r.Conditions)
-		if err != nil {
-			errors = append(errors, map[string]string{
-				"index": strconv.Itoa(i),
-				"name":  r.Name,
-				"error": err.Error(),
-			})
-			continue
-		}
-
-		rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
-			Name:         r.Name,
-			Conditions:   conditions,
-			Actions:      convertMCPActions(r.Actions),
-			CategorySlug: r.CategorySlug,
-			Trigger:      r.Trigger,
-			Priority:     r.Priority,
-			Stage:        r.Stage,
-			ExpiresIn:    r.ExpiresIn,
-			Actor:        actor,
-		})
-		if err != nil {
-			errors = append(errors, map[string]string{
-				"index": strconv.Itoa(i),
-				"name":  r.Name,
-				"error": err.Error(),
-			})
-			continue
-		}
-		created = append(created, *rule)
-	}
-
-	return jsonResult(map[string]any{
-		"created": len(created),
-		"failed":  len(errors),
-		"rules":   created,
-		"errors":  errors,
-	})
 }
 
 // --- Agent Reports ---

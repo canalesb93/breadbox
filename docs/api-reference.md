@@ -927,7 +927,7 @@ Rules auto-categorize transactions during sync by matching conditions on transac
 | GET | `/rules/{id}` | Read | Get a single rule |
 | GET | `/rules/{id}/sync-history` | Read | Last N sync runs that triggered this rule (default 10, max 100) |
 | POST | `/rules` | Write | Create a rule |
-| POST | `/rules/batch` | Write | Bulk-create rules (mirrors MCP `batch_create_rules`, max 50 per call) |
+| POST | `/rules/batch` | Write | Bulk-create rules (mirrors the MCP `create_transaction_rule` `rules` array, max 50 per call) |
 | PUT | `/rules/{id}` | Write | Update a rule |
 | DELETE | `/rules/{id}` | Write | Delete a rule |
 | POST | `/rules/{id}/apply` | Write | Apply a single rule retroactively (skips `category_override='user'` rows) |
@@ -936,7 +936,7 @@ Rules auto-categorize transactions during sync by matching conditions on transac
 
 `POST /rules/batch` and the apply endpoints both have integration coverage in `internal/api/rules_batch_integration_test.go` and `internal/api/rules_apply_integration_test.go`. The apply tests assert the `category_override='user'` sacred-cow contract: a manually-overridden transaction is never recategorized by retroactive apply, even when its conditions match.
 
-`POST /rules/batch` request body mirrors the MCP `batch_create_rules` shape:
+`POST /rules/batch` request body mirrors the MCP `create_transaction_rule` `rules`-array shape:
 
 ```json
 {

@@ -124,24 +124,18 @@ func TestToolRegistryScopeContract(t *testing.T) {
 	}
 
 	// Anchor the explicit canonical set for read tools — this is the surface
-	// area read-only API keys are allowed to exercise. Includes the seven
-	// reference-data mirrors (get_overview / list_* / get_sync_status) that
-	// shadow the bounded reference resources for clients without resources
-	// support — see tools_reads.go.
+	// area read-only API keys are allowed to exercise. The seven bounded
+	// reference-data mirrors that shadow the breadbox:// resources for clients
+	// without resources support are folded behind get_reference(kind=…) — see
+	// tools_reads.go. count_transactions folded into query_transactions
+	// (count_only=true).
 	wantReads := []string{
 		"query_transactions",
-		"count_transactions",
 		"transaction_summary",
 		"list_annotations",
 		"preview_rule",
 		"find_matching_rules",
-		"get_overview",
-		"list_accounts",
-		"list_categories",
-		"list_users",
-		"list_tags",
-		"get_sync_status",
-		"list_transaction_rules",
+		"get_reference",
 		"query_transaction_rules",
 		"list_series",
 		"get_series",
