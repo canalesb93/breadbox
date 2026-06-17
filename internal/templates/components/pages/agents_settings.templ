@@ -11,7 +11,7 @@ import (
 // AgentsSettings renders the MCP tab as a compact directory modeled on the
 // Providers tab: a short list of rows grouped into sections, each row
 // opening a slide-over Drawer for the actual editing. The heavy surfaces
-// — the three agent prompts (server instructions, review guidelines,
+// — the three server resources (server instructions, review guidelines,
 // report format) and the per-tool enable list — plus the read-only
 // connection cheatsheet all live in drawers keyed `mcp-<resource>` on the
 // global $store.drawers store, so the page itself stays a scannable list
@@ -22,14 +22,14 @@ templ AgentsSettings(p AgentsSettingsProps) {
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "MCP",
-			Subtitle: "Agent prompts, tool access, and connection details for the MCP server",
+			Subtitle: "Server resources, tool access, and connection details for the MCP server",
 		})
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:    "scroll-text",
-			Title:   "Agent prompts",
-			Caption: "Guidance served to agents over MCP — edit with a live Markdown preview",
+			Title:   "Server resources",
+			Caption: "Static guidance the MCP server serves to agents — preview or edit the Markdown",
 		}) {
-			@mcpPromptRow(mcpPromptRowData{
+			@mcpResourceRow(mcpResourceRowData{
 				ID:        "instructions",
 				Icon:      "scroll-text",
 				Name:      "Server instructions",
@@ -41,7 +41,7 @@ templ AgentsSettings(p AgentsSettingsProps) {
 				Warn:      true,
 				CSRFToken: p.CSRFToken,
 			})
-			@mcpPromptRow(mcpPromptRowData{
+			@mcpResourceRow(mcpResourceRowData{
 				ID:        "review-guidelines",
 				Icon:      "book-open",
 				Name:      "Review guidelines",
@@ -52,7 +52,7 @@ templ AgentsSettings(p AgentsSettingsProps) {
 				Default:   p.DefaultReviewGuidelines,
 				CSRFToken: p.CSRFToken,
 			})
-			@mcpPromptRow(mcpPromptRowData{
+			@mcpResourceRow(mcpResourceRowData{
 				ID:        "report-format",
 				Icon:      "file-text",
 				Name:      "Report format",
@@ -90,9 +90,9 @@ templ AgentsSettings(p AgentsSettingsProps) {
 			})
 		}
 		// Drawers — fixed-position, rendered after the sections; only the
-		// one matching the open id (plus its scrim) shows. The three agent
-		// prompts edit inline via the global prompt modal (#bb-prompt-modal),
-		// so only tools + connection keep a drawer.
+		// one matching the open id (plus its scrim) shows. The three server
+		// resources preview/edit inline via the global prompt modal
+		// (#bb-prompt-modal), so only tools + connection keep a drawer.
 		@mcpToolsDrawer(p)
 		@mcpConnectionDrawer()
 	</div>
@@ -147,18 +147,20 @@ templ mcpToolsCountStatus(enabled, total int) {
 }
 
 // ---------------------------------------------------------------------
-// Prompt rows (Server Instructions, Review Guidelines, Report Format)
+// Server-resource rows (Server Instructions, Review Guidelines, Report Format)
 // ---------------------------------------------------------------------
 
-// mcpPromptRowData configures one agent-prompt row. The three prompts share
-// this shape; only the copy, endpoint, field, and the editing-risk note
-// (instructions only) differ. Editing happens inline through the global prompt
-// modal (#bb-prompt-modal in base.html) — opened from the row's pencil button
-// in editable mode (Edit/Preview Markdown toggle + Copy). Save writes the
-// buffer back into the row's hidden field and submits the form as a normal
-// POST (server validates length, then flash + redirect). Reset restores the
-// built-in default and saves immediately; it only shows once customized.
-type mcpPromptRowData struct {
+// mcpResourceRowData configures one server-resource row — the static Markdown
+// the MCP server hands agents for guidance (server instructions + the
+// breadbox:// resources). The three share this shape; only the copy, endpoint,
+// field, and the editing-risk note (instructions only) differ. Each row offers
+// Preview and Edit, both opening the global prompt modal (#bb-prompt-modal in
+// base.html) straight into that view — Preview renders the Markdown, Edit jumps
+// to the editor; the modal's Save writes the buffer back into the row's hidden
+// field and submits the form as a normal POST (server validates length, then
+// flash + redirect). Reset restores the built-in default and saves immediately;
+// it only shows once customized.
+type mcpResourceRowData struct {
 	ID        string // anchor id + drawer-free row key
 	Icon      string
 	Name      string
@@ -171,13 +173,13 @@ type mcpPromptRowData struct {
 	CSRFToken string
 }
 
-templ mcpPromptRow(d mcpPromptRowData) {
-	<div id={ d.ID } class="bb-settings-row" x-data={ mcpPromptRowState(d.Default) }>
+templ mcpResourceRow(d mcpResourceRowData) {
+	<div id={ d.ID } class="bb-settings-row" x-data={ mcpResourceRowState(d.Default) }>
 		@components.LucideIcon(d.Icon, "w-5 h-5 text-base-content opacity-60 shrink-0")
 		<div class="bb-settings-row__main">
 			<div class="bb-settings-row__label">
 				{ d.Name }
-				if mcpPromptCustomized(d) {
+				if mcpResourceCustomized(d) {
 					<span class="badge badge-ghost badge-sm font-normal">Customized</span>
 				} else {
 					<span class="text-xs text-base-content/40 font-normal whitespace-nowrap">Default</span>
@@ -186,24 +188,34 @@ templ mcpPromptRow(d mcpPromptRowData) {
 			<p class="bb-settings-row__caption">{ d.Subtitle }</p>
 		</div>
 		<div class="bb-settings-row__control gap-1">
-			// Edit / preview — opens the global prompt modal in editable mode
-			// (preview first), targeting the hidden field below.
+			// Preview — opens the global prompt modal straight into the rendered
+			// Markdown view (still toggleable to Edit from inside).
 			<button
 				type="button"
 				class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
-				data-tip="Edit prompt"
-				@click={ mcpPromptEditJS(d) }
+				data-tip="Preview"
+				@click={ mcpResourceModalJS(d, false) }
+				aria-label={ "Preview " + d.Name }
+			>
+				@components.LucideIcon("eye", "w-4 h-4")
+			</button>
+			// Edit — opens the same modal straight into the editor.
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
+				data-tip="Edit"
+				@click={ mcpResourceModalJS(d, true) }
 				aria-label={ "Edit " + d.Name }
 			>
-				@components.LucideIcon("settings-2", "w-4 h-4")
+				@components.LucideIcon("square-pen", "w-4 h-4")
 			</button>
 			// Reset to the built-in default — only shown once customized.
-			if mcpPromptCustomized(d) {
+			if mcpResourceCustomized(d) {
 				<button
 					type="button"
 					class="btn btn-ghost btn-sm btn-square text-base-content/55 tooltip tooltip-top"
 					data-tip="Reset to default"
-					@click="resetPrompt()"
+					@click="resetResource()"
 					aria-label={ "Reset " + d.Name + " to default" }
 				>
 					@components.LucideIcon("rotate-ccw", "w-4 h-4")
@@ -212,7 +224,7 @@ templ mcpPromptRow(d mcpPromptRowData) {
 		</div>
 		// Hidden form: the textarea is the source of truth — server-rendered with
 		// the saved value, written directly by the prompt modal (target=$refs.field)
-		// or by resetPrompt(), then submitted. settings_page.js serializes this
+		// or by resetResource(), then submitted. settings_page.js serializes this
 		// form via FormData, so the field's DOM value is what persists — no x-model
 		// (its async data→field flush desynced against FormData's read).
 		<form method="POST" action={ templ.SafeURL(d.Action) } x-ref="form" class="hidden">
@@ -222,41 +234,44 @@ templ mcpPromptRow(d mcpPromptRowData) {
 	</div>
 }
 
-// mcpPromptCustomized reports whether the saved prompt diverges from the
+// mcpResourceCustomized reports whether the saved resource diverges from the
 // built-in default (whitespace-insensitive). Drives the Customized/Default
 // badge and whether the reset affordance shows. Computed server-side and
 // re-evaluated on every settings body swap, so it never drifts from storage.
-func mcpPromptCustomized(d mcpPromptRowData) bool {
+func mcpResourceCustomized(d mcpResourceRowData) bool {
 	norm := func(s string) string {
 		return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n"))
 	}
 	return norm(d.Value) != norm(d.Default)
 }
 
-// mcpPromptRowState is the Alpine scope for a prompt row — just the built-in
-// default (for reset) and the reset action. resetPrompt writes the default
+// mcpResourceRowState is the Alpine scope for a resource row — just the built-in
+// default (for reset) and the reset action. resetResource writes the default
 // straight into the hidden field and submits; FormData then serializes that
 // value verbatim. Returned as an inline object literal (not a factory call) so
 // it carries the per-row default without tripping the x-data factory-args lint.
-func mcpPromptRowState(def string) string {
+func mcpResourceRowState(def string) string {
 	return fmt.Sprintf(
-		"{ def: %s, async resetPrompt() { const ok = await bbConfirm({ title: 'Reset to default?', message: 'The built-in default prompt will replace your current text and save immediately.', confirmLabel: 'Reset', variant: 'warning' }); if (ok) { this.$refs.field.value = this.def; this.$refs.form.requestSubmit(); } } }",
+		"{ def: %s, async resetResource() { const ok = await bbConfirm({ title: 'Reset to default?', message: 'The built-in default will replace your current text and save immediately.', confirmLabel: 'Reset', variant: 'warning' }); if (ok) { this.$refs.field.value = this.def; this.$refs.form.requestSubmit(); } } }",
 		jsString(def),
 	)
 }
 
-// mcpPromptEditJS builds the @click expression that opens the global prompt
-// modal in editable mode for this row. Save writes the buffer into $refs.field
-// (the hidden textarea) and onSaved submits the row's form. The editing-risk
-// note rides along in the subtitle for the instructions prompt.
-func mcpPromptEditJS(d mcpPromptRowData) string {
+// mcpResourceModalJS builds the @click expression that opens the global prompt
+// modal for this row. `edit` picks the initial view — false opens the rendered
+// Markdown preview, true opens the editor — both in editable mode so the
+// Edit/Preview toggle, Copy, and Save are available either way. Save writes the
+// buffer into $refs.field (the hidden textarea) and onSaved submits the row's
+// form. The editing-risk note rides along in the subtitle for the instructions
+// resource.
+func mcpResourceModalJS(d mcpResourceRowData, edit bool) string {
 	subtitle := d.Subtitle
 	if d.Warn {
 		subtitle += " — editing changes how agents read your data model and call tools."
 	}
 	return fmt.Sprintf(
-		"$dispatch('bb-prompt-modal', { mode: 'editable', edit: false, title: %s, subtitle: %s, value: $refs.field.value, target: $refs.field, onSaved: () => $refs.form.requestSubmit(), saveLabel: 'Save changes' })",
-		jsString(d.Name), jsString(subtitle),
+		"$dispatch('bb-prompt-modal', { mode: 'editable', edit: %t, title: %s, subtitle: %s, value: $refs.field.value, target: $refs.field, onSaved: () => $refs.form.requestSubmit(), saveLabel: 'Save changes' })",
+		edit, jsString(d.Name), jsString(subtitle),
 	)
 }
 

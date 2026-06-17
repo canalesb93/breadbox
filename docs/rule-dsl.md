@@ -73,6 +73,7 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 | `tags`              | tags    | List of current transaction tag slugs (special, see below)      |
 | `series`            | string  | `short_id` of the recurring series the transaction belongs to (empty when unassigned) |
 | `in_series`         | bool    | Whether the transaction is linked to any recurring series       |
+| `metadata.<key>`    | metadata | One key from the transaction's free-form metadata blob — e.g. `metadata.tax_deductible` reads `metadata["tax_deductible"]`. See "Metadata conditions" below. |
 
 > **Raw vs assigned category.** `provider_category_primary` / `provider_category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
 
@@ -89,6 +90,9 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 | **bool**    | `eq`, `neq`                                     | `true` / `false`                                           |
 | **tags**    | `contains`, `not_contains`                      | `value` is a single tag slug; case-insensitive             |
 |             | `in`                                            | `value` is an array of slugs; matches if any slug is present |
+| **metadata** | `eq`, `neq`, `contains`, `not_contains`, `matches`, `in` | string-style ops on the stringified value (`contains`/`matches` case-insensitive / RE2) |
+|             | `gt`, `gte`, `lt`, `lte`                         | numeric comparison; both sides must parse as numbers       |
+|             | `exists`, `not_exists`                           | key-presence test; `value` is ignored                      |
 
 Unknown field or unknown op → condition evaluates to false (the rule simply won't match). Invalid regex or wrong value type → **rejected at write time**.
 
@@ -114,6 +118,30 @@ Rule 2 sees rule 1's tag. Rule 3 sees rule 2's category. All three fire in a sin
 The `tags` slice starts from tags already persisted on the row (loaded during sync for re-synced transactions; empty for brand-new ones) and the `category` slug starts from the transaction's currently assigned category (or empty if none yet).
 
 Mutations are scoped to the resolver run — the caller's `TransactionContext` (and the incoming tag slice) are not modified.
+
+### Metadata conditions
+
+Transactions carry a free-form JSONB `metadata` blob — arbitrary key/value enrichment your household cares about that isn't a first-class field (`tax_deductible`, `trip`, `reimbursable_by`, …). A rule reads one key per leaf via the dotted field `metadata.<key>`:
+
+```json
+{ "field": "metadata.tax_deductible", "op": "eq", "value": true }
+{ "field": "metadata.trip", "op": "eq", "value": "japan-2026" }
+{ "field": "metadata.reimburse_amount", "op": "gte", "value": 100 }
+{ "field": "metadata.notes", "op": "contains", "value": "warranty" }
+{ "field": "metadata.project_code", "op": "exists" }
+```
+
+The key (everything after `metadata.`) must be a valid metadata key — non-empty, ≤128 chars. Metadata keys are **case-sensitive** (they're JSONB keys), unlike tag slugs.
+
+**Semantics:**
+
+- `exists` / `not_exists` test key *presence* and ignore `value`.
+- **Every other operator requires the key to be present.** An absent key matches only `not_exists` — so `metadata.foo neq "x"` does **not** match a transaction that simply has no `foo` key (use `not_exists`, or an `or` of the two, if you want "missing OR different"). This avoids a `neq`/`not_contains` rule silently matching every transaction that lacks the key.
+- `eq` / `neq` pick their comparison from the **expected value's type**: a boolean expected compares as bool, a numeric expected compares numerically, otherwise the stored value is stringified and compared case-insensitively. So `value: true` matches stored `true` (and the string `"true"`); `value: 100` matches stored `100` or `"100"`.
+- `contains` / `not_contains` / `matches` / `in` always operate on the **stringified** stored value (numbers → their decimal form, booleans → `true`/`false`, objects/arrays → their JSON encoding), so a `matches` can pattern-match inside a structured value.
+- `gt` / `gte` / `lt` / `lte` require both the stored value and the expected value to parse as numbers; otherwise the leaf is false.
+
+Metadata conditions evaluate identically at sync time, in `preview_rule`, and during retroactive apply. They also chain: a `set_metadata` action by an earlier-stage rule is visible to a later-stage rule's `metadata.<key>` condition within the same pass (see "Rule chaining" above and the `set_metadata` action below).
 
 ## Actions
 
@@ -183,6 +211,29 @@ Behavior:
 
 This is the declarative counterpart to the `assign_series` MCP tool: author the rule once and every future matching charge auto-joins the series with zero agent runs.
 
+### `set_metadata`
+
+```json
+{ "type": "set_metadata", "metadata_key": "tax_deductible", "metadata_value": true }
+```
+
+Upserts **one key** in the transaction's free-form metadata blob, leaving every other key untouched. `metadata_value` may be any JSON value (string, number, boolean, object, array). This is the declarative counterpart to the `set_transaction_metadata` MCP tool.
+
+- `metadata_key` must be non-empty and ≤128 chars; `metadata_value` must serialize to ≤4 KiB (the same per-value cap the scoped metadata ops enforce). Both checked at write time.
+- Repeatable — a rule may set several keys at once. **Last-writer-wins per key** across the pipeline (a higher-priority rule's `set_metadata` for the same key overrides a lower one).
+- Chains: the write is mirrored into the live context, so a later-stage rule's `metadata.<key>` condition observes it within the same pass.
+- Materializes inside the sync transaction (and on retroactive apply) via a single `metadata = (metadata - removed) || set` merge. **No dedicated timeline annotation** is emitted (same as `assign_series`); the rule's `hit_count` records the firing.
+
+### `remove_metadata`
+
+```json
+{ "type": "remove_metadata", "metadata_key": "needs_receipt" }
+```
+
+Deletes **one key** from the metadata blob. No-op if the key isn't present. Repeatable.
+
+- **Net-diff with `set_metadata`** in a single pass: if an earlier-stage rule sets a key and a later-stage rule removes the same key, they cancel — neither hits the DB. A remove-then-set ends as a set. Mirrors `add_tag` / `remove_tag` net-diff semantics.
+
 ### Combining actions
 
 A rule can carry multiple actions of different types. Override (`category_override <> 'none'`) suppresses only the `set_category` part — `add_tag` and `add_comment` still fire.
@@ -199,7 +250,7 @@ A rule can carry multiple actions of different types. Override (`category_overri
 
 #### Which combinations make sense
 
-Only `set_category` is singleton per rule — repeating it is rejected at write time. `add_tag`, `remove_tag`, and `add_comment` can appear multiple times in one rule (e.g. add two tags at once, or add one and remove another). The admin UI disables a second `set_category` dropdown option once one is picked; tag and comment rows are freely repeatable.
+Only `set_category` is singleton per rule — repeating it is rejected at write time. `add_tag`, `remove_tag`, `add_comment`, `set_metadata`, and `remove_metadata` can appear multiple times in one rule (e.g. add two tags at once, or write two metadata keys). The admin UI disables a second `set_category` dropdown option once one is picked; tag and comment rows are freely repeatable.
 
 Useful combinations:
 
@@ -280,6 +331,8 @@ The rule engine has two entry points. They share condition evaluation and priori
 | `set_category`            | Applied (respects override)             | Applied (respects override)                 |
 | `add_tag`                 | Applied                                 | Applied                                     |
 | `remove_tag`              | Applied                                 | Applied                                     |
+| `set_metadata`            | Applied                                 | Applied                                     |
+| `remove_metadata`         | Applied                                 | Applied                                     |
 | `add_comment`             | Applied                                 | **Not applied** (by design)                 |
 | `hit_count`               | +1 per condition match                  | +1 per condition match                      |
 | `rule_applied` annotation | Written                                 | Written (with `applied_by = "retroactive"`) |
