@@ -43,18 +43,35 @@ func (p *SimpleFINProvider) SyncTransactions(ctx context.Context, conn provider.
 	}
 
 	var allTxns []provider.Transaction
+	// Accumulate the account set across windows, deduped by external id. Every
+	// window re-returns the full account list, so we keep the first sighting of
+	// each account; the engine upserts these (metadata only) so banks the user
+	// adds at the bridge after connect are discovered on the next sync.
+	seenAccounts := make(map[string]struct{})
+	var accounts []provider.Account
 	for _, w := range windows(fromDate, now, maxWindowDays) {
-		txns, err := p.fetchWindow(ctx, accessURL, w.start, w.end)
+		txns, accts, err := p.fetchWindow(ctx, accessURL, w.start, w.end)
 		if err != nil {
 			return provider.SyncResult{}, err
 		}
 		allTxns = append(allTxns, txns...)
+		for _, a := range accts {
+			if a.ExternalID == "" {
+				continue
+			}
+			if _, ok := seenAccounts[a.ExternalID]; ok {
+				continue
+			}
+			seenAccounts[a.ExternalID] = struct{}{}
+			accounts = append(accounts, a)
+		}
 	}
 
 	return provider.SyncResult{
-		Added:   allTxns,
-		HasMore: false,
-		Cursor:  now.Format(time.RFC3339),
+		Added:    allTxns,
+		Accounts: accounts,
+		HasMore:  false,
+		Cursor:   now.Format(time.RFC3339),
 	}, nil
 }
 
@@ -71,8 +88,9 @@ func syncStart(cursor string, now time.Time) (time.Time, error) {
 }
 
 // fetchWindow fetches one date-bounded /accounts page and maps every nested
-// transaction. start-date is inclusive, end-date is exclusive.
-func (p *SimpleFINProvider) fetchWindow(ctx context.Context, accessURL string, start, end time.Time) ([]provider.Transaction, error) {
+// transaction plus the account set it carries. start-date is inclusive,
+// end-date is exclusive.
+func (p *SimpleFINProvider) fetchWindow(ctx context.Context, accessURL string, start, end time.Time) ([]provider.Transaction, []provider.Account, error) {
 	query := strings.Join([]string{
 		"start-date=" + strconv.FormatInt(start.Unix(), 10),
 		"end-date=" + strconv.FormatInt(end.Unix(), 10),
@@ -81,11 +99,13 @@ func (p *SimpleFINProvider) fetchWindow(ctx context.Context, accessURL string, s
 
 	set, err := p.fetchAccountSet(ctx, accessURL, query)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var txns []provider.Transaction
+	accounts := make([]provider.Account, 0, len(set.Accounts))
 	for _, acct := range set.Accounts {
+		accounts = append(accounts, acct.toAccount())
 		for _, t := range acct.Transactions {
 			mapped, err := t.toTransaction(acct.ID, acct.Currency)
 			if err != nil {
@@ -96,7 +116,7 @@ func (p *SimpleFINProvider) fetchWindow(ctx context.Context, accessURL string, s
 			txns = append(txns, mapped)
 		}
 	}
-	return txns, nil
+	return txns, accounts, nil
 }
 
 type window struct {

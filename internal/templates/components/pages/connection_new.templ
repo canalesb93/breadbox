@@ -71,11 +71,11 @@ templ connectWizard(p ConnectionNewProps) {
 						if p.HasTeller {
 							@connectProviderRow("teller", "teller", "", "Teller", "Fast, developer-first US banks", !p.HasPlaid)
 						}
-						if p.HasSimpleFin {
-							@connectProviderRow("simplefin", "simplefin", "", "SimpleFIN", "Paste a token · privacy-first", !p.HasPlaid && !p.HasTeller)
-						}
-						@connectProviderRow("csv", "", "file-spreadsheet", "CSV", "Import a statement file manually", false)
+						@connectProviderRow("csv", "", "file-spreadsheet", "CSV", "Import a statement file manually", !p.HasPlaid && !p.HasTeller)
 					</div>
+					if p.HasSimpleFin {
+						@connectSimplefinRow()
+					}
 					if !p.HasPlaid || !p.HasTeller || !p.HasSimpleFin {
 						<a href="/settings/providers" class="inline-flex items-center gap-1 mt-2 text-xs text-base-content/50 hover:text-primary transition-colors">
 							@components.LucideIcon("settings", "w-3 h-3")
@@ -125,41 +125,38 @@ templ connectWizard(p ConnectionNewProps) {
 				</div>
 			</div>
 		</div>
-		if p.HasSimpleFin {
-			<div id="step-simplefin" class="hidden">
-				<div class="flex items-center gap-3 mb-4">
-					<span class="w-10 h-10 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center shrink-0">
-						@components.BrandIcon("simplefin", "w-5 h-5")
-					</span>
-					<div>
-						<h2 class="text-sm font-semibold">Connect SimpleFIN</h2>
-						<p class="text-xs text-base-content/45">Connecting for: <span id="simplefin-member-name" class="font-medium text-base-content"></span></p>
-					</div>
-				</div>
-				<div class="flex flex-col gap-4">
-					<p class="text-sm text-base-content/60">
-						Paste the one-time setup token from your SimpleFIN bridge. Don't have one yet?
-						<a href="https://bridge.simplefin.org/simplefin/create" target="_blank" rel="noopener" class="link link-primary">Get a token</a>
-						— or use your own server's <code class="text-xs">/create</code> page if self-hosted.
-					</p>
-					<fieldset class="fieldset">
-						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="simplefin-token">Setup token</label>
-						<textarea id="simplefin-token" rows="4" class="textarea w-full font-mono text-xs" placeholder="Paste your SimpleFIN setup token…"></textarea>
-					</fieldset>
-					<p id="simplefin-status" class="text-sm text-base-content/50 min-h-5"></p>
-					<div class="flex items-center gap-2">
-						<button id="simplefin-submit" class="btn btn-primary btn-sm">
-							@components.LucideIcon("link", "w-4 h-4")
-							Connect
-						</button>
-						<button id="simplefin-back" class="btn btn-ghost btn-sm">
-							@components.LucideIcon("arrow-left", "w-4 h-4")
-							Back
-						</button>
-					</div>
+	</div>
+}
+
+// connectSimplefinRow is the special non-radio entry in the connect picker.
+// SimpleFIN isn't a per-bank login like Plaid/Teller — it's an aggregator
+// bridge where one token spans every bank you link there — so instead of a
+// selectable provider it points out to the bridge (to manage which banks are
+// included) and to Settings (to paste the single token once). New accounts
+// then flow in automatically on the next sync.
+templ connectSimplefinRow() {
+	<div class="rounded-xl border border-base-300 bg-base-200/40 p-3.5">
+		<div class="flex items-start gap-3">
+			@components.BrandIcon("simplefin", "w-5 h-5 shrink-0 mt-0.5")
+			<div class="min-w-0 flex-1">
+				<div class="text-sm font-medium">SimpleFIN</div>
+				<p class="text-xs text-base-content/50 leading-relaxed mt-0.5">
+					A bridge that reaches every bank you link with a single token. Add or
+					remove banks at the SimpleFIN bridge, then paste your token once in
+					Settings — new accounts sync automatically.
+				</p>
+				<div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2.5">
+					<a href="https://bridge.simplefin.org" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs link link-primary">
+						@components.LucideIcon("external-link", "w-3.5 h-3.5")
+						Manage banks at SimpleFIN
+					</a>
+					<a href="/settings/providers" class="inline-flex items-center gap-1.5 text-xs link link-primary">
+						@components.LucideIcon("key-round", "w-3.5 h-3.5")
+						Set up your token in Settings
+					</a>
 				</div>
 			</div>
-		}
+		</div>
 	</div>
 }
 

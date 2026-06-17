@@ -262,6 +262,77 @@ func TestSync_BasicAddTransactions(t *testing.T) {
 	}
 }
 
+// TestSync_DiscoversNewAccountsMidSync proves the SimpleFIN aggregator case:
+// a connection that re-returns its account set on sync, where a NEW account has
+// appeared (the user linked another bank at their bridge after connecting). The
+// engine must create that account and link it to the connection so its
+// transactions resolve instead of being dropped on a missing-account lookup.
+func TestSync_DiscoversNewAccountsMidSync(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategories(t, queries)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_simplefin")
+	// Only one account exists at connect time.
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		reconcilesPending: true, // poll-based, like SimpleFIN
+		syncResult: provider.SyncResult{
+			Accounts: []provider.Account{
+				{ExternalID: "ext_acct_1", Name: "Checking", Type: "depository", ISOCurrencyCode: "USD"},
+				{ExternalID: "ext_acct_2", Name: "New Savings", Type: "depository", ISOCurrencyCode: "USD"},
+			},
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_on_new",
+					AccountExternalID: "ext_acct_2", // belongs to the just-discovered account
+					Amount:            decimal.NewFromFloat(20.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Coffee",
+					ISOCurrencyCode:   "USD",
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync() error: %v", err)
+	}
+
+	// The new account must now exist, linked to this connection.
+	var newAcctID, newAcctConn pgtype.UUID
+	var newAcctName string
+	if err := pool.QueryRow(ctx,
+		"SELECT id, connection_id, name FROM accounts WHERE external_account_id = $1",
+		"ext_acct_2").Scan(&newAcctID, &newAcctConn, &newAcctName); err != nil {
+		t.Fatalf("new account was not created during sync: %v", err)
+	}
+	if newAcctConn != conn.ID {
+		t.Errorf("new account linked to wrong connection: got %v want %v", newAcctConn, conn.ID)
+	}
+	if newAcctName != "New Savings" {
+		t.Errorf("new account name = %q, want %q", newAcctName, "New Savings")
+	}
+
+	// Its transaction must have resolved onto the new account rather than being dropped.
+	var txnCount int
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM transactions WHERE account_id = $1 AND deleted_at IS NULL",
+		newAcctID).Scan(&txnCount); err != nil {
+		t.Fatalf("count txns on new account: %v", err)
+	}
+	if txnCount != 1 {
+		t.Errorf("expected 1 transaction on the newly discovered account, got %d", txnCount)
+	}
+}
+
 func TestSync_ModifyTransactions(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()

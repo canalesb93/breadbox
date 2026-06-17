@@ -83,6 +83,16 @@ type SyncResult struct {
 	Removed  []string // external transaction IDs
 	Cursor   string
 	HasMore  bool
+
+	// Accounts is the provider's current account set, returned by providers
+	// whose account list can change between connect and sync (notably SimpleFIN,
+	// where one access URL spans every bank the user links at their bridge and
+	// grows new accounts over time). The sync engine upserts these onto the
+	// connection — metadata only, no balances — before processing transactions,
+	// so transactions for newly-appeared accounts resolve instead of being
+	// dropped. Leave nil for providers whose account set is fixed at connect
+	// time (Plaid, CSV); the engine simply skips the upsert when empty.
+	Accounts []Account
 }
 
 type Transaction struct {

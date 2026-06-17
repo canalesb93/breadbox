@@ -262,6 +262,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, syncLogS
 	var pendingRemovals []string
 	var pendingAdded []provider.Transaction
 	var pendingModified []provider.Transaction
+	// Accounts the provider re-discovered this sync (SimpleFIN spans a growing
+	// set of banks under one access URL). Deduped by external id across pages.
+	var pendingAccounts []provider.Account
+	seenAccountExternalIDs := make(map[string]struct{})
 
 	// Pagination loop.
 	for {
@@ -292,6 +296,16 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, syncLogS
 		pendingRemovals = append(pendingRemovals, result.Removed...)
 		pendingAdded = append(pendingAdded, result.Added...)
 		pendingModified = append(pendingModified, result.Modified...)
+		for _, acct := range result.Accounts {
+			if acct.ExternalID == "" {
+				continue
+			}
+			if _, ok := seenAccountExternalIDs[acct.ExternalID]; ok {
+				continue
+			}
+			seenAccountExternalIDs[acct.ExternalID] = struct{}{}
+			pendingAccounts = append(pendingAccounts, acct)
+		}
 
 		if result.HasMore {
 			cursor = result.Cursor
@@ -315,6 +329,40 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, syncLogS
 		}
 
 		txQueries := e.db.WithTx(tx)
+
+		// Discover accounts FIRST. Providers like SimpleFIN return their full
+		// account set on every sync; new accounts appear when the user links
+		// another bank at their bridge. Upsert metadata (never balances — those
+		// are owned by the balance-refresh path below) and seed the caches so
+		// the transactions for a brand-new account resolve in this same sync
+		// rather than erroring on a missing account row.
+		for _, acct := range pendingAccounts {
+			if _, known := accountIDCache[acct.ExternalID]; known {
+				continue // already linked to this connection; metadata refresh isn't worth a write per sync
+			}
+			row, err := txQueries.UpsertAccountMetadata(ctx, db.UpsertAccountMetadataParams{
+				ConnectionID:      connectionID,
+				ExternalAccountID: acct.ExternalID,
+				Name:              acct.Name,
+				OfficialName:      pgconv.TextIfNotEmpty(acct.OfficialName),
+				Type:              acct.Type,
+				Subtype:           pgconv.TextIfNotEmpty(acct.Subtype),
+				Mask:              pgconv.TextIfNotEmpty(acct.Mask),
+				IsoCurrencyCode:   pgconv.TextIfNotEmpty(acct.ISOCurrencyCode),
+			})
+			if err != nil {
+				logger.Error("upsert discovered account", "external_id", acct.ExternalID, "error", err)
+				continue
+			}
+			accountIDCache[row.ExternalAccountID] = row.ID
+			key := pgconv.FormatUUID(row.ID)
+			if row.DisplayName.Valid && row.DisplayName.String != "" {
+				accountNameCache[key] = row.DisplayName.String
+			} else {
+				accountNameCache[key] = row.Name
+			}
+			logger.Info("discovered new account during sync", "external_id", row.ExternalAccountID, "name", row.Name)
+		}
 
 		// Process removed FIRST.
 		for _, externalID := range pendingRemovals {
