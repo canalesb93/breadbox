@@ -462,6 +462,11 @@ type RuleAction struct {
 	SeriesShortID   string `json:"series_short_id,omitempty"`
 	MerchantKey     string `json:"merchant_key,omitempty"`
 	CreateIfMissing bool   `json:"create_if_missing,omitempty"`
+	// set_metadata / remove_metadata fields. MetadataKey is the metadata blob
+	// key (≤128 chars). MetadataValue is the JSON value to write for
+	// set_metadata (any JSON-serializable value); unused by remove_metadata.
+	MetadataKey   string `json:"metadata_key,omitempty"`
+	MetadataValue any    `json:"metadata_value,omitempty"`
 }
 
 // ActivityEntry represents a single event in a transaction's activity timeline.
@@ -570,6 +575,11 @@ type TransactionContext struct {
 	// InSeries reports whether the transaction is linked to any recurring
 	// series (field: "in_series").
 	InSeries bool
+	// Metadata holds the transaction's free-form metadata blob so conditions on
+	// dotted fields (field: "metadata.<key>") can read arbitrary enrichment
+	// values. Updated mid-resolver as earlier-stage set_metadata / remove_metadata
+	// actions apply, so later-stage rules observe the running blob.
+	Metadata map[string]any
 }
 
 type TransactionRuleResponse struct {

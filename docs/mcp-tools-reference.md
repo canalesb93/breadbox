@@ -302,20 +302,20 @@ The tools below are thin API skins over the DSL — the DSL doc is the source of
 
 ### create_transaction_rule (Write)
 
-Create a rule that fires during sync. Actions compose (`set_category` + `add_tag` + `add_comment` in a single rule are all valid).
+Create a rule that fires during sync. Actions compose (`set_category` + `add_tag` + `set_metadata` in a single rule are all valid).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `name` | string | Human-readable rule name |
-| `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. |
-| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`. Either this or `category_slug` is required. |
+| `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. Leaf fields include `metadata.<key>` to read a key from the free-form metadata blob (ops: `eq`/`neq`/`contains`/`not_contains`/`matches`/`in`/`gt`/`gte`/`lt`/`lte`/`exists`/`not_exists`; an absent key matches only `not_exists`). |
+| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`, `set_metadata` (`metadata_key` + `metadata_value`, any JSON), `remove_metadata` (`metadata_key`), `assign_series`. Either this or `category_slug` is required. |
 | `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
 | `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
 | `stage` | string | **Preferred.** Semantic pipeline stage: `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
 | `priority` | int | Raw pipeline-stage integer, 0–1000. Use for fine-grained slotting within a stage. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard) if neither is provided. |
 | `enabled` | bool | Default true |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
-| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag`; `add_comment` is sync-only) |
+| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series`; `add_comment` is sync-only) |
 
 ### list_transaction_rules (Read)
 

@@ -31,10 +31,10 @@ type Condition struct {
 // TransactionContext holds the fields available for rule evaluation during sync.
 type TransactionContext struct {
 	Name             string
-	MerchantName     string  // may be empty
+	MerchantName     string // may be empty
 	Amount           float64
-	CategoryPrimary  string  // raw provider category
-	CategoryDetailed string  // raw provider detailed category
+	CategoryPrimary  string // raw provider category
+	CategoryDetailed string // raw provider detailed category
 	// Category is the transaction's *assigned* category slug (distinct from
 	// CategoryPrimary's raw provider value). It updates mid-resolver as
 	// earlier-stage rules' set_category actions fire, so later-stage rules
@@ -59,6 +59,12 @@ type TransactionContext struct {
 	// InSeries reports whether the transaction is linked to any recurring
 	// series (field: "in_series"). Same timing caveat as SeriesShortID.
 	InSeries bool
+	// Metadata holds the transaction's free-form metadata blob (the JSONB
+	// `metadata` column) so conditions on dotted fields (field:
+	// "metadata.<key>") can read arbitrary enrichment values. Updated
+	// mid-resolver as earlier-stage set_metadata / remove_metadata actions
+	// apply, so later-stage rules observe the running blob.
+	Metadata map[string]any
 }
 
 // RuleActionSource tracks which rule contributed which action for audit.
@@ -68,8 +74,8 @@ type RuleActionSource struct {
 	RuleID      pgtype.UUID
 	RuleShortID string
 	RuleName    string
-	ActionField string // "category", "tag", "comment"
-	ActionValue string // slug for category/tag, content for comment
+	ActionField string // "category", "tag", "tag_remove", "comment", "series", "metadata", "metadata_remove"
+	ActionValue string // slug for category/tag, content for comment, key for metadata
 }
 
 // RuleActions holds the merged actions to apply to a transaction after resolving
@@ -105,6 +111,15 @@ type RuleActions struct {
 	// Last-writer-wins: the highest-priority matching rule owns the assignment
 	// (a transaction belongs to at most one series).
 	SeriesAssign *SeriesAssignIntent
+	// MetadataSet maps metadata keys to the value the net-surviving set_metadata
+	// action wrote. Last-writer-wins per key across the pipeline. A later-stage
+	// remove_metadata for the same key cancels the set (the key won't appear
+	// here).
+	MetadataSet map[string]any
+	// MetadataRemove is the net list of metadata keys to delete. A key set by an
+	// earlier-stage rule then removed by a later one cancels (appears in
+	// neither map); a key removed then re-set ends up only in MetadataSet.
+	MetadataRemove []string
 	// Sources records per-action provenance for the audit trail. For
 	// set_category, only the winning (last) rule's source is retained.
 	// For tag actions, only net-surviving adds/removes have sources.
@@ -122,6 +137,8 @@ type typedAction struct {
 	SeriesShortID   string
 	MerchantKey     string
 	CreateIfMissing bool
+	MetadataKey     string
+	MetadataValue   any
 }
 
 // SeriesAssignIntent is the resolved assign_series action: link the
@@ -138,9 +155,9 @@ type SeriesAssignIntent struct {
 // All matching rules contribute actions (merge non-conflicting).
 type RuleResolver struct {
 	rules           []compiledRule
-	slugCache       map[[16]byte]string      // category UUID bytes -> slug
-	slugToID        map[string]pgtype.UUID   // category slug -> UUID (reverse cache)
-	seriesShortID   map[[16]byte]string      // recurring_series UUID bytes -> short_id
+	slugCache       map[[16]byte]string    // category UUID bytes -> slug
+	slugToID        map[string]pgtype.UUID // category slug -> UUID (reverse cache)
+	seriesShortID   map[[16]byte]string    // recurring_series UUID bytes -> short_id
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
@@ -349,6 +366,12 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 			merchantKey, _ := m["merchant_key"].(string)
 			createIfMissing, _ := m["create_if_missing"].(bool)
 			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, MerchantKey: merchantKey, CreateIfMissing: createIfMissing})
+		case "set_metadata":
+			key, _ := m["metadata_key"].(string)
+			out = append(out, typedAction{Type: t, MetadataKey: key, MetadataValue: m["metadata_value"]})
+		case "remove_metadata":
+			key, _ := m["metadata_key"].(string)
+			out = append(out, typedAction{Type: t, MetadataKey: key})
 		default:
 			logger.Warn("skipping unknown rule action type",
 				"rule_id", pgconv.FormatUUID(ruleID), "type", t)
@@ -489,6 +512,20 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 	if len(txn.Tags) > 0 {
 		tctx.Tags = append([]string(nil), txn.Tags...)
 	}
+	// Snapshot the keys present in the original DB blob and work on a copy of the
+	// metadata map so chaining mutations don't leak into the caller's map.
+	// origMetaKeys lets the remove_metadata net-diff below distinguish a
+	// pre-existing key (a set-then-remove must still delete it) from a key
+	// created within this pass (a true no-op).
+	var origMetaKeys map[string]struct{}
+	if len(txn.Metadata) > 0 {
+		origMetaKeys = make(map[string]struct{}, len(txn.Metadata))
+		tctx.Metadata = make(map[string]any, len(txn.Metadata))
+		for k, v := range txn.Metadata {
+			origMetaKeys[k] = struct{}{}
+			tctx.Metadata[k] = v
+		}
+	}
 
 	var result *RuleActions
 	for i := range r.rules {
@@ -612,6 +649,65 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					ActionField: "series",
 					ActionValue: seriesActionValue(a),
 				})
+			case "set_metadata":
+				if a.MetadataKey == "" {
+					continue
+				}
+				// Last-writer-wins per key. Metadata keys are case-sensitive
+				// (JSONB), so matching is exact. If a prior-stage remove queued
+				// this key, the later set cancels the remove.
+				if i := indexExact(result.MetadataRemove, a.MetadataKey); i >= 0 {
+					result.MetadataRemove = append(result.MetadataRemove[:i], result.MetadataRemove[i+1:]...)
+					result.Sources = dropMetadataSource(result.Sources, "metadata_remove", a.MetadataKey)
+				}
+				if result.MetadataSet == nil {
+					result.MetadataSet = make(map[string]any)
+				}
+				result.MetadataSet[a.MetadataKey] = a.MetadataValue
+				// Refresh the source so the audit trail credits the winning rule.
+				result.Sources = dropMetadataSource(result.Sources, "metadata", a.MetadataKey)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: "metadata",
+					ActionValue: a.MetadataKey,
+				})
+				// Mirror into the live context so later-stage rules' metadata
+				// conditions observe the write.
+				if tctx.Metadata == nil {
+					tctx.Metadata = make(map[string]any)
+				}
+				tctx.Metadata[a.MetadataKey] = a.MetadataValue
+			case "remove_metadata":
+				if a.MetadataKey == "" {
+					continue
+				}
+				// If a same-pass earlier-stage rule set this key, drop that
+				// queued set and its source.
+				if _, was := result.MetadataSet[a.MetadataKey]; was {
+					delete(result.MetadataSet, a.MetadataKey)
+					result.Sources = dropMetadataSource(result.Sources, "metadata", a.MetadataKey)
+				}
+				// Mirror into the live context so later-stage rules see it gone.
+				delete(tctx.Metadata, a.MetadataKey)
+				// Queue a DB delete only when the key exists in the original blob.
+				// Last-writer-wins: a remove of a pre-existing key wins over an
+				// earlier set; a key created and removed within this pass (or one
+				// that never existed) is a net no-op needing no write or source.
+				if _, existed := origMetaKeys[a.MetadataKey]; !existed {
+					continue
+				}
+				if indexExact(result.MetadataRemove, a.MetadataKey) < 0 {
+					result.MetadataRemove = append(result.MetadataRemove, a.MetadataKey)
+					result.Sources = append(result.Sources, RuleActionSource{
+						RuleID:      rule.id,
+						RuleShortID: rule.shortID,
+						RuleName:    rule.name,
+						ActionField: "metadata_remove",
+						ActionValue: a.MetadataKey,
+					})
+				}
 			}
 		}
 	}
@@ -659,6 +755,36 @@ func dropSeriesSource(src []RuleActionSource) []RuleActionSource {
 		kept = append(kept, s)
 	}
 	return kept
+}
+
+// dropMetadataSource removes a (field, key) metadata source entry — used when a
+// later-stage rule supersedes (set→set, last-writer-wins) or cancels
+// (set↔remove net-diff) an earlier-stage rule's metadata intent. field is
+// "metadata" (set) or "metadata_remove" (remove); value is the metadata key.
+func dropMetadataSource(src []RuleActionSource, field, key string) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == field && s.ActionValue == key {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
+}
+
+// indexExact returns the index of target in slice using exact (case-sensitive)
+// comparison, or -1. Metadata keys are JSONB keys and therefore case-sensitive,
+// unlike tag slugs which match case-insensitively.
+func indexExact(slice []string, target string) int {
+	for i, s := range slice {
+		if s == target {
+			return i
+		}
+	}
+	return -1
 }
 
 // dropTagSource removes a specific (field, value) source entry — used when a
@@ -805,8 +931,157 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 	case "in_series":
 		return evaluateBool(c, tctx.InSeries)
 	default:
+		if key, ok := metadataKeyFromField(c.field); ok {
+			return evaluateMetadata(c, key, tctx.Metadata)
+		}
 		return false // unknown field
 	}
+}
+
+// metadataFieldPrefix marks a condition leaf that reads a key from the
+// transaction's free-form metadata blob. Mirrors service.metadataFieldPrefix.
+const metadataFieldPrefix = "metadata."
+
+// metadataKeyFromField extracts the metadata key from a "metadata.<key>" field.
+func metadataKeyFromField(field string) (string, bool) {
+	if !strings.HasPrefix(field, metadataFieldPrefix) {
+		return "", false
+	}
+	return field[len(metadataFieldPrefix):], true
+}
+
+// evaluateMetadata mirrors service.evalMetadata: presence operators test key
+// presence; every other operator requires the key to be present. eq/neq are
+// driven by the expected value's type, while contains/not_contains/matches/in
+// operate on the stringified stored value. Keeping the two implementations in
+// lockstep means a rule that passes write-time validation evaluates the same at
+// sync time as it does in preview / retroactive apply.
+func evaluateMetadata(c *compiledCondition, key string, meta map[string]any) bool {
+	raw, present := meta[key]
+	switch c.op {
+	case "exists":
+		return present
+	case "not_exists":
+		return !present
+	}
+	if !present {
+		return false
+	}
+	switch c.op {
+	case "eq":
+		return metadataEquals(raw, c.value)
+	case "neq":
+		return !metadataEquals(raw, c.value)
+	case "contains":
+		return strings.Contains(strings.ToLower(metadataString(raw)), strings.ToLower(metadataString(c.value)))
+	case "not_contains":
+		return !strings.Contains(strings.ToLower(metadataString(raw)), strings.ToLower(metadataString(c.value)))
+	case "matches":
+		if c.regex != nil {
+			return c.regex.MatchString(metadataString(raw))
+		}
+		return false
+	case "in":
+		actual := metadataString(raw)
+		if list, ok := c.value.([]interface{}); ok {
+			for _, item := range list {
+				if strings.EqualFold(actual, metadataString(item)) {
+					return true
+				}
+			}
+		}
+		return false
+	case "gt", "gte", "lt", "lte":
+		actual, ok1 := metadataFloat(raw)
+		expected, ok2 := metadataFloat(c.value)
+		if !ok1 || !ok2 {
+			return false
+		}
+		switch c.op {
+		case "gt":
+			return actual > expected
+		case "gte":
+			return actual >= expected
+		case "lt":
+			return actual < expected
+		case "lte":
+			return actual <= expected
+		}
+	}
+	return false
+}
+
+// metadataEquals compares a stored metadata value against the expected
+// condition value, selecting the comparison from the expected value's type.
+func metadataEquals(raw, expected any) bool {
+	switch exp := expected.(type) {
+	case bool:
+		b, ok := metadataBool(raw)
+		return ok && b == exp
+	case float64, float32, int, int64, json.Number:
+		ev, ok1 := metadataFloat(expected)
+		av, ok2 := metadataFloat(raw)
+		return ok1 && ok2 && av == ev
+	default:
+		return strings.EqualFold(metadataString(raw), metadataString(expected))
+	}
+}
+
+// metadataString renders a metadata value as a string for string operators.
+func metadataString(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case bool:
+		if val {
+			return "true"
+		}
+		return "false"
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case json.Number:
+		return val.String()
+	default:
+		if b, err := json.Marshal(val); err == nil {
+			return string(b)
+		}
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// metadataFloat coerces a metadata value to float64 for numeric comparison.
+func metadataFloat(v any) (float64, bool) {
+	switch val := v.(type) {
+	case float64:
+		return val, true
+	case float32:
+		return float64(val), true
+	case int:
+		return float64(val), true
+	case int64:
+		return float64(val), true
+	case json.Number:
+		f, err := val.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(val, 64)
+		return f, err == nil
+	}
+	return 0, false
+}
+
+// metadataBool coerces a metadata value to bool for eq/neq against a bool expected.
+func metadataBool(v any) (bool, bool) {
+	switch val := v.(type) {
+	case bool:
+		return val, true
+	case string:
+		b, err := strconv.ParseBool(val)
+		return b, err == nil
+	}
+	return false, false
 }
 
 // evaluateString applies string operators.
@@ -980,4 +1255,3 @@ func stringInList(fieldVal string, v interface{}) bool {
 		return strings.EqualFold(fieldVal, toString(v))
 	}
 }
-

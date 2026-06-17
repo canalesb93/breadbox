@@ -314,28 +314,28 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
-	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
-	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition tree. Omit or pass {} to match every transaction. Leaf: {\"field\":\"...\",\"op\":\"...\",\"value\":...}. Combinators: {\"and\":[...]}, {\"or\":[...]}, {\"not\":{...}} (nest freely, max depth 10). Fields: provider_name provider_merchant_name amount provider_category_primary provider_category_detailed category(assigned slug, live-updated by earlier-stage rules) pending provider account_id account_name user_id user_name tags. Ops: string/category=eq|neq|contains|not_contains|matches(RE2)|in; numeric=eq|neq|gt|gte|lt|lte; bool=eq|neq; tags=contains|not_contains|in. Nested example: {\"or\":[{\"and\":[{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},{\"field\":\"amount\",\"op\":\"gte\",\"value\":5}]},{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"}]}. Full spec: docs/rule-dsl.md."`
-	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"}. Actions compose: a rule can set a category AND add a tag AND add a comment in the same match. add_comment fires only at sync time (not on retroactive apply). remove_tag net-diffs against add_tag within the same sync pass. If omitted, use category_slug instead."`
-	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
-	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires during sync: 'on_create' (default — first-synced transactions) | 'on_change' (existing transactions that changed on re-sync) | 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'. Retroactive apply ignores trigger."`
-	Stage              string              `json:"stage,omitempty" jsonschema:"Semantic pipeline stage — preferred over raw priority for agent-authored rules. One of: 'baseline' (runs first, broad defaults), 'standard' (default), 'refinement' (reacts to earlier stages), 'override' (runs last, wins set_category). Resolves to priority 0/10/50/100. If both stage and priority are supplied, priority wins. Leave both unset for 'standard'."`
-	Priority           int                 `json:"priority,omitempty" jsonschema:"Raw pipeline-stage integer, 0..1000. Lower runs first. Prefer 'stage' for shared vocabulary. Canonical values: 0=baseline, 10=standard (default), 50=refinement, 100=override. Higher-priority rules observe earlier-stage rules' tag/category mutations via conditions, and win set_category under last-writer semantics."`
-	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
-	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to existing transactions after creation. Materializes set_category / add_tag / remove_tag; skips add_comment (sync-only). Hit count reflects every condition match, matching sync-time semantics."`
+	Name               string           `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
+	Conditions         map[string]any   `json:"conditions,omitempty" jsonschema:"JSON condition tree. Omit or pass {} to match every transaction. Leaf: {\"field\":\"...\",\"op\":\"...\",\"value\":...}. Combinators: {\"and\":[...]}, {\"or\":[...]}, {\"not\":{...}} (nest freely, max depth 10). Fields: provider_name provider_merchant_name amount provider_category_primary provider_category_detailed category(assigned slug, live-updated by earlier-stage rules) pending provider account_id account_name user_id user_name tags series in_series, plus metadata.<key> to read a key from the free-form metadata blob (e.g. metadata.tax_deductible). Ops: string/category=eq|neq|contains|not_contains|matches(RE2)|in; numeric=eq|neq|gt|gte|lt|lte; bool=eq|neq; tags=contains|not_contains|in; metadata.<key>=eq|neq|contains|not_contains|matches|in|gt|gte|lt|lte|exists|not_exists (an absent key matches only not_exists; eq/neq comparison type follows the value's type). Nested example: {\"or\":[{\"and\":[{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},{\"field\":\"amount\",\"op\":\"gte\",\"value\":5}]},{\"field\":\"metadata.reimbursable\",\"op\":\"eq\",\"value\":true}]}. Full spec: docs/rule-dsl.md."`
+	Actions            []map[string]any `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"} | {\"type\":\"set_metadata\",\"metadata_key\":\"...\",\"metadata_value\":<any JSON>} | {\"type\":\"remove_metadata\",\"metadata_key\":\"...\"} | {\"type\":\"assign_series\",\"series_short_id\":\"...\"} or {\"type\":\"assign_series\",\"merchant_key\":\"...\",\"create_if_missing\":true}. Actions compose: a rule can set a category AND add a tag AND write metadata in the same match. set_metadata upserts one key (value may be any JSON type); remove_metadata deletes one key; both repeat freely. add_comment fires only at sync time (not on retroactive apply). remove_tag/remove_metadata net-diff against add_tag/set_metadata within the same sync pass. If omitted, use category_slug instead."`
+	CategorySlug       string           `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
+	Trigger            string           `json:"trigger,omitempty" jsonschema:"When the rule fires during sync: 'on_create' (default — first-synced transactions) | 'on_change' (existing transactions that changed on re-sync) | 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'. Retroactive apply ignores trigger."`
+	Stage              string           `json:"stage,omitempty" jsonschema:"Semantic pipeline stage — preferred over raw priority for agent-authored rules. One of: 'baseline' (runs first, broad defaults), 'standard' (default), 'refinement' (reacts to earlier stages), 'override' (runs last, wins set_category). Resolves to priority 0/10/50/100. If both stage and priority are supplied, priority wins. Leave both unset for 'standard'."`
+	Priority           int              `json:"priority,omitempty" jsonschema:"Raw pipeline-stage integer, 0..1000. Lower runs first. Prefer 'stage' for shared vocabulary. Canonical values: 0=baseline, 10=standard (default), 50=refinement, 100=override. Higher-priority rules observe earlier-stage rules' tag/category mutations via conditions, and win set_category under last-writer semantics."`
+	ExpiresIn          string           `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
+	ApplyRetroactively bool             `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to existing transactions after creation. Materializes set_category / add_tag / remove_tag / set_metadata / remove_metadata / assign_series; skips add_comment (sync-only). Hit count reflects every condition match, matching sync-time semantics."`
 }
 
 type updateTransactionRuleInput struct {
-	ID           string               `json:"id" jsonschema:"required,UUID of the rule to update"`
-	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule. Omit to leave unchanged."`
-	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to explicitly change to match-all. Omit entirely to leave conditions unchanged."`
-	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace the entire actions array with typed actions: {\"type\":\"set_category|add_tag|remove_tag|add_comment\", ...}. Pass an empty array to reject (rules must have at least one action). Omit to leave actions unchanged."`
-	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace only the set_category action. Other action types on the rule are preserved. Omit to leave unchanged."`
-	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_change, or always. 'on_update' accepted as alias for on_change. Omit to leave unchanged."`
-	Stage        *string              `json:"stage,omitempty" jsonschema:"New semantic pipeline stage: baseline | standard | refinement | override (resolves to priority 0/10/50/100). Preferred alias for agent-authored updates. If both stage and priority are supplied, priority wins. Omit to leave unchanged."`
-	Priority     *int                 `json:"priority,omitempty" jsonschema:"New raw priority (pipeline stage). Prefer 'stage' for shared vocabulary. Omit to leave unchanged."`
-	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule. Disabled rules are excluded from sync + retroactive apply."`
-	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear expiry entirely. Omit to leave unchanged."`
+	ID           string            `json:"id" jsonschema:"required,UUID of the rule to update"`
+	Name         *string           `json:"name,omitempty" jsonschema:"New name for the rule. Omit to leave unchanged."`
+	Conditions   map[string]any    `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to explicitly change to match-all. Omit entirely to leave conditions unchanged."`
+	Actions      *[]map[string]any `json:"actions,omitempty" jsonschema:"Replace the entire actions array with typed actions: {\"type\":\"set_category|add_tag|remove_tag|add_comment|set_metadata|remove_metadata|assign_series\", ...}. set_metadata takes metadata_key + metadata_value (any JSON); remove_metadata takes metadata_key. Pass an empty array to reject (rules must have at least one action). Omit to leave actions unchanged."`
+	CategorySlug *string           `json:"category_slug,omitempty" jsonschema:"Shorthand: replace only the set_category action. Other action types on the rule are preserved. Omit to leave unchanged."`
+	Trigger      *string           `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_change, or always. 'on_update' accepted as alias for on_change. Omit to leave unchanged."`
+	Stage        *string           `json:"stage,omitempty" jsonschema:"New semantic pipeline stage: baseline | standard | refinement | override (resolves to priority 0/10/50/100). Preferred alias for agent-authored updates. If both stage and priority are supplied, priority wins. Omit to leave unchanged."`
+	Priority     *int              `json:"priority,omitempty" jsonschema:"New raw priority (pipeline stage). Prefer 'stage' for shared vocabulary. Omit to leave unchanged."`
+	Enabled      *bool             `json:"enabled,omitempty" jsonschema:"Enable or disable the rule. Disabled rules are excluded from sync + retroactive apply."`
+	ExpiresAt    *string           `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear expiry entirely. Omit to leave unchanged."`
 }
 
 type deleteTransactionRuleInput struct {
@@ -347,14 +347,14 @@ type batchCreateRulesInput struct {
 }
 
 type batchRuleItem struct {
-	Name         string              `json:"name" jsonschema:"required,Human-readable rule name"`
-	Actions      []map[string]string `json:"actions,omitempty" jsonschema:"Actions array (typed — same format as create_transaction_rule)"`
-	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for set_category action. Either actions or category_slug required."`
-	Conditions   map[string]any      `json:"conditions,omitempty" jsonschema:"Condition tree as JSON object. Omit or {} for match-all."`
-	Trigger      string              `json:"trigger,omitempty" jsonschema:"on_create (default), on_change, or always. 'on_update' accepted as alias for on_change."`
-	Stage        string              `json:"stage,omitempty" jsonschema:"Semantic pipeline stage: baseline | standard (default) | refinement | override — resolves to priority 0/10/50/100. Prefer over raw priority for cross-agent consistency. If both are supplied, priority wins."`
-	Priority     int                 `json:"priority,omitempty" jsonschema:"Raw priority integer. Prefer 'stage' for shared vocabulary. Defaults to 10 (standard)."`
-	ExpiresIn    string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
+	Name         string           `json:"name" jsonschema:"required,Human-readable rule name"`
+	Actions      []map[string]any `json:"actions,omitempty" jsonschema:"Actions array (typed — same format as create_transaction_rule, incl. set_metadata / remove_metadata)"`
+	CategorySlug string           `json:"category_slug,omitempty" jsonschema:"Shorthand for set_category action. Either actions or category_slug required."`
+	Conditions   map[string]any   `json:"conditions,omitempty" jsonschema:"Condition tree as JSON object. Omit or {} for match-all."`
+	Trigger      string           `json:"trigger,omitempty" jsonschema:"on_create (default), on_change, or always. 'on_update' accepted as alias for on_change."`
+	Stage        string           `json:"stage,omitempty" jsonschema:"Semantic pipeline stage: baseline | standard (default) | refinement | override — resolves to priority 0/10/50/100. Prefer over raw priority for cross-agent consistency. If both are supplied, priority wins."`
+	Priority     int              `json:"priority,omitempty" jsonschema:"Raw priority integer. Prefer 'stage' for shared vocabulary. Defaults to 10 (standard)."`
+	ExpiresIn    string           `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }
 
 type applyRulesInput struct {
@@ -670,31 +670,52 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 // parseConditions converts a map[string]any (from MCP input) to a service.Condition.
 // convertMCPActions converts MCP action maps to service RuleAction slice.
 //
-// Accepts the typed shape {type, category_slug|tag_slug|content}. Legacy
-// shape {field:"category", value:"<slug>"} is auto-translated to
-// {type:"set_category", category_slug:"<slug>"} for back-compat.
-func convertMCPActions(actions []map[string]string) []service.RuleAction {
+// Accepts the typed shape {type, category_slug|tag_slug|content|series_*|
+// metadata_*}. metadata_value keeps its native JSON type (string, number, bool,
+// object, array). Legacy shape {field:"category", value:"<slug>"} is
+// auto-translated to {type:"set_category", category_slug:"<slug>"} for
+// back-compat.
+func convertMCPActions(actions []map[string]any) []service.RuleAction {
 	if len(actions) == 0 {
 		return nil
 	}
 	result := make([]service.RuleAction, len(actions))
 	for i, a := range actions {
 		act := service.RuleAction{
-			Type:         a["type"],
-			CategorySlug: a["category_slug"],
-			TagSlug:      a["tag_slug"],
-			Content:      a["content"],
+			Type:            mcpString(a["type"]),
+			CategorySlug:    mcpString(a["category_slug"]),
+			TagSlug:         mcpString(a["tag_slug"]),
+			Content:         mcpString(a["content"]),
+			SeriesShortID:   mcpString(a["series_short_id"]),
+			MerchantKey:     mcpString(a["merchant_key"]),
+			CreateIfMissing: mcpBool(a["create_if_missing"]),
+			MetadataKey:     mcpString(a["metadata_key"]),
+			MetadataValue:   a["metadata_value"],
 		}
 		// Legacy shape: {"field":"category","value":"<slug>"}.
 		if act.Type == "" {
-			if field, ok := a["field"]; ok && field == "category" {
+			if field := mcpString(a["field"]); field == "category" {
 				act.Type = "set_category"
-				act.CategorySlug = a["value"]
+				act.CategorySlug = mcpString(a["value"])
 			}
 		}
 		result[i] = act
 	}
 	return result
+}
+
+// mcpString coerces an untyped JSON action value to a string, returning "" for
+// nil or non-string values (the typed fields are always strings).
+func mcpString(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+// mcpBool coerces an untyped JSON action value to a bool, returning false for
+// nil or non-bool values.
+func mcpBool(v any) bool {
+	b, _ := v.(bool)
+	return b
 }
 
 func parseConditions(m map[string]any) (service.Condition, error) {
@@ -839,7 +860,7 @@ func shortIDPrefix(key string) (string, bool) {
 // avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream and
 // collapses each object's own id/short_id pair:
 //
-//   {"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
+//	{"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
 //
 // Only the bare "short_id" key triggers the rewrite; the "short_id" key is
 // then dropped. If the sibling "id" field is missing or "short_id" is null,
@@ -1134,4 +1155,3 @@ func scanJSONString(data []byte, pos int) (string, int) {
 	}
 	return s, end
 }
-
