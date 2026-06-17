@@ -511,19 +511,6 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			providerName = "plaid"
 		}
 
-		// SimpleFIN is a Settings-managed bridge: one access URL spans every bank,
-		// so its single connection is created/rotated in Settings → Providers, not
-		// here. Routing it through this generic create-a-new-connection path would
-		// bypass the singleton invariant (GetActiveConnectionByProvider) and let a
-		// second active SimpleFIN connection be created that the drawer can't see
-		// or manage. Reject it so the invariant has one enforcement point. (Relink
-		// of an existing connection goes through reauthSimplefin, which rotates in
-		// place.)
-		if providerName == "simplefin" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "SimpleFIN connections are managed in Settings → Providers, not the connect flow."})
-			return
-		}
-
 		prov, ok := a.Providers[providerName]
 		if !ok {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": providerName + " provider not configured"})
@@ -544,15 +531,22 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// SimpleFIN discovers the real institution name during the claim (the
+		// browser only sends the "SimpleFIN" placeholder), so prefer what the
+		// provider returned.
+		institutionName := req.InstitutionName
+		if providerName == "simplefin" && conn.InstitutionName != "" {
+			institutionName = conn.InstitutionName
+		}
+
 		// Persist the connection + accounts via the shared service helper.
 		// REST (api.PlaidExchangeHandler) calls the same path so both
-		// surfaces stay byte-identical on what lands in the DB. (SimpleFIN is
-		// rejected above — it never reaches this generic path.)
+		// surfaces stay byte-identical on what lands in the DB.
 		result, err := a.Service.RegisterNewConnection(r.Context(), service.RegisterNewConnectionParams{
 			UserID:          userID,
 			Provider:        providerName,
 			InstitutionID:   req.InstitutionID,
-			InstitutionName: req.InstitutionName,
+			InstitutionName: institutionName,
 			Conn:            conn,
 			Accounts:        accounts,
 		})
@@ -562,9 +556,18 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// SimpleFIN's bridge expects ≤24 requests/day, so put new SimpleFIN
+		// connections on a shared daily schedule rather than the household
+		// default (which may be more frequent).
+		if providerName == "simplefin" {
+			if err := a.Service.AssignConnectionToManagedSchedule(r.Context(), pgconv.FormatUUID(result.ID), simplefinScheduleName, simplefinScheduleCron); err != nil {
+				a.Logger.Warn("assign simplefin daily schedule", "error", err, "connection_id", pgconv.FormatUUID(result.ID))
+			}
+		}
+
 		writeJSON(w, http.StatusCreated, exchangeTokenResponse{
 			ConnectionID:    pgconv.FormatUUID(result.ID),
-			InstitutionName: req.InstitutionName,
+			InstitutionName: institutionName,
 			Status:          "active",
 		})
 	}

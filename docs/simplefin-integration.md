@@ -14,34 +14,17 @@ unsupported methods) and Teller (real HTTP client + date-range polling).
 
 | Aspect | SimpleFIN |
 |---|---|
-| Connect | **Token paste, in Settings.** The single bridge token is pasted in **Settings → Providers → SimpleFIN** (a side drawer), not the per-bank Add-connection flow. No SDK popup, no `CreateLinkSession`. |
+| Connect | **Token paste.** User gets a one-time base64 *setup token* from their bridge's `/create` page and pastes it. No SDK popup, no `CreateLinkSession`. |
 | Credential | The claimed **access URL** `https://user:pass@host/path` (HTTP Basic creds embedded), stored AES-GCM encrypted. |
 | Fetch | **Poll only.** `GET {accessURL}/accounts?start-date&end-date&pending=1` returns accounts with nested transactions. No cursor, no webhooks. |
-| Scope | **One access URL spans every bank** the user linked at the bridge (multi-bank aggregator) → **one singleton** Breadbox connection, many accounts. |
-| Account growth | Banks added at the bridge **after** connect are discovered **automatically on the next sync** — no new token. The engine upserts the re-discovered account set before processing transactions (see "Sync" below). |
+| Scope | **One access URL spans every bank** the user linked at the bridge (multi-bank aggregator) → one Breadbox connection, many accounts. |
 | Amount sign | **Inverted.** SimpleFIN positive = money in; Breadbox positive = debit (money out). The mapper negates uniformly. |
-| Reauth / rotate | Paste a **fresh** setup token in the Settings drawer; it rotates the existing connection's credential in place (the old access URL 403s once revoked). |
-| Enablement | **Connecting in Settings enables it** (`simplefin_enabled` app_config is set on first claim). `SIMPLEFIN_ENABLED=false` in env hard-disables. No manual on/off toggle. |
-
-## Where the token lives (Settings, not Add-connection)
-
-SimpleFIN is an **aggregator bridge**, not a per-bank login like Plaid/Teller, so
-its single token is managed in **Settings → Providers → SimpleFIN** (a side
-drawer), and the household has **at most one** active SimpleFIN connection (the
-"singleton"). The drawer's form claims a pasted token and either creates that one
-bridge connection (first time) or **rotates the stored credential in place** when
-one already exists — there's never a second SimpleFIN connection, so re-pasting a
-token can't strand accounts on an orphan row.
-
-The **Add a connection** flow shows SimpleFIN as a *special, non-selectable row*
-that links out to the bridge (to manage which banks are included) and to Settings
-(to paste/rotate the token) — reinforcing that you don't add SimpleFIN banks one
-at a time here. `internal/admin/providers.go::ProvidersSaveSimpleFINHandler` owns
-the connect/rotate POST; `GetActiveConnectionByProvider` resolves the singleton.
+| Reauth | Paste a **new** setup token; the old access URL 403s once revoked. |
+| Enablement | **Opt-in toggle** (`SIMPLEFIN_ENABLED` env / `simplefin_enabled` app_config). No server-level credential. |
 
 ## The connect flow (claim)
 
-1. User pastes the setup token in **Settings → Providers → SimpleFIN**.
+1. User pastes the setup token in the admin **Add connection** screen.
 2. `ExchangeToken` base64-decodes it to a one-time **claim URL** and `POST`s to it
    (unauthenticated, empty body). A `200` returns the **access URL**; a `403`
    means the token was already used or is invalid.
@@ -77,16 +60,17 @@ window each sync, the engine soft-deletes stale pending rows via the
 
 ### Account discovery on every sync
 
-Each `/accounts` response carries the **full current account set**, so
-`SyncTransactions` returns it in `SyncResult.Accounts` (deduped across windows).
-The sync engine upserts that set — **metadata only, never balances** (the
-`UpsertAccountMetadata` query; balances are owned by the balance-refresh path) —
-onto the connection *before* processing transactions, then seeds its account
-cache. The effect: a bank the user links at the bridge after connecting shows up
-on the next sync, and its transactions resolve instead of being dropped on a
-missing-account lookup. Existing accounts already on the connection are skipped
-(no per-sync metadata write). Providers whose account set is fixed at connect
-(Plaid, CSV) leave `SyncResult.Accounts` nil and the engine skips the step.
+One access URL spans every bank at the bridge, and the user can link more banks
+there *after* connecting Breadbox. So `SyncTransactions` also returns the
+connection's **full current account set** in `SyncResult.Accounts` (captured once
+per sync — the bridge lists the full set on every window, so there's no need to
+re-collect per window). Before processing transactions, the sync engine upserts
+that set with `UpsertAccountMetadata` — **metadata only, never balances** (those
+are owned by the balance-refresh path) and `connection_id` is set only on INSERT,
+so an existing account keeps its connection. A bank added at the bridge after
+connect therefore appears in Breadbox on the next sync automatically — no
+reconnect, no new token. Providers whose account set is fixed at connect time
+(Plaid, CSV) leave `SyncResult.Accounts` nil and the engine skips the upsert.
 
 ### Rate limits
 

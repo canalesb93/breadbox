@@ -27,22 +27,11 @@ type ProvidersProps struct {
 	TellerCertConfigured    bool
 	TellerWebhookConfigured bool
 
-	// SimpleFIN state. SimpleFIN has no server-level credential — a single
-	// pasted setup token is claimed for an access URL that spans every bank the
-	// user links at their bridge. The drawer manages that one bridge connection
-	// (connect / rotate token) rather than offering a per-bank credential.
+	// SimpleFIN state. SimpleFIN has no server-level credential — it's an
+	// opt-in toggle deciding whether the provider is offered at connect time
+	// (the access token is pasted per connection).
 	SimpleFINEnabled bool
 	SimpleFINFromEnv bool
-	// SimpleFINConnected is true when an active SimpleFIN bridge connection
-	// already exists; the drawer then shows status + a token-rotation form
-	// instead of the first-time connect form.
-	SimpleFINConnected   bool
-	SimpleFINInstitution string // institution label of the bridge connection
-	SimpleFINAccounts    int64  // number of accounts under the bridge connection
-	SimpleFINConnShortID string // short_id for the "view connection" link
-	// SimpleFINUsers is the household-member list for the first-time connect
-	// form's owner <select>. Reuses the connect-wizard's flat user shape.
-	SimpleFINUsers []ConnectionNewUser
 
 	// Encryption-key availability (needed to store cert PEM bytes).
 	HasEncryptionKey bool

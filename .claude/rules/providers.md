@@ -50,13 +50,12 @@ Connection storage uses generic columns: `external_id` + `encrypted_credentials`
 
 - No SDK. Token-paste, poll-only protocol (`internal/provider/simplefin/`). Full details in `docs/simplefin-integration.md`.
 - **Connect = claim.** `ExchangeToken` receives the pasted base64 *setup token*, decodes it to a one-time claim URL, `POST`s for the **access URL** (`https://user:pass@host/path`), and stores the encrypted access URL as the credential. `CreateLinkSession` returns `ErrNotSupported`.
-- **Singleton, managed in Settings.** The token is pasted in **Settings → Providers → SimpleFIN** (side drawer), not the per-bank Add-connection flow. At most one active SimpleFIN connection per household: `ProvidersSaveSimpleFINHandler` creates it on first claim or **rotates the credential in place** (`GetActiveConnectionByProvider` resolves the singleton), so re-pasting can't orphan accounts. The Add-connection flow shows SimpleFIN as a non-selectable row linking out to the bridge + Settings.
 - **`external_id` is minted** (`internal/shortid`) — SimpleFIN exposes no stable upstream id and a single access URL spans many banks. Reauth keeps the row and rotates only `encrypted_credentials` (`UpdateBankConnectionCredentials`).
 - **Sign is inverted vs Plaid**: SimpleFIN positive = money in; negate uniformly (no per-account-type rule, unlike Teller).
 - **Sync**: date-range polling chunked into **≤90-day windows** (bridge cap). Cursor = last-sync RFC3339 timestamp. `ReconcilesPendingByPolling()` is true. New connections default to a **daily** `sync_interval_override_minutes` (bridge expects ≤24 req/day).
-- **Account discovery on sync.** Every sync returns the full account set in `SyncResult.Accounts`; the engine upserts it (metadata only, via `UpsertAccountMetadata` — never balances) before processing transactions, so banks linked at the bridge after connect flow in automatically. Fixed-account-set providers (Plaid, CSV) leave `SyncResult.Accounts` nil.
+- **Account discovery on sync.** One access URL spans every bank at the bridge, and that set grows as the user links more banks there. So each sync returns the connection's full current account set in `SyncResult.Accounts`; the engine upserts it (metadata only, via `UpsertAccountMetadata` — never balances) before processing transactions, so banks added at the bridge after connect appear automatically on the next sync — no reconnect needed. Fixed-account-set providers (Plaid, CSV) leave `SyncResult.Accounts` nil and the engine skips the upsert.
 - `HandleWebhook`/`CreateReauthSession` → `ErrNotSupported`; `RemoveConnection` → `nil` (no revoke endpoint). Account type defaults to `depository` (not exposed by SimpleFIN).
-- **Enablement**: connecting in Settings sets `simplefin_enabled` app_config; `SIMPLEFIN_ENABLED=false` in env hard-disables. No manual on/off toggle. Admin-page connect/relink only in v1 — no REST endpoint, not in the hosted-link allowlist.
+- **Opt-in**: gated by `SIMPLEFIN_ENABLED` env / `simplefin_enabled` app_config (no server-level credential). Admin-page connect/relink only in v1 — no REST endpoint, not in the hosted-link allowlist.
 
 ## CSV
 

@@ -82,20 +82,6 @@ WHERE id = $1;
 -- name: GetBankConnectionByExternalID :one
 SELECT * FROM bank_connections WHERE provider = $1 AND external_id = $2;
 
--- name: GetActiveConnectionByProvider :one
--- Returns the most recent non-disconnected connection for a provider plus its
--- account count and owner name. Used for singleton-style providers like
--- SimpleFIN, where one access URL (one connection) spans every bank the user
--- links at their bridge — so the settings drawer manages that single
--- connection (connect / rotate token) rather than creating one per bank.
-SELECT bc.*, u.name AS user_name,
-  (SELECT COUNT(*) FROM accounts a WHERE a.connection_id = bc.id) AS account_count
-FROM bank_connections bc
-LEFT JOIN users u ON bc.user_id = u.id
-WHERE bc.provider = $1 AND bc.status != 'disconnected'
-ORDER BY bc.created_at DESC
-LIMIT 1;
-
 -- name: CountConnectionsNeedingAttention :one
 SELECT COUNT(*) FROM bank_connections WHERE status IN ('error', 'pending_reauth');
 

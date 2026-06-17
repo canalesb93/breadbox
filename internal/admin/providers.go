@@ -4,11 +4,11 @@ package admin
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/app"
@@ -22,7 +22,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -77,31 +76,6 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			SyncIntervalMinutes: a.Config.SyncIntervalMinutes,
 			ProviderHealth:      providerHealth,
 		}
-
-		// SimpleFIN bridge connection status drives the drawer's connect-vs-rotate
-		// form. One access URL spans every bank, so there's at most one active
-		// SimpleFIN connection per household.
-		if conn, err := a.Queries.GetActiveConnectionByProvider(ctx, db.ProviderTypeSimplefin); err == nil {
-			props.SimpleFINConnected = true
-			props.SimpleFINInstitution = conn.InstitutionName.String
-			props.SimpleFINAccounts = conn.AccountCount
-			props.SimpleFINConnShortID = conn.ShortID
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			a.Logger.Error("look up simplefin connection", "error", err)
-		}
-
-		// Household members for the first-time connect form's owner <select>.
-		if users, err := a.Queries.ListUsers(ctx); err != nil {
-			a.Logger.Error("list users for simplefin connect form", "error", err)
-		} else {
-			for _, u := range users {
-				props.SimpleFINUsers = append(props.SimpleFINUsers, pages.ConnectionNewUser{
-					ID:   pgconv.FormatUUID(u.ID),
-					Name: u.Name,
-				})
-			}
-		}
-
 		renderProviders(w, r, sm, tr, data, props)
 	}
 }
@@ -366,115 +340,39 @@ func readTellerCertFiles(r *http.Request) (certPEM, keyPEM []byte, err error) {
 }
 
 // ProvidersSaveSimpleFINHandler serves POST /admin/settings/providers/simplefin.
-//
-// SimpleFIN has no server-level credential: the user pastes a one-time setup
-// token, which is claimed for a long-lived access URL spanning every bank they
-// linked at their bridge. This handler claims that token and either creates the
-// household's single SimpleFIN bridge connection (first time) or rotates the
-// stored credential on the existing one (token refresh / reconnect). Banks the
-// user later adds at the bridge flow in automatically on the next sync — no new
-// token needed — because the sync engine re-discovers the account set.
+// SimpleFIN has no server-level credential, so this only toggles whether the
+// provider is offered at connect time.
 func ProvidersSaveSimpleFINHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("SIMPLEFIN_ENABLED")), "false") {
-			FlashRedirect(w, r, sm, "error", "SimpleFIN is disabled via the SIMPLEFIN_ENABLED environment variable.", "/settings/providers")
+		if os.Getenv("SIMPLEFIN_ENABLED") != "" {
+			FlashRedirect(w, r, sm, "error", "SimpleFIN is configured via environment variables and cannot be changed here.", "/settings/providers")
 			return
 		}
 
-		token := strings.TrimSpace(r.FormValue("simplefin_token"))
-		if token == "" {
-			FlashRedirect(w, r, sm, "error", "Paste a SimpleFIN setup token to connect.", "/settings/providers")
+		val := strings.ToLower(strings.TrimSpace(r.FormValue("simplefin_enabled")))
+		enabled := val == "on" || val == "true" || val == "1" || val == "yes"
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "simplefin_enabled",
+			Value: pgconv.Text(strconv.FormatBool(enabled)),
+		}); err != nil {
+			a.Logger.Error("save simplefin config", "error", err)
+			FlashRedirect(w, r, sm, "error", "Failed to save SimpleFIN setting.", "/settings/providers")
 			return
 		}
 
-		// Ensure the provider is initialized so we can claim. SimpleFIN needs no
-		// server credential beyond the encryption key, so the first connect
-		// bootstraps the enabled flag + provider instance before claiming.
-		if a.Providers["simplefin"] == nil {
-			if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-				Key:   "simplefin_enabled",
-				Value: pgconv.Text("true"),
-			}); err != nil {
-				a.Logger.Error("enable simplefin", "error", err)
-				FlashRedirect(w, r, sm, "error", "Failed to enable SimpleFIN.", "/settings/providers")
-				return
-			}
-			a.Config.SimpleFINEnabled = true
-			a.Config.ConfigSources["simplefin_enabled"] = "db"
-			if err := a.ReinitProvider("simplefin"); err != nil {
-				a.Logger.Error("reinit simplefin provider", "error", err)
-			}
+		a.Config.SimpleFINEnabled = enabled
+		a.Config.ConfigSources["simplefin_enabled"] = "db"
+		if err := a.ReinitProvider("simplefin"); err != nil {
+			a.Logger.Error("reinit simplefin provider", "error", err)
 		}
 
-		prov, ok := a.Providers["simplefin"]
-		if !ok {
-			FlashRedirect(w, r, sm, "error", "SimpleFIN provider unavailable — check that ENCRYPTION_KEY is set.", "/settings/providers")
-			return
+		msg := "SimpleFIN disabled."
+		if enabled {
+			msg = "SimpleFIN enabled. It's now available when adding a connection."
 		}
-
-		// Claim the token → access URL (+ account discovery). Setup tokens are
-		// single-use, so a stale or already-claimed token fails here.
-		conn, accounts, err := prov.ExchangeToken(ctx, token)
-		if err != nil {
-			a.Logger.Error("simplefin claim token", "error", err)
-			FlashRedirect(w, r, sm, "error", "Couldn't claim that setup token: "+err.Error(), "/settings/providers")
-			return
-		}
-
-		// Rotate in place when a bridge connection already exists (singleton —
-		// one access URL spans every bank, so there's never more than one).
-		existing, err := a.Queries.GetActiveConnectionByProvider(ctx, db.ProviderTypeSimplefin)
-		switch {
-		case err == nil:
-			if err := a.Queries.UpdateBankConnectionCredentials(ctx, db.UpdateBankConnectionCredentialsParams{
-				ID:                   existing.ID,
-				EncryptedCredentials: conn.EncryptedCredentials,
-			}); err != nil {
-				a.Logger.Error("simplefin rotate credentials", "error", err)
-				FlashRedirect(w, r, sm, "error", "Failed to update the SimpleFIN token.", "/settings/providers")
-				return
-			}
-			FlashRedirect(w, r, sm, "success", "SimpleFIN token updated. Banks at your bridge sync on the next run.", "/settings/providers")
-			return
-		case !errors.Is(err, pgx.ErrNoRows):
-			a.Logger.Error("look up simplefin connection", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to read SimpleFIN connection state.", "/settings/providers")
-			return
-		}
-
-		// First time: create the household's single bridge connection. user_id is
-		// nullable — an unset owner means a household-level (unattributed) bridge.
-		var userID pgtype.UUID
-		if uid := strings.TrimSpace(r.FormValue("user_id")); uid != "" {
-			if err := userID.Scan(uid); err != nil {
-				FlashRedirect(w, r, sm, "error", "Invalid household member.", "/settings/providers")
-				return
-			}
-		}
-
-		result, err := a.Service.RegisterNewConnection(ctx, service.RegisterNewConnectionParams{
-			UserID:          userID,
-			Provider:        "simplefin",
-			InstitutionID:   "simplefin",
-			InstitutionName: conn.InstitutionName,
-			Conn:            conn,
-			Accounts:        accounts,
-		})
-		if err != nil {
-			a.Logger.Error("register simplefin connection", "error", err)
-			FlashRedirect(w, r, sm, "error", "Failed to save the SimpleFIN connection.", "/settings/providers")
-			return
-		}
-
-		// SimpleFIN's bridge expects ≤24 requests/day, so put the connection on a
-		// shared daily schedule rather than the household default.
-		if err := a.Service.AssignConnectionToManagedSchedule(ctx, pgconv.FormatUUID(result.ID), simplefinScheduleName, simplefinScheduleCron); err != nil {
-			a.Logger.Warn("assign simplefin daily schedule", "error", err, "connection_id", pgconv.FormatUUID(result.ID))
-		}
-
-		FlashRedirect(w, r, sm, "success", fmt.Sprintf("SimpleFIN connected — %d account(s) discovered.", len(accounts)), "/settings/providers")
+		FlashRedirect(w, r, sm, "success", msg, "/settings/providers")
 	}
 }
 
