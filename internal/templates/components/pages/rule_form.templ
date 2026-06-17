@@ -193,7 +193,15 @@ templ RuleForm(p RuleFormProps) {
 										<option value="user_name">Family member</option>
 										<option value="provider">Provider</option>
 									</optgroup>
+									<optgroup label="Metadata">
+										<option value="metadata">Metadata field</option>
+									</optgroup>
 								</select>
+								<!-- Metadata key — only for the metadata field. The dotted
+								     field metadata.<key> is assembled at submit time. Fixed width
+								     + shrink-0 (matching the numeric/bool controls) so it doesn't
+								     eat the row; flex-wrap drops operator+value to row 2 on mobile. -->
+								<input type="text" x-model="cond.key" x-show="cond.field === 'metadata'" @input="syncToJson()" class="input input-xs bg-base-100 w-32 shrink-0" placeholder="key"/>
 								<!-- Flex-wrap break: on mobile, forces Operator + value + remove
 								     onto a second row so Field can use the full width. Hidden on
 								     sm+ so the row stays single-line at larger widths.
@@ -204,7 +212,7 @@ templ RuleForm(p RuleFormProps) {
 								     rendered inline (not x-for) so x-model syncs correctly on
 								     first paint when editing an existing rule. Each option value
 								     appears exactly once; labels shift per fieldType via x-text. -->
-								<select x-model="cond.op" @change="syncToJson()" :disabled="!cond.field" class="select select-xs bg-base-100 w-28 shrink-0 disabled:bg-base-200 disabled:opacity-70">
+								<select x-model="cond.op" @change="syncToJson()" :disabled="!cond.field" x-show="fieldType(cond.field) !== 'metadata'" class="select select-xs bg-base-100 w-28 shrink-0 disabled:bg-base-200 disabled:opacity-70">
 									<option value="" x-show="!cond.field">Operator...</option>
 									<option value="contains" x-show="cond.field && (fieldType(cond.field) === 'string' || fieldType(cond.field) === 'tags')" x-text="fieldType(cond.field) === 'tags' ? 'has' : 'contains'"></option>
 									<option value="not_contains" x-show="cond.field && (fieldType(cond.field) === 'string' || fieldType(cond.field) === 'tags')" x-text="fieldType(cond.field) === 'tags' ? 'does not have' : 'not contains'"></option>
@@ -216,6 +224,22 @@ templ RuleForm(p RuleFormProps) {
 									<option value="lte" x-show="cond.field && fieldType(cond.field) === 'numeric'">≤</option>
 									<option value="gt" x-show="cond.field && fieldType(cond.field) === 'numeric'">&gt;</option>
 									<option value="lt" x-show="cond.field && fieldType(cond.field) === 'numeric'">&lt;</option>
+								</select>
+								<!-- Metadata operator — own select (the inline-option select above
+								     can't cleanly host the exists/not_exists presence ops). -->
+								<select x-model="cond.op" x-show="cond.field === 'metadata'" @change="syncToJson()" class="select select-xs bg-base-100 w-28 shrink-0">
+									<option value="eq">equals</option>
+									<option value="neq">not equals</option>
+									<option value="contains">contains</option>
+									<option value="not_contains">not contains</option>
+									<option value="matches">regex</option>
+									<option value="in">in list</option>
+									<option value="gt">&gt;</option>
+									<option value="gte">≥</option>
+									<option value="lt">&lt;</option>
+									<option value="lte">≤</option>
+									<option value="exists">exists</option>
+									<option value="not_exists">does not exist</option>
 								</select>
 								<!-- Value — disabled placeholder when no field picked -->
 								<input type="text" disabled x-show="!cond.field" class="input input-xs bg-base-200 opacity-70 flex-1 min-w-0" placeholder="value..."/>
@@ -241,6 +265,9 @@ templ RuleForm(p RuleFormProps) {
 								</select>
 								<input type="text" x-model="cond.value" x-show="cond.field && fieldType(cond.field) === 'string' && !(cond.field === 'category' && (cond.op === 'eq' || cond.op === 'neq'))" @input="syncToJson()" class="input input-xs bg-base-100 flex-1 min-w-0" placeholder="value..."/>
 								<input type="text" x-model="cond.value" x-show="cond.field && fieldType(cond.field) === 'tags'" list="bb-tag-slugs" @input="syncToJson()" class="input input-xs bg-base-100 flex-1 min-w-0" :placeholder="cond.op === 'in' ? 'slug1, slug2, ...' : 'tag-slug'"/>
+								<!-- Metadata value — free text; hidden for presence ops
+								     (exists / does not exist), which need no value. -->
+								<input type="text" x-model="cond.value" x-show="cond.field === 'metadata' && cond.op !== 'exists' && cond.op !== 'not_exists'" @input="syncToJson()" class="input input-xs bg-base-100 flex-1 min-w-0" :placeholder="cond.op === 'in' ? 'value1, value2, ...' : 'value...'"/>
 								<!-- Remove -->
 								<button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" @click="removeCondition(idx)" :title="form.conditions.length === 1 ? 'Remove (rule will match all transactions)' : 'Remove'">
 									@components.LucideIcon("x", "w-3.5 h-3.5 text-base-content opacity-40")
@@ -286,6 +313,8 @@ templ RuleForm(p RuleFormProps) {
 									<option value="tag" :disabled="action.field !== 'tag'        && isActionUsed('tag')">Add tag</option>
 									<option value="tag_remove" :disabled="action.field !== 'tag_remove' && isActionUsed('tag_remove')">Remove tag</option>
 									<option value="comment" :disabled="action.field !== 'comment'    && isActionUsed('comment')">Add comment</option>
+									<option value="metadata_set">Set metadata</option>
+									<option value="metadata_remove">Remove metadata</option>
 								</select>
 								<!-- Remove — pinned to the right of the Action select on mobile,
 								     moves to the far right of the row on sm+. Rendered here (not at
@@ -333,6 +362,34 @@ templ RuleForm(p RuleFormProps) {
 									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
 										<textarea x-model="action.value" rows="2" class="textarea textarea-xs bg-base-100 w-full text-xs" placeholder="Comment to attach to matching transactions..."></textarea>
 										<p class="text-[0.65rem] text-base-content/40 mt-1">Plain text. The comment is attributed to this rule.</p>
+									</div>
+								</template>
+								<!-- Value: set metadata (key + typed value) -->
+								<template x-if="action.field === 'metadata_set'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
+										<div class="flex flex-wrap items-center gap-2">
+											<input type="text" x-model="action.key" class="input input-xs bg-base-100 w-full sm:w-40 mt-px" placeholder="key (e.g. tax_deductible)"/>
+											<select x-model="action.valueType" @change="onMetadataValueTypeChange(idx)" class="select select-xs bg-base-100 w-full sm:w-24 mt-px">
+												<option value="text">text</option>
+												<option value="number">number</option>
+												<option value="boolean">true/false</option>
+											</select>
+											<input type="text" x-model="action.value" x-show="action.valueType === 'text'" class="input input-xs bg-base-100 w-full sm:flex-1 sm:min-w-0 mt-px" placeholder="value"/>
+											<input type="number" step="any" x-model="action.value" x-show="action.valueType === 'number'" class="input input-xs bg-base-100 w-full sm:flex-1 sm:min-w-0 mt-px" placeholder="0"/>
+											<select x-model="action.value" x-show="action.valueType === 'boolean'" class="select select-xs bg-base-100 w-full sm:w-24 mt-px">
+												<option value="true">true</option>
+												<option value="false">false</option>
+											</select>
+										</div>
+										<p x-show="action.error" x-cloak class="text-[0.65rem] text-error mt-1" x-text="action.error"></p>
+										<p x-show="!action.error" class="text-[0.65rem] text-base-content/40 mt-1">Upserts one metadata key (value stored with the chosen type). Other keys are untouched.</p>
+									</div>
+								</template>
+								<!-- Value: remove metadata (key only) -->
+								<template x-if="action.field === 'metadata_remove'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
+										<input type="text" x-model="action.key" class="input input-xs bg-base-100 w-full mt-px" placeholder="key to remove"/>
+										<p class="text-[0.65rem] text-base-content/40 mt-1">Deletes one metadata key from matching transactions.</p>
 									</div>
 								</template>
 							</div>

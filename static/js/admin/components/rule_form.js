@@ -22,8 +22,17 @@ document.addEventListener('alpine:init', function () {
       account_id: 'string', account_name: 'string',
       user_id: 'string', user_name: 'string',
       tags: 'tags',
+      // "metadata" is the visual-builder field for a metadata.<key> leaf. The
+      // dotted field is assembled at submit time from cond.field + cond.key.
+      metadata: 'metadata',
     };
-    var defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq', tags: 'contains' };
+    var defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq', tags: 'contains', metadata: 'eq' };
+
+    // metadataFieldPrefix mirrors service.metadataFieldPrefix. A leaf with
+    // field "metadata.<key>" reads that key from the transaction's metadata blob.
+    var metadataFieldPrefix = 'metadata.';
+    // Operators that take no value (presence test) — the value input is hidden.
+    var metadataPresenceOps = { exists: true, not_exists: true };
     // Operator option sets keyed by fieldType. Kept as labels (not HTML glyphs)
     // because the visual builder renders via x-text now.
     var operatorOptionsByType = {
@@ -52,24 +61,43 @@ document.addEventListener('alpine:init', function () {
         { value: 'not_contains', label: 'does not have' },
         { value: 'in',           label: 'has any of' },
       ],
+      metadata: [
+        { value: 'eq',           label: 'equals' },
+        { value: 'neq',          label: 'not equals' },
+        { value: 'contains',     label: 'contains' },
+        { value: 'not_contains', label: 'not contains' },
+        { value: 'matches',      label: 'regex' },
+        { value: 'in',           label: 'in list' },
+        { value: 'gt',           label: '>' },
+        { value: 'gte',          label: '≥' },
+        { value: 'lt',           label: '<' },
+        { value: 'lte',          label: '≤' },
+        { value: 'exists',       label: 'exists' },
+        { value: 'not_exists',   label: 'does not exist' },
+      ],
     };
     // The initial condition row renders empty so the user must pick a field
     // explicitly — the operator + value inputs then snap to sensible defaults
     // via onFieldChange().
-    function emptyCondition() { return { field: '', op: '', value: '' }; }
+    // `key` carries the metadata key for a metadata.<key> leaf (unused by every
+    // other field type).
+    function emptyCondition() { return { field: '', op: '', value: '', key: '' }; }
     // New action rows start as unpicked drafts so "Action..." is the default
-    // and the value input stays disabled until a type is chosen.
-    function emptyAction() { return { field: '', value: '', error: '' }; }
+    // and the value input stays disabled until a type is chosen. `key` /
+    // `valueType` are only used by the metadata actions.
+    function emptyAction() { return { field: '', value: '', key: '', valueType: 'text', error: '' }; }
 
     // Action type registry — first-class typed actions match the API's
     // supported action.type values (set_category | add_tag | remove_tag |
-    // add_comment). The internal "field" name is a UI alias; we map back
-    // at submit time.
+    // add_comment | set_metadata | remove_metadata). The internal "field" name
+    // is a UI alias; we map back at submit time.
     var actionTypes = [
-      { value: 'category',   label: 'Set category' },
-      { value: 'tag',        label: 'Add tag' },
-      { value: 'tag_remove', label: 'Remove tag' },
-      { value: 'comment',    label: 'Add comment' },
+      { value: 'category',         label: 'Set category' },
+      { value: 'tag',             label: 'Add tag' },
+      { value: 'tag_remove',      label: 'Remove tag' },
+      { value: 'comment',         label: 'Add comment' },
+      { value: 'metadata_set',    label: 'Set metadata' },
+      { value: 'metadata_remove', label: 'Remove metadata' },
     ];
 
     // Tag slug regex must match the server-side validator in
@@ -90,8 +118,36 @@ document.addEventListener('alpine:init', function () {
       if (a.type === 'add_comment') {
         return { field: 'comment', value: a.content || '', error: '' };
       }
+      if (a.type === 'set_metadata') {
+        // Recover the value's type so the editor renders the right control and
+        // re-submits the same JSON type.
+        var vt = 'text', val = a.metadata_value;
+        if (typeof val === 'boolean') { vt = 'boolean'; val = val ? 'true' : 'false'; }
+        else if (typeof val === 'number') { vt = 'number'; val = String(val); }
+        else if (val == null) { val = ''; }
+        else if (typeof val !== 'string') { val = JSON.stringify(val); }
+        return { field: 'metadata_set', key: a.metadata_key || '', value: String(val), valueType: vt, error: '' };
+      }
+      if (a.type === 'remove_metadata') {
+        return { field: 'metadata_remove', key: a.metadata_key || '', value: '', valueType: 'text', error: '' };
+      }
       // Tolerate unknown types so the form still loads — validation happens at submit.
       return { field: a.type || a.field || '', value: a.category_slug || a.tag_slug || a.content || a.value || '', error: '' };
+    }
+
+    // loadCondition maps a stored condition leaf into the visual-builder shape,
+    // splitting a "metadata.<key>" field back into field="metadata" + key. Array
+    // values (the `in` operator) render as a comma-joined string.
+    function loadCondition(sub) {
+      var field = sub.field || '';
+      var key = '';
+      if (field.indexOf(metadataFieldPrefix) === 0) {
+        key = field.slice(metadataFieldPrefix.length);
+        field = 'metadata';
+      }
+      var value = sub.value;
+      if (Array.isArray(value)) value = value.join(', ');
+      return { field: field, op: sub.op || 'contains', value: String(value == null ? '' : value), key: key };
     }
 
     // Initialize form from existing rule or defaults
@@ -113,13 +169,13 @@ document.addEventListener('alpine:init', function () {
       var conditions = [], logic = 'and';
       var c = existingRule.conditions;
       if (c && c.and) {
-        conditions = c.and.map(function (sub) { return { field: sub.field || '', op: sub.op || 'contains', value: String(sub.value == null ? '' : sub.value) }; });
+        conditions = c.and.map(loadCondition);
         logic = 'and';
       } else if (c && c.or) {
-        conditions = c.or.map(function (sub) { return { field: sub.field || '', op: sub.op || 'contains', value: String(sub.value == null ? '' : sub.value) }; });
+        conditions = c.or.map(loadCondition);
         logic = 'or';
       } else if (c && c.field) {
-        conditions = [{ field: c.field, op: c.op || 'contains', value: String(c.value == null ? '' : c.value) }];
+        conditions = [loadCondition(c)];
       }
       // else: NULL or empty {} → conditions stays [] (match-all)
 
@@ -229,6 +285,9 @@ document.addEventListener('alpine:init', function () {
         else cond.op = defaultOps[this.fieldType(cond.field)] || 'contains';
         if (this.fieldType(cond.field) === 'bool') cond.value = 'true';
         else cond.value = '';
+        // Reset the metadata key when leaving/entering the metadata field so a
+        // stale key doesn't ride along on a non-metadata leaf.
+        if (cond.field !== 'metadata') cond.key = '';
         this.syncToJson();
       },
       addCondition: function () {
@@ -265,8 +324,18 @@ document.addEventListener('alpine:init', function () {
         this.form.actions.splice(idx, 1);
       },
       onActionTypeChange: function (idx) {
-        this.form.actions[idx].value = '';
-        this.form.actions[idx].error = '';
+        var a = this.form.actions[idx];
+        a.value = '';
+        a.error = '';
+        a.key = '';
+        a.valueType = 'text';
+      },
+      // When the metadata value-type switches, reset the value so a stale
+      // string doesn't carry into a boolean/number control.
+      onMetadataValueTypeChange: function (idx) {
+        var a = this.form.actions[idx];
+        a.value = a.valueType === 'boolean' ? 'true' : '';
+        a.error = '';
       },
       // Validate tag slug inline so the error renders before submit
       validateTagSlug: function (idx) {
@@ -291,6 +360,15 @@ document.addEventListener('alpine:init', function () {
             }
           }
         }
+        var setMeta = this.form.actions.filter(function (a) { return a.field === 'metadata_set' && a.key; });
+        var rmMeta = this.form.actions.filter(function (a) { return a.field === 'metadata_remove' && a.key; });
+        for (var m = 0; m < setMeta.length; m++) {
+          for (var n = 0; n < rmMeta.length; n++) {
+            if (setMeta[m].key.trim() === rmMeta[n].key.trim()) {
+              warnings.push('Metadata key "' + setMeta[m].key.trim() + '" is being set and removed — these cancel out.');
+            }
+          }
+        }
         return warnings;
       },
 
@@ -304,12 +382,12 @@ document.addEventListener('alpine:init', function () {
           var parsed = JSON.parse(this.form.conditions_json);
           if (parsed.and) {
             this.form.logic = 'and';
-            this.form.conditions = parsed.and.map(function (sub) { return { field: sub.field || '', op: sub.op || 'contains', value: String(sub.value == null ? '' : sub.value) }; });
+            this.form.conditions = parsed.and.map(loadCondition);
           } else if (parsed.or) {
             this.form.logic = 'or';
-            this.form.conditions = parsed.or.map(function (sub) { return { field: sub.field || '', op: sub.op || 'contains', value: String(sub.value == null ? '' : sub.value) }; });
+            this.form.conditions = parsed.or.map(loadCondition);
           } else if (parsed.field) {
-            this.form.conditions = [{ field: parsed.field, op: parsed.op || 'contains', value: String(parsed.value == null ? '' : parsed.value) }];
+            this.form.conditions = [loadCondition(parsed)];
           }
         } catch (e) { /* let them type freely */ }
       },
@@ -319,11 +397,32 @@ document.addEventListener('alpine:init', function () {
       // body sends `conditions: null` and the server stores NULL.
       buildConditionsJSON: function () {
         var self = this;
-        var conds = this.form.conditions.filter(function (c) { return c.field && c.value !== ''; });
+        var conds = this.form.conditions.filter(function (c) {
+          if (!c.field) return false;
+          if (self.fieldType(c.field) === 'metadata') {
+            // A metadata leaf needs a key; presence ops (exists/not_exists)
+            // need no value, every other op does.
+            if (!c.key || !c.key.trim()) return false;
+            if (metadataPresenceOps[c.op]) return true;
+            return c.value !== '';
+          }
+          return c.value !== '';
+        });
         if (conds.length === 0) return null;
         var mapped = conds.map(function (c) {
           var val = c.value;
           var type = self.fieldType(c.field);
+          if (type === 'metadata') {
+            // Assemble the dotted field; presence ops drop the value entirely.
+            // `in` collects a comma-separated list into an array. Other ops keep
+            // the value as a string — the server's metadata eval coerces by
+            // operator (numeric ops parse it; eq/neq stringify-compare).
+            var field = metadataFieldPrefix + c.key.trim();
+            if (metadataPresenceOps[c.op]) return { field: field, op: c.op };
+            var mval = val;
+            if (c.op === 'in') mval = String(val).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+            return { field: field, op: c.op, value: mval };
+          }
           if (type === 'numeric') val = parseFloat(val) || 0;
           else if (type === 'bool') val = val === 'true';
           else if (type === 'tags' && c.op === 'in') {
@@ -368,6 +467,12 @@ document.addEventListener('alpine:init', function () {
             a.error = 'Lowercase letters, numbers, hyphens, or colons (e.g. needs-review)';
             actionError = actionError || 'Fix the tag slug before saving.';
           }
+          // A number-typed metadata value must parse — otherwise it would be
+          // silently stored as a string, contradicting the chosen type.
+          if (a.field === 'metadata_set' && a.valueType === 'number' && a.value !== '' && isNaN(parseFloat(a.value))) {
+            a.error = 'Enter a number, or switch the type to Text.';
+            actionError = actionError || 'Fix the numeric metadata value before saving.';
+          }
         });
         if (actionError) {
           this.formError = actionError;
@@ -377,13 +482,28 @@ document.addEventListener('alpine:init', function () {
         }
 
         // Build typed actions array for the API. Drop incomplete drafts.
+        // Metadata actions are kept on a non-empty key (remove_metadata needs no
+        // value; set_metadata may legitimately store an empty string).
         var actions = this.form.actions
-          .filter(function (a) { return a.field && (a.value !== undefined && a.value !== ''); })
+          .filter(function (a) {
+            if (!a.field) return false;
+            if (a.field === 'metadata_set' || a.field === 'metadata_remove') return !!(a.key && a.key.trim());
+            return a.value !== undefined && a.value !== '';
+          })
           .map(function (a) {
             if (a.field === 'category') return { type: 'set_category', category_slug: a.value };
             if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
             if (a.field === 'tag_remove') return { type: 'remove_tag', tag_slug: a.value };
             if (a.field === 'comment') return { type: 'add_comment', content: a.value };
+            if (a.field === 'metadata_set') {
+              // Coerce the value to its declared JSON type so the stored blob is
+              // typed (boolean true, number 100) rather than always a string.
+              var v = a.value;
+              if (a.valueType === 'number') { var n = parseFloat(a.value); v = isNaN(n) ? a.value : n; }
+              else if (a.valueType === 'boolean') { v = a.value === 'true'; }
+              return { type: 'set_metadata', metadata_key: a.key.trim(), metadata_value: v };
+            }
+            if (a.field === 'metadata_remove') return { type: 'remove_metadata', metadata_key: a.key.trim() };
             return { type: a.field, category_slug: a.value };
           });
         if (actions.length === 0) {
