@@ -43,11 +43,12 @@ func (p *SimpleFINProvider) SyncTransactions(ctx context.Context, conn provider.
 	}
 
 	var allTxns []provider.Transaction
-	// Accumulate the account set across windows, deduped by external id. Every
-	// window re-returns the full account list, so we keep the first sighting of
-	// each account; the engine upserts these (metadata only) so banks the user
-	// adds at the bridge after connect are discovered on the next sync.
-	seenAccounts := make(map[string]struct{})
+	// The bridge returns its full account set on every window (the date range
+	// only bounds the nested transactions, not which accounts are listed), so
+	// capture it once rather than re-collecting and de-duping per window. The
+	// sync engine is the single dedup authority across results, and it upserts
+	// these (metadata only) so banks the user links at the bridge after connect
+	// are discovered on the next sync.
 	var accounts []provider.Account
 	for _, w := range windows(fromDate, now, maxWindowDays) {
 		txns, accts, err := p.fetchWindow(ctx, accessURL, w.start, w.end)
@@ -55,15 +56,8 @@ func (p *SimpleFINProvider) SyncTransactions(ctx context.Context, conn provider.
 			return provider.SyncResult{}, err
 		}
 		allTxns = append(allTxns, txns...)
-		for _, a := range accts {
-			if a.ExternalID == "" {
-				continue
-			}
-			if _, ok := seenAccounts[a.ExternalID]; ok {
-				continue
-			}
-			seenAccounts[a.ExternalID] = struct{}{}
-			accounts = append(accounts, a)
+		if accounts == nil && len(accts) > 0 {
+			accounts = accts
 		}
 	}
 

@@ -225,8 +225,10 @@ func TestSyncTransactions_ReturnsDiscoveredAccounts(t *testing.T) {
 	enc, _ := crypto.Encrypt([]byte(fb.accessURL()), testKey)
 	conn := provider.Connection{ProviderName: "simplefin", EncryptedCredentials: enc}
 
-	// Empty cursor → multi-window backfill; accounts must be deduped across the
-	// windows (every window re-returns the full account list).
+	// Empty cursor → multi-window backfill. Every window re-returns the full
+	// account list, but SyncTransactions captures it once (the engine is the
+	// dedup authority), so the result carries each account exactly once — not
+	// one copy per window.
 	res, err := p.SyncTransactions(context.Background(), conn, "")
 	if err != nil {
 		t.Fatalf("SyncTransactions: %v", err)
@@ -235,7 +237,7 @@ func TestSyncTransactions_ReturnsDiscoveredAccounts(t *testing.T) {
 		t.Fatalf("expected multiple windows for a backfill, got %d hits", fb.accountsHits)
 	}
 	if len(res.Accounts) != 2 {
-		t.Fatalf("accounts = %d, want 2 (deduped across %d windows)", len(res.Accounts), fb.accountsHits)
+		t.Fatalf("accounts = %d, want 2 (captured once across %d windows)", len(res.Accounts), fb.accountsHits)
 	}
 	byID := map[string]provider.Account{}
 	for _, a := range res.Accounts {
