@@ -2,6 +2,8 @@
 
 Canonical spec for the transaction rule DSL — the condition tree, action types, and trigger semantics used by both humans (admin UI) and agents (MCP). This is the source of truth; tool descriptions, admin form help, and tests should all agree with it.
 
+> **Governing doctrine.** Rules are breadbox's single deterministic enrichment layer. The *why* — provider data is immutable, intelligence accrues as rules, and rules must match raw immutable fields to stay drift-proof — lives in the **"Operating Model — the reconciliation flywheel"** section of the root `CLAUDE.md` (read first), with the full design + rollout in Obsidian `planned-features/rules-as-universal-substrate.md` and `rules-substrate-implementation-roadmap.md`.
+
 ## At a glance
 
 A rule is a JSON document with four parts:
@@ -78,6 +80,39 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 > **Raw vs assigned category.** `provider_category_primary` / `provider_category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
 
 > **Series membership timing.** `series` / `in_series` reflect a transaction's *current* `series_id`. A brand-new transaction has no series until the post-sync detector links it, so these fields are `""` / `false` on the create pass — they're most useful for re-synced/changed rows and for **retroactive apply** over historical data (e.g. tag everything already in a series, or exclude series members from a catch-all rule). They are the read-half companion to the `assign_series` action (the write-half). A rule **matches** on series membership but cannot **discover** a series — detection is an aggregate decision the detector owns; see `docs/data-model.md` and the recurring-series design notes.
+
+### Match-stability contract — what to condition on
+
+This is the **authoritative** stability classification of every matchable field. It is the doctrinal heart of the rules-as-substrate model (see the **Governing doctrine** note at the top of this doc): a rule is durable only when it matches the parts of a transaction that *don't move*. Every field below is tagged by how stable its value is across renames, re-syncs, and prior-stage rule writes.
+
+The classes:
+
+- **raw-immutable** — verbatim provider data. Breadbox never rewrites it; it changes only if the provider re-reports the transaction. A condition on it means the same thing on the create pass, on every re-sync, and on retroactive apply. **This is the substrate. Author here.**
+- **stable-surrogate** — a Breadbox-assigned `id` (UUID) that is stable for the life of the entity. Not provider data, but it doesn't drift when a user renames the entity, so it's a safe primary match. **Also safe.**
+- **mutable-display** — a human-facing label or a value a prior rule / the user / an agent can change. It silently *breaks* when someone renames the thing (`account_name`, `user_name`), or its truth *depends on pipeline order* (`category`, `tags`, `series`, `in_series` — set by earlier-stage rules in the same pass). **Avoid as a primary match condition.**
+
+| Field                          | Type     | Class                | Why                                                                                       |
+| ------------------------------ | -------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| `provider_name`                | string   | **raw-immutable**    | Provider's raw transaction name (`TransactionContext.Name`)                               |
+| `provider_merchant_name`       | string   | **raw-immutable**    | Provider's raw merchant string (`MerchantName`); may be empty                             |
+| `amount`                       | numeric  | **raw-immutable**    | Provider-reported amount                                                                   |
+| `pending`                      | bool     | **raw-immutable**    | Provider-reported pending flag                                                             |
+| `provider`                     | string   | **raw-immutable**    | Source system (`plaid`, `teller`, `simplefin`, `csv`)                                      |
+| `provider_category_primary`    | string   | **raw-immutable**    | Provider's primary category classification — never rewritten by Breadbox                   |
+| `provider_category_detailed`   | string   | **raw-immutable**    | Provider's detailed category classification — never rewritten by Breadbox                  |
+| `account_id`                   | string   | **stable-surrogate** | Account UUID — stable across account renames                                              |
+| `user_id`                      | string   | **stable-surrogate** | Family-member UUID — stable across member renames                                         |
+| `account_name`                 | string   | **mutable-display**  | Display name; **breaks silently** when the account is renamed                             |
+| `user_name`                    | string   | **mutable-display**  | Display name; **breaks silently** when the member is renamed                              |
+| `category`                     | string   | **mutable-display**  | *Assigned* slug; mutates mid-pass as earlier `set_category` rules fire (pipeline-ordered)  |
+| `tags`                         | tags     | **mutable-display**  | Current tag slugs; mutate mid-pass as earlier `add_tag`/`remove_tag` rules fire            |
+| `series`                       | string   | **mutable-display**  | Current series `short_id`; set by `assign_series` (a rule write), empty until then         |
+| `in_series`                    | bool     | **mutable-display**  | Whether a series link exists; same pipeline/timing caveat as `series`                      |
+| `metadata.<key>`               | metadata | **mutable-display**  | Free-form blob a user / agent / rule writes; no stability guarantee                        |
+
+> **The contract.** *Author conditions on **raw-immutable** + **stable-surrogate** fields.* These are the immutable provider substrate (and stable surrogates of it) the whole model rests on — a rule built on them resolves identically on the create pass, on every future re-sync, and on retroactive apply over history.
+>
+> **Mutable-display fields silently break or depend on pipeline order — avoid them as primary match conditions.** A rule keyed on `account_name` stops matching the moment the user renames that account (the surrogate `account_id` would not). A rule keyed on `category`, `tags`, `series`, or `in_series` is reacting to *another rule's output within the same pass*, so whether it matches depends entirely on rule priority ordering — that's **chaining**, a deliberate composition tool (see [Rule chaining](#rule-chaining-tags--category)), not a stable predicate on the transaction itself. Use them when you *intend* to react to a prior stage's result; never as the load-bearing condition that decides whether the rule fires at all.
 
 ### Operators per field type
 

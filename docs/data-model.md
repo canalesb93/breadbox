@@ -6,6 +6,8 @@
 
 This document defines the complete PostgreSQL database schema for the Breadbox MVP. An engineer should be able to write all migration files directly from this document without consulting any other source.
 
+> **Governing doctrine.** How synced data is identified, standardized, and enriched on top of this schema is governed by the **"Operating Model — the reconciliation flywheel"** section of the root `CLAUDE.md` (provider data is immutable; intelligence accrues as rules). The full design + rollout lives in Obsidian `planned-features/rules-as-universal-substrate.md` and `rules-substrate-implementation-roadmap.md`. The matchable-field stability contract is in `docs/rule-dsl.md`.
+
 ---
 
 ## Table of Contents
