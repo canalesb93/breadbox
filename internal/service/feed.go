@@ -1469,6 +1469,10 @@ func bulkSubjectKey(a Annotation) string {
 		return "category:" + a.CategorySlug
 	case "rule_applied":
 		return "rule:" + a.RuleShortID
+	case "series_assigned", "series_unlinked":
+		return "series:" + annotationPayloadString(a, "series_id")
+	case "counterparty_assigned", "counterparty_unlinked":
+		return "counterparty:" + annotationPayloadString(a, "counterparty_id")
 	}
 	return ""
 }
@@ -1481,8 +1485,26 @@ func bulkSubjectSlug(a Annotation) string {
 		return a.CategorySlug
 	case "rule_applied":
 		return a.RuleShortID
+	case "series_assigned", "series_unlinked":
+		return annotationPayloadString(a, "series_id")
+	case "counterparty_assigned", "counterparty_unlinked":
+		return annotationPayloadString(a, "counterparty_id")
 	}
 	return ""
+}
+
+// annotationPayloadString reads a string field from an annotation's untyped
+// payload, returning "" when absent or not a string. The bulk-action subject
+// helpers use it to key membership events (series / counterparty) on their
+// short_id — the payload carries series_id / counterparty_id without a typed
+// field threaded through every call site. The subject *name* still comes from
+// the enriched Annotation.Subject.
+func annotationPayloadString(a Annotation, key string) string {
+	if a.Payload == nil {
+		return ""
+	}
+	s, _ := a.Payload[key].(string)
+	return s
 }
 
 // sampleTxFromRow projects a feed-activity row into the small FeedSampleTx
