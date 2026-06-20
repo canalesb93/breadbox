@@ -274,6 +274,36 @@ Detach a tag from a recurring series and strip the series-inherited copies from 
 
 ---
 
+## Counterparties Tools
+
+A counterparty is the canonical, cross-provider "other side" of a charge — merchants **and** non-merchants (Venmo, people, employers). It is a thin, rule-maintained entity: a surrogate identity (`id`/`short_id`) + `name` + optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). Membership comes from `assign_counterparty` rules, not a normalizer.
+
+### list_counterparties (Read)
+
+List every live counterparty with its `name` and enrichment fields. Get a counterparty's charges via `query_transactions`; get one counterparty via `get_counterparty`.
+
+### get_counterparty (Read)
+
+Get one counterparty by short ID or UUID: its `name` and enrichment fields. Its governing rules (the `assign_counterparty` rules that define its membership) are visible on the admin Counterparties detail page; its linked charges come from `query_transactions`. Also exposed as the `breadbox://counterparty/{short_id}` resource (detail + governing rules).
+
+### create_counterparty (Write)
+
+Create a new counterparty with a `name` and optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use `assign_counterparty` (one-off) or author an `assign_counterparty` **rule** (durable).
+
+### update_counterparty (Write)
+
+Enrich a counterparty: edit its `name`, `website_url`, `logo_url`, `category_id` (slug or short ID), and/or `mcc`. Every field optional — omit to leave unchanged; an empty `name` is rejected. This is the enrichment lane (no auto-fetch).
+
+### assign_counterparty (Write)
+
+Bind transactions to a counterparty, creating it if needed — a **one-off** assignment. For durable patterns, author an `assign_counterparty` **rule** so every future matching charge resolves automatically. Provide `counterparty_id` to bind to an existing counterparty, **or** `name` + `create_if_missing:true` to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass `transaction_ids` (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).
+
+### unlink_counterparty_transaction (Write)
+
+Detach `transaction_ids` (≤50, each a current member) from a counterparty — the inverse of `assign_counterparty`' link path. Clears each charge's `counterparty_id`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.
+
+---
+
 ## Transaction Rules Tools
 
 > **Full DSL specification**: see **[`docs/rule-dsl.md`](rule-dsl.md)** for the complete condition grammar, action semantics, trigger matrix, pipeline-stage (priority) ordering, sync-vs-retroactive differences, and the chaining model that lets later-stage rules observe earlier-stage rules' tag/category mutations.

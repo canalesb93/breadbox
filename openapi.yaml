@@ -95,6 +95,8 @@ tags:
     description: Scoped credentials for REST and MCP clients.
   - name: Settings
     description: Provider credentials and other app-config knobs.
+  - name: Counterparties
+    description: The canonical, cross-provider "other side" of a charge (merchants and non-merchants), with manual enrichment.
   - name: Workflows
     description: Scheduled Claude Agent SDK definitions, run history, transcripts, and prompt blocks.
   - name: Webhooks
@@ -2070,6 +2072,122 @@ paths:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # -- Counterparties --
+  /api/v1/counterparties:
+    get:
+      tags: [Counterparties]
+      summary: List counterparties
+      description: "Counterparties are the canonical, cross-provider \"other side\" of a charge — merchants AND non-merchants (Venmo, people, employers). Each is a surrogate identity (id/short_id) + name + optional enrichment. Membership comes from `assign_counterparty` rules, not a normalizer."
+      responses:
+        "200":
+          description: Counterparties.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counterparties:
+                    type: array
+                    items: { $ref: "#/components/schemas/Counterparty" }
+    post:
+      tags: [Counterparties]
+      summary: Create a counterparty
+      description: "**Requires `full_access` scope.** Creates a counterparty by `name` with optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). A duplicate live name is rejected — edit the existing one instead. To bind charges, use the assign endpoint or author an `assign_counterparty` rule."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                website_url: { type: string }
+                logo_url: { type: string }
+                category_id: { type: string, description: "Category slug or short ID/UUID." }
+                mcc: { type: string }
+      responses:
+        "200":
+          description: Created counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "409": { $ref: "#/components/responses/NotFound" }
+  /api/v1/counterparties/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Counterparties]
+      summary: Get counterparty
+      responses:
+        "200":
+          description: Counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Counterparties]
+      summary: Enrich a counterparty
+      description: "**Requires `full_access` scope.** Partial enrichment update of `name`, `website_url`, `logo_url`, `category_id` (slug or short ID/UUID), and/or `mcc` — omitted fields are unchanged. An empty body, or an empty `name`, is rejected."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                website_url: { type: string }
+                logo_url: { type: string }
+                category_id: { type: string }
+                mcc: { type: string }
+      responses:
+        "200":
+          description: Updated counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/counterparties/{id}/transactions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Counterparties]
+      summary: Link transactions to a counterparty
+      description: "**Requires `full_access` scope.** Binds transactions (max 50, NULL-fill only — never steals a charge already bound to another counterparty) to the counterparty. This is a one-off; for durable patterns author an `assign_counterparty` rule."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transaction_ids]
+              properties:
+                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
+      responses:
+        "200":
+          description: Updated counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/counterparties/{id}/transactions/{txid}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: txid, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Counterparties]
+      summary: Unlink a transaction from a counterparty
+      description: "**Requires `full_access` scope.** Detaches the transaction (which must currently be bound to this counterparty) — the inverse of the link path."
+      responses:
+        "200":
+          description: Updated counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # -- Users --
   /api/v1/users:
     get:
@@ -3362,6 +3480,21 @@ components:
         name: { type: string }
         type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`." }
         tags: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    Counterparty:
+      type: object
+      description: "The canonical, cross-provider \"other side\" of a charge (a merchant or non-merchant). Surrogate identity + name + optional enrichment; membership comes from `assign_counterparty` rules, not a normalizer."
+      properties:
+        id: { type: string }
+        short_id: { type: string }
+        name: { type: string }
+        website_url: { type: string, nullable: true }
+        logo_url: { type: string, nullable: true }
+        category_id: { type: string, nullable: true }
+        mcc: { type: string, nullable: true }
+        canonical_counterparty_id: { type: string, nullable: true, description: "Self-reference for later rollups of duplicate counterparties." }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       additionalProperties: true
