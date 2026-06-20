@@ -57,7 +57,6 @@ type TransactionResponse struct {
 	ProviderName               string                   `json:"provider_name"`
 	ProviderMerchantName       *string                  `json:"provider_merchant_name"`
 	Category                   *TransactionCategoryInfo `json:"category"`
-	CategoryOverride           string                   `json:"category_override"`
 	ProviderCategoryPrimary    *string                  `json:"provider_category_primary"`
 	ProviderCategoryDetailed   *string                  `json:"provider_category_detailed"`
 	ProviderCategoryConfidence *string                  `json:"provider_category_confidence"`
@@ -351,7 +350,6 @@ type AdminTransactionRow struct {
 	CategorySlug        *string
 	CategoryIcon        *string
 	CategoryColor       *string
-	CategoryOverride    string
 	Pending             bool
 	CommentCount        int
 	HasPendingReview    bool

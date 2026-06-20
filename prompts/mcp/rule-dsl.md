@@ -63,7 +63,7 @@ A condition is one of:
 { "type": "add_comment",  "body": "Auto-flagged by recurring-charge rule" }
 ```
 
-`set_category` only fires when `category_override = 'none'` — manually-categorized transactions are sacred.
+`set_category` writes `category_id` directly — last-writer-wins, no provenance. Rules only run on new or changed transactions, so a manual edit on an unchanged row is not continuously re-clobbered.
 
 ## Pipeline-stage priority
 

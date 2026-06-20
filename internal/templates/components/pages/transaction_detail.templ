@@ -241,7 +241,6 @@ templ txdMain(p TransactionDetailProps) {
 			class="bb-card p-4 sm:p-5 space-y-4 sm:space-y-5"
 			x-data="txdCategoryEditor"
 			data-tx-id={ p.TransactionID }
-			data-category-override={ txdCategoryOverrideAttr(p) }
 		>
 			<div>
 				<h2 class="text-sm font-semibold text-base-content/50 mb-3">Category</h2>
@@ -263,20 +262,8 @@ templ txdMain(p TransactionDetailProps) {
 						@components.LucideIcon("chevron-down", "w-4 h-4 text-base-content opacity-30")
 					</button>
 				</div>
-				<div class="flex items-center gap-2 mt-3">
-					<button
-						type="button"
-						class="btn btn-xs rounded-full gap-1.5 px-2.5"
-						:class="isOverride ? 'btn-primary btn-soft' : 'btn-ghost text-base-content/55 hover:text-base-content'"
-						:aria-pressed="isOverride ? 'true' : 'false'"
-						:title="isOverride ? 'Locked — protected from automatic rules. Click to unlock.' : 'Auto — managed by transaction rules. Click to lock.'"
-						@click="toggleOverride()"
-						:disabled="saving"
-					>
-						<i :data-lucide="isOverride ? 'lock' : 'lock-open'" class="w-3.5 h-3.5"></i>
-						<span x-text="isOverride ? 'Locked' : 'Auto'"></span>
-					</button>
-					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
+				<div class="flex items-center gap-2 mt-3" x-show="saving">
+					<span class="loading loading-spinner loading-xs"></span>
 				</div>
 			</div>
 			<!-- Tags -->
@@ -1042,17 +1029,6 @@ func txdCategoryInitial(p TransactionDetailProps) string {
 		return *p.Transaction.Category.ID
 	}
 	return ""
-}
-
-// txdCategoryOverrideAttr returns "true" / "false" for the data-category-override
-// attribute consumed by the txdCategoryEditor Alpine factory's init(). The
-// detail-page lock toggle is binary, so any non-'none' source (user or agent)
-// reads as locked.
-func txdCategoryOverrideAttr(p TransactionDetailProps) string {
-	if p.Transaction != nil && p.Transaction.CategoryOverride != "none" {
-		return "true"
-	}
-	return "false"
 }
 
 // txdLastActivityTimestamp returns the RFC3339 timestamp of the latest

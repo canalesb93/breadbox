@@ -258,7 +258,7 @@ Actions describe what a matching rule does to the transaction. An action array m
 
 Sets the transaction's assigned category. At most one `set_category` per rule.
 
-- Skipped when `category_override <> 'none'` — an agent or user already set the category. Rules are the lowest priority (user > agent > rule).
+- Writes `category_id` directly — last-writer-wins. Provenance/precedence was removed in the rules-substrate sprint (P3); rules, agents, and users all write the same field. Rules only run on new or changed transactions, so a user's manual edit on an unchanged row is not continuously re-clobbered.
 - Writes a `category_set` annotation with the rule as actor.
 
 ### `add_tag`
@@ -360,7 +360,7 @@ Clears the flag (`flagged_at = NULL`) on a matching transaction. Takes no parame
 
 ### Combining actions
 
-A rule can carry multiple actions of different types. Override (`category_override <> 'none'`) suppresses only the `set_category` part — `add_tag` and `add_comment` still fire.
+A rule can carry multiple actions of different types; they all fire together. There is no per-action suppression — `set_category` is last-writer-wins with no provenance guard.
 
 ```json
 {
@@ -382,7 +382,7 @@ Useful combinations:
 | --- | --- |
 | `set_category` alone | Straightforward reclassification (e.g. `Uber` → `Transportation > Rideshare`). |
 | `set_category` + `add_tag` | Reclassify and annotate simultaneously (e.g. `Uber` → `Transportation > Rideshare` + `recurring`). |
-| `add_tag` alone | Add a tag without touching category. Safe pairing with override-protected transactions. |
+| `add_tag` alone | Add a tag without touching category. |
 | `remove_tag` alone | Clean up a tag a prior rule or agent added (e.g. remove `needs-review` once a condition proves the transaction is benign). |
 | `add_tag` + `remove_tag` (different slugs) | Transition a transaction between tags (e.g. add `reviewed`, remove `needs-review`). |
 | `set_category` + `add_comment` | Reclassify and explain why — useful for audit trails. |
@@ -452,7 +452,7 @@ The rule engine has two entry points. They share condition evaluation and priori
 | Aspect                    | Sync (`on_create`/`on_change`/`always`) | Retroactive (`apply_rules`)                 |
 | ------------------------- | --------------------------------------- | ------------------------------------------- |
 | Trigger honored?          | Yes                                     | No — runs regardless of trigger             |
-| `set_category`            | Applied (respects override)             | Applied (respects override)                 |
+| `set_category`            | Applied (last-writer-wins)              | Applied (last-writer-wins)                  |
 | `add_tag`                 | Applied                                 | Applied                                     |
 | `remove_tag`              | Applied                                 | Applied                                     |
 | `set_metadata`            | Applied                                 | Applied                                     |

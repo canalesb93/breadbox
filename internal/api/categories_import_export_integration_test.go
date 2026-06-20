@@ -356,22 +356,22 @@ func TestImportCategories_RejectsBadParentSlug(t *testing.T) {
 	}
 }
 
-func TestImportCategories_PreservesCategoryOverride(t *testing.T) {
+func TestImportCategories_PreservesTransactionCategory(t *testing.T) {
 	env := setupTestEnv(t)
 
-	// Seed: connection + account + transaction with a category override.
+	// Seed: connection + account + transaction with a category assignment.
 	user := testutil.MustCreateUser(t, env.Queries, "Alice")
 	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "item_1")
 	acct := testutil.MustCreateAccount(t, env.Queries, conn.ID, "ext_acct_1", "Checking")
 	cat := testutil.MustCreateCategory(t, env.Queries, "groceries", "Groceries")
 	txn := testutil.MustCreateTransaction(t, env.Queries, acct.ID, "ext_txn_1", "Whole Foods", 4500, "2025-03-15")
 
-	// Pin the transaction to groceries with category_override=true.
-	if _, err := env.Queries.SetTransactionCategoryOverride(context.Background(), db.SetTransactionCategoryOverrideParams{
+	// Assign the transaction to groceries.
+	if _, err := env.Queries.SetTransactionCategory(context.Background(), db.SetTransactionCategoryParams{
 		ID:         txn.ID,
 		CategoryID: cat.ID,
 	}); err != nil {
-		t.Fatalf("set override: %v", err)
+		t.Fatalf("set category: %v", err)
 	}
 
 	// Re-import with a different display name.
@@ -385,13 +385,10 @@ func TestImportCategories_PreservesCategoryOverride(t *testing.T) {
 		t.Errorf("Updated: want 1, got %d", result.Updated)
 	}
 
-	// Verify the transaction still has its override and the same category_id.
+	// Verify the transaction still has the same category_id.
 	got, err := env.Queries.GetTransaction(context.Background(), txn.ID)
 	if err != nil {
 		t.Fatalf("get transaction: %v", err)
-	}
-	if got.CategoryOverride == "none" {
-		t.Errorf("category_override: want true, got false (import must not touch transaction overrides)")
 	}
 	if pgconv.FormatUUID(got.CategoryID) != pgconv.FormatUUID(cat.ID) {
 		t.Errorf("category_id changed by import — want %s, got %s", pgconv.FormatUUID(cat.ID), pgconv.FormatUUID(got.CategoryID))

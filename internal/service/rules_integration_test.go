@@ -879,24 +879,28 @@ func TestGetAccountLink_MatchCounts(t *testing.T) {
 
 // --- PreviewRule ---
 
-func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
-	svc, queries, pool := newService(t)
+func TestPreviewRule_IncludesPriorCategorized(t *testing.T) {
+	svc, queries, _ := newService(t)
 	ctx := context.Background()
 
 	// Setup: user, connection, account, category.
 	user := testutil.MustCreateUser(t, queries, "User")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
 	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	cat := testutil.MustCreateCategory(t, queries, "shopping", "Shopping")
 
 	// Create 3 transactions: all named "Amazon".
 	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Amazon Purchase", 1500, "2025-06-01")
 	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_2", "Amazon Prime", 1299, "2025-06-02")
 	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_3", "Amazon Fresh", 4500, "2025-06-03")
 
-	// Set category_override=TRUE on one of them (simulating a manual categorization).
-	_, err := pool.Exec(ctx, "UPDATE transactions SET category_override = 'user' WHERE id = $1", txn1.ID)
-	if err != nil {
-		t.Fatalf("set category_override: %v", err)
+	// Pre-categorize one of them. Under P3 last-writer-wins there is no
+	// override lock, so preview must NOT exclude an already-categorized row.
+	if _, err := queries.SetTransactionCategory(ctx, db.SetTransactionCategoryParams{
+		ID:         txn1.ID,
+		CategoryID: cat.ID,
+	}); err != nil {
+		t.Fatalf("set prior category: %v", err)
 	}
 
 	// Preview a rule that matches "Amazon" in name.
@@ -909,17 +913,16 @@ func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
 		t.Fatalf("PreviewRule: %v", err)
 	}
 
-	// Should only match 2 transactions (the non-overridden ones).
-	// Before the fix, this would return 3 because PreviewRule didn't filter category_override.
-	if result.MatchCount != 2 {
-		t.Errorf("match_count: got %d, want 2 (should exclude category_override=TRUE)", result.MatchCount)
+	// All 3 transactions match — the previously categorized one is included
+	// (the old override filter was removed in P3).
+	if result.MatchCount != 3 {
+		t.Errorf("match_count: got %d, want 3 (should include the prior-categorized txn)", result.MatchCount)
 	}
-	if len(result.SampleMatches) != 2 {
-		t.Errorf("sample_matches: got %d, want 2", len(result.SampleMatches))
+	if len(result.SampleMatches) != 3 {
+		t.Errorf("sample_matches: got %d, want 3", len(result.SampleMatches))
 	}
-	// TotalScanned should also be 2 (only non-overridden are scanned).
-	if result.TotalScanned != 2 {
-		t.Errorf("total_scanned: got %d, want 2", result.TotalScanned)
+	if result.TotalScanned != 3 {
+		t.Errorf("total_scanned: got %d, want 3", result.TotalScanned)
 	}
 }
 
@@ -1363,14 +1366,15 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 }
 
 // TestApplyRuleRetroactively_HitCountMatchesSync verifies Q12: hit_count counts
-// condition matches (sync parity), not UPDATE-touched rows. One matched
-// transaction has category_override=TRUE and is skipped by the set_category
-// UPDATE, but still counts toward the rule's hit count.
+// condition matches (sync parity). Under P3 last-writer-wins, a matched txn that
+// already carries a prior category is OVERWRITTEN by the set_category UPDATE
+// (no lock), so every match both counts toward hit_count AND gets recategorized.
 func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
 	targetCat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	priorCat := testutil.MustCreateCategory(t, queries, "personal_misc", "Personal")
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_hit")
@@ -1380,12 +1384,13 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_mat_2", "Cafe Match B", 1200, "2025-06-02")
 	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_no_match", "Gas Station", 4500, "2025-06-03")
 
-	// Mark one of the two matching txns as category_override=TRUE. Still a
-	// match for the rule's conditions, but the set_category UPDATE will skip
-	// it — hit_count should still include it.
-	if _, err := pool.Exec(ctx,
-		`UPDATE transactions SET category_override = 'user' WHERE id = $1`, txn1.ID); err != nil {
-		t.Fatalf("set category_override: %v", err)
+	// Pre-categorize one of the two matching txns. It still matches the rule's
+	// conditions; last-writer-wins means the set_category UPDATE overwrites it.
+	if _, err := queries.SetTransactionCategory(ctx, db.SetTransactionCategoryParams{
+		ID:         txn1.ID,
+		CategoryID: priorCat.ID,
+	}); err != nil {
+		t.Fatalf("set prior category: %v", err)
 	}
 
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
@@ -1404,29 +1409,31 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 		t.Fatalf("ApplyRuleRetroactively: %v", err)
 	}
 	if matched != 2 {
-		t.Errorf("match count: got %d, want 2 (every condition match, even if overridden)", matched)
+		t.Errorf("match count: got %d, want 2 (every condition match)", matched)
 	}
 
-	// Exactly one transaction's category was actually updated to the target
-	// (txn2); txn1 was skipped due to category_override=TRUE.
+	// Last-writer-wins: BOTH matching transactions now carry the target
+	// category, including the previously-categorized txn1.
 	var updatedCount int
 	if err := pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM transactions WHERE category_id = $1`,
 		targetCat.ID).Scan(&updatedCount); err != nil {
 		t.Fatalf("count updated transactions: %v", err)
 	}
-	if updatedCount != 1 {
-		t.Errorf("updated category rows: got %d, want 1 (override-protected row skipped)", updatedCount)
+	if updatedCount != 2 {
+		t.Errorf("updated category rows: got %d, want 2 (last-writer-wins overwrites prior)", updatedCount)
 	}
 
-	// Confirm the specific row that actually got set.
-	var updatedCatID pgtype.UUID
-	if err := pool.QueryRow(ctx,
-		`SELECT category_id FROM transactions WHERE id = $1`, txn2.ID).Scan(&updatedCatID); err != nil {
-		t.Fatalf("query txn2 category_id: %v", err)
-	}
-	if updatedCatID != targetCat.ID {
-		t.Errorf("txn2 category_id: got %v, want %v", updatedCatID, targetCat.ID)
+	// Confirm both rows got set.
+	for _, id := range []pgtype.UUID{txn1.ID, txn2.ID} {
+		var updatedCatID pgtype.UUID
+		if err := pool.QueryRow(ctx,
+			`SELECT category_id FROM transactions WHERE id = $1`, id).Scan(&updatedCatID); err != nil {
+			t.Fatalf("query category_id: %v", err)
+		}
+		if updatedCatID != targetCat.ID {
+			t.Errorf("category_id: got %v, want %v", updatedCatID, targetCat.ID)
+		}
 	}
 
 	got, err := svc.GetTransactionRule(ctx, rule.ID)
@@ -1434,7 +1441,7 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 		t.Fatalf("GetTransactionRule: %v", err)
 	}
 	if got.HitCount != 2 {
-		t.Errorf("hit_count: got %d, want 2 (sync parity — count matches, not UPDATE rows)", got.HitCount)
+		t.Errorf("hit_count: got %d, want 2 (sync parity)", got.HitCount)
 	}
 }
 

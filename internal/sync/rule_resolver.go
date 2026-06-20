@@ -530,9 +530,9 @@ func (r *RuleResolver) SeriesShortID(id pgtype.UUID) string {
 // As earlier-stage rules apply their add_tag / set_category actions, the
 // local context updates so later-stage rules' conditions can observe them.
 // This enables composition ("rule A tags 'coffee'; rule B reacts to the tag
-// and picks a category"). `category_override=true` on the transaction
-// suppresses set_category both in the local context mutation and downstream
-// in the engine's DB write.
+// and picks a category"). Provenance/precedence was removed in P3 — rules
+// write category_id directly (last-writer-wins), so there is no override that
+// suppresses set_category.
 //
 // Action merging:
 //   - set_category: last-writer-wins. The highest-priority matching rule

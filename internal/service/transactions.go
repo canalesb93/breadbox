@@ -218,7 +218,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"COALESCE(a.display_name, a.name) AS account_name, " +
 		"a.short_id AS account_short_id, " +
 		"COALESCE(au.name, u.name) AS user_name, " +
-		"t.category_id, t.category_override, " +
+		"t.category_id, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
 		"au.short_id AS attributed_user_short_id, au.name AS attributed_user_name, " +
@@ -473,7 +473,6 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			accountShortID         string
 			userName               pgtype.Text
 			categoryID             pgtype.UUID
-			categoryOverride       string
 			catSlug                pgtype.Text
 			catDisplayName         pgtype.Text
 			catIcon                pgtype.Text
@@ -495,7 +494,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&categoryConfidence, &paymentChannel, &pending,
 			&deletedAt, &createdAt, &updatedAt,
 			&accountName, &accountShortID, &userName,
-			&categoryID, &categoryOverride,
+			&categoryID,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
 			&attributedUserShortID, &attributedUserName,
@@ -549,7 +548,6 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			ProviderName:               name,
 			ProviderMerchantName:       textPtr(merchantName),
 			Category:                   catInfo,
-			CategoryOverride:           categoryOverride,
 			ProviderCategoryPrimary:    textPtr(categoryPrimary),
 			ProviderCategoryDetailed:   textPtr(categoryDetailed),
 			ProviderCategoryConfidence: textPtr(categoryConfidence),
@@ -644,7 +642,7 @@ func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
 func (s *Service) CountUncategorizedTransactions(ctx context.Context) (int64, error) {
 	var count int64
 	err := s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL AND category_override = 'none'").
+		"SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL").
 		Scan(&count)
 	return count, err
 }
@@ -798,7 +796,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
 		"t.date, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
-		"t.category_override, t.pending, " +
+		"t.pending, " +
 		// "Comment count" is the number of live (non-tombstoned) comment
 		// annotations on this row. "Pending review" is the presence of the
 		// needs-review tag.
@@ -1047,7 +1045,6 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			catSlug          pgtype.Text
 			catIcon          pgtype.Text
 			catColor         pgtype.Text
-			categoryOverride string
 			pending          bool
 			commentCount     int64
 			hasPendingReview bool
@@ -1062,7 +1059,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
-			&categoryOverride, &pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
+			&pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
 			&effectiveUserID, &flaggedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
@@ -1101,7 +1098,6 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			CategorySlug:        textPtr(catSlug),
 			CategoryIcon:        textPtr(catIcon),
 			CategoryColor:       textPtr(catColor),
-			CategoryOverride:    categoryOverride,
 			Pending:             pending,
 			CommentCount:        int(commentCount),
 			HasPendingReview:    hasPendingReview,
@@ -1200,7 +1196,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
 		"t.date, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
-		"t.category_override, t.pending, " +
+		"t.pending, " +
 		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
@@ -1239,7 +1235,6 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			catSlug          pgtype.Text
 			catIcon          pgtype.Text
 			catColor         pgtype.Text
-			categoryOverride string
 			pending          bool
 			commentCount     int64
 			hasPendingReview bool
@@ -1253,7 +1248,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
-			&categoryOverride, &pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
+			&pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
 			&effectiveUserID, &flaggedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
@@ -1289,7 +1284,6 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			CategorySlug:        textPtr(catSlug),
 			CategoryIcon:        textPtr(catIcon),
 			CategoryColor:       textPtr(catColor),
-			CategoryOverride:    categoryOverride,
 			Pending:             pending,
 			CommentCount:        int(commentCount),
 			HasPendingReview:    hasPendingReview,
@@ -1366,7 +1360,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 			t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name,
 			t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence,
 			t.provider_payment_channel, t.pending, t.created_at, t.updated_at,
-			t.category_id, t.category_override, t.metadata, t.flagged_at
+			t.category_id, t.metadata, t.flagged_at
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN bank_connections bc ON bc.id = a.connection_id
@@ -1400,7 +1394,6 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		createdAt             pgtype.Timestamptz
 		updatedAt             pgtype.Timestamptz
 		categoryID            pgtype.UUID
-		categoryOverride      string
 		metadata              []byte
 		flaggedAt             pgtype.Timestamptz
 	)
@@ -1413,7 +1406,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		&datetime, &authorizedDatetime, &providerName, &providerMerchant,
 		&providerCatPrimary, &providerCatDetailed, &providerCatConf,
 		&providerChannel, &pending, &createdAt, &updatedAt,
-		&categoryID, &categoryOverride, &metadata, &flaggedAt,
+		&categoryID, &metadata, &flaggedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -1451,7 +1444,6 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		ProviderCategoryPrimary:    textPtr(providerCatPrimary),
 		ProviderCategoryDetailed:   textPtr(providerCatDetailed),
 		ProviderCategoryConfidence: textPtr(providerCatConf),
-		CategoryOverride:           categoryOverride,
 		ProviderPaymentChannel:     textPtr(providerChannel),
 		Pending:                    pending,
 		CreatedAt:                  pgconv.TimestampStr(createdAt),

@@ -1590,12 +1590,9 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 // conditions work during retroactive apply. GROUP BY t.id is required because
 // of the LEFT JOIN onto the tag pivot.
 //
-// NOTE: `category_override=TRUE` rows are intentionally *not* filtered here.
-// Hit counts must reflect every condition match (sync-time parity, Q12), and
-// non-category actions (add_tag, remove_tag) legitimately fire on overridden
-// rows. The `set_category` UPDATE below enforces its own
-// `category_override = 'none'` guard so overridden rows keep their user-pinned
-// category.
+// Hit counts reflect every condition match (sync-time parity, Q12). Provenance
+// was removed in P3, so set_category writes category_id directly here — there is
+// no override guard to honor.
 const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
@@ -1729,11 +1726,12 @@ type retroRuleApplied struct {
 // All writes use ruleapply.AppliedByRetroactive — this function is the
 // retroactive lane by construction.
 func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroTxnIntent) error {
-	// set_category — guarded by category_override='none' (P3 removes the guard).
+	// set_category — provenance/precedence was removed in P3: retroactive apply
+	// writes category_id directly (last-writer-wins), matching the sync path.
 	if it.catID.Valid {
 		if _, err := tx.Exec(ctx,
 			`UPDATE transactions SET category_id = $1, updated_at = NOW()
-			WHERE id = $2 AND category_override = 'none' AND deleted_at IS NULL`,
+			WHERE id = $2 AND deleted_at IS NULL`,
 			it.catID, it.txnID); err != nil {
 			return fmt.Errorf("update transaction category: %w", err)
 		}
@@ -1796,8 +1794,8 @@ func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroT
 
 // ApplyRuleRetroactively applies a single rule to all existing non-deleted
 // transactions matching its condition. Materialization flows through the shared
-// applyRetroTxnIntent, so it covers every state-mutating action — set_category
-// (skipped on category_override<>'none' rows), add_tag, remove_tag,
+// applyRetroTxnIntent, so it covers every state-mutating action — set_category,
+// add_tag, remove_tag,
 // assign_series, set_metadata, remove_metadata, flag, unflag. add_comment stays
 // sync-only by design — retroactive apply is bulk historical data, not
 // narration.
@@ -2573,8 +2571,9 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 
 	// Extended query to also get date and current category slug.
 	// Must match the same filters as transactionContextQuery (used by ApplyRuleRetroactively):
-	// - category_override = 'none' (rules don't overwrite manual overrides)
 	// - exclude matched dependent transactions (dedup'd via account links)
+	// Provenance was removed in P3, so there is no category_override filter — the
+	// preview reflects every row a rule would match (last-writer-wins).
 	baseQuery := `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 		COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
@@ -2585,7 +2584,7 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories c ON t.category_id = c.id
 		LEFT JOIN recurring_series rs ON rs.id = t.series_id
-		WHERE t.deleted_at IS NULL AND t.category_override = 'none'
+		WHERE t.deleted_at IS NULL
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 	// When previewing for a specific rule's detail page, exclude transactions

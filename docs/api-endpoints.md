@@ -46,7 +46,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/transactions/update` | W | Atomic multi-field batch (category + tags + comment per row, max 50) |
 | POST | `/transactions/batch-categorize` | W | Set category on many transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | W | Server-side recategorize by filter |
-| PATCH | `/transactions/{id}/category` | W | Set category (`category_override='user'`) |
+| PATCH | `/transactions/{id}/category` | W | Set category (`category_id`; last-writer-wins) |
 | DELETE | `/transactions/{id}/category` | W | Reset category to provider default |
 | DELETE | `/transactions/{id}` | W | Soft-delete (sets `deleted_at`) |
 | POST | `/transactions/{id}/restore` | W | Restore a soft-deleted transaction |
@@ -108,7 +108,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/rules` | W | Create a rule |
 | POST | `/rules/batch` | W | Bulk create; per-op results, `on_error: continue\|abort` |
 | POST | `/rules/preview` | W | Dry-run — show which transactions would match |
-| POST | `/rules/{id}/apply` | W | Apply one rule retroactively (respects `category_override`) |
+| POST | `/rules/{id}/apply` | W | Apply one rule retroactively (set_category last-writer-wins) |
 | POST | `/rules/apply-all` | W | Apply every active rule retroactively |
 | PUT | `/rules/{id}` | W | Replace a rule |
 | DELETE | `/rules/{id}` | W | Delete a rule |

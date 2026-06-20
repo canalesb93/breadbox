@@ -27,11 +27,12 @@ ON CONFLICT (provider_transaction_id) DO UPDATE SET
   provider_category_confidence = EXCLUDED.provider_category_confidence,
   provider_payment_channel = EXCLUDED.provider_payment_channel,
   pending = EXCLUDED.pending,
-  category_id = CASE
-    WHEN transactions.category_override <> 'none' THEN transactions.category_id
-    WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
-    ELSE transactions.category_id
-  END,
+  -- category_id is enrichment owned by rules/agents/users — never by raw sync.
+  -- The sync engine never populates EXCLUDED.category_id (the upsert params leave
+  -- it unset), so a raw re-sync of an existing row must PRESERVE the category it
+  -- already has. (P3 collapsed the old category_override CASE: with provenance
+  -- removed there is nothing to branch on, and re-sync must not touch category.)
+  category_id = transactions.category_id,
   deleted_at = NULL,
   updated_at = CASE
     WHEN transactions.amount IS DISTINCT FROM EXCLUDED.amount

@@ -461,8 +461,8 @@ templ ruleDetailApplyModal(p RuleDetailProps) {
 								@templ.Raw(ruleApplyModalCountSentence(p.Preview.MatchCount))
 							</p>
 							<ul class="mt-3 text-xs text-base-content/50 space-y-1 list-disc pl-4">
-								<li><code class="text-[10px]">set_category</code> skips transactions where you've set a manual override.</li>
-								<li><code class="text-[10px]">add_tag</code> / <code class="text-[10px]">remove_tag</code> apply to every match regardless of override.</li>
+								<li><code class="text-[10px]">set_category</code> writes the category directly — last-writer-wins, no lock.</li>
+								<li><code class="text-[10px]">add_tag</code> / <code class="text-[10px]">remove_tag</code> apply to every match.</li>
 								<li><code class="text-[10px]">add_comment</code> is sync-only — it won't fire retroactively.</li>
 							</ul>
 							<div class="form-control mt-4">
