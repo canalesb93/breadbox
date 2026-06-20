@@ -543,6 +543,7 @@ type ruleActionAlias RuleAction
 // UnmarshalJSON decodes a RuleAction, mapping the legacy assign_series
 // `merchant_key` key onto SeriesName so rules authored before the surrogate-first
 // rebuild (P2) keep working. An explicit `series_name` always wins.
+// TODO: remove after existing assign_series rules are migrated off merchant_key
 func (a *RuleAction) UnmarshalJSON(data []byte) error {
 	var alias ruleActionAlias
 	if err := json.Unmarshal(data, &alias); err != nil {

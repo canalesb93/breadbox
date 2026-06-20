@@ -23,9 +23,6 @@ type NavBadges struct {
 	PendingReviews       int64
 	ConnectionsAttention int64
 	UnreadReports        int64
-	// SeriesCandidates is the count of recurring-series candidates awaiting a
-	// confirm/reject verdict. Displayed next to the Subscriptions nav link.
-	SeriesCandidates int64
 	// WorkflowFailures is the count of preset-instantiated workflows whose most
 	// recent run errored. Drives a red dot on the Workflows nav link so a failed
 	// automation is visible from any page (mirrors the /workflows card red dot).
@@ -60,10 +57,6 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			} else {
 				logger.Debug("nav badges: count unread agent reports", "error", err)
 			}
-
-			// Recurring series no longer have a candidate/review queue
-			// (rules-as-substrate, P2): membership comes from rules, not a
-			// detector. The nav badge count stays 0.
 
 			if failed, err := queries.CountWorkflowsWithFailedLastRun(ctx); err == nil {
 				badges.WorkflowFailures = failed

@@ -687,6 +687,7 @@ func convertMCPActions(actions []map[string]any) []service.RuleAction {
 			TagSlug:         mcpString(a["tag_slug"]),
 			Content:         mcpString(a["content"]),
 			SeriesShortID:   mcpString(a["series_short_id"]),
+			// TODO: remove after existing assign_series rules are migrated off merchant_key
 			SeriesName:      mcpFirstNonEmpty(a["series_name"], a["merchant_key"]),
 			CreateIfMissing: mcpBool(a["create_if_missing"]),
 			MetadataKey:     mcpString(a["metadata_key"]),

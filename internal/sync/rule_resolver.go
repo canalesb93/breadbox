@@ -438,6 +438,7 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 			// Backward-compat: a rule authored before the surrogate-first rebuild
 			// (P2) stored the mint target under `merchant_key`. Map it onto
 			// SeriesName so existing rules keep firing. An explicit series_name wins.
+			// TODO: remove after existing assign_series rules are migrated off merchant_key
 			if seriesName == "" {
 				seriesName, _ = m["merchant_key"].(string)
 			}

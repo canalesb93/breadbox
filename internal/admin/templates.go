@@ -332,7 +332,6 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		p.UnreadReports = badges.UnreadReports
 		p.ConnectionsAttention = badges.ConnectionsAttention
 		p.PendingReviews = badges.PendingReviews
-		p.SeriesCandidates = badges.SeriesCandidates
 		p.WorkflowFailures = badges.WorkflowFailures
 	}
 	return p
