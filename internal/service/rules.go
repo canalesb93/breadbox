@@ -1523,10 +1523,117 @@ func (r *transactionContextRow) finalize() {
 	}
 }
 
+// retroTxnIntent is the net, resolved set of state-mutating rule actions to
+// materialize against ONE transaction during a retroactive apply. Both
+// retroactive paths — ApplyRuleRetroactively (a single rule) and
+// ApplyAllRulesRetroactively (the whole rule set) — reduce their matches to
+// this shape and hand it to applyRetroTxnIntent, so the two can never again
+// diverge on which actions they materialize. That asymmetry is exactly what
+// previously dropped assign_series from the bulk path.
+//
+// add_comment is deliberately NOT a field here: a comment is narration authored
+// at the moment a rule fires during sync, not durable transaction state.
+// Replaying it across a bulk historical backfill would manufacture thousands of
+// misleading "comment" annotations, so every retroactive path skips it. (The
+// sync-time resolver in internal/sync/rule_resolver.go still materializes
+// add_comment — retroactive apply is the one place it's intentionally dropped.)
+//
+// Adding a new state-mutating action (e.g. the P1 set_field family) means
+// teaching this one struct + applyRetroTxnIntent; both paths inherit it.
+type retroTxnIntent struct {
+	txnID pgtype.UUID
+
+	// set_category — last-writer-wins. catID.Valid gates the write; catRule is
+	// the winning rule (for the category_set annotation).
+	catID   pgtype.UUID
+	catSlug string
+	catRule ruleapply.Rule
+
+	// add_tag / remove_tag — net-diffed; value is the owning rule for audit.
+	tagAdds    map[string]ruleapply.Rule
+	tagRemoves map[string]ruleapply.Rule
+
+	// assign_series — last-writer-wins; nil means no assignment.
+	series     *RuleAction
+	seriesRule ruleapply.Rule
+
+	// set_metadata / remove_metadata — net-diffed, disjoint by construction.
+	metadataSet    map[string]any
+	metadataRemove []string
+
+	// ruleApplied drives the generic rule_applied audit annotations. Each path
+	// populates this with its own granularity (per-action for the single-rule
+	// path, per-matching-rule for the bulk path); the materializer just emits.
+	ruleApplied []retroRuleApplied
+}
+
+// retroRuleApplied is one rule_applied audit annotation to emit for a txn.
+type retroRuleApplied struct {
+	rule  ruleapply.Rule
+	field string // may be "" for a rule-level (action-less) audit
+	value string
+}
+
+// applyRetroTxnIntent materializes one transaction's net retroactive intent
+// within tx. It is THE shared writer for every state-mutating rule action
+// (set_category, add_tag, remove_tag, assign_series, set_metadata,
+// remove_metadata), so coverage cannot drift between the retroactive paths.
+//
+// All writes use ruleapply.AppliedByRetroactive — this function is the
+// retroactive lane by construction.
+func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroTxnIntent) error {
+	// set_category — guarded by category_override='none' (P3 removes the guard).
+	if it.catID.Valid {
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET category_id = $1, updated_at = NOW()
+			WHERE id = $2 AND category_override = 'none' AND deleted_at IS NULL`,
+			it.catID, it.txnID); err != nil {
+			return fmt.Errorf("update transaction category: %w", err)
+		}
+		if err := ruleapply.WriteCategorySet(ctx, tx, it.txnID, it.catRule, it.catSlug, ruleapply.AppliedByRetroactive); err != nil {
+			return fmt.Errorf("annotate category_set: %w", err)
+		}
+	}
+
+	for slug, r := range it.tagAdds {
+		if _, err := s.materializeRuleTagAdd(ctx, tx, it.txnID, slug, r.ID, r.ShortID, r.Name); err != nil {
+			return err
+		}
+	}
+	for slug, r := range it.tagRemoves {
+		if _, err := s.materializeRuleTagRemove(ctx, tx, it.txnID, slug, r.ID, r.ShortID, r.Name); err != nil {
+			return err
+		}
+	}
+
+	// assign_series — same resolve-or-mint + back-link the sync path uses, so
+	// retroactive and sync-time behave identically.
+	if it.series != nil {
+		if err := s.AssignSeriesFromRuleTx(ctx, tx, it.txnID, it.series.SeriesShortID, it.series.MerchantKey, it.series.CreateIfMissing); err != nil {
+			return fmt.Errorf("apply assign_series retroactively: %w", err)
+		}
+	}
+
+	// set_metadata / remove_metadata — one UPDATE merges the net intent.
+	if len(it.metadataSet) > 0 || len(it.metadataRemove) > 0 {
+		if err := applyMetadataToTxns(ctx, tx, []pgtype.UUID{it.txnID}, it.metadataSet, it.metadataRemove); err != nil {
+			return err
+		}
+	}
+
+	for _, ra := range it.ruleApplied {
+		if err := ruleapply.WriteRuleApplied(ctx, tx, it.txnID, ra.rule, ra.field, ra.value, ruleapply.AppliedByRetroactive); err != nil {
+			return fmt.Errorf("annotate rule_applied: %w", err)
+		}
+	}
+	return nil
+}
+
 // ApplyRuleRetroactively applies a single rule to all existing non-deleted
-// transactions matching its condition. Materializes set_category (SQL UPDATE,
-// skipped on category_override=TRUE rows), add_tag (upsert transaction_tags),
-// and remove_tag (delete transaction_tags). add_comment stays sync-only by
+// transactions matching its condition. Materialization flows through the shared
+// applyRetroTxnIntent, so it covers every state-mutating action — set_category
+// (skipped on category_override<>'none' rows), add_tag, remove_tag,
+// assign_series, set_metadata, remove_metadata. add_comment stays sync-only by
 // design — retroactive apply is bulk historical data, not narration.
 //
 // Returns the number of transactions that matched the condition (hit count —
@@ -1670,76 +1777,47 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 			return totalMatched, fmt.Errorf("begin retroactive apply tx: %w", err)
 		}
 
-		// set_category: bulk UPDATE for matching non-overridden rows.
-		if categorySetCatID.Valid {
-			_, err := tx.Exec(ctx,
-				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = 'none' AND deleted_at IS NULL`,
-				categorySetCatID, matchIDs)
-			if err != nil {
-				tx.Rollback(ctx)
-				return totalMatched, fmt.Errorf("update transactions: %w", err)
-			}
-			// Annotation per touched row.
-			rule := ruleapply.Rule{ID: ruleUUID, ShortID: ruleShortID, Name: ruleName}
-			for _, txnID := range matchIDs {
-				if err := ruleapply.WriteCategorySet(ctx, tx, txnID, rule, categorySetSlug, ruleapply.AppliedByRetroactive); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, fmt.Errorf("annotate category_set: %w", err)
-				}
-			}
-		}
-
-		// add_tag: materialize per tag per matching txn.
-		for _, txnID := range matchIDs {
-			for _, slug := range tagAdds {
-				if _, err := s.materializeRuleTagAdd(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, err
-				}
-			}
-			for _, slug := range tagRemoves {
-				if _, err := s.materializeRuleTagRemove(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, err
-				}
-			}
-		}
-
-		// assign_series: resolve-or-mint the series and link each matched txn
-		// (NULL-fill) within the batch tx — same materialization the sync path
-		// uses, so retroactive and sync-time behave identically.
-		if seriesAssign != nil {
-			for _, txnID := range matchIDs {
-				if err := s.AssignSeriesFromRuleTx(ctx, tx, txnID, seriesAssign.SeriesShortID, seriesAssign.MerchantKey, seriesAssign.CreateIfMissing); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, fmt.Errorf("apply assign_series retroactively: %w", err)
-				}
-			}
-		}
-
-		// set_metadata / remove_metadata: one bulk UPDATE merges the rule's net
-		// metadata intent into every matched row (sets overwrite, removes delete;
-		// the two are disjoint by construction).
-		if len(metadataSet) > 0 || len(metadataRemove) > 0 {
-			if err := applyMetadataToTxns(ctx, tx, matchIDs, metadataSet, metadataRemove); err != nil {
-				tx.Rollback(ctx)
-				return totalMatched, err
-			}
-		}
-
-		// rule_applied audit trail — one per action intent per matched txn.
+		// Materialize through the shared per-txn applier so this path covers the
+		// exact same action set as the bulk ApplyAllRulesRetroactively path. The
+		// rule's net intent (category/tags/series/metadata) is uniform across
+		// matched rows, so the per-txn intent differs only by txnID.
 		appliedRule := ruleapply.Rule{ID: ruleUUID, ShortID: ruleShortID, Name: ruleName}
+
+		// rule_applied audit shape is identical for every matched txn: one entry
+		// per non-comment action intent. add_comment is skipped retroactively
+		// (see retroTxnIntent).
+		var ruleApplied []retroRuleApplied
 		for _, action := range rule.Actions {
 			field, value := actionAuditFields(action)
 			if field == "" || field == "comment" {
 				continue
 			}
-			for _, txnID := range matchIDs {
-				if err := ruleapply.WriteRuleApplied(ctx, tx, txnID, appliedRule, field, value, ruleapply.AppliedByRetroactive); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, fmt.Errorf("annotate rule_applied: %w", err)
-				}
+			ruleApplied = append(ruleApplied, retroRuleApplied{rule: appliedRule, field: field, value: value})
+		}
+
+		for _, txnID := range matchIDs {
+			it := retroTxnIntent{
+				txnID:          txnID,
+				catID:          categorySetCatID,
+				catSlug:        categorySetSlug,
+				catRule:        appliedRule,
+				tagAdds:        make(map[string]ruleapply.Rule, len(tagAdds)),
+				tagRemoves:     make(map[string]ruleapply.Rule, len(tagRemoves)),
+				series:         seriesAssign,
+				seriesRule:     appliedRule,
+				metadataSet:    metadataSet,
+				metadataRemove: metadataRemove,
+				ruleApplied:    ruleApplied,
+			}
+			for _, slug := range tagAdds {
+				it.tagAdds[slug] = appliedRule
+			}
+			for _, slug := range tagRemoves {
+				it.tagRemoves[slug] = appliedRule
+			}
+			if err := s.applyRetroTxnIntent(ctx, tx, &it); err != nil {
+				tx.Rollback(ctx)
+				return totalMatched, err
 			}
 		}
 
@@ -1777,6 +1855,11 @@ func actionAuditFields(a RuleAction) (string, string) {
 		return "category", a.CategorySlug
 	case "add_tag":
 		return "tag", a.TagSlug
+	case "remove_tag":
+		// "tag_remove" mirrors the sync resolver's audit field for removals
+		// (internal/sync/rule_resolver.go), keeping retroactive and sync-time
+		// rule_applied annotations consistent.
+		return "tag_remove", a.TagSlug
 	case "add_comment":
 		return "comment", a.Content
 	case "assign_series":
@@ -1832,9 +1915,11 @@ func indexExactStr(slice []string, target string) int {
 }
 
 // ApplyAllRulesRetroactively applies all active rules to existing transactions
-// in pipeline-stage order (priority ASC, created_at ASC). Materializes
-// set_category (last-writer-wins), add_tag, and remove_tag. add_comment stays
-// sync-only.
+// in pipeline-stage order (priority ASC, created_at ASC). Per transaction it
+// folds the rule set to a net intent and materializes it through the shared
+// applyRetroTxnIntent, covering every state-mutating action — set_category
+// (last-writer-wins), add_tag, remove_tag, assign_series, set_metadata,
+// remove_metadata. add_comment stays sync-only.
 //
 // Returns a map of rule_id → match_count. Hit counts include every condition
 // match, not just actions that caused a DB write (sync-time parity).
@@ -1910,6 +1995,8 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			catRule        *compiledRule
 			tagAdds        map[string]*compiledRule // slug → first rule that added it
 			tagRemoves     map[string]*compiledRule
+			series         *RuleAction     // net assign_series intent (last-writer-wins)
+			seriesRule     *compiledRule   // rule that owns the winning series assignment
 			metadataSet    map[string]any  // key → net value to write
 			metadataRemove []string        // net keys to delete
 			matchingRules  []*compiledRule // every rule whose condition matched (for rule_applied)
@@ -2005,11 +2092,23 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 							intent.metadataRemove = append(intent.metadataRemove, a.MetadataKey)
 						}
 						delete(tctx.Metadata, a.MetadataKey)
+					case "assign_series":
+						if a.SeriesShortID == "" && a.MerchantKey == "" {
+							continue
+						}
+						// Last-writer-wins: a txn joins at most one series, so a
+						// later-stage rule overrides an earlier assignment.
+						aCopy := a
+						intent.series = &aCopy
+						intent.seriesRule = cr
+					case "add_comment":
+						// Narration authored at sync time; intentionally never
+						// replayed on a historical backfill (see retroTxnIntent).
 					}
 				}
 			}
 			if intent.catRule != nil || len(intent.tagAdds) > 0 || len(intent.tagRemoves) > 0 ||
-				len(intent.metadataSet) > 0 || len(intent.metadataRemove) > 0 {
+				intent.series != nil || len(intent.metadataSet) > 0 || len(intent.metadataRemove) > 0 {
 				intents = append(intents, intent)
 			}
 		}
@@ -2029,87 +2128,50 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		if err != nil {
 			return hitCounts, fmt.Errorf("begin apply-all tx: %w", err)
 		}
-		aborted := false
 
-		// Group category updates by (catID) for batched UPDATEs.
-		catBatches := make(map[pgtype.UUID][]pgtype.UUID)
-		for _, it := range intents {
-			if it.catRule != nil {
-				catBatches[it.catID] = append(catBatches[it.catID], it.txnID)
+		// Materialize each txn's net intent through the shared per-txn applier so
+		// this path covers the exact same action set as ApplyRuleRetroactively —
+		// including assign_series, which this bulk path previously dropped.
+		//
+		// rule_applied audit: one annotation per matching rule per txn, without
+		// per-action specialization (action_field / action_value left empty) —
+		// callers get a rule-level audit. Shape still matches the canonical
+		// 5-key payload.
+		for i := range intents {
+			it := &intents[i]
+			ri := retroTxnIntent{
+				txnID:          it.txnID,
+				tagAdds:        make(map[string]ruleapply.Rule, len(it.tagAdds)),
+				tagRemoves:     make(map[string]ruleapply.Rule, len(it.tagRemoves)),
+				metadataSet:    it.metadataSet,
+				metadataRemove: it.metadataRemove,
 			}
-		}
-		for catID, txnIDs := range catBatches {
-			if _, err := tx.Exec(ctx,
-				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = 'none' AND deleted_at IS NULL`,
-				catID, txnIDs); err != nil {
-				tx.Rollback(ctx)
-				return hitCounts, fmt.Errorf("update transactions: %w", err)
-			}
-		}
-
-		for _, it := range intents {
-			// category_set annotation (one per touched row, owned by the winning rule).
 			if it.catRule != nil {
-				if err := ruleapply.WriteCategorySet(ctx, tx, it.txnID,
-					ruleapply.Rule{ID: it.catRule.uuid, ShortID: it.catRule.shortID, Name: it.catRule.name},
-					it.catSlug, ruleapply.AppliedByRetroactive,
-				); err != nil {
-					aborted = true
-					break
-				}
+				ri.catID = it.catID
+				ri.catSlug = it.catSlug
+				ri.catRule = ruleapply.Rule{ID: it.catRule.uuid, ShortID: it.catRule.shortID, Name: it.catRule.name}
 			}
 			for slug, cr := range it.tagAdds {
-				if _, err := s.materializeRuleTagAdd(ctx, tx, it.txnID, slug, cr.uuid, cr.shortID, cr.name); err != nil {
-					aborted = true
-					break
-				}
-			}
-			if aborted {
-				break
+				ri.tagAdds[slug] = ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name}
 			}
 			for slug, cr := range it.tagRemoves {
-				if _, err := s.materializeRuleTagRemove(ctx, tx, it.txnID, slug, cr.uuid, cr.shortID, cr.name); err != nil {
-					aborted = true
-					break
-				}
+				ri.tagRemoves[slug] = ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name}
 			}
-			if aborted {
-				break
+			if it.series != nil {
+				ri.series = it.series
+				ri.seriesRule = ruleapply.Rule{ID: it.seriesRule.uuid, ShortID: it.seriesRule.shortID, Name: it.seriesRule.name}
 			}
-
-			// set_metadata / remove_metadata: merge the net intent into this row.
-			if len(it.metadataSet) > 0 || len(it.metadataRemove) > 0 {
-				if err := applyMetadataToTxns(ctx, tx, []pgtype.UUID{it.txnID}, it.metadataSet, it.metadataRemove); err != nil {
-					aborted = true
-					break
-				}
-			}
-
-			// rule_applied audit: one per matching rule per txn.
-			//
-			// Unlike ApplyRuleRetroactively, this path emits one annotation per
-			// (matching rule, txn) without per-action specialization — callers
-			// get a rule-level audit, so action_field / action_value are left
-			// empty. Shape still matches the canonical 5-key payload.
 			for _, cr := range it.matchingRules {
-				if err := ruleapply.WriteRuleApplied(ctx, tx, it.txnID,
-					ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name},
-					"", "", ruleapply.AppliedByRetroactive,
-				); err != nil {
-					aborted = true
-					break
-				}
+				ri.ruleApplied = append(ri.ruleApplied, retroRuleApplied{
+					rule: ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name},
+				})
 			}
-			if aborted {
-				break
+			if err := s.applyRetroTxnIntent(ctx, tx, &ri); err != nil {
+				tx.Rollback(ctx)
+				return hitCounts, fmt.Errorf("apply-all retroactive batch: %w", err)
 			}
 		}
 
-		if aborted {
-			tx.Rollback(ctx)
-			return hitCounts, fmt.Errorf("apply-all retroactive batch aborted")
-		}
 		if err := tx.Commit(ctx); err != nil {
 			return hitCounts, fmt.Errorf("commit apply-all batch: %w", err)
 		}
