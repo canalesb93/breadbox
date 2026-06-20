@@ -22,6 +22,9 @@ document.addEventListener('alpine:init', function () {
       account_id: 'string', account_name: 'string',
       user_id: 'string', user_name: 'string',
       tags: 'tags',
+      // Date-part fields are numeric, derived server-side from the tz-naive date.
+      day_of_month: 'numeric', month: 'numeric',
+      day_of_week: 'numeric', day_of_year: 'numeric',
       // "metadata" is the visual-builder field for a metadata.<key> leaf. The
       // dotted field is assembled at submit time from cond.field + cond.key.
       metadata: 'metadata',
@@ -45,12 +48,14 @@ document.addEventListener('alpine:init', function () {
         { value: 'in',           label: 'in list' },
       ],
       numeric: [
-        { value: 'gte', label: '≥' },
-        { value: 'lte', label: '≤' },
-        { value: 'eq',  label: '=' },
-        { value: 'gt',  label: '>' },
-        { value: 'lt',  label: '<' },
-        { value: 'neq', label: '≠' },
+        { value: 'gte',     label: '≥' },
+        { value: 'lte',     label: '≤' },
+        { value: 'eq',      label: '=' },
+        { value: 'gt',      label: '>' },
+        { value: 'lt',      label: '<' },
+        { value: 'neq',     label: '≠' },
+        { value: 'approx',  label: '≈ ±' },
+        { value: 'between', label: 'between' },
       ],
       bool: [
         { value: 'eq',  label: 'is' },
@@ -81,7 +86,9 @@ document.addEventListener('alpine:init', function () {
     // via onFieldChange().
     // `key` carries the metadata key for a metadata.<key> leaf (unused by every
     // other field type).
-    function emptyCondition() { return { field: '', op: '', value: '', key: '' }; }
+    // `tolerance` is the ± window for the numeric `approx` operator; `min`/`max`
+    // bound the `between` operator. Unused by every other field/operator.
+    function emptyCondition() { return { field: '', op: '', value: '', key: '', tolerance: '', min: '', max: '' }; }
     // New action rows start as unpicked drafts so "Action..." is the default
     // and the value input stays disabled until a type is chosen. `key` /
     // `valueType` are only used by the metadata actions.
@@ -147,7 +154,16 @@ document.addEventListener('alpine:init', function () {
       }
       var value = sub.value;
       if (Array.isArray(value)) value = value.join(', ');
-      return { field: field, op: sub.op || 'contains', value: String(value == null ? '' : value), key: key };
+      return {
+        field: field,
+        op: sub.op || 'contains',
+        value: String(value == null ? '' : value),
+        key: key,
+        // Recover the approx ± window and between bounds so an edit round-trips.
+        tolerance: sub.tolerance == null ? '' : String(sub.tolerance),
+        min: sub.min == null ? '' : String(sub.min),
+        max: sub.max == null ? '' : String(sub.max),
+      };
     }
 
     // Initialize form from existing rule or defaults
@@ -285,6 +301,9 @@ document.addEventListener('alpine:init', function () {
         else cond.op = defaultOps[this.fieldType(cond.field)] || 'contains';
         if (this.fieldType(cond.field) === 'bool') cond.value = 'true';
         else cond.value = '';
+        // Reset the approx/between params so a stale tolerance/bound doesn't ride
+        // along after switching fields.
+        cond.tolerance = ''; cond.min = ''; cond.max = '';
         // Reset the metadata key when leaving/entering the metadata field so a
         // stale key doesn't ride along on a non-metadata leaf.
         if (cond.field !== 'metadata') cond.key = '';
@@ -406,6 +425,12 @@ document.addEventListener('alpine:init', function () {
             if (metadataPresenceOps[c.op]) return true;
             return c.value !== '';
           }
+          if (self.fieldType(c.field) === 'numeric') {
+            // `between` carries min+max instead of a single value; `approx`
+            // needs both a center value and a ± tolerance.
+            if (c.op === 'between') return c.min !== '' && c.max !== '';
+            if (c.op === 'approx') return c.value !== '' && c.tolerance !== '';
+          }
           return c.value !== '';
         });
         if (conds.length === 0) return null;
@@ -423,7 +448,15 @@ document.addEventListener('alpine:init', function () {
             if (c.op === 'in') mval = String(val).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
             return { field: field, op: c.op, value: mval };
           }
-          if (type === 'numeric') val = parseFloat(val) || 0;
+          if (type === 'numeric') {
+            if (c.op === 'between') {
+              return { field: c.field, op: 'between', min: parseFloat(c.min) || 0, max: parseFloat(c.max) || 0 };
+            }
+            if (c.op === 'approx') {
+              return { field: c.field, op: 'approx', value: parseFloat(val) || 0, tolerance: parseFloat(c.tolerance) || 0 };
+            }
+            val = parseFloat(val) || 0;
+          }
           else if (type === 'bool') val = val === 'true';
           else if (type === 'tags' && c.op === 'in') {
             // Tags `in` takes an array; UI collects a comma-separated string.

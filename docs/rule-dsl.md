@@ -75,6 +75,10 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 | `tags`              | tags    | List of current transaction tag slugs (special, see below)      |
 | `series`            | string  | `short_id` of the recurring series the transaction belongs to (empty when unassigned) |
 | `in_series`         | bool    | Whether the transaction is linked to any recurring series       |
+| `day_of_month`      | numeric | Day component of the posting `date`, `1`–`31`. Supports the cyclic/clamped `approx` (see "Date-part conditions"). |
+| `month`             | numeric | Month of the posting `date`, `1`–`12`                           |
+| `day_of_week`       | numeric | Weekday of the posting `date`, `0`=Sunday … `6`=Saturday        |
+| `day_of_year`       | numeric | Ordinal day of the posting `date`, `1`–`366`                    |
 | `metadata.<key>`    | metadata | One key from the transaction's free-form metadata blob — e.g. `metadata.tax_deductible` reads `metadata["tax_deductible"]`. See "Metadata conditions" below. |
 
 > **Raw vs assigned category.** `provider_category_primary` / `provider_category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
@@ -90,6 +94,7 @@ The classes:
 - **raw-immutable** — verbatim provider data. Breadbox never rewrites it; it changes only if the provider re-reports the transaction. A condition on it means the same thing on the create pass, on every re-sync, and on retroactive apply. **This is the substrate. Author here.**
 - **stable-surrogate** — a Breadbox-assigned `id` (UUID) that is stable for the life of the entity. Not provider data, but it doesn't drift when a user renames the entity, so it's a safe primary match. **Also safe.**
 - **mutable-display** — a human-facing label or a value a prior rule / the user / an agent can change. It silently *breaks* when someone renames the thing (`account_name`, `user_name`), or its truth *depends on pipeline order* (`category`, `tags`, `series`, `in_series` — set by earlier-stage rules in the same pass). **Avoid as a primary match condition.**
+- **stable-derived** — a value *computed* deterministically from a raw-immutable column, carrying no independent state. The date-parts (`day_of_month`, `month`, `day_of_week`, `day_of_year`) are pure functions of the immutable, tz-naive `date`, so a condition on them is as durable as one on `amount`. **Safe to author on** (this is the backbone of recurrence rules).
 
 | Field                          | Type     | Class                | Why                                                                                       |
 | ------------------------------ | -------- | -------------------- | ----------------------------------------------------------------------------------------- |
@@ -108,6 +113,10 @@ The classes:
 | `tags`                         | tags     | **mutable-display**  | Current tag slugs; mutate mid-pass as earlier `add_tag`/`remove_tag` rules fire            |
 | `series`                       | string   | **mutable-display**  | Current series `short_id`; set by `assign_series` (a rule write), empty until then         |
 | `in_series`                    | bool     | **mutable-display**  | Whether a series link exists; same pipeline/timing caveat as `series`                      |
+| `day_of_month`                 | numeric  | **stable-derived**   | Day-of-month of the immutable tz-naive `date`; pure function, no independent state         |
+| `month`                        | numeric  | **stable-derived**   | Month of the immutable `date`                                                              |
+| `day_of_week`                  | numeric  | **stable-derived**   | Weekday of the immutable `date` (`0`=Sun)                                                  |
+| `day_of_year`                  | numeric  | **stable-derived**   | Ordinal day of the immutable `date`                                                        |
 | `metadata.<key>`               | metadata | **mutable-display**  | Free-form blob a user / agent / rule writes; no stability guarantee                        |
 
 > **The contract.** *Author conditions on **raw-immutable** + **stable-surrogate** fields.* These are the immutable provider substrate (and stable surrogates of it) the whole model rests on — a rule built on them resolves identically on the create pass, on every future re-sync, and on retroactive apply over history.
@@ -122,6 +131,8 @@ The classes:
 |             | `matches`                                       | RE2 regex; case-sensitive by default (`(?i)` for insensitive) |
 |             | `in`                                            | Non-empty array; case-insensitive membership test          |
 | **numeric** | `eq`, `neq`, `gt`, `gte`, `lt`, `lte`           | `float64` comparison                                       |
+|             | `approx`                                        | `value ± tolerance`: matches when `abs(actual - value) ≤ tolerance`. Requires a sibling `tolerance ≥ 0`. For `day_of_month` the comparison is **cyclic + clamped** (see "Date-part conditions"). |
+|             | `between`                                       | `min ≤ actual ≤ max` (inclusive). Requires sibling `min` and `max` (with `min ≤ max`); `value` is ignored. |
 | **bool**    | `eq`, `neq`                                     | `true` / `false`                                           |
 | **tags**    | `contains`, `not_contains`                      | `value` is a single tag slug; case-insensitive             |
 |             | `in`                                            | `value` is an array of slugs; matches if any slug is present |
@@ -177,6 +188,63 @@ The key (everything after `metadata.`) must be a valid metadata key — non-empt
 - `gt` / `gte` / `lt` / `lte` require both the stored value and the expected value to parse as numbers; otherwise the leaf is false.
 
 Metadata conditions evaluate identically at sync time, in `preview_rule`, and during retroactive apply. They also chain: a `set_metadata` action by an earlier-stage rule is visible to a later-stage rule's `metadata.<key>` condition within the same pass (see "Rule chaining" above and the `set_metadata` action below).
+
+### Amount tolerance (`approx` / `between`)
+
+Two numeric operators express "near a value" without a pile of `gte`/`lte` pairs — the building block for recurring-charge rules:
+
+```json
+{ "field": "amount", "op": "approx", "value": 15.49, "tolerance": 0.50 }
+{ "field": "amount", "op": "between", "min": 9.99, "max": 19.99 }
+```
+
+- `approx` matches when `abs(amount - value) ≤ tolerance`. The `tolerance` sibling is **required and must be ≥ 0**.
+- `between` matches when `min ≤ amount ≤ max` (both ends inclusive). Both `min` and `max` are **required**, with `min ≤ max`; the `value` field is ignored.
+- Both work on every numeric field — `amount` and the date-parts below.
+
+### Date-part conditions
+
+Four **numeric** fields are derived from the transaction's posting `date` — the **tz-naive, provider-localized** date column. There is deliberately **no timezone math**: the date is taken exactly as the provider reported it, so a charge "on the 14th" is the 14th in the provider's locale regardless of where the server runs.
+
+| Field          | Range          | Notes                                  |
+| -------------- | -------------- | -------------------------------------- |
+| `day_of_month` | `1`–`31`       | Cyclic + clamped under `approx` (below) |
+| `month`        | `1`–`12`       | January = 1                            |
+| `day_of_week`  | `0`–`6`        | `0` = Sunday … `6` = Saturday          |
+| `day_of_year`  | `1`–`366`      | Ordinal day; `366` only on leap years  |
+
+They support the full numeric operator set: `eq` / `neq` / `gt` / `gte` / `lt` / `lte`, plus `between` and `approx`. A transaction with no date never matches a date-part condition.
+
+**`day_of_month` `approx` is cyclic and clamped** — this is what makes "around the 1st" and "the 31st" behave sanely:
+
+- **Cyclic:** the distance wraps around the month, so the 1st and the month's last day are **1 day apart**. `day_of_month approx 1 ± 2` therefore matches the 30th/31st of the previous-style cycle as well as the 1st–3rd.
+- **Clamped:** a target past the month's actual length collapses to the **last day** of that month. So `day_of_month approx 31 ± 0` matches **Feb 28** (or **Feb 29** in a leap year), April 30, etc. — "bill me on the 31st" still fires in short months.
+
+Both the clamp boundary and the wrap distance use the transaction's **own** month length (28/29/30/31), so the same rule behaves correctly across every month and across leap years.
+
+```json
+{ "field": "day_of_month", "op": "approx", "value": 14, "tolerance": 3 }
+```
+
+> **Annual cadence — use `month` + `day_of_month`, not `day_of_year`.** `day_of_year` drifts by one after February in leap years (day 60 is Mar 1 in a common year but Feb 29 in a leap year), so an annual rule keyed on `day_of_year` silently misses every fourth year. Express a yearly charge as a conjunction instead, which is leap-robust:
+>
+> ```json
+> { "and": [
+>   { "field": "month", "op": "eq", "value": 4 },
+>   { "field": "day_of_month", "op": "approx", "value": 15, "tolerance": 2 }
+> ] }
+> ```
+
+Date-part conditions evaluate identically at sync time, in `preview_rule`, and during retroactive apply (all three read the same tz-naive `date`).
+
+A full recurring-charge rule combines amount tolerance with a date-part — the detector-free way to capture a subscription:
+
+```json
+{ "and": [
+  { "field": "amount", "op": "approx", "value": 15.49, "tolerance": 0.50 },
+  { "field": "day_of_month", "op": "approx", "value": 14, "tolerance": 3 }
+] }
+```
 
 ## Actions
 

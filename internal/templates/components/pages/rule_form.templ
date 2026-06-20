@@ -193,6 +193,12 @@ templ RuleForm(p RuleFormProps) {
 										<option value="user_name">Family member</option>
 										<option value="provider">Provider</option>
 									</optgroup>
+									<optgroup label="Date (from posting date)">
+										<option value="day_of_month">Day of month (1-31)</option>
+										<option value="month">Month (1-12)</option>
+										<option value="day_of_week">Day of week (0=Sun)</option>
+										<option value="day_of_year">Day of year (1-366)</option>
+									</optgroup>
 									<optgroup label="Metadata">
 										<option value="metadata">Metadata field</option>
 									</optgroup>
@@ -224,6 +230,8 @@ templ RuleForm(p RuleFormProps) {
 									<option value="lte" x-show="cond.field && fieldType(cond.field) === 'numeric'">≤</option>
 									<option value="gt" x-show="cond.field && fieldType(cond.field) === 'numeric'">&gt;</option>
 									<option value="lt" x-show="cond.field && fieldType(cond.field) === 'numeric'">&lt;</option>
+									<option value="approx" x-show="cond.field && fieldType(cond.field) === 'numeric'">≈ ±</option>
+									<option value="between" x-show="cond.field && fieldType(cond.field) === 'numeric'">between</option>
 								</select>
 								<!-- Metadata operator — own select (the inline-option select above
 								     can't cleanly host the exists/not_exists presence ops). -->
@@ -247,7 +255,14 @@ templ RuleForm(p RuleFormProps) {
 									<option value="true">true</option>
 									<option value="false">false</option>
 								</select>
-								<input type="number" x-model="cond.value" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-xs bg-base-100 w-24 shrink-0" placeholder="0.00"/>
+								<input type="number" x-model="cond.value" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op !== 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-24 shrink-0" placeholder="0.00"/>
+									<!-- approx ± tolerance window -->
+									<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" class="text-xs opacity-60 shrink-0">±</span>
+									<input type="number" x-model="cond.tolerance" step="0.01" min="0" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="tol"/>
+									<!-- between min/max bounds (inclusive) -->
+									<input type="number" x-model="cond.min" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="min"/>
+									<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" class="text-xs opacity-60 shrink-0">–</span>
+									<input type="number" x-model="cond.max" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="max"/>
 								<!-- Category (assigned) with eq/neq — show the same category
 								     picker we use in actions instead of a free-text slug input.
 								     For contains/matches/in we fall back to text so power users

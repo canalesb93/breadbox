@@ -545,6 +545,15 @@ type Condition struct {
 	Op    string      `json:"op,omitempty"`
 	Value interface{} `json:"value,omitempty"`
 
+	// Tolerance is the ± window for the numeric `approx` operator
+	// (e.g. amount ≈ value ± tolerance). Required (and must be ≥ 0) when
+	// Op == "approx"; ignored otherwise.
+	Tolerance *float64 `json:"tolerance,omitempty"`
+	// Min / Max bound the numeric `between` operator (inclusive on both ends).
+	// Both required when Op == "between"; ignored otherwise.
+	Min *float64 `json:"min,omitempty"`
+	Max *float64 `json:"max,omitempty"`
+
 	And []Condition `json:"and,omitempty"`
 	Or  []Condition `json:"or,omitempty"`
 	Not *Condition  `json:"not,omitempty"`
@@ -580,6 +589,12 @@ type TransactionContext struct {
 	// values. Updated mid-resolver as earlier-stage set_metadata / remove_metadata
 	// actions apply, so later-stage rules observe the running blob.
 	Metadata map[string]any
+	// Date is the transaction's tz-naive posting date (the provider-localized
+	// `date` column, no time component). The derived date-part condition fields
+	// (day_of_month / month / day_of_week / day_of_year) are computed from it.
+	// Zero (IsZero) when the row carries no date — date-part conditions then
+	// evaluate to false.
+	Date time.Time
 }
 
 type TransactionRuleResponse struct {
