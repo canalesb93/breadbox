@@ -30,21 +30,6 @@ func ListSeriesHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-// ExplainSeriesCandidatesHandler returns the near-miss / explain feed: every
-// recurring-looking merchant group that is NOT already a series, with the
-// detector's verdict on why it did or didn't qualify.
-// GET /api/v1/series/explain — mirrors the explain_series_candidates MCP tool.
-func ExplainSeriesCandidatesHandler(svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		nearMisses, err := svc.ExplainSeriesCandidates(r.Context())
-		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to explain series candidates")
-			return
-		}
-		writeData(w, map[string]any{"near_misses": nearMisses})
-	}
-}
-
 // GetSeriesHandler returns a single series by short_id or uuid.
 // GET /api/v1/series/{id} — mirrors the get_series MCP tool.
 func GetSeriesHandler(svc *service.Service) http.HandlerFunc {

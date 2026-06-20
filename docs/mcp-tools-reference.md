@@ -246,15 +246,11 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
+List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
 
 ### get_series (Read)
 
 Get one series by short ID or UUID, including its full `detection_signals` (`occurrence_count`, `interval_cv`, `cadence_snap_error`, `amount_branch`, `merchant_key_is_fallback`). Inspect before reviewing a candidate.
-
-### explain_series_candidates (Read)
-
-Answer "why isn't *merchant* a subscription?". Returns `near_misses` — every recurring-looking merchant group that is **not** already a series, each annotated with the detector's verdict: `qualifies:true` (passes every gate but isn't tracked yet — confirm it with `assign_series`) or a specific `reason` it fell short (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Each row carries a human `explanation` plus the raw numbers (`occurrence_count`, `nearest_cadence`, `median_gap_days`, `interval_cv`, `amount_min`/`amount_max`, `first_seen`/`last_seen`). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this surfaces what it skipped (ordered most-charges-first, capped at 50).
 
 ### review_series (Write)
 

@@ -145,7 +145,6 @@ func TestToolRegistryScopeContract(t *testing.T) {
 		"query_transaction_rules",
 		"list_series",
 		"get_series",
-		"explain_series_candidates",
 		"list_workflows",
 	}
 	if len(readNames) != len(wantReads) {

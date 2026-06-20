@@ -120,7 +120,6 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/tags", ListTagsHandler(svc))
 		r.Get("/tags/{slug}", GetTagHandler(svc))
 		r.Get("/series", ListSeriesHandler(svc))
-		r.Get("/series/explain", ExplainSeriesCandidatesHandler(svc)) // static before /series/{id}
 		r.Get("/series/{id}", GetSeriesHandler(svc))
 		r.Get("/settings/providers", GetProviderConfigHandler(a))
 		// Agents — read endpoints. Specific paths before /workflows/{slug} param.

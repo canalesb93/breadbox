@@ -30,8 +30,6 @@ var seriesValidFields = map[string]bool{
 	"last_amount":        true,
 	"last_seen_date":     true,
 	"next_expected_date": true,
-	"renewal_health":     true,
-	"days_until_renewal": true,
 	"occurrence_count":   true,
 	"detection_signals":  true,
 	"tags":               true,
@@ -50,7 +48,7 @@ var seriesFieldAliases = map[string][]string{
 		"name", "status", "type", "cadence", "confidence",
 		"expected_amount", "iso_currency_code", "expected_day",
 		"last_amount", "last_seen_date", "next_expected_date",
-		"renewal_health", "days_until_renewal", "occurrence_count", "tags",
+		"occurrence_count", "tags",
 	},
 }
 
@@ -113,10 +111,6 @@ func FilterSeriesFields(s SeriesResponse, fields map[string]bool) map[string]any
 			m["last_seen_date"] = s.LastSeenDate
 		case "next_expected_date":
 			m["next_expected_date"] = s.NextExpectedDate
-		case "renewal_health":
-			m["renewal_health"] = s.RenewalHealth
-		case "days_until_renewal":
-			m["days_until_renewal"] = s.DaysUntilRenewal
 		case "occurrence_count":
 			m["occurrence_count"] = s.OccurrenceCount
 		case "detection_signals":

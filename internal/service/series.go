@@ -51,21 +51,7 @@ const (
 	SeriesTypeBill         = "bill"         // rent, utilities, insurance, telecom
 	SeriesTypeLoan         = "loan"         // mortgage, auto/student/personal loans
 	SeriesTypeOther        = "other"        // recurring but uncategorized
-
-	// Renewal-health buckets — a derived (not stored) read-side signal computed
-	// from an active series' projected next_expected_date relative to today.
-	// Surfaced on SeriesResponse so agents and the UI can answer "what renews
-	// soon" and "what looks cancelled" without re-deriving the cadence math.
-	SeriesHealthActive  = "active"   // next charge comfortably in the future
-	SeriesHealthDueSoon = "due_soon" // renews within the next week
-	SeriesHealthOverdue = "overdue"  // past due but within one cadence cycle (likely just lag)
-	SeriesHealthStale   = "stale"    // missed a full cadence cycle — likely cancelled
-	SeriesHealthUnknown = "unknown"  // no prediction (irregular/unknown cadence or no charges yet)
 )
-
-// renewalDueSoonWindowDays is how far ahead a projected charge still counts as
-// "due soon" rather than merely "active".
-const renewalDueSoonWindowDays = 7
 
 var validSeriesCadence = map[string]bool{
 	SeriesCadenceWeekly: true, SeriesCadenceBiweekly: true, SeriesCadenceMonthly: true,
@@ -143,31 +129,25 @@ type SeriesUpsert struct {
 
 // SeriesResponse is the API/MCP shape of a recurring_series row.
 type SeriesResponse struct {
-	ID               string   `json:"id"`
-	ShortID          string   `json:"short_id"`
-	UserID           *string  `json:"user_id,omitempty"`
-	Name             string   `json:"name"`
-	MerchantKey      string   `json:"merchant_key"`
-	Cadence          string   `json:"cadence"`
-	ExpectedDay      *int     `json:"expected_day,omitempty"`
-	ExpectedAmount   *float64 `json:"expected_amount,omitempty"`
-	AmountTolerance  *float64 `json:"amount_tolerance,omitempty"`
-	IsoCurrencyCode  *string  `json:"iso_currency_code,omitempty"`
-	CategoryID       *string  `json:"category_id,omitempty"`
-	Status           string   `json:"status"`
-	Type             string   `json:"type"`
-	DetectionSource  string   `json:"detection_source"`
-	Confidence       string   `json:"confidence"`
-	ConfirmedByType  *string  `json:"confirmed_by_type,omitempty"`
-	LastAmount       *float64 `json:"last_amount,omitempty"`
-	LastSeenDate     *string  `json:"last_seen_date,omitempty"`
-	NextExpectedDate *string  `json:"next_expected_date,omitempty"`
-	// RenewalHealth is a derived bucket (active|due_soon|overdue|stale|unknown)
-	// computed from NextExpectedDate vs today; only populated for active series.
-	RenewalHealth string `json:"renewal_health,omitempty"`
-	// DaysUntilRenewal is the signed day count to NextExpectedDate (negative =
-	// overdue). Nil when there's no prediction. Populated for active series.
-	DaysUntilRenewal *int            `json:"days_until_renewal,omitempty"`
+	ID               string          `json:"id"`
+	ShortID          string          `json:"short_id"`
+	UserID           *string         `json:"user_id,omitempty"`
+	Name             string          `json:"name"`
+	MerchantKey      string          `json:"merchant_key"`
+	Cadence          string          `json:"cadence"`
+	ExpectedDay      *int            `json:"expected_day,omitempty"`
+	ExpectedAmount   *float64        `json:"expected_amount,omitempty"`
+	AmountTolerance  *float64        `json:"amount_tolerance,omitempty"`
+	IsoCurrencyCode  *string         `json:"iso_currency_code,omitempty"`
+	CategoryID       *string         `json:"category_id,omitempty"`
+	Status           string          `json:"status"`
+	Type             string          `json:"type"`
+	DetectionSource  string          `json:"detection_source"`
+	Confidence       string          `json:"confidence"`
+	ConfirmedByType  *string         `json:"confirmed_by_type,omitempty"`
+	LastAmount       *float64        `json:"last_amount,omitempty"`
+	LastSeenDate     *string         `json:"last_seen_date,omitempty"`
+	NextExpectedDate *string         `json:"next_expected_date,omitempty"`
 	OccurrenceCount  int             `json:"occurrence_count"`
 	DetectionSignals json.RawMessage `json:"detection_signals,omitempty"`
 	Tags             []string        `json:"tags,omitempty"`
@@ -1249,36 +1229,6 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 	return &resp, nil
 }
 
-// ReinferSeriesTypes re-derives the type of every series still at the default
-// 'subscription' from its members' dominant category — a one-time backfill for
-// series detected before the type field existed (type is sticky-after-insert,
-// so they never re-type on their own). Series already typed bill/loan/other are
-// left untouched, and a series whose members still infer 'subscription' is a
-// no-op. Returns the number actually re-typed.
-func (s *Service) ReinferSeriesTypes(ctx context.Context) (int, error) {
-	rows, err := s.Queries.ListRecurringSeries(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("list series: %w", err)
-	}
-	retyped := 0
-	for _, row := range rows {
-		if row.Type != SeriesTypeSubscription {
-			continue // already typed (non-default) — leave deliberate values alone
-		}
-		inferred := s.inferTypeFromMembers(ctx, s.Queries, row.ID)
-		if inferred == "" || inferred == row.Type {
-			continue
-		}
-		upd := updateParamsFromRow(row)
-		upd.Type = inferred
-		if _, err := s.Queries.UpdateRecurringSeries(ctx, upd); err != nil {
-			return retyped, fmt.Errorf("re-type series %s: %w", row.ShortID, err)
-		}
-		retyped++
-	}
-	return retyped, nil
-}
-
 // GetSeries returns a single series by short_id or uuid.
 func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
@@ -1631,7 +1581,6 @@ func seriesFromRow(r db.RecurringSeries) SeriesResponse {
 	if len(r.DetectionSignals) > 0 {
 		resp.DetectionSignals = json.RawMessage(r.DetectionSignals)
 	}
-	resp.RenewalHealth, resp.DaysUntilRenewal = seriesRenewalHealth(r.Status, r.Cadence, r.NextExpectedDate, time.Now())
 	return resp
 }
 
@@ -1712,39 +1661,6 @@ func addMonthsClamped(d time.Time, months int) time.Time {
 // the following month resolves to the last day of the requested month.
 func lastDayOfMonth(year int, month time.Month) int {
 	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
-}
-
-// seriesRenewalHealth derives the renewal-health bucket and signed days-until
-// for an active series, from its projected next_expected_date relative to now.
-//
-// Buckets: due_soon (0..window ahead), active (further ahead), overdue (past
-// due but within one cadence cycle — likely processing lag), stale (missed a
-// full cycle — likely cancelled). Returns ("", nil) for non-active series and
-// ("unknown", nil) when no projection exists (irregular cadence / no charges).
-func seriesRenewalHealth(status, cadence string, nextExpected pgtype.Date, now time.Time) (string, *int) {
-	if status != SeriesStatusActive {
-		return "", nil
-	}
-	interval := cadenceIntervalDays(cadence)
-	if !nextExpected.Valid || interval == 0 {
-		return SeriesHealthUnknown, nil
-	}
-	// Day-granular difference; truncate both ends to midnight UTC so partial
-	// days don't flip the sign.
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	exp := time.Date(nextExpected.Time.Year(), nextExpected.Time.Month(), nextExpected.Time.Day(), 0, 0, 0, 0, time.UTC)
-	days := int(exp.Sub(today).Hours() / 24)
-	d := days
-	switch {
-	case days < -interval:
-		return SeriesHealthStale, &d
-	case days < 0:
-		return SeriesHealthOverdue, &d
-	case days <= renewalDueSoonWindowDays:
-		return SeriesHealthDueSoon, &d
-	default:
-		return SeriesHealthActive, &d
-	}
 }
 
 func numericDollars(f float64) pgtype.Numeric {
