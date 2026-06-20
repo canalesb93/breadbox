@@ -448,6 +448,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/sync/schedules/{shortID}/toggle", ScheduleToggleHandler(a, svc, sm))
 		r.Post("/settings/sync/schedules/{shortID}/delete", ScheduleDeleteHandler(a, svc, sm))
 		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
+		r.Post("/settings/counterparty-logos", SettingsCounterpartyLogosPostHandler(a, sm))
+		r.Post("/settings/logo-dev-token", SettingsLogoDevTokenPostHandler(a, sm))
 	})
 
 	// Admin API (authenticated, JSON responses).

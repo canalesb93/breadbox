@@ -621,6 +621,33 @@ The following keys are seeded during initial migration and used by the applicati
 | `webhook_url` | `(empty)` | Publicly accessible URL for Plaid webhooks. Optional. |
 | `sync_interval_hours` | `12` | How often the cron sync runs, in hours. |
 | `setup_complete` | `false` | Whether the first-run setup wizard has been completed. |
+| `counterparty_logos` | `true` | Whether counterparty avatars hotlink brand logos from logo.dev (see below). `false` disables it (monogram everywhere). Overridable via `BREADBOX_COUNTERPARTY_LOGOS`. |
+| `logo_dev_token` | `(empty)` | Optional logo.dev publishable key (`pk_…`) for higher rate limits. Stored in plaintext (publishable keys are public by design). Overridable via `LOGO_DEV_TOKEN`. |
+
+#### Counterparty brand logos (logo.dev)
+
+Counterparty avatars (`/counterparties` rows and detail headers) show real brand
+logos **hotlinked** from the free [logo.dev](https://logo.dev) image API
+(`https://img.logo.dev/{domain}?size=128&format=png&retina=true&fallback=404`).
+The domain is derived at render time from the counterparty's `website_url`
+(scheme + leading `www.` stripped); a counterparty with no website, or with a
+manual `logo_url` override, never hits logo.dev. Precedence for the rendered
+avatar is: manual `logo_url` → logo.dev hotlink → gradient monogram.
+
+**Hotlink, not fetch-and-store.** Breadbox does not download or cache the logo;
+the browser loads it directly from logo.dev. When logo.dev has no logo for the
+domain (or no token is configured) the image errors and the avatar degrades to
+the gradient monogram — it never shows a broken image.
+
+**Privacy.** Because logos are hotlinked, the counterparty's **domain is sent to
+logo.dev on every render** of a counterparty surface. Households that prefer not
+to leak counterparty domains can disable hotlinking from
+**Settings → General → Counterparties** (writes `counterparty_logos=false`), at
+which point every counterparty falls back to its monogram and no request leaves
+the browser for logo.dev. A self-hosted, single-household deployment is exempt
+from logo.dev's commercial link-back/attribution requirement (it's personal,
+non-commercial use). An optional publishable token (`logo_dev_token` /
+`LOGO_DEV_TOKEN`) raises rate limits; it is a public key by design.
 
 ---
 

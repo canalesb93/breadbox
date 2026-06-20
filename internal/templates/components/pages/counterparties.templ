@@ -63,10 +63,11 @@ templ counterpartiesListRow(c CounterpartyRow) {
 			aria-label={ "Open counterparty " + c.Name }
 		>
 			@components.EntityAvatar(components.EntityAvatarProps{
-				Name:     c.Name,
-				ImageURL: c.LogoURL,
-				Seed:     c.ShortID,
-				Size:     components.EntityAvatarSizeMD,
+				Name:       c.Name,
+				ImageURL:   c.LogoURL,
+				LogoDevURL: c.LogoDevURL,
+				Seed:       c.ShortID,
+				Size:       components.EntityAvatarSizeMD,
 			})
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 min-w-0">
@@ -211,10 +212,11 @@ templ CounterpartyForm(p CounterpartyFormProps) {
 // matches the list.
 templ counterpartyHeaderIcon(c CounterpartyRow) {
 	@components.EntityAvatar(components.EntityAvatarProps{
-		Name:     c.Name,
-		ImageURL: c.LogoURL,
-		Seed:     c.ShortID,
-		Class:    "w-full h-full",
+		Name:       c.Name,
+		ImageURL:   c.LogoURL,
+		LogoDevURL: c.LogoDevURL,
+		Seed:       c.ShortID,
+		Class:      "w-full h-full",
 	})
 }
 

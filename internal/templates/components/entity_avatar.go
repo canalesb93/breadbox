@@ -48,8 +48,16 @@ type EntityAvatarProps struct {
 	// Name drives the monogram letters and, when Seed is empty, the monogram's
 	// deterministic gradient hue. Also used as the image alt text.
 	Name string
-	// ImageURL, when set, renders the image shape (a counterparty logo).
+	// ImageURL, when set, renders the image shape (a counterparty's manual
+	// logo_url override) — top precedence, no monogram fallback.
 	ImageURL string
+	// LogoDevURL, when set (and ImageURL is empty), renders a hotlinked
+	// logo.dev brand logo OVER the gradient monogram: the image covers the
+	// monogram on load and removes itself on error (unknown domain / no token /
+	// network), so the tile degrades gracefully to the monogram and never shows
+	// a broken image. Build it with LogoDevURL(websiteURL, token). Counterparty
+	// surfaces only — series pass an Icon instead.
+	LogoDevURL string
 	// Icon, when set (and ImageURL is empty), renders the tinted-icon shape — a
 	// lucide glyph name (a series type glyph).
 	Icon string

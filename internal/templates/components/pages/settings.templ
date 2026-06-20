@@ -27,6 +27,7 @@ templ SettingsGeneral(p SettingsProps) {
 		<div>
 			@settingsSyncSection(p)
 			@settingsAppearanceSection()
+			@settingsCounterpartiesSection(p)
 			@settingsAvatarsSection(p)
 			@settingsSyncLogsSection(p)
 		</div>
@@ -54,6 +55,52 @@ templ settingsAppearanceSection() {
 			Caption: "System follows your OS light/dark setting",
 		}) {
 			@components.ThemeControl()
+		}
+	}
+}
+
+// ---------------------------------------------------------------------
+// General — Counterparties (brand logos)
+// ---------------------------------------------------------------------
+
+// settingsCounterpartiesSection toggles hotlinking real brand logos from
+// logo.dev onto counterparty rows and headers. When on, every counterparty
+// with a website (and no manual logo) shows its brand logo, hotlinked at render
+// time from img.logo.dev — the domain is sent to logo.dev on each render. When
+// off (or when logo.dev has no logo), the counterparty falls back to its
+// gradient monogram. The optional publishable token lifts rate limits; it's a
+// public key (it rides in the image URL), so it's shown in the clear. Both
+// controls auto-save on change.
+templ settingsCounterpartiesSection(p SettingsProps) {
+	@components.SettingsSection(components.SettingsSectionProps{
+		Icon:    "store",
+		Title:   "Counterparties",
+		Caption: "Brand logos for merchants and other counterparties",
+	}) {
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "Counterparty logos",
+			Caption: "Hotlink brand logos from logo.dev (the domain is sent to logo.dev on render); falls back to a monogram",
+		}) {
+			@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+				Action:    "/settings/counterparty-logos",
+				CSRFToken: p.CSRFToken,
+				Label:     "Counterparty logos saved",
+			}) {
+				<input type="checkbox" name="counterparty_logos" value="true" class="toggle toggle-sm toggle-primary" checked?={ p.CounterpartyLogos } aria-label="Enable counterparty brand logos"/>
+			}
+		}
+		@components.SettingsRow(components.SettingsRowProps{
+			Label:   "logo.dev token",
+			Caption: "Optional publishable key (pk_…) for higher rate limits — public by design",
+			Stack:   true,
+		}) {
+			@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+				Action:    "/settings/logo-dev-token",
+				CSRFToken: p.CSRFToken,
+				Label:     "logo.dev token saved",
+			}) {
+				<input type="text" name="logo_dev_token" value={ p.LogoDevToken } placeholder="pk_… (optional)" autocomplete="off" spellcheck="false" class="input input-sm w-full font-mono" aria-label="logo.dev publishable token"/>
+			}
 		}
 	}
 }
