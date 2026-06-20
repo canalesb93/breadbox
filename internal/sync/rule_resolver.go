@@ -134,6 +134,12 @@ type RuleActions struct {
 	// earlier-stage rule then removed by a later one cancels (appears in
 	// neither map); a key removed then re-set ends up only in MetadataSet.
 	MetadataRemove []string
+	// FlagIntent is the net flag/unflag decision for the transaction:
+	// "flag" sets flagged_at = NOW(), "unflag" clears it, "" leaves it
+	// untouched. Last-writer-wins across the pipeline (a higher-priority rule's
+	// flag/unflag overrides a lower one), mirroring the flag_transaction MCP
+	// tool's flagged_at write.
+	FlagIntent string
 	// Sources records per-action provenance for the audit trail. For
 	// set_category, only the winning (last) rule's source is retained.
 	// For tag actions, only net-surviving adds/removes have sources.
@@ -390,6 +396,9 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 		case "remove_metadata":
 			key, _ := m["metadata_key"].(string)
 			out = append(out, typedAction{Type: t, MetadataKey: key})
+		case "flag", "unflag":
+			// No parameters — surfaces / clears the transaction's flag.
+			out = append(out, typedAction{Type: t})
 		default:
 			logger.Warn("skipping unknown rule action type",
 				"rule_id", pgconv.FormatUUID(ruleID), "type", t)
@@ -729,10 +738,41 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 						ActionValue: a.MetadataKey,
 					})
 				}
+			case "flag", "unflag":
+				// Last-writer-wins: a later-stage rule's flag/unflag supersedes
+				// an earlier one (a transaction is flagged or it isn't). Drop the
+				// superseded source so the rule_applied audit credits the winning
+				// rule only. ActionField is the action type so the dedup key and
+				// audit annotation distinguish flag from unflag.
+				result.FlagIntent = a.Type
+				result.Sources = dropFlagSource(result.Sources)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: a.Type,
+				})
 			}
 		}
 	}
 	return result
+}
+
+// dropFlagSource removes any prior flag/unflag source so the final
+// RuleActionSource slice records only the winning (last) rule's provenance for
+// the flag decision. Non-flag sources are preserved.
+func dropFlagSource(src []RuleActionSource) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == "flag" || s.ActionField == "unflag" {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
 }
 
 // dropCategorySource removes any prior category source so the final

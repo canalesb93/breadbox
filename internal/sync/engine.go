@@ -859,6 +859,26 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		}
 	}
 
+	// flag / unflag: set or clear flagged_at within the sync tx, mirroring the
+	// flag_transaction MCP tool's write (transaction_flag.go). The net decision
+	// is already resolved last-writer-wins. Like assign_series / metadata, no
+	// dedicated timeline annotation is emitted — the rule_applied source records
+	// the firing.
+	switch result.FlagIntent {
+	case "flag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+			dbTxn.ID); err != nil {
+			return result.Sources, fmt.Errorf("apply rule flag: %w", err)
+		}
+	case "unflag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NULL WHERE id = $1 AND deleted_at IS NULL`,
+			dbTxn.ID); err != nil {
+			return result.Sources, fmt.Errorf("apply rule unflag: %w", err)
+		}
+	}
+
 	return result.Sources, nil
 }
 

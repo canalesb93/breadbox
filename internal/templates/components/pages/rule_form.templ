@@ -256,13 +256,13 @@ templ RuleForm(p RuleFormProps) {
 									<option value="false">false</option>
 								</select>
 								<input type="number" x-model="cond.value" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op !== 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-24 shrink-0" placeholder="0.00"/>
-									<!-- approx ± tolerance window -->
-									<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" class="text-xs opacity-60 shrink-0">±</span>
-									<input type="number" x-model="cond.tolerance" step="0.01" min="0" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="tol"/>
-									<!-- between min/max bounds (inclusive) -->
-									<input type="number" x-model="cond.min" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="min"/>
-									<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" class="text-xs opacity-60 shrink-0">–</span>
-									<input type="number" x-model="cond.max" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="max"/>
+								<!-- approx ± tolerance window -->
+								<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" class="text-xs opacity-60 shrink-0">±</span>
+								<input type="number" x-model="cond.tolerance" step="0.01" min="0" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="tol"/>
+								<!-- between min/max bounds (inclusive) -->
+								<input type="number" x-model="cond.min" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="min"/>
+								<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" class="text-xs opacity-60 shrink-0">–</span>
+								<input type="number" x-model="cond.max" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="max"/>
 								<!-- Category (assigned) with eq/neq — show the same category
 								     picker we use in actions instead of a free-text slug input.
 								     For contains/matches/in we fall back to text so power users
@@ -330,6 +330,8 @@ templ RuleForm(p RuleFormProps) {
 									<option value="comment" :disabled="action.field !== 'comment'    && isActionUsed('comment')">Add comment</option>
 									<option value="metadata_set">Set metadata</option>
 									<option value="metadata_remove">Remove metadata</option>
+									<option value="flag" :disabled="action.field !== 'flag' && isActionUsed('flag')">Flag for attention</option>
+									<option value="unflag" :disabled="action.field !== 'unflag' && isActionUsed('unflag')">Clear flag</option>
 								</select>
 								<!-- Remove — pinned to the right of the Action select on mobile,
 								     moves to the far right of the row on sm+. Rendered here (not at
@@ -405,6 +407,19 @@ templ RuleForm(p RuleFormProps) {
 									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
 										<input type="text" x-model="action.key" class="input input-xs bg-base-100 w-full mt-px" placeholder="key to remove"/>
 										<p class="text-[0.65rem] text-base-content/40 mt-1">Deletes one metadata key from matching transactions.</p>
+									</div>
+								</template>
+								<!-- Value: flag / unflag take no parameters — just a hint. -->
+								<template x-if="action.field === 'flag'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none flex items-center gap-1.5 mt-px h-6">
+										@components.LucideIcon("flag", "w-3.5 h-3.5 text-warning shrink-0")
+										<p class="text-[0.65rem] text-base-content/40">Surfaces matching transactions for attention (sets the flag). Find them with the flagged filter.</p>
+									</div>
+								</template>
+								<template x-if="action.field === 'unflag'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none flex items-center gap-1.5 mt-px h-6">
+										@components.LucideIcon("flag-off", "w-3.5 h-3.5 text-base-content/40 shrink-0")
+										<p class="text-[0.65rem] text-base-content/40">Clears the flag on matching transactions.</p>
 									</div>
 								</template>
 							</div>

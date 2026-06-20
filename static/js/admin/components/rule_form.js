@@ -105,6 +105,8 @@ document.addEventListener('alpine:init', function () {
       { value: 'comment',         label: 'Add comment' },
       { value: 'metadata_set',    label: 'Set metadata' },
       { value: 'metadata_remove', label: 'Remove metadata' },
+      { value: 'flag',            label: 'Flag for attention' },
+      { value: 'unflag',          label: 'Clear flag' },
     ];
 
     // Tag slug regex must match the server-side validator in
@@ -137,6 +139,10 @@ document.addEventListener('alpine:init', function () {
       }
       if (a.type === 'remove_metadata') {
         return { field: 'metadata_remove', key: a.metadata_key || '', value: '', valueType: 'text', error: '' };
+      }
+      if (a.type === 'flag' || a.type === 'unflag') {
+        // No parameters — the action type alone carries the intent.
+        return { field: a.type, value: '', key: '', valueType: 'text', error: '' };
       }
       // Tolerate unknown types so the form still loads — validation happens at submit.
       return { field: a.type || a.field || '', value: a.category_slug || a.tag_slug || a.content || a.value || '', error: '' };
@@ -322,7 +328,10 @@ document.addEventListener('alpine:init', function () {
       // Action helpers. Only set_category is singleton (backend enforces one
       // per rule); add_tag / remove_tag / add_comment may repeat.
       isActionUsed: function (field) {
-        if (field !== 'category') return false;
+        // set_category is backend-singleton; flag/unflag are singleton in the UI
+        // (a rule either flags or it doesn't — last-writer-wins makes a second
+        // row meaningless).
+        if (field !== 'category' && field !== 'flag' && field !== 'unflag') return false;
         return this.form.actions.some(function (a) { return a.field === field; });
       },
       // Block "Add action" only while there's an unpicked draft row.
@@ -387,6 +396,11 @@ document.addEventListener('alpine:init', function () {
               warnings.push('Metadata key "' + setMeta[m].key.trim() + '" is being set and removed — these cancel out.');
             }
           }
+        }
+        var hasFlag = this.form.actions.some(function (a) { return a.field === 'flag'; });
+        var hasUnflag = this.form.actions.some(function (a) { return a.field === 'unflag'; });
+        if (hasFlag && hasUnflag) {
+          warnings.push('This rule both flags and clears the flag — last action wins, so one of them has no effect.');
         }
         return warnings;
       },
@@ -520,6 +534,8 @@ document.addEventListener('alpine:init', function () {
         var actions = this.form.actions
           .filter(function (a) {
             if (!a.field) return false;
+            // flag / unflag carry no value — keep them on the field alone.
+            if (a.field === 'flag' || a.field === 'unflag') return true;
             if (a.field === 'metadata_set' || a.field === 'metadata_remove') return !!(a.key && a.key.trim());
             return a.value !== undefined && a.value !== '';
           })
@@ -528,6 +544,8 @@ document.addEventListener('alpine:init', function () {
             if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
             if (a.field === 'tag_remove') return { type: 'remove_tag', tag_slug: a.value };
             if (a.field === 'comment') return { type: 'add_comment', content: a.value };
+            if (a.field === 'flag') return { type: 'flag' };
+            if (a.field === 'unflag') return { type: 'unflag' };
             if (a.field === 'metadata_set') {
               // Coerce the value to its declared JSON type so the stored blob is
               // typed (boolean true, number 100) rather than always a string.
