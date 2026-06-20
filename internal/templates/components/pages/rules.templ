@@ -460,6 +460,14 @@ func rulesActionIcon(r RulesRow) string {
 		return "message-square"
 	case "assign_series":
 		return "repeat"
+	case "assign_counterparty":
+		return "store"
+	case "flag":
+		return "flag"
+	case "unflag":
+		return "flag-off"
+	case "set_metadata", "remove_metadata":
+		return "braces"
 	default:
 		return "layers"
 	}

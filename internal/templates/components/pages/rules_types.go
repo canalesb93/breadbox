@@ -31,8 +31,8 @@ type RulesProps struct {
 
 	// Filter state — driven by query params, echoed back so the toolbar
 	// shows the active filter. Empty string == no filter for that dim.
-	Search       string
-	CategorySlug string
+	Search        string
+	CategorySlug  string
 	EnabledFilter string // "", "true", "false"
 	CreatorType   string // "", "user", "agent", "system"
 
@@ -58,13 +58,13 @@ type RulesCategoryOption struct {
 // that need helper logic (relative time, condition counts, expired flag)
 // so the templ stays free of funcMap shims.
 type RulesRow struct {
-	ID         string
-	Name       string
-	Enabled    bool
-	IsSystem   bool
-	HitCount   int
-	Priority   int
-	LastHitAt  *string // RFC3339; rendered via LastHitAtRelative
+	ID                string
+	Name              string
+	Enabled           bool
+	IsSystem          bool
+	HitCount          int
+	Priority          int
+	LastHitAt         *string // RFC3339; rendered via LastHitAtRelative
 	LastHitAtRelative string
 
 	// Creator identity — drives the agent avatar on agent-authored rows
@@ -82,14 +82,16 @@ type RulesRow struct {
 
 	// Conditions/actions surface counts + summaries; the row only needs
 	// the scalar derivatives.
-	ConditionCount  int
-	IsMatchAll      bool
+	ConditionCount   int
+	IsMatchAll       bool
 	ConditionSummary string
-	ActionsCount    int
-	ActionsSummary  string
+	ActionsCount     int
+	ActionsSummary   string
 	// PrimaryActionType is the single action's type ("set_category",
-	// "add_tag", "remove_tag", "add_comment", "assign_series") when the
-	// rule has exactly one action; "" when it has zero or multiple actions.
+	// "add_tag", "remove_tag", "add_comment", "assign_series",
+	// "assign_counterparty", "flag", "unflag", "set_metadata",
+	// "remove_metadata") when the rule has exactly one action; "" when it
+	// has zero or multiple actions.
 	// Drives the Action-column icon so the column reflects what the rule
 	// *does*, not just whether it sets a category.
 	PrimaryActionType string
