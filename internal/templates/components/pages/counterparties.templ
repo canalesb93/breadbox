@@ -1,0 +1,240 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// CounterpartiesList renders /counterparties — the directory of canonical,
+// cross-provider counterparties (the "other side" of a charge: merchants AND
+// non-merchants). A counterparty is a thin, rule-maintained entity whose
+// membership comes from `assign_counterparty` rules, so there is no detector and
+// no candidate-review queue: just every live counterparty as one list-row
+// (name · logo · linked-charge count · governing-rule count), linking to its
+// detail page where it can be enriched.
+templ CounterpartiesList(p CounterpartiesListProps) {
+	<div x-data="{ q: '' }">
+		@components.PageHeader(components.PageHeaderProps{
+			Title:                "Counterparties",
+			Subtitle:             "The canonical other side of a charge — merchants, people, employers. Membership is defined by the rules that assign charges to each one.",
+			SubtitleHideOnMobile: true,
+			Action:               components.PageHeaderAction(templ.SafeURL("/counterparties/new"), "plus", "New counterparty"),
+		})
+		if len(p.Rows) == 0 {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:  "store",
+				Title: "No counterparties yet",
+				Body:  "Create a counterparty, then author a rule with an “assign counterparty” action to populate it — or assign charges directly. A counterparty is just a name its rules fill.",
+			})
+		} else {
+			<div class="mt-4">
+				@components.FilterSearchInput(components.FilterSearchInputProps{
+					Placeholder: "Filter counterparties...",
+					XModel:      "q",
+				})
+			</div>
+			<div class="mt-4">
+				@components.AgentRunRowList() {
+					for _, c := range p.Rows {
+						@counterpartiesListRow(c)
+					}
+				}
+			</div>
+		}
+	</div>
+}
+
+// counterpartiesListRow renders one counterparty as a daisy list-row: a leading
+// logo thumbnail (or fallback glyph), the name on the title line, the
+// linked-charge + governing-rule counts on the body line, and a chevron. The
+// whole row links to the detail page.
+templ counterpartiesListRow(c CounterpartyRow) {
+	<li
+		class="list-row transition-colors hover:bg-base-200/40 items-center"
+		data-search={ c.Search }
+		x-show="!q || $el.dataset.search.includes(q.toLowerCase())"
+	>
+		<a
+			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+			href={ templ.SafeURL("/counterparties/" + c.ShortID) }
+			aria-label={ "Open counterparty " + c.Name }
+		>
+			@counterpartyLogoTile(c.LogoURL, c.Name)
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 min-w-0">
+					<span data-private="merchant" class="font-medium text-sm text-base-content truncate">{ c.Name }</span>
+				</div>
+				<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
+					{ counterpartyRowMeta(c.MemberCount, c.GoverningRuleCount) }
+				</div>
+			</div>
+			<div class="shrink-0 self-center">
+				@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content/25")
+			</div>
+		</a>
+	</li>
+}
+
+// counterpartyLogoTile is the leading glyph for a counterparty row/header — the
+// logo image when one is set, otherwise a quiet "store" tile.
+templ counterpartyLogoTile(logoURL, name string) {
+	if logoURL != "" {
+		<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200 overflow-hidden">
+			<img src={ logoURL } alt={ name } class="w-full h-full object-contain" loading="lazy"/>
+		</div>
+	} else {
+		<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200">
+			@components.LucideIcon("store", "w-4 h-4 text-base-content/50")
+		</div>
+	}
+}
+
+// CounterpartyDetail renders /counterparties/{short_id} under the
+// rules-as-substrate model: a counterparty IS the rules that define it. The page
+// pairs the LINKED CHARGES (what's bound to it) with the GOVERNING RULES (the
+// assign_counterparty rules that put them there), and adds a manual ENRICHMENT
+// form (name, category, mcc, website, logo). Enrichment is a plain POST →
+// UpdateCounterparty; no auto-fetch.
+templ CounterpartyDetail(p CounterpartyDetailProps) {
+	<div data-counterparty-id={ p.Counterparty.ShortID }>
+		@components.EntityHeader(components.EntityHeaderProps{
+			Title:            p.Counterparty.Name,
+			TitlePrivateKind: "merchant",
+			IconComponent:    counterpartyHeaderIcon(p.Counterparty.LogoURL, p.Counterparty.Name),
+			IconTone:         components.IconToneNeutral,
+			Meta:             counterpartyDetailMeta(p),
+		})
+		<!-- Linked charges (what's bound) + Governing rules (what defines it) -->
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+			<div>
+				@seriesPanelHeader("receipt", "Linked charges", fmt.Sprintf("%d bound to this counterparty", len(p.MemberRows)), nil)
+				if len(p.MemberRows) > 0 {
+					<div class="bb-card p-2 sm:p-3">
+						for _, m := range p.MemberRows {
+							@seriesChargeRow(m)
+						}
+					</div>
+				} else {
+					<div class="bb-card p-2 sm:p-3">
+						<div class="px-3 py-6 text-center text-sm text-base-content/55">
+							No charges are linked yet. A governing rule will fill this in on the next sync, or assign one manually.
+						</div>
+					</div>
+				}
+			</div>
+			<div>
+				@seriesPanelHeader("filter", "Governing rules", counterpartyGoverningSubtitle(len(p.GoverningRules)), seriesNewRuleBtn())
+				@counterpartyGoverningRulesPanel(p.GoverningRules)
+			</div>
+		</div>
+		<!-- Enrichment — manual edit lane (no auto-fetch) -->
+		<div class="mt-5 max-w-3xl">
+			@seriesPanelHeader("sparkles", "Enrichment", "Name, category, and brand details", nil)
+			<form method="POST" action={ templ.SafeURL("/counterparties/" + p.Counterparty.ShortID) }>
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				@components.SettingsSection(components.SettingsSectionProps{
+					Icon:  "store",
+					Title: "Details",
+				}) {
+					@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "Display label for this counterparty"}) {
+						<input type="text" name="name" value={ p.Counterparty.Name } required class="input input-sm w-full sm:w-80" aria-label="Name"/>
+					}
+					@components.SettingsRow(components.SettingsRowProps{Label: "Category", Caption: "Default category for its charges"}) {
+						<select name="category_id" class="select select-sm w-auto max-w-full" aria-label="Category">
+							<option value="" selected?={ p.CategoryID == "" }>— None —</option>
+							for _, opt := range p.CategoryOptions {
+								<option value={ opt.Value } selected?={ opt.Selected }>{ opt.Label }</option>
+							}
+						</select>
+					}
+					@components.SettingsRow(components.SettingsRowProps{Label: "MCC", Caption: "Merchant category code (4 digits)"}) {
+						<input type="text" name="mcc" value={ p.MCC } inputmode="numeric" maxlength="4" placeholder="e.g. 5411" class="input input-sm w-32" aria-label="MCC"/>
+					}
+					@components.SettingsRow(components.SettingsRowProps{Label: "Website", Stack: true}) {
+						<input type="url" name="website_url" value={ p.WebsiteURL } placeholder="https://example.com" class="input input-sm w-full" aria-label="Website URL"/>
+					}
+					@components.SettingsRow(components.SettingsRowProps{Label: "Logo URL", Caption: "Image hotlinked on counterparty rows", Stack: true}) {
+						<input type="url" name="logo_url" value={ p.LogoURL } placeholder="https://logo.example.com/acme.png" class="input input-sm w-full" aria-label="Logo URL"/>
+					}
+				}
+				<div class="bb-action-row">
+					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+						@components.LucideIcon("check", "w-4 h-4")
+						Save enrichment
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+// CounterpartyForm renders /counterparties/new — a from-scratch create form. A
+// counterparty needs only a name; enrich it and point rules at it afterwards.
+// Plain POST → CreateCounterpartyPageHandler creates the counterparty and
+// redirects to its detail page.
+templ CounterpartyForm(p CounterpartyFormProps) {
+	@components.PageHeader(components.PageHeaderProps{
+		Title:                "New counterparty",
+		Subtitle:             "Name a counterparty, then enrich it and author rules that assign charges to it. It starts empty.",
+		SubtitleHideOnMobile: true,
+	})
+	<form method="POST" action="/counterparties/new" class="max-w-2xl">
+		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+		if p.Error != "" {
+			<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
+				@components.LucideIcon("alert-triangle", "w-4 h-4")
+				<span>{ p.Error }</span>
+			</div>
+		}
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:  "store",
+			Title: "Details",
+		}) {
+			@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "What you call this counterparty"}) {
+				<input type="text" name="name" value={ p.Name } required placeholder="e.g. Amazon" class="input input-sm w-full sm:w-80" aria-label="Name"/>
+			}
+		}
+		<div class="bb-action-row">
+			<a href="/counterparties" class="btn btn-ghost btn-sm">Cancel</a>
+			<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+				@components.LucideIcon("plus", "w-4 h-4")
+				Create counterparty
+			</button>
+		</div>
+	</form>
+}
+
+// counterpartyHeaderIcon renders the EntityHeader leading tile content — the logo
+// image when set, otherwise a store glyph.
+templ counterpartyHeaderIcon(logoURL, name string) {
+	if logoURL != "" {
+		<img src={ logoURL } alt={ name } class="w-6 h-6 object-contain" loading="lazy"/>
+	} else {
+		@components.LucideIcon("store", "w-5 h-5 sm:w-6 sm:h-6")
+	}
+}
+
+// counterpartyDetailMeta is the quiet sub-title line — the linked-charge count.
+templ counterpartyDetailMeta(p CounterpartyDetailProps) {
+	<span class="text-sm text-base-content/55">{ counterpartyMemberCount(len(p.MemberRows)) }</span>
+}
+
+// counterpartyGoverningRulesPanel lists the assign_counterparty rules that define
+// this counterparty's membership. Reuses the shared GoverningRulesPanel rows; the
+// empty state is counterparty-specific copy.
+templ counterpartyGoverningRulesPanel(rules []components.GoverningRule) {
+	if len(rules) == 0 {
+		<div class="bb-card p-2 sm:p-3">
+			<div class="px-3 py-6 text-center">
+				<div class="text-sm text-base-content/60">No rules assign charges to this counterparty yet.</div>
+				<div class="text-xs text-base-content/40 mt-1">
+					Membership comes from rules with an <code class="font-mono bg-base-200 rounded px-1">assign_counterparty</code> action.
+					Create one on the <a href="/rules" class="link link-hover text-primary">Rules</a> page to define what lands here.
+				</div>
+			</div>
+		</div>
+	} else {
+		@components.GoverningRulesPanel(rules)
+	}
+}

@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -379,6 +380,79 @@ func (s *Service) CounterpartyTransactionCount(ctx context.Context, idOrShort st
 		return 0, fmt.Errorf("count counterparty transactions: %w", err)
 	}
 	return n, nil
+}
+
+// CounterpartyMembers returns the short_ids of the live charges linked to a
+// counterparty, newest first — the admin detail page feeds these to
+// GetAdminTransactionRowsByIDs so linked charges render through the shared
+// transaction-row component (identical to the /transactions list).
+func (s *Service) CounterpartyMembers(ctx context.Context, idOrShort string) ([]string, error) {
+	id, err := s.resolveCounterpartyID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := s.Queries.ListCounterpartyMemberShortIDs(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list counterparty members: %w", err)
+	}
+	return ids, nil
+}
+
+// ListCounterpartyMemberCounts returns the live charge count per counterparty,
+// keyed by the counterparty's uuid string (matching CounterpartyResponse.ID).
+// One query for the whole list page.
+func (s *Service) ListCounterpartyMemberCounts(ctx context.Context) (map[string]int, error) {
+	rows, err := s.Queries.ListCounterpartyMemberCounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list counterparty member counts: %w", err)
+	}
+	out := make(map[string]int, len(rows))
+	for _, r := range rows {
+		out[formatUUID(r.ID)] = int(r.MemberCount)
+	}
+	return out, nil
+}
+
+// ListCounterpartyGoverningRuleCounts tallies, in one pass over every
+// `assign_counterparty` rule, how many such rules target each counterparty — by
+// its short_id (assign-to-existing) or by its name (resolve-or-create). Returns
+// two maps (bySHortID, byName) so the list handler can combine them with the
+// counterparties it already has without an N+1 of ListCounterpartyGoverningRules.
+func (s *Service) ListCounterpartyGoverningRuleCounts(ctx context.Context) (byShortID map[string]int, byName map[string]int, err error) {
+	rows, err := s.Pool.Query(ctx,
+		`SELECT actions FROM transaction_rules
+		   WHERE actions @> '[{"type":"assign_counterparty"}]'::jsonb`)
+	if err != nil {
+		return nil, nil, fmt.Errorf("query counterparty governing rule counts: %w", err)
+	}
+	defer rows.Close()
+
+	byShortID = map[string]int{}
+	byName = map[string]int{}
+	for rows.Next() {
+		var raw []byte
+		if err := rows.Scan(&raw); err != nil {
+			return nil, nil, fmt.Errorf("scan rule actions: %w", err)
+		}
+		var actions []RuleAction
+		if err := json.Unmarshal(raw, &actions); err != nil {
+			continue // a malformed action blob shouldn't break the whole tally
+		}
+		for _, a := range actions {
+			if a.Type != "assign_counterparty" {
+				continue
+			}
+			if sid := strings.TrimSpace(a.CounterpartyShortID); sid != "" {
+				byShortID[sid]++
+			} else if name := strings.TrimSpace(a.CounterpartyName); name != "" {
+				byName[name]++
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterate rule actions: %w", err)
+	}
+	return byShortID, byName, nil
 }
 
 // ListCounterpartyGoverningRules returns the rules whose `assign_counterparty`

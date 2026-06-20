@@ -69,6 +69,9 @@ templ Nav(p NavProps) {
 			@navLink("/categories", "folder", "Categories", navActive(p.CurrentPage, "categories"))
 		}
 		if p.IsEditor {
+			@navLink("/counterparties", "store", "Counterparties", navActive(p.CurrentPage, "counterparties"))
+		}
+		if p.IsEditor {
 			@navLink("/tags", "tags", "Tags", navActive(p.CurrentPage, "tags"))
 		}
 		// System sits at the foot of the rail. The header renders for every

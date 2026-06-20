@@ -173,6 +173,15 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			http.Redirect(w, req, "/recurring/"+chi.URLParam(req, "id"), http.StatusFound)
 		})
 
+		// Counterparties — the canonical "other side" of a charge (merchants AND
+		// non-merchants). List + detail (enrichment form, linked charges,
+		// governing rules). Editor scope. Static /new before the {id} param.
+		r.Get("/counterparties", CounterpartiesListPageHandler(a, svc, sm, tr))
+		r.Get("/counterparties/new", NewCounterpartyPageHandler(a, svc, sm, tr))
+		r.Post("/counterparties/new", CreateCounterpartyPageHandler(a, svc, sm, tr))
+		r.Get("/counterparties/{id}", CounterpartyDetailHandler(a, sm, tr, svc))
+		r.Post("/counterparties/{id}", UpdateCounterpartyPageHandler(a, svc, sm, tr))
+
 		// Design-system sandbox. /design is the full gallery; /design/c/{slug}
 		// renders a single component family in isolation for focused screenshots.
 		// Editor scope: developer tooling, not user-facing.

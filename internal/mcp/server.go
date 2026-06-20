@@ -407,6 +407,32 @@ func (s *MCPServer) buildToolRegistry() {
 			Description: "Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.",
 		}, s.handleRemoveSeriesTag, s),
 
+		// --- Counterparties (rules-as-substrate, P4) ---
+		makeToolDefLogged(ToolSpec{
+			Name: "list_counterparties", Title: "List Counterparties", Classification: ToolRead,
+			Description: "List counterparties — the canonical, cross-provider 'other side' of a charge (merchants AND non-merchants: Venmo, people, employers). Each is a surrogate identity (id/short_id) with a name and optional enrichment (website_url, logo_url, category, mcc). Membership comes from assign_counterparty rules, not a normalizer. Use get_counterparty for one, query_transactions for its charges.",
+		}, s.handleListCounterparties, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "get_counterparty", Title: "Get Counterparty", Classification: ToolRead,
+			Description: "Get one counterparty by short ID or UUID: its name and enrichment fields. Its governing rules (the assign_counterparty rules that define its membership) are on the admin Counterparties detail page; its linked charges come from query_transactions.",
+		}, s.handleGetCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "create_counterparty", Title: "Create Counterparty", Classification: ToolWrite,
+			Description: "Create a new counterparty with a name and optional enrichment (website_url, logo_url, category_id, mcc). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use assign_counterparty (one-off) or author an assign_counterparty RULE (durable).",
+		}, s.handleCreateCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "update_counterparty", Title: "Enrich Counterparty", Classification: ToolWrite,
+			Description: "Enrich a counterparty: edit its name, website_url, logo_url, category_id (slug or short ID), and/or mcc. Every field optional — omit to leave unchanged; an empty name is rejected. This is the enrichment lane (no auto-fetch).",
+		}, s.handleUpdateCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "assign_counterparty", Title: "Assign Counterparty", Classification: ToolWrite,
+			Description: "Bind transactions to a counterparty, creating it if needed. This is a ONE-OFF assignment. For durable patterns, author an assign_counterparty RULE instead so every future matching charge resolves automatically. Provide counterparty_id to bind to an existing counterparty, OR name + create_if_missing:true to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass transaction_ids (≤50) to link members (NULL-fill only — never steals a charge already bound to another counterparty).",
+		}, s.handleAssignCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "unlink_counterparty_transaction", Title: "Unlink Charge from Counterparty", Classification: ToolWrite,
+			Description: "Detach transactions (≤50, each a current member) from a counterparty — the inverse of assign_counterparty's link path. Clears each charge's counterparty_id. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.",
+		}, s.handleUnlinkCounterpartyTransaction, s),
+
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
 			Name: "query_transactions", Title: "Query Transactions", Classification: ToolRead,
@@ -829,6 +855,15 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		MIMEType:    "application/json",
 		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
 	}, s.handleUserTemplate)
+
+	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
+		Name:        "Counterparty",
+		Title:       "Counterparty Detail",
+		URITemplate: "breadbox://counterparty/{short_id}",
+		Description: "Single counterparty (merchant or non-merchant) with its enrichment fields and the governing rules (assign_counterparty rules) that define its membership. short_id is the 8-char base62 id surfaced by list_counterparties.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
+	}, s.handleCounterpartyTemplate)
 }
 
 // AllToolDefs returns the full tool registry for admin display.

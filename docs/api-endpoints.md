@@ -98,6 +98,17 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | DELETE | `/series/{id}/tags/{slug}` | W | Detach a tag; strips series-inherited copies from members (keeps user-added) |
 | PATCH | `/series/{id}` | W | Edit a thin series' `name` and/or `type` (`subscription`/`bill`/`loan`/`other`) |
 
+## Counterparties
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/counterparties` | R | List counterparties (id, short_id, name, enrichment fields) |
+| GET | `/counterparties/{id}` | R | Single counterparty (accepts UUID or short_id) |
+| POST | `/counterparties` | W | Create by `name` + optional `website_url`/`logo_url`/`category_id`/`mcc`; duplicate live name rejected |
+| PATCH | `/counterparties/{id}` | W | Enrich `name`/`website_url`/`logo_url`/`category_id`/`mcc` (partial; empty body rejected) |
+| POST | `/counterparties/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a counterparty |
+| DELETE | `/counterparties/{id}/transactions/{txid}` | W | Unlink a transaction; errors if not a current member |
+
 ## Rules
 
 | Method | Path | Scope | Description |

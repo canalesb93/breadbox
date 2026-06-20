@@ -73,3 +73,21 @@ WHERE id = ANY(sqlc.arg('transaction_ids')::uuid[])
 -- name: CounterpartyTransactionCount :one
 SELECT COUNT(*) FROM transactions
 WHERE counterparty_id = $1 AND deleted_at IS NULL;
+
+-- ListCounterpartyMemberShortIDs returns the short_ids of a counterparty's live
+-- linked charges, newest first — fed to GetAdminTransactionRowsByIDs so the admin
+-- detail page renders them through the shared transaction-row component.
+-- name: ListCounterpartyMemberShortIDs :many
+SELECT t.short_id
+FROM transactions t
+WHERE t.counterparty_id = $1 AND t.deleted_at IS NULL
+ORDER BY t.date DESC, t.created_at DESC;
+
+-- ListCounterpartyMemberCounts returns the live charge count per counterparty in
+-- one pass, for the admin list page (avoids an N+1 of CounterpartyTransactionCount).
+-- name: ListCounterpartyMemberCounts :many
+SELECT cp.id, COUNT(t.id)::bigint AS member_count
+FROM counterparties cp
+LEFT JOIN transactions t ON t.counterparty_id = cp.id AND t.deleted_at IS NULL
+WHERE cp.deleted_at IS NULL
+GROUP BY cp.id;
