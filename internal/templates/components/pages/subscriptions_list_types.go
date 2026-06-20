@@ -160,8 +160,3 @@ func subscriptionTypeTone(typ string) components.IconTone {
 		return components.IconToneNeutral
 	}
 }
-
-// subscriptionSearchHaystack builds the lowercase filter haystack for a row.
-func subscriptionSearchHaystack(name, typeLabel string) string {
-	return strings.ToLower(strings.Join([]string{name, typeLabel}, " "))
-}
