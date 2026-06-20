@@ -48,12 +48,18 @@ func CounterpartiesListPageHandler(a *app.App, svc *service.Service, sm *scs.Ses
 			a.Logger.Error("counterparty governing rule counts", "error", err)
 			ruleByShortID, ruleByName = map[string]int{}, map[string]int{}
 		}
+		// Resolve each counterparty's default-category UUID → display name in one
+		// pass, so the row can show a small category chip without an N+1.
+		catNameByUUID := counterpartyCategoryNames(ctx, svc)
 
 		rows := make([]pages.CounterpartyRow, 0, len(all))
 		for _, c := range all {
 			row := counterpartyRow(c)
 			row.MemberCount = counts[c.ID]
 			row.GoverningRuleCount = ruleByShortID[c.ShortID] + ruleByName[c.Name]
+			if c.CategoryID != nil {
+				row.Category = catNameByUUID[*c.CategoryID]
+			}
 			rows = append(rows, row)
 		}
 
@@ -257,6 +263,25 @@ func counterpartyRow(c service.CounterpartyResponse) pages.CounterpartyRow {
 		LogoURL: derefStr(c.LogoURL),
 		Search:  strings.ToLower(c.Name),
 	}
+}
+
+// counterpartyCategoryNames builds a UUID → display-name map across the whole
+// category tree (parents + children), so the list page can label a
+// counterparty's default category in one query rather than N. A child uses its
+// own short display name (not "Parent / Child") to keep the row chip compact.
+func counterpartyCategoryNames(ctx context.Context, svc *service.Service) map[string]string {
+	cats, err := svc.ListCategories(ctx)
+	if err != nil {
+		return map[string]string{}
+	}
+	out := make(map[string]string)
+	for _, parent := range cats {
+		out[parent.ID] = parent.DisplayName
+		for _, child := range parent.Children {
+			out[child.ID] = child.DisplayName
+		}
+	}
+	return out
 }
 
 // counterpartyCategoryOptions flattens the category tree into "Parent / Child"

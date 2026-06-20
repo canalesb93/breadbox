@@ -23,8 +23,8 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 		@components.EntityHeader(components.EntityHeaderProps{
 			Title:            p.Series.Name,
 			TitlePrivateKind: "merchant",
-			Icon:             subscriptionTypeIcon(p.Series.Type),
-			IconTone:         components.IconToneNeutral,
+			IconComponent:    seriesHeaderIcon(p.Series.Type),
+			IconTone:         components.IconToneDefault,
 			Badges:           seriesDetailBadges(p.Series),
 			Meta:             seriesDetailMeta(p),
 			Action:           seriesDetailActions(),
@@ -127,6 +127,17 @@ templ seriesLinkChargeBtn() {
 		@components.LucideIcon("plus", "w-3.5 h-3.5")
 		Link a charge
 	</button>
+}
+
+// seriesHeaderIcon renders the EntityHeader leading tile content — the same
+// type-tinted EntityAvatar the ledger rows use, sized to fill the header tile
+// slot so the detail hero matches the list.
+templ seriesHeaderIcon(typ string) {
+	@components.EntityAvatar(components.EntityAvatarProps{
+		Icon:  subscriptionTypeIcon(typ),
+		Tone:  subscriptionTypeTone(typ),
+		Class: "w-full h-full",
+	})
 }
 
 // seriesDetailBadges is the EntityHeader badge row: the structured type chip.

@@ -42,12 +42,18 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			a.Logger.Error("series member counts", "error", err)
 			counts = map[string]int{} // degrade gracefully — rows still render
 		}
+		ruleByShortID, ruleByName, err := svc.ListSeriesGoverningRuleCounts(ctx)
+		if err != nil {
+			a.Logger.Error("series governing rule counts", "error", err)
+			ruleByShortID, ruleByName = map[string]int{}, map[string]int{}
+		}
 
 		typesPresent := map[string]bool{}
 		rows := make([]pages.SubscriptionRow, 0, len(all))
 		for _, s := range all {
 			row := subscriptionRow(s)
 			row.MemberCount = counts[s.ID]
+			row.GoverningRuleCount = ruleByShortID[s.ShortID] + ruleByName[s.Name]
 			if row.Type != "" {
 				typesPresent[row.Type] = true
 			}

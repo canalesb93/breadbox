@@ -68,3 +68,40 @@ func TestSubscriptionMemberCount(t *testing.T) {
 		}
 	}
 }
+
+// TestSubscriptionRowMeta pins the body-line composition: charges always show;
+// the rule count is appended only when at least one governing rule exists
+// (mirrors counterpartyRowMeta so the two surfaces read identically).
+func TestSubscriptionRowMeta(t *testing.T) {
+	cases := []struct {
+		members, rules int
+		want           string
+	}{
+		{0, 0, "0 charges"},
+		{1, 0, "1 charge"},
+		{4, 1, "4 charges · 1 rule"},
+		{4, 3, "4 charges · 3 rules"},
+	}
+	for _, c := range cases {
+		if got := subscriptionRowMeta(c.members, c.rules); got != c.want {
+			t.Errorf("subscriptionRowMeta(%d,%d) = %q, want %q", c.members, c.rules, got, c.want)
+		}
+	}
+}
+
+// TestSubscriptionTypeTone pins the type→tone mapping to the vivid tones only
+// (so subscription never collapses to gray on the dark theme).
+func TestSubscriptionTypeTone(t *testing.T) {
+	cases := map[string]string{
+		"subscription": "success",
+		"bill":         "warning",
+		"loan":         "info",
+		"other":        "neutral",
+		"":             "neutral",
+	}
+	for typ, want := range cases {
+		if got := string(subscriptionTypeTone(typ)); got != want {
+			t.Errorf("subscriptionTypeTone(%q) = %q, want %q", typ, got, want)
+		}
+	}
+}

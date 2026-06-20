@@ -61,19 +61,21 @@ templ subscriptionsTypeFilterBtn(t SubscriptionTypeFilter) {
 	>{ t.Label }</button>
 }
 
-// subscriptionsListRow renders one series as a daisy list-row: a leading type
-// glyph, the name + type chip on the title line, the linked-charge count on the
-// body line, and a chevron affordance. The whole row links to the detail page.
+// subscriptionsListRow renders one series as a daisy list-row in the
+// Workflows-gallery idiom: a leading type-tinted EntityAvatar (a distinct calm
+// tint + glyph per series type), the name + type chip on the title line, the
+// linked-charge + governing-rule counts on the body line, and a chevron
+// affordance. The whole row links to the detail page.
 templ subscriptionsListRow(s SubscriptionRow) {
 	<li
-		class="list-row transition-colors hover:bg-base-200/40 items-center"
+		class="list-row rounded-xl transition-colors hover:bg-base-200/40 focus-within:bg-base-200/40 items-center"
 		data-series-card
 		data-type={ s.Type }
 		data-search={ s.Search }
 		x-show="(filterType === 'all' || filterType === $el.dataset.type) && matches($el)"
 	>
 		<a
-			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
 			href={ templ.SafeURL("/recurring/" + s.ShortID) }
 			aria-label={ "Open recurring series " + s.Name }
 		>
@@ -84,7 +86,7 @@ templ subscriptionsListRow(s SubscriptionRow) {
 					@components.SeriesTypeChip(s.TypeLabel, "xs")
 				</div>
 				<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
-					{ subscriptionMemberCount(s.MemberCount) }
+					{ subscriptionRowMeta(s.MemberCount, s.GoverningRuleCount) }
 				</div>
 			</div>
 			<div class="shrink-0 self-center">
@@ -94,12 +96,15 @@ templ subscriptionsListRow(s SubscriptionRow) {
 	</li>
 }
 
-// subscriptionsTypeTile is the leading glyph for a ledger row — a quiet,
-// type-keyed icon tile (subscription → repeat, bill → receipt, loan → landmark).
+// subscriptionsTypeTile is the leading EntityAvatar for a ledger row — a
+// type-tinted tile (subscription → primary/repeat, bill → warning/receipt,
+// loan → info/landmark, other → neutral/shapes).
 templ subscriptionsTypeTile(typ string) {
-	<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200">
-		@components.LucideIcon(subscriptionTypeIcon(typ), "w-4 h-4 text-base-content/50")
-	</div>
+	@components.EntityAvatar(components.EntityAvatarProps{
+		Icon: subscriptionTypeIcon(typ),
+		Tone: subscriptionTypeTone(typ),
+		Size: components.EntityAvatarSizeMD,
+	})
 }
 
 // subscriptionTypeIcon maps a series type to its lucide glyph (shared by the
@@ -110,6 +115,8 @@ func subscriptionTypeIcon(typ string) string {
 		return "receipt"
 	case "loan":
 		return "landmark"
+	case "other":
+		return "shapes"
 	default:
 		return "repeat"
 	}
