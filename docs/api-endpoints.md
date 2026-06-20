@@ -90,7 +90,6 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
 | GET | `/series` | R | List recurring series; optional `?status=active\|candidate\|paused\|cancelled` |
-| GET | `/series/explain` | R | Near-miss feed: recurring-looking merchants not yet a series + the detector's verdict (why) |
 | GET | `/series/{id}` | R | Single series (accepts UUID or short_id) |
 | POST | `/series` | W | Create a missed series (`merchant_key`+`create_if_missing`) or assign by `series_id`; links `transaction_ids` (≤50), optional `confirm` |
 | POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series; optional `confirm` |

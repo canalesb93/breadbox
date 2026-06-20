@@ -724,8 +724,9 @@ func subscriptionRow(s service.SeriesResponse, catName, userName map[string]stri
 	}
 	row.Type = s.Type
 	row.TypeLabel = recurringTypeLabel(s.Type)
-	row.RenewalLabel, row.RenewalTone = subscriptionRenewal(s)
-	row.DaysUntilRenewal = s.DaysUntilRenewal
+	// Renewal-health display retired (rules-as-substrate, P2-PR1). The series
+	// no longer carries a derived renewal projection; the full ledger rebuild
+	// lands in P2-PR3. Leave the renewal chip / days-until empty for now.
 	if sig, ok := decodeSignals(s.DetectionSignals); ok {
 		row.PriceChanged = sig.AmountBranch == "monotonic_drift"
 	}
@@ -761,42 +762,6 @@ func recurringTypeLabel(t string) string {
 		return "Other"
 	default:
 		return "Subscription"
-	}
-}
-
-// subscriptionRenewal derives an attention chip (label + daisy tone) from a
-// series' renewal health (shipped on SeriesResponse). Returns empty for
-// comfortably-renewing / no-projection series — only due_soon / overdue /
-// stale earn a chip, so the ledger highlights what needs a look. Health is
-// only populated for active series, so candidates/paused/cancelled get nothing.
-func subscriptionRenewal(s service.SeriesResponse) (string, string) {
-	days := 0
-	if s.DaysUntilRenewal != nil {
-		days = *s.DaysUntilRenewal
-	}
-	switch s.RenewalHealth {
-	case service.SeriesHealthDueSoon:
-		switch {
-		case days <= 0:
-			return "Due today", "info"
-		case days == 1:
-			return "Due tomorrow", "info"
-		default:
-			return fmt.Sprintf("Renews in %dd", days), "info"
-		}
-	case service.SeriesHealthOverdue:
-		return fmt.Sprintf("%dd overdue", -days), "warning"
-	case service.SeriesHealthStale:
-		// Type-aware copy: a bill/loan that goes silent has "lapsed" (you may
-		// have missed a payment), whereas a subscription has likely been cancelled.
-		switch s.Type {
-		case service.SeriesTypeBill, service.SeriesTypeLoan:
-			return "Lapsed?", "error"
-		default:
-			return "Likely cancelled", "error"
-		}
-	default:
-		return "", ""
 	}
 }
 

@@ -621,11 +621,6 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
 	}
 
-	merchantName := ""
-	if txn.MerchantName != nil {
-		merchantName = *txn.MerchantName
-	}
-
 	params := db.UpsertTransactionParams{
 		AccountID:                    accountID,
 		ProviderTransactionID:        txn.ExternalID,
@@ -643,10 +638,10 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderCategoryConfidence:   pgconv.TextPtrIfNotEmpty(txn.CategoryConfidence),
 		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
-		// merchant_key: the normalized recurring-series detection anchor, set at
-		// sync time so going-forward rows are immediately groupable. NULL when no
-		// usable merchant signal (excluded from auto-detection). See merchantkey.go.
-		MerchantKey: pgconv.TextIfNotEmpty(MerchantKey(merchantName, txn.Name)),
+		// merchant_key: detection anchor retired (rules-as-substrate). The column
+		// still exists this migration cycle but is no longer computed at sync time;
+		// new rows write NULL until the column is dropped (P2-PR2).
+		MerchantKey: pgtype.Text{},
 	}
 
 	row, err := q.UpsertTransaction(ctx, params)

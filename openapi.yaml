@@ -1971,22 +1971,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/explain:
-    get:
-      tags: [Series]
-      summary: Explain near-miss subscriptions
-      description: "Answer \"why isn't <merchant> a subscription?\". Reports every recurring-looking merchant group that is not already a series, with the detector's verdict — `qualifies:true` (eligible but untracked) or a specific gate it failed (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Read-only analysis over the trailing detection window."
-      responses:
-        "200":
-          description: Near-miss merchant groups with detector verdicts.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  near_misses:
-                    type: array
-                    items: { $ref: "#/components/schemas/SeriesNearMiss" }
   /api/v1/series/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }
