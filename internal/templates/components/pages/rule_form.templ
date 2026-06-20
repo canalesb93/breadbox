@@ -175,15 +175,15 @@ templ RuleForm(p RuleFormProps) {
 								<select x-model="cond.field" @change="onFieldChange(idx)" class="select select-xs bg-base-100 flex-1 min-w-0">
 									<option value="">Field...</option>
 									<optgroup label="Transaction">
-										<option value="name">Name</option>
-										<option value="merchant_name">Merchant</option>
+										<option value="provider_name">Name</option>
+										<option value="provider_merchant_name">Merchant</option>
 										<option value="amount">Amount</option>
 										<option value="pending">Pending</option>
 									</optgroup>
 									<optgroup label="Category">
 										<option value="category">Category (assigned)</option>
-										<option value="category_primary">Category (raw primary)</option>
-										<option value="category_detailed">Category (raw detail)</option>
+										<option value="provider_category_primary">Category (raw primary)</option>
+										<option value="provider_category_detailed">Category (raw detail)</option>
 									</optgroup>
 									<optgroup label="Tags">
 										<option value="tags">Tag</option>

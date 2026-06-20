@@ -15,8 +15,8 @@
 document.addEventListener('alpine:init', function () {
   Alpine.data('ruleForm', function () {
     var fieldTypes = {
-      name: 'string', merchant_name: 'string', amount: 'numeric',
-      category_primary: 'string', category_detailed: 'string',
+      provider_name: 'string', provider_merchant_name: 'string', amount: 'numeric',
+      provider_category_primary: 'string', provider_category_detailed: 'string',
       category: 'string',
       pending: 'bool', provider: 'string',
       account_id: 'string', account_name: 'string',
