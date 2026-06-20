@@ -68,6 +68,15 @@ type TransactionContext struct {
 	// InSeries reports whether the transaction is linked to any recurring
 	// series (field: "in_series"). Same timing caveat as SeriesShortID.
 	InSeries bool
+	// CounterpartyShortID is the short_id of the counterparty this transaction is
+	// bound to (field: "counterparty"), empty when unassigned. Resolved from the
+	// resolver's counterparty cache at sync time. Like series_id, counterparty_id
+	// is NULL on freshly-synced rows (resolved post-upsert by assign_counterparty
+	// rules), so this matters mostly for changed / re-synced rows + retroactive.
+	CounterpartyShortID string
+	// HasCounterparty reports whether the transaction is bound to any counterparty
+	// (field: "has_counterparty"). Same timing caveat as CounterpartyShortID.
+	HasCounterparty bool
 	// Metadata holds the transaction's free-form metadata blob (the JSONB
 	// `metadata` column) so conditions on dotted fields (field:
 	// "metadata.<key>") can read arbitrary enrichment values. Updated
@@ -125,6 +134,10 @@ type RuleActions struct {
 	// Last-writer-wins: the highest-priority matching rule owns the assignment
 	// (a transaction belongs to at most one series).
 	SeriesAssign *SeriesAssignIntent
+	// CounterpartyAssign, when non-nil, binds the transaction to a counterparty.
+	// Last-writer-wins: the highest-priority matching rule owns the binding
+	// (a transaction binds at most one counterparty).
+	CounterpartyAssign *CounterpartyAssignIntent
 	// MetadataSet maps metadata keys to the value the net-surviving set_metadata
 	// action wrote. Last-writer-wins per key across the pipeline. A later-stage
 	// remove_metadata for the same key cancels the set (the key won't appear
@@ -150,15 +163,17 @@ type RuleActions struct {
 // Kept local so the sync package doesn't import service (preserves the
 // one-way service → sync dependency direction).
 type typedAction struct {
-	Type            string
-	CategorySlug    string
-	TagSlug         string
-	Content         string
-	SeriesShortID   string
-	SeriesName      string
-	CreateIfMissing bool
-	MetadataKey     string
-	MetadataValue   any
+	Type                string
+	CategorySlug        string
+	TagSlug             string
+	Content             string
+	SeriesShortID       string
+	SeriesName          string
+	CounterpartyShortID string
+	CounterpartyName    string
+	CreateIfMissing     bool
+	MetadataKey         string
+	MetadataValue       any
 }
 
 // SeriesAssignIntent is the resolved assign_series action: link the
@@ -171,6 +186,16 @@ type SeriesAssignIntent struct {
 	CreateIfMissing bool
 }
 
+// CounterpartyAssignIntent is the resolved assign_counterparty action: bind the
+// transaction to an existing counterparty (CounterpartyShortID) or resolve-or-
+// create one by name (CounterpartyName + CreateIfMissing). A transaction binds at
+// most one counterparty, so this is last-writer-wins across matching rules.
+type CounterpartyAssignIntent struct {
+	CounterpartyShortID string
+	CounterpartyName    string
+	CreateIfMissing     bool
+}
+
 // RuleResolver loads transaction rules and evaluates them during sync.
 // All matching rules contribute actions (merge non-conflicting).
 type RuleResolver struct {
@@ -178,6 +203,7 @@ type RuleResolver struct {
 	slugCache       map[[16]byte]string    // category UUID bytes -> slug
 	slugToID        map[string]pgtype.UUID // category slug -> UUID (reverse cache)
 	seriesShortID   map[[16]byte]string    // recurring_series UUID bytes -> short_id
+	cpShortID       map[[16]byte]string    // counterparties UUID bytes -> short_id
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
@@ -222,6 +248,7 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 		slugCache:     make(map[[16]byte]string),
 		slugToID:      make(map[string]pgtype.UUID),
 		seriesShortID: make(map[[16]byte]string),
+		cpShortID:     make(map[[16]byte]string),
 		hitCounts:     make(map[[16]byte]int),
 	}
 
@@ -272,6 +299,26 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 				return nil, fmt.Errorf("scan recurring series short_id: %w", err)
 			}
 			r.seriesShortID[id.Bytes] = shortID
+		}
+	}
+
+	// Load the counterparty id→short_id cache so the `counterparty` condition
+	// field can resolve a transaction's counterparty_id to its short_id without a
+	// per-row query. Tolerate a missing table (older deployments / lite / before
+	// the P4 migration) the same way the series cache does — counterparty
+	// conditions simply won't match.
+	cpRows, err := pool.Query(ctx, "SELECT id, short_id FROM counterparties")
+	if err != nil {
+		logger.Warn("failed to load counterparties cache; counterparty conditions will not match", "error", err)
+	} else {
+		defer cpRows.Close()
+		for cpRows.Next() {
+			var id pgtype.UUID
+			var shortID string
+			if err := cpRows.Scan(&id, &shortID); err != nil {
+				return nil, fmt.Errorf("scan counterparty short_id: %w", err)
+			}
+			r.cpShortID[id.Bytes] = shortID
 		}
 	}
 
@@ -396,6 +443,11 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 			}
 			createIfMissing, _ := m["create_if_missing"].(bool)
 			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, SeriesName: seriesName, CreateIfMissing: createIfMissing})
+		case "assign_counterparty":
+			cpShortID, _ := m["counterparty_short_id"].(string)
+			cpName, _ := m["counterparty_name"].(string)
+			createIfMissing, _ := m["create_if_missing"].(bool)
+			out = append(out, typedAction{Type: t, CounterpartyShortID: cpShortID, CounterpartyName: cpName, CreateIfMissing: createIfMissing})
 		case "set_metadata":
 			key, _ := m["metadata_key"].(string)
 			out = append(out, typedAction{Type: t, MetadataKey: key, MetadataValue: m["metadata_value"]})
@@ -515,6 +567,16 @@ func (r *RuleResolver) SeriesShortID(id pgtype.UUID) string {
 		return ""
 	}
 	return r.seriesShortID[id.Bytes]
+}
+
+// CounterpartyShortID returns the short_id for a counterparty UUID, or empty
+// string if the counterparty is unknown to the resolver's cache (e.g. created
+// after resolver construction, or the table was unavailable at load time).
+func (r *RuleResolver) CounterpartyShortID(id pgtype.UUID) string {
+	if !id.Valid {
+		return ""
+	}
+	return r.cpShortID[id.Bytes]
 }
 
 // ResolveWithContext evaluates all transaction rules in pipeline-stage order
@@ -685,6 +747,26 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					ActionField: "series",
 					ActionValue: seriesActionValue(a),
 				})
+			case "assign_counterparty":
+				if a.CounterpartyShortID == "" && a.CounterpartyName == "" {
+					continue
+				}
+				// Last-writer-wins: a transaction binds at most one counterparty,
+				// so a later-stage rule overrides an earlier binding and supersedes
+				// its audit source.
+				result.CounterpartyAssign = &CounterpartyAssignIntent{
+					CounterpartyShortID: a.CounterpartyShortID,
+					CounterpartyName:    a.CounterpartyName,
+					CreateIfMissing:     a.CreateIfMissing,
+				}
+				result.Sources = dropCounterpartySource(result.Sources)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: "counterparty",
+					ActionValue: counterpartyActionValue(a),
+				})
 			case "set_metadata":
 				if a.MetadataKey == "" {
 					continue
@@ -817,6 +899,32 @@ func dropSeriesSource(src []RuleActionSource) []RuleActionSource {
 	kept := src[:0]
 	for _, s := range src {
 		if s.ActionField == "series" {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
+}
+
+// counterpartyActionValue is the audit value for an assign_counterparty action:
+// the counterparty short_id when binding to an existing counterparty, else the
+// name it resolves-or-creates under.
+func counterpartyActionValue(a typedAction) string {
+	if a.CounterpartyShortID != "" {
+		return a.CounterpartyShortID
+	}
+	return a.CounterpartyName
+}
+
+// dropCounterpartySource removes any prior counterparty source so the final
+// source slice records only the winning (last) rule's provenance for the binding.
+func dropCounterpartySource(src []RuleActionSource) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == "counterparty" {
 			continue
 		}
 		kept = append(kept, s)
@@ -997,6 +1105,10 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.SeriesShortID)
 	case "in_series":
 		return evaluateBool(c, tctx.InSeries)
+	case "counterparty":
+		return evaluateString(c, tctx.CounterpartyShortID)
+	case "has_counterparty":
+		return evaluateBool(c, tctx.HasCounterparty)
 	case "day_of_month":
 		if tctx.Date.IsZero() {
 			return false

@@ -44,6 +44,8 @@ var validConditionFields = map[string]string{
 	"tags":                       "tags",
 	"series":                     "string", // recurring-series short_id the txn belongs to
 	"in_series":                  "bool",   // whether the txn belongs to any recurring series
+	"counterparty":               "string", // counterparty short_id the txn is bound to
+	"has_counterparty":           "bool",   // whether the txn is bound to any counterparty
 
 	// Date-part fields — numeric values derived from the tz-naive `date`
 	// column (no timezone math; provider-localized). day_of_week uses Go's
@@ -479,6 +481,10 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 		return evalString(c, tctx.SeriesShortID)
 	case "in_series":
 		return evalBool(c, tctx.InSeries)
+	case "counterparty":
+		return evalString(c, tctx.CounterpartyShortID)
+	case "has_counterparty":
+		return evalBool(c, tctx.HasCounterparty)
 	case "day_of_month":
 		if tctx.Date.IsZero() {
 			return false
@@ -847,15 +853,16 @@ func toStringSlice(v interface{}) ([]string, bool) {
 // Unknown types are rejected by ValidateActions. Read-time tolerates unknown
 // types by skipping them with a logged warning (see sync/rule_resolver).
 var validActionTypes = map[string]bool{
-	"set_category":    true,
-	"add_tag":         true,
-	"remove_tag":      true,
-	"add_comment":     true,
-	"assign_series":   true,
-	"set_metadata":    true,
-	"remove_metadata": true,
-	"flag":            true,
-	"unflag":          true,
+	"set_category":        true,
+	"add_tag":             true,
+	"remove_tag":          true,
+	"add_comment":         true,
+	"assign_series":       true,
+	"assign_counterparty": true,
+	"set_metadata":        true,
+	"remove_metadata":     true,
+	"flag":                true,
+	"unflag":              true,
 }
 
 // tagSlugPattern enforces the tag slug format: lowercase alphanumerics with
@@ -874,7 +881,7 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 	seenCategory := false
 	for _, a := range actions {
 		if !validActionTypes[a.Type] {
-			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series|set_metadata|remove_metadata|flag|unflag)", ErrInvalidParameter, a.Type)
+			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series|assign_counterparty|set_metadata|remove_metadata|flag|unflag)", ErrInvalidParameter, a.Type)
 		}
 		switch a.Type {
 		case "set_category":
@@ -911,6 +918,20 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 			if hasSeries {
 				if _, err := s.resolveSeriesID(ctx, a.SeriesShortID); err != nil {
 					return fmt.Errorf("%w: assign_series series_short_id %q not found", ErrInvalidParameter, a.SeriesShortID)
+				}
+			}
+		case "assign_counterparty":
+			hasCP := strings.TrimSpace(a.CounterpartyShortID) != ""
+			hasName := strings.TrimSpace(a.CounterpartyName) != ""
+			if hasCP == hasName {
+				return fmt.Errorf("%w: assign_counterparty requires exactly one of counterparty_short_id or counterparty_name", ErrInvalidParameter)
+			}
+			if hasName && !a.CreateIfMissing {
+				return fmt.Errorf("%w: assign_counterparty with counterparty_name requires create_if_missing=true", ErrInvalidParameter)
+			}
+			if hasCP {
+				if _, err := s.resolveCounterpartyID(ctx, a.CounterpartyShortID); err != nil {
+					return fmt.Errorf("%w: assign_counterparty counterparty_short_id %q not found", ErrInvalidParameter, a.CounterpartyShortID)
 				}
 			}
 		case "set_metadata":
@@ -1597,7 +1618,8 @@ const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provid
 	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
 	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[]),
-	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata, t.date
+	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata, t.date,
+	COALESCE(cp.short_id, ''), (t.counterparty_id IS NOT NULL)
 	FROM transactions t
 	JOIN accounts a ON t.account_id = a.id
 	JOIN bank_connections bc ON a.connection_id = bc.id
@@ -1605,16 +1627,17 @@ const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provid
 	LEFT JOIN transaction_tags tt ON tt.transaction_id = t.id
 	LEFT JOIN tags tag ON tag.id = tt.tag_id
 	LEFT JOIN recurring_series rs ON rs.id = t.series_id
+	LEFT JOIN counterparties cp ON cp.id = t.counterparty_id
 	WHERE t.deleted_at IS NULL
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
-const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id, t.metadata, t.date`
+const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id, t.metadata, t.date, cp.short_id, t.counterparty_id`
 
 // transactionContextColumns is the number of columns selected by
 // transactionContextQuery (and bound by scanTransactionContextRow). Callers size
 // their scan-dest slice with this so adding a column is a single-line change.
-const transactionContextColumns = 16
+const transactionContextColumns = 18
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
@@ -1642,6 +1665,8 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	dest[13] = &r.tctx.InSeries
 	dest[14] = &r.metadataRaw
 	dest[15] = &r.dateRaw
+	dest[16] = &r.tctx.CounterpartyShortID
+	dest[17] = &r.tctx.HasCounterparty
 	return r
 }
 
@@ -1694,6 +1719,10 @@ type retroTxnIntent struct {
 	// assign_series — last-writer-wins; nil means no assignment.
 	series     *RuleAction
 	seriesRule ruleapply.Rule
+
+	// assign_counterparty — last-writer-wins; nil means no assignment.
+	counterparty     *RuleAction
+	counterpartyRule ruleapply.Rule
 
 	// set_metadata / remove_metadata — net-diffed, disjoint by construction.
 	metadataSet    map[string]any
@@ -1756,6 +1785,13 @@ func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroT
 	if it.series != nil {
 		if err := s.AssignSeriesFromRuleTx(ctx, tx, it.txnID, it.series.SeriesShortID, it.series.SeriesName, it.series.CreateIfMissing); err != nil {
 			return fmt.Errorf("apply assign_series retroactively: %w", err)
+		}
+	}
+
+	// assign_counterparty — same resolve-or-create + link the sync path uses.
+	if it.counterparty != nil {
+		if err := s.AssignCounterpartyFromRuleTx(ctx, tx, it.txnID, it.counterparty.CounterpartyShortID, it.counterparty.CounterpartyName, it.counterparty.CreateIfMissing); err != nil {
+			return fmt.Errorf("apply assign_counterparty retroactively: %w", err)
 		}
 	}
 
@@ -1833,6 +1869,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 	var tagAdds []string
 	var tagRemoves []string
 	var seriesAssign *RuleAction
+	var counterpartyAssign *RuleAction
 	metadataSet := map[string]any{}
 	var metadataRemove []string
 	var flagIntent string
@@ -1855,6 +1892,9 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		case "assign_series":
 			aCopy := a
 			seriesAssign = &aCopy
+		case "assign_counterparty":
+			aCopy := a
+			counterpartyAssign = &aCopy
 		case "set_metadata":
 			if a.MetadataKey == "" {
 				continue
@@ -1881,7 +1921,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		}
 	}
 	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0 || seriesAssign != nil ||
-		len(metadataSet) > 0 || len(metadataRemove) > 0 || flagIntent != ""
+		counterpartyAssign != nil || len(metadataSet) > 0 || len(metadataRemove) > 0 || flagIntent != ""
 	if !hasWriteAction {
 		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
@@ -1966,18 +2006,20 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 
 		for _, txnID := range matchIDs {
 			it := retroTxnIntent{
-				txnID:          txnID,
-				catID:          categorySetCatID,
-				catSlug:        categorySetSlug,
-				catRule:        appliedRule,
-				tagAdds:        make(map[string]ruleapply.Rule, len(tagAdds)),
-				tagRemoves:     make(map[string]ruleapply.Rule, len(tagRemoves)),
-				series:         seriesAssign,
-				seriesRule:     appliedRule,
-				metadataSet:    metadataSet,
-				metadataRemove: metadataRemove,
-				flagIntent:     flagIntent,
-				ruleApplied:    ruleApplied,
+				txnID:            txnID,
+				catID:            categorySetCatID,
+				catSlug:          categorySetSlug,
+				catRule:          appliedRule,
+				tagAdds:          make(map[string]ruleapply.Rule, len(tagAdds)),
+				tagRemoves:       make(map[string]ruleapply.Rule, len(tagRemoves)),
+				series:           seriesAssign,
+				seriesRule:       appliedRule,
+				counterparty:     counterpartyAssign,
+				counterpartyRule: appliedRule,
+				metadataSet:      metadataSet,
+				metadataRemove:   metadataRemove,
+				flagIntent:       flagIntent,
+				ruleApplied:      ruleApplied,
 			}
 			for _, slug := range tagAdds {
 				it.tagAdds[slug] = appliedRule
@@ -2037,6 +2079,11 @@ func actionAuditFields(a RuleAction) (string, string) {
 			return "series", a.SeriesShortID
 		}
 		return "series", a.SeriesName
+	case "assign_counterparty":
+		if a.CounterpartyShortID != "" {
+			return "counterparty", a.CounterpartyShortID
+		}
+		return "counterparty", a.CounterpartyName
 	case "set_metadata":
 		return "metadata", a.MetadataKey
 	case "remove_metadata":
@@ -2163,18 +2210,20 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		// the sync resolver. Category: last-writer-wins. Tags: net-diff.
 		// Metadata: last-writer-wins per key, net-diff set↔remove.
 		type txnIntent struct {
-			txnID          pgtype.UUID
-			catID          pgtype.UUID
-			catSlug        string
-			catRule        *compiledRule
-			tagAdds        map[string]*compiledRule // slug → first rule that added it
-			tagRemoves     map[string]*compiledRule
-			series         *RuleAction     // net assign_series intent (last-writer-wins)
-			seriesRule     *compiledRule   // rule that owns the winning series assignment
-			metadataSet    map[string]any  // key → net value to write
-			metadataRemove []string        // net keys to delete
-			flagIntent     string          // "flag" | "unflag" | "" (last-writer-wins)
-			matchingRules  []*compiledRule // every rule whose condition matched (for rule_applied)
+			txnID            pgtype.UUID
+			catID            pgtype.UUID
+			catSlug          string
+			catRule          *compiledRule
+			tagAdds          map[string]*compiledRule // slug → first rule that added it
+			tagRemoves       map[string]*compiledRule
+			series           *RuleAction     // net assign_series intent (last-writer-wins)
+			seriesRule       *compiledRule   // rule that owns the winning series assignment
+			counterparty     *RuleAction     // net assign_counterparty intent (last-writer-wins)
+			counterpartyRule *compiledRule   // rule that owns the winning counterparty assignment
+			metadataSet      map[string]any  // key → net value to write
+			metadataRemove   []string        // net keys to delete
+			flagIntent       string          // "flag" | "unflag" | "" (last-writer-wins)
+			matchingRules    []*compiledRule // every rule whose condition matched (for rule_applied)
 		}
 		var intents []txnIntent
 		rowCount := 0
@@ -2276,6 +2325,14 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						aCopy := a
 						intent.series = &aCopy
 						intent.seriesRule = cr
+					case "assign_counterparty":
+						if a.CounterpartyShortID == "" && a.CounterpartyName == "" {
+							continue
+						}
+						// Last-writer-wins: a txn binds at most one counterparty.
+						aCopy := a
+						intent.counterparty = &aCopy
+						intent.counterpartyRule = cr
 					case "flag":
 						// Last-writer-wins: a later-stage rule's flag/unflag
 						// overrides an earlier one.
@@ -2289,8 +2346,8 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 				}
 			}
 			if intent.catRule != nil || len(intent.tagAdds) > 0 || len(intent.tagRemoves) > 0 ||
-				intent.series != nil || len(intent.metadataSet) > 0 || len(intent.metadataRemove) > 0 ||
-				intent.flagIntent != "" {
+				intent.series != nil || intent.counterparty != nil || len(intent.metadataSet) > 0 ||
+				len(intent.metadataRemove) > 0 || intent.flagIntent != "" {
 				intents = append(intents, intent)
 			}
 		}
@@ -2343,6 +2400,10 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			if it.series != nil {
 				ri.series = it.series
 				ri.seriesRule = ruleapply.Rule{ID: it.seriesRule.uuid, ShortID: it.seriesRule.shortID, Name: it.seriesRule.name}
+			}
+			if it.counterparty != nil {
+				ri.counterparty = it.counterparty
+				ri.counterpartyRule = ruleapply.Rule{ID: it.counterpartyRule.uuid, ShortID: it.counterpartyRule.shortID, Name: it.counterpartyRule.name}
 			}
 			for _, cr := range it.matchingRules {
 				ri.ruleApplied = append(ri.ruleApplied, retroRuleApplied{
@@ -2577,13 +2638,15 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 	baseQuery := `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 		COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
-		t.date, COALESCE(c.slug, ''), COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata
+		t.date, COALESCE(c.slug, ''), COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata,
+		COALESCE(cp.short_id, ''), (t.counterparty_id IS NOT NULL)
 		FROM transactions t
 		JOIN accounts a ON t.account_id = a.id
 		JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories c ON t.category_id = c.id
 		LEFT JOIN recurring_series rs ON rs.id = t.series_id
+		LEFT JOIN counterparties cp ON cp.id = t.counterparty_id
 		WHERE t.deleted_at IS NULL
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
@@ -2631,7 +2694,8 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 			if err := rows.Scan(&id, &tctx.Name, &tctx.MerchantName, &tctx.Amount,
 				&tctx.CategoryPrimary, &tctx.CategoryDetailed,
 				&tctx.Pending, &tctx.Provider, &tctx.AccountID, &tctx.UserID, &tctx.UserName,
-				&date, &catSlug, &tctx.SeriesShortID, &tctx.InSeries, &metadataRaw); err != nil {
+				&date, &catSlug, &tctx.SeriesShortID, &tctx.InSeries, &metadataRaw,
+				&tctx.CounterpartyShortID, &tctx.HasCounterparty); err != nil {
 				rows.Close()
 				return nil, fmt.Errorf("scan transaction: %w", err)
 			}
@@ -3086,6 +3150,8 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Add comment"
 	case "assign_series":
 		return "Assign to series"
+	case "assign_counterparty":
+		return "Assign counterparty"
 	case "flag":
 		return "Flag for attention"
 	case "unflag":

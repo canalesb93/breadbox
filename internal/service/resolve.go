@@ -86,6 +86,11 @@ func (s *Service) resolveSeriesID(ctx context.Context, idOrShort string) (pgtype
 	return s.resolveID(ctx, idOrShort, s.Queries.GetRecurringSeriesUUIDByShortID, ErrNotFound)
 }
 
+// resolveCounterpartyID accepts either a UUID string or a short ID for a counterparty.
+func (s *Service) resolveCounterpartyID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
+	return s.resolveID(ctx, idOrShort, s.Queries.GetCounterpartyUUIDByShortID, ErrNotFound)
+}
+
 // resolveAgentReportID accepts either a UUID string or a short ID for an agent report.
 func (s *Service) resolveAgentReportID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
 	return s.resolveID(ctx, idOrShort, s.Queries.GetAgentReportUUIDByShortID, ErrNotFound)
