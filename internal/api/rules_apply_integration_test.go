@@ -117,36 +117,32 @@ func TestApplyRule_NoMatches(t *testing.T) {
 	}
 }
 
-// TestApplyRule_RespectsCategoryOverride — a transaction with
-// category_override=true must NOT be touched by retroactive apply. This is
-// the load-bearing "category_override is sacred" assertion.
-func TestApplyRule_RespectsCategoryOverride(t *testing.T) {
+// TestApplyRule_OverwritesPriorCategory — P3 last-writer-wins: a transaction
+// that already carries a prior category IS overwritten by an explicit
+// retroactive apply. (Pre-P3 this asserted the override was sacred; inverted.)
+func TestApplyRule_OverwritesPriorCategory(t *testing.T) {
 	env := setupTestEnv(t)
 	catSlug, coffeeID, _ := applyRulesSeed(t, env)
 
-	// Pre-set a manual override on the coffee txn to a different category.
+	// Pre-set a prior category on the coffee txn to a different category.
 	otherCat := testutil.MustCreateCategory(t, env.Queries, "personal_care", "Personal Care")
 	if err := env.Service.SetTransactionCategory(context.Background(), coffeeID, otherCat.ShortID, service.SystemActor()); err != nil {
-		t.Fatalf("seed override: %v", err)
+		t.Fatalf("seed prior category: %v", err)
 	}
 
-	// Now create + apply a rule that would otherwise recategorize the coffee txn.
+	// Now create + apply a rule that recategorizes the coffee txn.
 	ruleID := createApplyRule(t, env, "Coffee → Coffee Cat", catSlug, "Coffee")
 
 	resp := env.doPost(t, "/api/v1/rules/"+ruleID+"/apply", nil)
 	assertStatus(t, resp, http.StatusOK)
 
-	// The match counter still increments (sync-time parity), but the UPDATE
-	// is filtered to category_override=FALSE, so the txn must NOT change.
+	// Last-writer-wins: the retroactive apply overwrites the prior category.
 	got, err := env.Service.GetTransaction(context.Background(), coffeeID)
 	if err != nil {
 		t.Fatalf("get coffee txn: %v", err)
 	}
-	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != otherCat.Slug {
-		t.Fatalf("category_override is sacred: want category %q untouched, got %+v", otherCat.Slug, got.Category)
-	}
-	if got.CategoryOverride == "none" {
-		t.Fatalf("category_override flag must remain true after apply, got false")
+	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != catSlug {
+		t.Fatalf("last-writer-wins: want rule category %q, got %+v", catSlug, got.Category)
 	}
 }
 
@@ -234,16 +230,17 @@ func TestApplyAllRules_SkipsDisabled(t *testing.T) {
 	}
 }
 
-// TestApplyAllRules_RespectsCategoryOverride — txn with category_override=true
-// stays untouched even when a matching active rule runs as part of apply-all.
-func TestApplyAllRules_RespectsCategoryOverride(t *testing.T) {
+// TestApplyAllRules_OverwritesPriorCategory — P3 last-writer-wins: a txn with a
+// prior category IS recategorized when a matching active rule runs as part of
+// apply-all. (Pre-P3 this asserted the override was sacred; inverted.)
+func TestApplyAllRules_OverwritesPriorCategory(t *testing.T) {
 	env := setupTestEnv(t)
 	coffeeCatSlug, coffeeID, _ := applyRulesSeed(t, env)
 
-	// Pre-set a manual override on the coffee txn.
+	// Pre-set a prior category on the coffee txn.
 	otherCat := testutil.MustCreateCategory(t, env.Queries, "personal_care", "Personal Care")
 	if err := env.Service.SetTransactionCategory(context.Background(), coffeeID, otherCat.ShortID, service.SystemActor()); err != nil {
-		t.Fatalf("seed override: %v", err)
+		t.Fatalf("seed prior category: %v", err)
 	}
 
 	_ = createApplyRule(t, env, "Coffee → coffee", coffeeCatSlug, "Coffee")
@@ -255,11 +252,8 @@ func TestApplyAllRules_RespectsCategoryOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get coffee txn: %v", err)
 	}
-	if gotCoffee.Category == nil || gotCoffee.Category.Slug == nil || *gotCoffee.Category.Slug != otherCat.Slug {
-		t.Fatalf("category_override is sacred: want %q, got %+v", otherCat.Slug, gotCoffee.Category)
-	}
-	if gotCoffee.CategoryOverride == "none" {
-		t.Fatalf("category_override flag must remain true after apply-all")
+	if gotCoffee.Category == nil || gotCoffee.Category.Slug == nil || *gotCoffee.Category.Slug != coffeeCatSlug {
+		t.Fatalf("last-writer-wins: want rule category %q, got %+v", coffeeCatSlug, gotCoffee.Category)
 	}
 }
 

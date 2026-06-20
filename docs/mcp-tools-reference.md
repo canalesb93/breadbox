@@ -188,7 +188,7 @@ Each operation:
 | Field | Type | Description |
 |-------|------|-------------|
 | `transaction_id` | string | UUID or short ID. Required. |
-| `category_slug` | string | Optional category to set. Sets `category_override='user'`. |
+| `category_slug` | string | Optional category to set (writes `category_id`; last-writer-wins, no provenance). |
 | `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates tags if the slug is new. |
 | `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional — if provided, lands on the `tag_removed` annotation. |
 | `comment` | string | Optional comment annotation. |

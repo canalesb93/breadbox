@@ -900,10 +900,8 @@ func TestUpdateTransactionsHandler_ResetCategoryShape(t *testing.T) {
 		t.Fatalf("seed uncategorized: %v", err)
 	}
 
-	// The fixture txn already has a category set via direct UPDATE in
-	// seedFixtures, but category_override is still false. Set the override
-	// via the service so the reset has something semantically meaningful to
-	// clear.
+	// Set a non-default category via the service so the reset has something
+	// semantically meaningful to clear.
 	if _, err := f.svc.svc.UpdateTransactions(f.ctx, service.UpdateTransactionsParams{
 		Operations: []service.UpdateTransactionsOp{{
 			TransactionID: f.txnID,
@@ -944,13 +942,13 @@ func TestUpdateTransactionsHandler_ResetCategoryShape(t *testing.T) {
 	// And confirm the side effect actually happened — i.e. the wrapper passed
 	// ResetCategory through to the service. A wrapper that swallowed the flag
 	// would still return status=ok (the empty op is valid) but leave the
-	// override intact.
+	// category unchanged.
 	got, err := f.svc.svc.GetTransaction(f.ctx, f.txnID)
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
 	}
-	if got.CategoryOverride != "none" {
-		t.Errorf("category_override <> 'none' after reset; the MCP wrapper likely dropped ResetCategory")
+	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
+		t.Errorf("category slug <> 'uncategorized' after reset; the MCP wrapper likely dropped ResetCategory (got %+v)", got.Category)
 	}
 }
 

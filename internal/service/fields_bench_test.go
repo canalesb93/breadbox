@@ -56,7 +56,6 @@ func benchTransactionResponse() TransactionResponse {
 			Icon:               &icon,
 			Color:              &color,
 		},
-		CategoryOverride: "none",
 		ProviderCategoryPrimary:    &categoryPrimaryRaw,
 		ProviderCategoryDetailed:   &categoryDetailedRaw,
 		ProviderCategoryConfidence: &categoryConfidence,
@@ -79,7 +78,7 @@ func mustParseFields(b *testing.B, raw string) map[string]bool {
 
 // allTransactionFieldsRaw enumerates every valid transaction field. Kept in
 // sync with validFields manually (benchmark-only, would break loudly otherwise).
-const allTransactionFieldsRaw = "id,short_id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_override,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at"
+const allTransactionFieldsRaw = "id,short_id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at"
 
 func BenchmarkFilterTransaction_Small_Core(b *testing.B) {
 	txn := benchTransactionResponse()

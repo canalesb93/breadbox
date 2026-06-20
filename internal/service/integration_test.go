@@ -1058,9 +1058,9 @@ func TestBulkRecategorizeByFilter_SearchFilter(t *testing.T) {
 		t.Errorf("expected updated_count=2, got %d", result.UpdatedCount)
 	}
 
-	// Verify UBER transactions got the target category and category_override=true
+	// Verify UBER transactions got the target category
 	rows, err := pool.Query(ctx,
-		"SELECT provider_transaction_id, category_id, category_override FROM transactions WHERE provider_name ILIKE '%UBER%' ORDER BY provider_transaction_id")
+		"SELECT provider_transaction_id, category_id FROM transactions WHERE provider_name ILIKE '%UBER%' ORDER BY provider_transaction_id")
 	if err != nil {
 		t.Fatalf("query UBER txns: %v", err)
 	}
@@ -1068,15 +1068,11 @@ func TestBulkRecategorizeByFilter_SearchFilter(t *testing.T) {
 	for rows.Next() {
 		var extID string
 		var catID pgtype.UUID
-		var override string
-		if err := rows.Scan(&extID, &catID, &override); err != nil {
+		if err := rows.Scan(&extID, &catID); err != nil {
 			t.Fatalf("scan: %v", err)
 		}
 		if catID != targetCat.ID {
 			t.Errorf("%s: expected category %v, got %v", extID, targetCat.ID, catID)
-		}
-		if override == "none" {
-			t.Errorf("%s: expected category_override=true", extID)
 		}
 	}
 
@@ -1116,7 +1112,7 @@ func TestBulkRecategorizeByFilter_NoFilterError(t *testing.T) {
 
 // --- ApplyRuleRetroactively ---
 
-func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
+func TestApplyRuleRetroactively_OverwritesPriorCategory(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
@@ -1128,18 +1124,19 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_1", "Shell Gas", 4000, "2025-01-18")
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_2", "Amazon", 7500, "2025-01-19")
 
-	// Set one Starbucks transaction with category_override=true (should be skipped)
-	overrideCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
-		Slug: "other_override", DisplayName: "Other Override",
+	// Pre-set one Starbucks transaction to a different category. Under P3
+	// last-writer-wins, an explicit retroactive apply OVERWRITES it (no lock).
+	priorCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "other_prior", DisplayName: "Other Prior",
 	})
 	if err != nil {
-		t.Fatalf("create override category: %v", err)
+		t.Fatalf("create prior category: %v", err)
 	}
-	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE id = $2",
-		overrideCat.ID, txnSb3.ID)
-	if err != nil {
-		t.Fatalf("set override: %v", err)
+	if _, err := queries.SetTransactionCategory(ctx, db.SetTransactionCategoryParams{
+		ID:         txnSb3.ID,
+		CategoryID: priorCat.ID,
+	}); err != nil {
+		t.Fatalf("set prior category: %v", err)
 	}
 
 	// Create target category
@@ -1170,17 +1167,14 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyRuleRetroactively: %v", err)
 	}
-	// Under sync-parity hit-count semantics (Q12) every condition match
-	// counts, regardless of whether the rule's action actually updated the
-	// row. All three Starbucks transactions satisfy the condition, so
-	// count=3; the override on txn_sb_3 is honored by the set_category
-	// UPDATE below, not by excluding it from the match count.
+	// All three Starbucks transactions satisfy the condition, so count=3.
 	if count != 3 {
 		t.Errorf("expected count=3 (condition matches), got %d", count)
 	}
 
-	// Verify txn_sb_1 and txn_sb_2 have coffee category
-	for _, extID := range []string{"txn_sb_1", "txn_sb_2"} {
+	// Last-writer-wins: ALL three Starbucks txns (including the previously
+	// categorized txn_sb_3) now carry the rule's coffee category.
+	for _, extID := range []string{"txn_sb_1", "txn_sb_2", "txn_sb_3"} {
 		var catID pgtype.UUID
 		err = pool.QueryRow(ctx,
 			"SELECT category_id FROM transactions WHERE provider_transaction_id = $1", extID).Scan(&catID)
@@ -1188,19 +1182,8 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 			t.Fatalf("query %s: %v", extID, err)
 		}
 		if catID != coffeeCat.ID {
-			t.Errorf("%s: expected coffee category, got %v", extID, catID)
+			t.Errorf("%s: expected coffee category (last-writer-wins), got %v", extID, catID)
 		}
-	}
-
-	// Verify txn_sb_3 still has override category (not changed)
-	var overrideCatID pgtype.UUID
-	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_sb_3'").Scan(&overrideCatID)
-	if err != nil {
-		t.Fatalf("query txn_sb_3: %v", err)
-	}
-	if overrideCatID != overrideCat.ID {
-		t.Errorf("txn_sb_3: expected override category %v, got %v", overrideCat.ID, overrideCatID)
 	}
 
 	// Verify non-matching transactions are unchanged

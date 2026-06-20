@@ -24,7 +24,6 @@ var validFields = map[string]bool{
 	"provider_name":                true,
 	"provider_merchant_name":       true,
 	"category":                     true,
-	"category_override":            true,
 	"provider_category_primary":    true,
 	"provider_category_detailed":   true,
 	"provider_category_confidence": true,
@@ -155,8 +154,6 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 			m["provider_merchant_name"] = t.ProviderMerchantName
 		case "category":
 			m["category"] = t.Category
-		case "category_override":
-			m["category_override"] = t.CategoryOverride
 		case "provider_category_primary":
 			m["provider_category_primary"] = t.ProviderCategoryPrimary
 		case "provider_category_detailed":
