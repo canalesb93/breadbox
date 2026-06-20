@@ -1,28 +1,28 @@
 package pages
 
-// SectionRecurringLedger showcases the /recurring (Recurring) ledger after its
-// table → grouped-list-row migration. The live page composes these same
-// subscriptionsStatusGroup / subscriptionsListRow templs; here they're wrapped
-// in a tiny literal x-data stub that satisfies the filter bindings
-// (filterUser / filterType / matches / groupVisible) so the rows render without
-// the live subscriptionsList factory. The fixtures route through the real
-// GroupSubscriptionsByStatus, so the grouping order and single-currency monthly
-// subtotal shown here match production.
+import "breadbox/internal/templates/components"
+
+// SectionRecurringLedger showcases the /recurring (Recurring) ledger under the
+// rules-as-substrate model. The live page composes the same subscriptionsListRow
+// templ; here it's wrapped in a tiny literal x-data stub that satisfies the
+// filter bindings (filterType / matches) so the rows render without the live
+// subscriptionsList factory.
 templ SectionRecurringLedger() {
 	<div class="flex flex-col gap-6">
 		<div class="rounded-xl border border-base-300 bg-base-200/50 px-4 py-3 text-xs text-base-content/60">
 			<p class="font-semibold text-base-content/80 mb-1">When to use</p>
 			<ul class="space-y-1 list-disc pl-4">
-				<li>Renders the recurring-charge ledger (canonical: <code>/recurring</code>) as grouped daisy <code>list-row</code>s inside <code>AgentRunRowList</code> cards — the same shape as <code>/accounts</code> and <code>/rules</code>. No desktop-table / mobile-card split.</li>
-				<li>Rows group by <strong>status</strong> under quiet label lines — <strong>Active</strong> → <strong>Paused</strong> → <strong>Ended</strong> — and the Active header carries a single-currency <strong>monthly subtotal</strong> (never summed across currencies).</li>
-				<li>Each row: a leading color-coded <strong>status tile</strong> (active → success, paused → warning, ended → muted), the <strong>name</strong> + type / renewal / price chips on the title line, a single <strong>cadence · next-renewal</strong> body line, the <strong>amount</strong>, and an <strong>OverflowMenu</strong> (View · Pause/Resume · Cancel) outside the row link.</li>
-				<li>Status lives in the tile + the group header — no parallel status badge in the row (principle #2).</li>
+				<li>Renders the recurring-series ledger (canonical: <code>/recurring</code>) as daisy <code>list-row</code>s inside an <code>AgentRunRowList</code> card — the same shape as <code>/accounts</code> and <code>/rules</code>.</li>
+				<li>A series is a <strong>thin</strong> entity: each row carries a type glyph, the <strong>name</strong> + type chip, and the <strong>linked-charge count</strong>. No detector-era status tile, renewal chip, cadence line, or amount.</li>
+				<li>The whole row links to the detail page, where the linked charges sit beside the <strong>governing rules</strong> that define membership.</li>
 			</ul>
 		</div>
-		@designExample("Recurring ledger — grouped list-rows", "Full variant matrix: active rows with due-soon / overdue renewal chips + a price-rising chip, the Active group's monthly subtotal, a paused row, and ended rows (one with a stale chip, one with no amount). The x-data stub stands in for the live filter factory.") {
-			<div x-data="{ filterUser: 'all', filterType: 'all', filter: '', matches() { return true }, groupVisible() { return true } }" class="flex flex-col gap-5">
-				for _, g := range designSubscriptionLedgerGroups() {
-					@subscriptionsStatusGroup(g)
+		@designExample("Recurring ledger — list-rows", "Type glyphs (subscription → repeat, bill → receipt, loan → landmark), name + type chip, and the linked-charge count — including an empty series. The x-data stub stands in for the live filter factory.") {
+			<div x-data="{ filterType: 'all', filter: '', matches() { return true } }">
+				@components.AgentRunRowList() {
+					for _, s := range designSubscriptionLedgerRows() {
+						@subscriptionsListRow(s)
+					}
 				}
 			</div>
 		}

@@ -437,6 +437,22 @@ func (s *Service) ListSeries(ctx context.Context, _ *string) ([]SeriesResponse, 
 	return out, nil
 }
 
+// ListSeriesMemberCounts returns the live member-charge count for every series
+// that has at least one member, keyed by the series' UUID string (matching
+// SeriesResponse.ID). Series with no members are absent from the map (count 0).
+// One round-trip — the admin /recurring list uses it to label each series row.
+func (s *Service) ListSeriesMemberCounts(ctx context.Context) (map[string]int, error) {
+	rows, err := s.Queries.CountSeriesMembersGrouped(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count series members: %w", err)
+	}
+	out := make(map[string]int, len(rows))
+	for _, r := range rows {
+		out[formatUUID(r.SeriesID)] = int(r.MemberCount)
+	}
+	return out, nil
+}
+
 // ListGoverningRules returns the rules whose `assign_series` action targets this
 // series — by its short_id (assign to existing) or by its name (mint by name).
 // These rules ARE the series' durable definition (rules-as-substrate): its

@@ -1,19 +1,17 @@
 // Recurring-series detail page (/recurring/{id}) Alpine component — the
-// detection-forward redesign.
+// rules-as-substrate model.
 //
 // Convention reference: docs/design-system.md -> "Alpine page components".
 //
-// Editing model (hybrid):
-//   - INLINE in the Rule card: type (POST /type), category (shared
-//     categoryPicker -> PATCH), tags (shared tag picker -> series tag
-//     endpoints), merchant-key re-key (POST /rekey).
-//   - DRAWER + explicit Save: name, cadence, expected amount + currency,
-//     tolerance, expected day -> one PATCH /api/v1/series/{id}.
-//   - Evidence rows: per-row unlink (DELETE) + a "Link a charge" search modal.
+// A series is a THIN entity (a name + a type) whose membership is defined by the
+// `assign_series` rules that target it. This component covers the small set of
+// direct edits the detail page still exposes:
+//   - DRAWER + explicit Save: name + type -> PATCH /api/v1/series/{id}.
+//   - Tags: inline add/remove via the shared tag picker -> series tag endpoints.
+//   - Linked charges: per-row unlink (DELETE) + a "Link a charge" search modal.
 //
-// Every write reloads on success so the server re-derives the detection
-// summary, match window, evidence timeline, and renewal projection. CSRF is
-// auto-injected by the global fetch wrapper in base.html.
+// Every write reloads on success so the server re-renders the linked charges and
+// governing-rules panels. CSRF is auto-injected by the global fetch wrapper.
 (function () {
   function restorePageState() {
     if (window.bbProgress && window.bbProgress.finish) window.bbProgress.finish();
@@ -35,9 +33,8 @@
     try { return JSON.parse(el.textContent) || fallback; } catch (e) { return fallback; }
   }
 
-  // Seed the globals the shared category + tag pickers read on first render.
+  // Seed the globals the shared tag picker reads on first render.
   (function seedGlobals() {
-    window.__bbCategories = parseJSONScript('series-detail-categories', window.__bbCategories || []);
     window.__bbAllTags = parseJSONScript('series-detail-alltags', window.__bbAllTags || []);
   })();
 
@@ -79,44 +76,12 @@
           }).catch(function () { restorePageState(); toast('Network error. Please try again.'); return false; });
         },
 
-        // --- Drawer: edit the heavier fields, one Save ----------------------
+        // --- Drawer: edit the two thin attributes (name + type), one Save ---
         saveDrawer: function (form) {
           var f = new FormData(form);
-          var body = { name: (f.get('name') || '').trim(), cadence: f.get('cadence') };
-          var amt = (f.get('expected_amount') || '').trim();
-          if (amt !== '') body.expected_amount = parseFloat(amt);
-          var cur = (f.get('currency') || '').trim();
-          if (cur !== '') body.currency = cur.toUpperCase();
-          var tol = (f.get('amount_tolerance') || '').trim();
-          if (tol !== '') body.amount_tolerance = parseFloat(tol);
-          // Always send expected_day: a blank field clears the anchor (the
-          // service treats 0 as "clear back to NULL"). The input is pre-filled
-          // with the current day, so an untouched Save preserves it.
-          var day = (f.get('expected_day') || '').trim();
-          body.expected_day = day === '' ? 0 : parseInt(day, 10);
+          var body = { name: (f.get('name') || '').trim(), type: f.get('type') };
           if (!body.name) { toast('Name cannot be empty.'); return; }
           this._write('PATCH', '/api/v1/series/' + encodeURIComponent(this.seriesId), body, 'Saved', 'Failed to save.');
-        },
-
-        // --- Inline edits ---------------------------------------------------
-        setType: function (seriesId, value) {
-          this._write('POST', '/api/v1/series/' + encodeURIComponent(seriesId) + '/type', { type: value }, 'Type updated', 'Failed to set type.');
-        },
-
-        saveCategory: function (detail) {
-          this._write('PATCH', '/api/v1/series/' + encodeURIComponent(this.seriesId), { category_id: detail.id || '' }, 'Category updated', 'Failed to update category.');
-        },
-
-        rekey: function (seriesId, newKey) {
-          newKey = (newKey || '').trim();
-          if (!newKey) { toast('Merchant key cannot be empty.'); return; }
-          this._write('POST', '/api/v1/series/' + encodeURIComponent(seriesId) + '/rekey', { new_merchant_key: newKey }, 'Re-keyed', 'Failed to re-key.');
-        },
-
-        // --- Verdicts -------------------------------------------------------
-        submitVerdict: function (seriesId, seriesName, verdict) {
-          var label = { confirm: 'Confirmed', reject: 'Marked not recurring', pause: 'Paused', cancel: 'Cancelled' }[verdict] || 'Updated';
-          this._write('PATCH', '/api/v1/series/' + encodeURIComponent(seriesId), { verdict: verdict }, label + (seriesName ? ': ' + seriesName : ''), 'Failed to update recurring charge.');
         },
 
         // --- Tags: shared picker + per-chip remove --------------------------

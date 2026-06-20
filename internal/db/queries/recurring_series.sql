@@ -39,6 +39,15 @@ ORDER BY name ASC;
 -- name: CountRecurringSeries :one
 SELECT COUNT(*) FROM recurring_series WHERE deleted_at IS NULL;
 
+-- CountSeriesMembersGrouped returns the live member-charge count for every
+-- series that has at least one member, in one round-trip. The admin /recurring
+-- list uses it to show a per-series "N charges" count without an N+1 sweep.
+-- name: CountSeriesMembersGrouped :many
+SELECT series_id, COUNT(*)::int AS member_count
+FROM transactions
+WHERE series_id IS NOT NULL AND deleted_at IS NULL
+GROUP BY series_id;
+
 -- BackLinkSeriesMembers attaches the given transactions to a series, NULL-fill
 -- only — it never clobbers a manual/rule assignment. Returns rows affected.
 -- name: BackLinkSeriesMembers :execrows
