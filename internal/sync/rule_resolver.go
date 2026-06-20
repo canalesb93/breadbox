@@ -155,19 +155,19 @@ type typedAction struct {
 	TagSlug         string
 	Content         string
 	SeriesShortID   string
-	MerchantKey     string
+	SeriesName      string
 	CreateIfMissing bool
 	MetadataKey     string
 	MetadataValue   any
 }
 
 // SeriesAssignIntent is the resolved assign_series action: link the
-// transaction to an existing series (SeriesShortID) or mint one keyed on
-// MerchantKey (CreateIfMissing). A transaction joins at most one series, so
+// transaction to an existing series (SeriesShortID) or mint one by name
+// (SeriesName + CreateIfMissing). A transaction joins at most one series, so
 // this is last-writer-wins across matching rules.
 type SeriesAssignIntent struct {
 	SeriesShortID   string
-	MerchantKey     string
+	SeriesName      string
 	CreateIfMissing bool
 }
 
@@ -387,9 +387,15 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 			out = append(out, typedAction{Type: t, Content: content})
 		case "assign_series":
 			seriesShortID, _ := m["series_short_id"].(string)
-			merchantKey, _ := m["merchant_key"].(string)
+			seriesName, _ := m["series_name"].(string)
+			// Backward-compat: a rule authored before the surrogate-first rebuild
+			// (P2) stored the mint target under `merchant_key`. Map it onto
+			// SeriesName so existing rules keep firing. An explicit series_name wins.
+			if seriesName == "" {
+				seriesName, _ = m["merchant_key"].(string)
+			}
 			createIfMissing, _ := m["create_if_missing"].(bool)
-			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, MerchantKey: merchantKey, CreateIfMissing: createIfMissing})
+			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, SeriesName: seriesName, CreateIfMissing: createIfMissing})
 		case "set_metadata":
 			key, _ := m["metadata_key"].(string)
 			out = append(out, typedAction{Type: t, MetadataKey: key, MetadataValue: m["metadata_value"]})
@@ -660,7 +666,7 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					ActionValue: a.Content,
 				})
 			case "assign_series":
-				if a.SeriesShortID == "" && a.MerchantKey == "" {
+				if a.SeriesShortID == "" && a.SeriesName == "" {
 					continue
 				}
 				// Last-writer-wins: a transaction joins at most one series, so a
@@ -668,7 +674,7 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				// its audit source.
 				result.SeriesAssign = &SeriesAssignIntent{
 					SeriesShortID:   a.SeriesShortID,
-					MerchantKey:     a.MerchantKey,
+					SeriesName:      a.SeriesName,
 					CreateIfMissing: a.CreateIfMissing,
 				}
 				result.Sources = dropSeriesSource(result.Sources)
@@ -793,13 +799,13 @@ func dropCategorySource(src []RuleActionSource) []RuleActionSource {
 }
 
 // seriesActionValue is the audit value for an assign_series action: the
-// series short_id when assigning to an existing series, else the merchant_key
+// series short_id when assigning to an existing series, else the series name
 // the series is minted under.
 func seriesActionValue(a typedAction) string {
 	if a.SeriesShortID != "" {
 		return a.SeriesShortID
 	}
-	return a.MerchantKey
+	return a.SeriesName
 }
 
 // dropSeriesSource removes any prior series source so the final source slice

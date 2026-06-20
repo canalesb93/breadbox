@@ -246,39 +246,23 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
+List recurring series — thin, rule-maintained entities: each is a surrogate identity (`id`/`short_id`), a `name`, and a `type` (`subscription` | `bill` | `loan` | `other`), plus its `tags`. Membership comes from `assign_series` rules, not a shipped detector. **Lean by default** (`fields` omitted → `overview` projection: `name`, `type`, `tags`); pass `fields=all` for timestamps. Get a series' charges via `query_transactions(series_id=...)`.
 
 ### get_series (Read)
 
-Get one series by short ID or UUID, including its full `detection_signals` (`occurrence_count`, `interval_cv`, `cadence_snap_error`, `amount_branch`, `merchant_key_is_fallback`). Inspect before reviewing a candidate.
-
-### review_series (Write)
-
-Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a subscription → sticky at that amount band, never re-proposed), `pause`, or `cancel`. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates candidates from `list_series(status=candidate)`.
+Get one series by short ID or UUID: its `name`, `type`, and `tags`. A series' linked charges come from `query_transactions(series_id=...)`; its governing rules (the `assign_series` rules that define its membership) are visible on the admin Recurring detail page.
 
 ### assign_series (Write)
 
-Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide `series_id` to assign to an existing series, **or** `merchant_key` + `create_if_missing:true` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). `confirm:true` flips it straight to `active`; omit to leave a reviewable `candidate`. Use after `list_series(status=candidate)` shows nothing for a subscription the user says exists.
+Link transactions to a recurring series, creating it if needed — the agent's path for a **one-off** assignment (encode a durable pattern as an `assign_series` **rule** instead when you want future charges to resolve automatically). Provide `series_id` to assign to an existing series, **or** `series_name` + `create_if_missing:true` to mint/resolve one by name (surrogate-first: the same name always resolves the same series). Optional `type` (`subscription`|`bill`|`loan`|`other`) for a minted series. Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series).
 
 ### update_series (Write)
 
-Edit a recurring series' user-owned attributes: `name`, `expected_amount` (+ `currency`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id` (owner). Every field is optional — omit to leave unchanged. This is a deliberate override, **not** a detection proposal: it bypasses the source-precedence ladder and protects the edited values from being reverted by the next sync's re-detect. Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature, so an edit can't silently merge two series). Use `review_series` for `confirm`/`pause`/`cancel`, `set_series_type` for the type axis, and `rekey_series` for the `merchant_key` — those have their own semantics and are not editable here.
-
-### set_series_type (Write)
-
-Set a recurring series' `type`: `subscription` (streaming/SaaS/memberships), `bill` (rent/utilities/insurance/telecom), `loan` (mortgage/auto/student/personal), or `other`. The detector infers the type from the linked charges' dominant category at first detection; this is the correction handle. The override is **sticky** — re-detection won't revert it. (`assign_series` also accepts an optional `type` when minting.)
-
-### rekey_series (Write)
-
-Correct a series' `merchant_key` when detection grouped it under a wrong or fallback key (e.g. `payment` → `spotify`). Repoints the series and its linked transactions to `new_merchant_key`. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects *historical* grouping — incoming charges still key off the provider name at sync time (a merchant-key alias table is future work).
-
-### split_series (Write)
-
-Break an over-grouped series in two: move `transaction_ids` (≤50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency / user / category; rollups recompute on both sides. Errors if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series.
+Edit a recurring series' `name` and/or `type` (`subscription` | `bill` | `loan` | `other`). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).
 
 ### unlink_series_transactions (Write)
 
-Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id`, strips the series' inherited tags from them (a tag the user added directly survives), and recomputes the series' rollups + `next_expected_date`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series. Use to remove a charge the detector wrongly swept in; use `split_series` instead when the stray charges form their own series.
+Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id` and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.
 
 ### add_series_tag (Write)
 

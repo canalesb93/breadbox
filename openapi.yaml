@@ -1925,11 +1925,7 @@ paths:
     get:
       tags: [Series]
       summary: List recurring series (subscriptions)
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema: { type: string, enum: [active, candidate, paused, cancelled] }
+      description: "Recurring series are thin, rule-maintained entities — surrogate id/short_id, name, type, tags. Membership comes from `assign_series` rules, not a shipped detector."
       responses:
         "200":
           description: Recurring series.
@@ -1943,8 +1939,8 @@ paths:
                     items: { $ref: "#/components/schemas/RecurringSeries" }
     post:
       tags: [Series]
-      summary: Create or assign a recurring series
-      description: "**Requires `full_access` scope.** Create a series detection missed, or assign transactions to one. Provide `series_id` to assign to an existing series, or `merchant_key` + `create_if_missing` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector). `transaction_ids` (max 50) are back-linked NULL-fill only. `confirm:true` activates the series in the same call."
+      summary: Assign or create a recurring series
+      description: "**Requires `full_access` scope.** Link transactions to a series, creating it if needed. Provide `series_id` to assign to an existing series, or `series_name` + `create_if_missing` to mint/resolve one by name (surrogate-first: the same name always resolves the same series). `transaction_ids` (max 50) are back-linked NULL-fill only."
       requestBody:
         required: true
         content:
@@ -1953,17 +1949,10 @@ paths:
               type: object
               properties:
                 series_id: { type: string, description: "Existing series short ID or UUID to assign to." }
-                merchant_key: { type: string, description: "Key to mint a new series under (requires create_if_missing)." }
+                series_name: { type: string, description: "Name to mint/resolve a series under (requires create_if_missing)." }
                 create_if_missing: { type: boolean }
-                name: { type: string }
-                cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual] }
-                type: { type: string, enum: [subscription, bill, loan, other], description: "Optional type for a minted series; inferred from category when omitted." }
-                expected_amount: { type: number }
-                currency: { type: string }
-                category_id: { type: string }
-                user_id: { type: string }
+                type: { type: string, enum: [subscription, bill, loan, other], description: "Optional type for a minted series (default subscription)." }
                 transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
-                confirm: { type: boolean }
       responses:
         "200":
           description: Created or updated series.
@@ -1986,8 +1975,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Series]
-      summary: Edit and/or review a recurring series
-      description: "**Requires `full_access` scope.** Partial update. `verdict` (optional) adjudicates the lifecycle (confirm/reject/pause/cancel; a user's confirmation outranks a later agent write). The remaining fields edit the series' user-owned attributes — any subset may be present, omitted fields are unchanged. Edits apply first, then the verdict, so a caller can rename-and-confirm in one request. Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature). An empty body is rejected. Detector-owned fields (merchant_key, confidence, rollups) are not editable here — use `/rekey` and the detection funnel; the `type` axis has its own `/type` endpoint."
+      summary: Edit a recurring series
+      description: "**Requires `full_access` scope.** Partial update of a thin series' `name` and/or `type` — any subset may be present, omitted fields are unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key). An empty body is rejected."
       requestBody:
         required: true
         content:
@@ -1995,15 +1984,8 @@ paths:
             schema:
               type: object
               properties:
-                verdict: { type: string, enum: [confirm, reject, pause, cancel] }
                 name: { type: string }
-                expected_amount: { type: number }
-                amount_tolerance: { type: number }
-                currency: { type: string }
-                cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual, irregular, unknown] }
-                expected_day: { type: integer, description: "Day-of-month / day-of-week anchor (1–31). Send 0 to clear the anchor; omit to leave unchanged." }
-                category_id: { type: string }
-                user_id: { type: string }
+                type: { type: string, enum: [subscription, bill, loan, other] }
       responses:
         "200":
           description: Updated series.
@@ -2017,7 +1999,7 @@ paths:
     post:
       tags: [Series]
       summary: Link transactions to a recurring series
-      description: "**Requires `full_access` scope.** Back-links transactions (max 50, NULL-fill only — never steals a charge already in another series) to the series and recomputes its rollups. `confirm:true` activates the series."
+      description: "**Requires `full_access` scope.** Back-links transactions (max 50, NULL-fill only — never steals a charge already in another series) to the series."
       requestBody:
         required: true
         content:
@@ -2027,7 +2009,6 @@ paths:
               required: [transaction_ids]
               properties:
                 transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
-                confirm: { type: boolean }
       responses:
         "200":
           description: Updated series.
@@ -2042,81 +2023,10 @@ paths:
     delete:
       tags: [Series]
       summary: Unlink a transaction from a recurring series
-      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`), strips the series' inherited tags from it (a user-added tag survives), and recomputes the series' rollups + next expected date. Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
+      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`) and strips the series' inherited tags from it (a user-added tag survives). Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
       responses:
         "200":
           description: Updated series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/rekey:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Re-key a recurring series
-      description: "**Requires `full_access` scope.** Corrects a series' `merchant_key` and repoints its members' `merchant_key` to match. Errors (400) if a live series already exists at the new key or it is sticky-rejected — re-key never silently merges. Corrects historical grouping; future charges still key off the provider name."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [new_merchant_key]
-              properties:
-                new_merchant_key: { type: string }
-      responses:
-        "200":
-          description: Re-keyed series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/type:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Set a recurring series' type
-      description: "**Requires `full_access` scope.** Overrides the series type (`subscription`|`bill`|`loan`|`other`). Sticky correction — re-detection won't change it back."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [type]
-              properties:
-                type: { type: string, enum: [subscription, bill, loan, other] }
-      responses:
-        "200":
-          description: Updated series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/split:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Split a recurring series
-      description: "**Requires `full_access` scope.** Moves the given `transaction_ids` (max 50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for an over-grouped series. Errors (400) if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [new_merchant_key, transaction_ids]
-              properties:
-                new_merchant_key: { type: string }
-                name: { type: string }
-                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
-      responses:
-        "200":
-          description: The new series the members were split into.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
@@ -3443,48 +3353,15 @@ components:
         color: { type: string }
     RecurringSeries:
       type: object
-      description: A detected recurring series (subscription).
+      description: "A thin, rule-maintained recurring series (subscription/bill/loan). Surrogate identity + name + type + tags; membership comes from `assign_series` rules, not a shipped detector."
       properties:
         id: { type: string }
         short_id: { type: string }
         name: { type: string }
-        merchant_key: { type: string }
-        cadence: { type: string, description: "`weekly`|`biweekly`|`monthly`|`quarterly`|`semiannual`|`annual`|`irregular`|`unknown`." }
-        expected_amount: { type: number, nullable: true }
-        iso_currency_code: { type: string, nullable: true }
-        status: { type: string, description: "`active`|`paused`|`cancelled`|`candidate`." }
-        type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`. Inferred from the members' dominant category at first detection; user/agent-overridable + sticky." }
-        confidence: { type: string, description: "`auto`|`confirmed`|`rejected` — the verdict axis." }
-        detection_source: { type: string, description: "`deterministic`|`agent`|`user`|`rule`." }
-        last_amount: { type: number, nullable: true }
-        last_seen_date: { type: string, format: date, nullable: true }
-        next_expected_date: { type: string, format: date, nullable: true }
-        renewal_health: { type: string, description: "Derived (active series only): `active`|`due_soon`|`overdue`|`stale`|`unknown`, from next_expected_date vs today." }
-        days_until_renewal: { type: integer, nullable: true, description: "Signed days to next_expected_date (negative = overdue). Omitted when no projection." }
-        occurrence_count: { type: integer }
-        detection_signals: { type: object, nullable: true, additionalProperties: true }
+        type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`." }
         tags: { type: array, items: { type: string } }
         created_at: { type: string, format: date-time }
-      additionalProperties: true
-    SeriesNearMiss:
-      type: object
-      description: A recurring-looking merchant group that is not (yet) a series, with the detector's verdict.
-      properties:
-        merchant_key: { type: string }
-        name: { type: string }
-        iso_currency_code: { type: string, nullable: true }
-        occurrence_count: { type: integer }
-        qualifies: { type: boolean, description: "True when the group passes every gate but isn't tracked yet." }
-        reason: { type: string, description: "Gate it failed; empty when qualifies. `too_few_occurrences`|`irregular_cadence`|`interval_too_variable`|`amount_unstable`|`same_day_duplicates`|`too_few_charges`." }
-        explanation: { type: string, description: "Human one-line explanation with the numbers folded in." }
-        nearest_cadence: { type: string }
-        median_gap_days: { type: number }
-        interval_cv: { type: number }
-        amount_min: { type: number, nullable: true }
-        amount_max: { type: number, nullable: true }
-        amount_spread_ratio: { type: number }
-        first_seen: { type: string, format: date, nullable: true }
-        last_seen: { type: string, format: date, nullable: true }
+        updated_at: { type: string, format: date-time }
       additionalProperties: true
     Category:
       type: object

@@ -73,7 +73,7 @@ type Engine struct {
 	// the transaction. Wired by the app layer in serve.go (function pointer, no
 	// import cycle — the same pattern as OnSyncComplete). Nil-safe: when unset
 	// (series subsystem not wired) the action is a no-op.
-	AssignSeriesInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, merchantKey string, createIfMissing bool) error
+	AssignSeriesInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, seriesName string, createIfMissing bool) error
 }
 
 // NewEngine creates a new sync engine.
@@ -638,10 +638,6 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderCategoryConfidence:   pgconv.TextPtrIfNotEmpty(txn.CategoryConfidence),
 		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
-		// merchant_key: detection anchor retired (rules-as-substrate). The column
-		// still exists this migration cycle but is no longer computed at sync time;
-		// new rows write NULL until the column is dropped (P2-PR2).
-		MerchantKey: pgtype.Text{},
 	}
 
 	row, err := q.UpsertTransaction(ctx, params)
@@ -838,7 +834,7 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	// stays decoupled from the series service. No-op when the hook is unset.
 	if result.SeriesAssign != nil && e.AssignSeriesInTx != nil {
 		if err := e.AssignSeriesInTx(ctx, tx, dbTxn.ID,
-			result.SeriesAssign.SeriesShortID, result.SeriesAssign.MerchantKey, result.SeriesAssign.CreateIfMissing); err != nil {
+			result.SeriesAssign.SeriesShortID, result.SeriesAssign.SeriesName, result.SeriesAssign.CreateIfMissing); err != nil {
 			return result.Sources, fmt.Errorf("apply assign_series: %w", err)
 		}
 	}

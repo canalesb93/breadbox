@@ -458,15 +458,41 @@ type RuleAction struct {
 	TagSlug      string `json:"tag_slug,omitempty"`
 	Content      string `json:"content,omitempty"`
 	// assign_series fields: assign matching transactions to an existing series
-	// (SeriesShortID) or mint one keyed on MerchantKey (CreateIfMissing).
+	// (SeriesShortID) or mint one by name (SeriesName + CreateIfMissing). Series
+	// are surrogate-first thin entities (rules-as-substrate, P2); the mint resolves
+	// the same surrogate for a given name every time.
 	SeriesShortID   string `json:"series_short_id,omitempty"`
-	MerchantKey     string `json:"merchant_key,omitempty"`
+	SeriesName      string `json:"series_name,omitempty"`
 	CreateIfMissing bool   `json:"create_if_missing,omitempty"`
 	// set_metadata / remove_metadata fields. MetadataKey is the metadata blob
 	// key (≤128 chars). MetadataValue is the JSON value to write for
 	// set_metadata (any JSON-serializable value); unused by remove_metadata.
 	MetadataKey   string `json:"metadata_key,omitempty"`
 	MetadataValue any    `json:"metadata_value,omitempty"`
+}
+
+// ruleActionAlias is RuleAction without the custom UnmarshalJSON, used to avoid
+// infinite recursion while decoding.
+type ruleActionAlias RuleAction
+
+// UnmarshalJSON decodes a RuleAction, mapping the legacy assign_series
+// `merchant_key` key onto SeriesName so rules authored before the surrogate-first
+// rebuild (P2) keep working. An explicit `series_name` always wins.
+func (a *RuleAction) UnmarshalJSON(data []byte) error {
+	var alias ruleActionAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	*a = RuleAction(alias)
+	if a.SeriesName == "" {
+		var legacy struct {
+			MerchantKey string `json:"merchant_key"`
+		}
+		if err := json.Unmarshal(data, &legacy); err == nil && legacy.MerchantKey != "" {
+			a.SeriesName = legacy.MerchantKey
+		}
+	}
+	return nil
 }
 
 // ActivityEntry represents a single event in a transaction's activity timeline.

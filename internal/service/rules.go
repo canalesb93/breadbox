@@ -901,12 +901,12 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 			}
 		case "assign_series":
 			hasSeries := strings.TrimSpace(a.SeriesShortID) != ""
-			hasKey := strings.TrimSpace(a.MerchantKey) != ""
-			if hasSeries == hasKey {
-				return fmt.Errorf("%w: assign_series requires exactly one of series_short_id or merchant_key", ErrInvalidParameter)
+			hasName := strings.TrimSpace(a.SeriesName) != ""
+			if hasSeries == hasName {
+				return fmt.Errorf("%w: assign_series requires exactly one of series_short_id or series_name", ErrInvalidParameter)
 			}
-			if hasKey && !a.CreateIfMissing {
-				return fmt.Errorf("%w: assign_series with merchant_key requires create_if_missing=true", ErrInvalidParameter)
+			if hasName && !a.CreateIfMissing {
+				return fmt.Errorf("%w: assign_series with series_name requires create_if_missing=true", ErrInvalidParameter)
 			}
 			if hasSeries {
 				if _, err := s.resolveSeriesID(ctx, a.SeriesShortID); err != nil {
@@ -1756,7 +1756,7 @@ func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroT
 	// assign_series — same resolve-or-mint + back-link the sync path uses, so
 	// retroactive and sync-time behave identically.
 	if it.series != nil {
-		if err := s.AssignSeriesFromRuleTx(ctx, tx, it.txnID, it.series.SeriesShortID, it.series.MerchantKey, it.series.CreateIfMissing); err != nil {
+		if err := s.AssignSeriesFromRuleTx(ctx, tx, it.txnID, it.series.SeriesShortID, it.series.SeriesName, it.series.CreateIfMissing); err != nil {
 			return fmt.Errorf("apply assign_series retroactively: %w", err)
 		}
 	}
@@ -2038,7 +2038,7 @@ func actionAuditFields(a RuleAction) (string, string) {
 		if a.SeriesShortID != "" {
 			return "series", a.SeriesShortID
 		}
-		return "series", a.MerchantKey
+		return "series", a.SeriesName
 	case "set_metadata":
 		return "metadata", a.MetadataKey
 	case "remove_metadata":
@@ -2270,7 +2270,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						}
 						delete(tctx.Metadata, a.MetadataKey)
 					case "assign_series":
-						if a.SeriesShortID == "" && a.MerchantKey == "" {
+						if a.SeriesShortID == "" && a.SeriesName == "" {
 							continue
 						}
 						// Last-writer-wins: a txn joins at most one series, so a

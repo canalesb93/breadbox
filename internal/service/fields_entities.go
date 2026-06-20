@@ -3,53 +3,28 @@
 package service
 
 // Field projection for recurring series and transaction rules, mirroring the
-// transaction projection in fields.go. The heavy, rarely-needed payloads —
-// a series' detection_signals JSON blob, a rule's conditions/actions trees —
-// are excluded from each entity's lean default alias and only returned when
-// the caller asks (fields=all, or names them explicitly).
+// transaction projection in fields.go. A series is now a thin, rule-maintained
+// entity — id, short_id, name, type, tags, timestamps — so its projection is
+// correspondingly small; a rule's conditions/actions trees stay excluded from
+// the lean default alias.
 
 // --- Recurring series ---
 
 var seriesValidFields = map[string]bool{
-	"id":                 true,
-	"short_id":           true,
-	"user_id":            true,
-	"name":               true,
-	"merchant_key":       true,
-	"cadence":            true,
-	"expected_day":       true,
-	"expected_amount":    true,
-	"amount_tolerance":   true,
-	"iso_currency_code":  true,
-	"category_id":        true,
-	"status":             true,
-	"type":               true,
-	"detection_source":   true,
-	"confidence":         true,
-	"confirmed_by_type":  true,
-	"last_amount":        true,
-	"last_seen_date":     true,
-	"next_expected_date": true,
-	"occurrence_count":   true,
-	"detection_signals":  true,
-	"tags":               true,
-	"created_at":         true,
-	"updated_at":         true,
+	"id":         true,
+	"short_id":   true,
+	"name":       true,
+	"type":       true,
+	"tags":       true,
+	"created_at": true,
+	"updated_at": true,
 }
 
 var seriesFieldAliases = map[string][]string{
 	// minimal: just enough to recognize a series in a list.
-	"minimal": {"name", "status", "type", "cadence"},
-	// overview: identity + lifecycle + renewal prediction — the useful default
-	// for list_series. Deliberately omits detection_signals (verbose, only
-	// needed for the get_series detail view), merchant_key/category_id internals,
-	// detection_source, confirmed_by_type, tolerances, and timestamps.
-	"overview": {
-		"name", "status", "type", "cadence", "confidence",
-		"expected_amount", "iso_currency_code", "expected_day",
-		"last_amount", "last_seen_date", "next_expected_date",
-		"occurrence_count", "tags",
-	},
+	"minimal": {"name", "type"},
+	// overview: identity + type + tags — the useful default for list_series.
+	"overview": {"name", "type", "tags"},
 }
 
 // DefaultSeriesFields is the lean projection list_series returns when the caller
@@ -77,44 +52,10 @@ func FilterSeriesFields(s SeriesResponse, fields map[string]bool) map[string]any
 			m["id"] = s.ID
 		case "short_id":
 			m["short_id"] = s.ShortID
-		case "user_id":
-			m["user_id"] = s.UserID
 		case "name":
 			m["name"] = s.Name
-		case "merchant_key":
-			m["merchant_key"] = s.MerchantKey
-		case "cadence":
-			m["cadence"] = s.Cadence
-		case "expected_day":
-			m["expected_day"] = s.ExpectedDay
-		case "expected_amount":
-			m["expected_amount"] = s.ExpectedAmount
-		case "amount_tolerance":
-			m["amount_tolerance"] = s.AmountTolerance
-		case "iso_currency_code":
-			m["iso_currency_code"] = s.IsoCurrencyCode
-		case "category_id":
-			m["category_id"] = s.CategoryID
-		case "status":
-			m["status"] = s.Status
 		case "type":
 			m["type"] = s.Type
-		case "detection_source":
-			m["detection_source"] = s.DetectionSource
-		case "confidence":
-			m["confidence"] = s.Confidence
-		case "confirmed_by_type":
-			m["confirmed_by_type"] = s.ConfirmedByType
-		case "last_amount":
-			m["last_amount"] = s.LastAmount
-		case "last_seen_date":
-			m["last_seen_date"] = s.LastSeenDate
-		case "next_expected_date":
-			m["next_expected_date"] = s.NextExpectedDate
-		case "occurrence_count":
-			m["occurrence_count"] = s.OccurrenceCount
-		case "detection_signals":
-			m["detection_signals"] = s.DetectionSignals
 		case "tags":
 			m["tags"] = s.Tags
 		case "created_at":

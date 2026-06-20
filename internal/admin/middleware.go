@@ -61,11 +61,9 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 				logger.Debug("nav badges: count unread agent reports", "error", err)
 			}
 
-			if cand, err := queries.CountCandidateSeriesForReview(ctx); err == nil {
-				badges.SeriesCandidates = cand
-			} else {
-				logger.Debug("nav badges: count candidate series", "error", err)
-			}
+			// Recurring series no longer have a candidate/review queue
+			// (rules-as-substrate, P2): membership comes from rules, not a
+			// detector. The nav badge count stays 0.
 
 			if failed, err := queries.CountWorkflowsWithFailedLastRun(ctx); err == nil {
 				badges.WorkflowFailures = failed

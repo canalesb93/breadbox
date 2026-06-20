@@ -4,200 +4,70 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
-	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
-	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Recurring-series enum vocabularies (mirrors the CHECK constraints in the
-// recurring_series migration). Kept here so the service validates before the DB.
+// Recurring-charge type — the structured classification axis (mirrors the CHECK
+// in the recurring_series migration). "subscription" is one type, not the
+// umbrella. A series is otherwise a thin, rule-maintained entity: surrogate
+// id/short_id, an agent/user-authored name, and this type. Membership comes from
+// assign_series rules (plus first-class agent one-off assigns) — there is no
+// shipped detector, no cadence/amount/next-date stats, no confidence/lifecycle.
 const (
-	SeriesCadenceWeekly     = "weekly"
-	SeriesCadenceBiweekly   = "biweekly"
-	SeriesCadenceMonthly    = "monthly"
-	SeriesCadenceQuarterly  = "quarterly"
-	SeriesCadenceSemiannual = "semiannual"
-	SeriesCadenceAnnual     = "annual"
-	SeriesCadenceIrregular  = "irregular"
-	SeriesCadenceUnknown    = "unknown"
-
-	SeriesStatusActive    = "active"
-	SeriesStatusPaused    = "paused"
-	SeriesStatusCancelled = "cancelled"
-	SeriesStatusCandidate = "candidate"
-
-	SeriesSourceDeterministic = "deterministic"
-	SeriesSourceAgent         = "agent"
-	SeriesSourceUser          = "user"
-	SeriesSourceRule          = "rule"
-
-	SeriesConfidenceAuto      = "auto"
-	SeriesConfidenceConfirmed = "confirmed"
-	SeriesConfidenceRejected  = "rejected"
-
-	// Recurring-charge type — the structured classification axis (mirrors the
-	// CHECK in the type migration). "subscription" is one type, not the umbrella.
 	SeriesTypeSubscription = "subscription" // streaming, SaaS, memberships
 	SeriesTypeBill         = "bill"         // rent, utilities, insurance, telecom
 	SeriesTypeLoan         = "loan"         // mortgage, auto/student/personal loans
 	SeriesTypeOther        = "other"        // recurring but uncategorized
 )
 
-var validSeriesCadence = map[string]bool{
-	SeriesCadenceWeekly: true, SeriesCadenceBiweekly: true, SeriesCadenceMonthly: true,
-	SeriesCadenceQuarterly: true, SeriesCadenceSemiannual: true, SeriesCadenceAnnual: true,
-	SeriesCadenceIrregular: true, SeriesCadenceUnknown: true,
-}
-
-var validSeriesSource = map[string]bool{
-	SeriesSourceDeterministic: true, SeriesSourceAgent: true,
-	SeriesSourceUser: true, SeriesSourceRule: true,
-}
-
 var validSeriesType = map[string]bool{
 	SeriesTypeSubscription: true, SeriesTypeBill: true,
 	SeriesTypeLoan: true, SeriesTypeOther: true,
 }
 
-// inferSeriesType maps a (Plaid PFC) category slug to a recurring-charge type.
-// Prefix-based so it's robust to the full taxonomy; unknown/empty → subscription
-// (the most common recurring charge that isn't a bill or loan).
-func inferSeriesType(categorySlug string) string {
-	switch {
-	case categorySlug == "":
-		return SeriesTypeSubscription
-	case categorySlug == "loan_payments_insurance_payment":
-		return SeriesTypeBill // insurance is a bill, not a loan
-	case categorySlug == "loan_payments_credit_card_payment":
-		return SeriesTypeOther // a card payment is a transfer, not a tracked sub/bill/loan
-	case strings.HasPrefix(categorySlug, "loan_payments"):
-		return SeriesTypeLoan // mortgage, auto, student, personal
-	case strings.HasPrefix(categorySlug, "rent_and_utilities"):
-		return SeriesTypeBill // rent, gas/electric, internet/cable, phone, water
-	case categorySlug == "general_services_insurance":
-		return SeriesTypeBill
-	case strings.HasPrefix(categorySlug, "entertainment"):
-		return SeriesTypeSubscription // streaming, music, games
-	default:
-		return SeriesTypeSubscription
-	}
-}
-
-// SeriesVerdict is a human/agent adjudication applied via ReviewSeries.
-type SeriesVerdict string
-
-const (
-	VerdictConfirm SeriesVerdict = "confirm"
-	VerdictReject  SeriesVerdict = "reject"
-	VerdictPause   SeriesVerdict = "pause"
-	VerdictCancel  SeriesVerdict = "cancel"
-)
-
-// SeriesUpsert is the input to the detection funnel. The deterministic detector,
-// rule actions, and agents all funnel proposals through it. MerchantKey is
-// required — a NULL-merchant charge never produces a series this way (it joins a
-// series only via an explicit manual/agent/rule link).
-type SeriesUpsert struct {
-	UserID           *string  // short_id or uuid; nil = shared/household
-	Name             string   // display label; defaults to MerchantKey when empty
-	MerchantKey      string   // required, the dedup anchor
-	Cadence          string   // defaults to "unknown"
-	ExpectedDay      *int32   // day-of-month / day-of-week, when known
-	ExpectedAmount   *float64 // dollars, paired with Currency
-	AmountTolerance  *float64 // dollars; defaults to 1.00 on insert
-	Currency         *string
-	CategoryID       *string  // short_id or uuid; advisory
-	Source           string   // deterministic|agent|user|rule (defaults deterministic)
-	Type             string   // subscription|bill|loan|other — explicit assertion (caller); when empty, inferred at first detection from the members' dominant category, then sticky
-	MemberTxnIDs     []string // transactions to back-link (short_id or uuid)
-	DetectionSignals []byte   // raw JSON signals (§6.6)
-	// FailIfExists makes the upsert a strict create: return ErrConflict when a
-	// series already exists at the signature instead of adopting/reviving it.
-	// The detector leaves this false; the "create from scratch" UI sets it true.
-	FailIfExists bool
-}
-
-// SeriesResponse is the API/MCP shape of a recurring_series row.
+// SeriesResponse is the thin API/MCP shape of a recurring_series row.
 type SeriesResponse struct {
-	ID               string          `json:"id"`
-	ShortID          string          `json:"short_id"`
-	UserID           *string         `json:"user_id,omitempty"`
-	Name             string          `json:"name"`
-	MerchantKey      string          `json:"merchant_key"`
-	Cadence          string          `json:"cadence"`
-	ExpectedDay      *int            `json:"expected_day,omitempty"`
-	ExpectedAmount   *float64        `json:"expected_amount,omitempty"`
-	AmountTolerance  *float64        `json:"amount_tolerance,omitempty"`
-	IsoCurrencyCode  *string         `json:"iso_currency_code,omitempty"`
-	CategoryID       *string         `json:"category_id,omitempty"`
-	Status           string          `json:"status"`
-	Type             string          `json:"type"`
-	DetectionSource  string          `json:"detection_source"`
-	Confidence       string          `json:"confidence"`
-	ConfirmedByType  *string         `json:"confirmed_by_type,omitempty"`
-	LastAmount       *float64        `json:"last_amount,omitempty"`
-	LastSeenDate     *string         `json:"last_seen_date,omitempty"`
-	NextExpectedDate *string         `json:"next_expected_date,omitempty"`
-	OccurrenceCount  int             `json:"occurrence_count"`
-	DetectionSignals json.RawMessage `json:"detection_signals,omitempty"`
-	Tags             []string        `json:"tags,omitempty"`
-	CreatedAt        string          `json:"created_at"`
-	UpdatedAt        string          `json:"updated_at"`
+	ID        string   `json:"id"`
+	ShortID   string   `json:"short_id"`
+	Name      string   `json:"name"`
+	Type      string   `json:"type"`
+	Tags      []string `json:"tags,omitempty"`
+	CreatedAt string   `json:"created_at"`
+	UpdatedAt string   `json:"updated_at"`
 }
 
 // AssignSeriesInput is the input to AssignSeries — the imperative create/link
 // path an agent or user drives (the MCP/REST `assign_series` tool). Either
-// assign to an existing series (SeriesID) or mint one by signature
-// (MerchantKey + CreateIfMissing); then back-link members and optionally
-// confirm in the same call.
+// assign to an existing series (SeriesID), or mint one by name (Name +
+// CreateIfMissing); then back-link members in the same call. Surrogate-first:
+// the mint is idempotent on the unique live name.
 type AssignSeriesInput struct {
 	SeriesID        *string  // short_id or uuid — assign to an existing series
-	MerchantKey     string   // required when minting (CreateIfMissing)
-	CreateIfMissing bool     // mint a series if no SeriesID
-	Name            string   // optional display label for a minted series
-	Cadence         string   // optional proposed cadence for a minted series
+	Name            string   // display label + mint key (required when CreateIfMissing)
+	CreateIfMissing bool      // mint a series (by Name) if no SeriesID
 	Type            string   // optional subscription|bill|loan|other for a minted series
-	ExpectedAmount  *float64 // optional, paired with Currency
-	ExpectedDay     *int32   // optional day-of-month / day-of-week anchor for a minted series
-	Currency        *string
-	CategoryID      *string  // short_id or uuid, advisory
-	UserID          *string  // short_id or uuid; nil = shared/household
 	TransactionIDs  []string // members to back-link (short_id or uuid), ≤50
-	Confirm         bool     // flip straight to confirmed/active in the same call
-	// FailIfExists turns a mint into a strict create: if a series already exists
-	// at the (merchant_key, currency, user) signature, return ErrConflict instead
-	// of silently adopting (or, for a rejected signature, resurrecting) it. The
-	// detector leaves this false (re-detect is idempotent); the deliberate
-	// "create from scratch" UI sets it true.
+	// FailIfExists turns a mint into a strict create: return ErrConflict when a
+	// live series already exists with this name (instead of resolving to it). The
+	// rule/agent paths leave this false (mint-by-name is idempotent); the
+	// deliberate "create from scratch" UI sets it true.
 	FailIfExists bool
 }
 
-// EditSeriesInput is the partial-update payload for UpdateSeries. Every field is
-// a pointer: nil leaves the column unchanged. It carries only the user-owned
-// attributes — name, the expected-charge amount (+ currency / tolerance),
-// cadence, expected-day anchor, suggested category, and owner. Detector-owned
-// fields (merchant_key, confidence, detection_source, the rollups, signals) and
-// the lifecycle status are deliberately NOT editable here — those move through
-// RekeySeries, the detection funnel, and ReviewSeries verdicts respectively.
+// EditSeriesInput is the partial-update payload for UpdateSeries / PatchSeries.
+// Every field is a pointer: nil leaves the column unchanged. A thin series owns
+// exactly two editable attributes — its name and its type.
 type EditSeriesInput struct {
-	Name            *string  // non-empty display label; "" is rejected
-	ExpectedAmount  *float64 // dollars; pair with Currency
-	AmountTolerance *float64 // dollars (the ± band the detector matches within)
-	Currency        *string  // ISO code; part of the dedup signature — a change is collision-guarded
-	Cadence         *string  // weekly|biweekly|monthly|quarterly|semiannual|annual|irregular|unknown; re-derives next_expected_date
-	ExpectedDay     *int32   // day-of-month / day-of-week anchor
-	CategoryID      *string  // short_id or uuid; "" clears the suggested category
-	UserID          *string  // short_id or uuid; "" = shared/household — part of the dedup signature, collision-guarded
+	Name *string // non-empty display label; "" is rejected
+	Type *string // subscription|bill|loan|other
 }
 
 // seriesAssignMaxMembers caps the per-call back-link batch (mirrors the
@@ -205,64 +75,90 @@ type EditSeriesInput struct {
 const seriesAssignMaxMembers = 50
 
 // AssignSeries is the imperative create/link entry point shared by the
-// `assign_series` MCP tool and REST endpoints. It funnels through
-// UpsertSeriesCandidate (mint path) or a direct link (existing-series path),
-// so the precedence ladder + sticky-reject arbitrate uniformly, then applies
-// an optional confirm verdict. Source is derived from the actor (user|agent).
+// `assign_series` MCP tool and REST endpoints. It assigns to an existing series
+// (SeriesID) or mints one surrogate-first by name (CreateIfMissing), then
+// back-links members.
 func (s *Service) AssignSeries(ctx context.Context, in AssignSeriesInput, actor Actor) (*SeriesResponse, error) {
 	if len(in.TransactionIDs) > seriesAssignMaxMembers {
 		return nil, fmt.Errorf("%w: at most %d transactions per call", ErrInvalidParameter, seriesAssignMaxMembers)
 	}
 
-	var resp *SeriesResponse
 	switch {
 	case in.SeriesID != nil && strings.TrimSpace(*in.SeriesID) != "":
-		linked, err := s.linkSeriesMembers(ctx, *in.SeriesID, in.TransactionIDs, actor)
-		if err != nil {
-			return nil, err
-		}
-		resp = linked
-	case in.CreateIfMissing && strings.TrimSpace(in.MerchantKey) != "":
-		minted, err := s.UpsertSeriesCandidate(ctx, SeriesUpsert{
-			UserID:         in.UserID,
-			Name:           in.Name,
-			MerchantKey:    in.MerchantKey,
-			Cadence:        in.Cadence,
-			Type:           in.Type,
-			ExpectedAmount: in.ExpectedAmount,
-			ExpectedDay:    in.ExpectedDay,
-			Currency:       in.Currency,
-			CategoryID:     in.CategoryID,
-			Source:         seriesSourceForActor(actor),
-			MemberTxnIDs:   in.TransactionIDs,
-			FailIfExists:   in.FailIfExists,
-		}, actor)
-		if err != nil {
-			return nil, err
-		}
-		resp = minted
+		return s.linkSeriesMembers(ctx, *in.SeriesID, in.TransactionIDs, actor)
+	case in.CreateIfMissing && strings.TrimSpace(in.Name) != "":
+		return s.mintSeriesByName(ctx, in, actor)
 	default:
-		return nil, fmt.Errorf("%w: provide series_id, or merchant_key with create_if_missing", ErrInvalidParameter)
+		return nil, fmt.Errorf("%w: provide series_id, or name with create_if_missing", ErrInvalidParameter)
+	}
+}
+
+// mintSeriesByName resolves (or creates) a series by its unique live name and
+// back-links any members in one transaction. Idempotent — the same name always
+// resolves the same surrogate. FailIfExists makes it a strict create.
+func (s *Service) mintSeriesByName(ctx context.Context, in AssignSeriesInput, actor Actor) (*SeriesResponse, error) {
+	name := strings.TrimSpace(in.Name)
+	seriesType := strings.TrimSpace(in.Type)
+	if seriesType == "" {
+		seriesType = SeriesTypeSubscription
+	}
+	if !validSeriesType[seriesType] {
+		return nil, fmt.Errorf("%w: invalid type %q", ErrInvalidParameter, seriesType)
+	}
+	memberIDs, err := s.resolveTransactionIDs(ctx, in.TransactionIDs)
+	if err != nil {
+		return nil, err
 	}
 
-	if in.Confirm {
-		return s.ReviewSeries(ctx, resp.ShortID, VerdictConfirm, actor)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin assign series: %w", err)
 	}
-	return resp, nil
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	if in.FailIfExists {
+		if existing, gerr := qtx.GetRecurringSeriesByName(ctx, name); gerr == nil {
+			_ = existing
+			return nil, fmt.Errorf("%w: a recurring series named %q already exists — edit it from the Recurring list instead of creating a new one", ErrConflict, name)
+		} else if !errors.Is(gerr, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("check existing series: %w", gerr)
+		}
+	}
+
+	seriesID, err := qtx.UpsertRecurringSeriesByName(ctx, db.UpsertRecurringSeriesByNameParams{
+		Name: name,
+		Type: seriesType,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mint series: %w", err)
+	}
+
+	if len(memberIDs) > 0 {
+		if err := backLinkAndTag(ctx, tx, qtx, seriesID, memberIDs, actor); err != nil {
+			return nil, err
+		}
+	}
+
+	row, err := qtx.GetRecurringSeriesByID(ctx, seriesID)
+	if err != nil {
+		return nil, fmt.Errorf("reload series: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit assign series: %w", err)
+	}
+	resp := seriesFromRow(row)
+	return &resp, nil
 }
 
 // AssignSeriesFromRuleTx materializes an `assign_series` rule action INSIDE the
 // sync transaction (the engine calls this via the Engine.AssignSeriesInTx hook,
 // so the sync package never imports service). It resolves the target series by
-// short_id, or matches/mints one by merchant_key signature, then back-links the
-// single transaction (NULL-fill only) and recomputes rollups — all on the
-// provided tx so it commits atomically with the sync.
-//
-// It is deliberately link-and-rollup only: it never sharpens cadence/signals,
-// so it can't downgrade a detector's snapped values (PATCH A is moot here).
-// Sticky-reject is honored (a rejected signature is skipped). Failures to
-// resolve are returned as nil (the rule no-ops) rather than failing the sync.
-func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, merchantKey string, createIfMissing bool) error {
+// short_id, or — surrogate-first — mints one by name (createIfMissing), then
+// back-links the single transaction (NULL-fill only). All on the provided tx so
+// it commits atomically with the sync. Failure to resolve is a no-op (the rule
+// is skipped) rather than a sync failure.
+func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, seriesName string, createIfMissing bool) error {
 	qtx := s.Queries.WithTx(tx)
 
 	var seriesID pgtype.UUID
@@ -276,75 +172,66 @@ func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID p
 			return fmt.Errorf("resolve series %q: %w", seriesShortID, err)
 		}
 		seriesID = id
-	case createIfMissing && strings.TrimSpace(merchantKey) != "":
-		key := strings.TrimSpace(merchantKey)
-		existing, matchErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
-			MerchantKey:     key,
-			IsoCurrencyCode: pgtype.Text{}, // rule mints a household-level series
-			UserID:          pgtype.UUID{},
+	case createIfMissing && strings.TrimSpace(seriesName) != "":
+		id, err := qtx.UpsertRecurringSeriesByName(ctx, db.UpsertRecurringSeriesByNameParams{
+			Name: strings.TrimSpace(seriesName),
+			Type: SeriesTypeSubscription,
 		})
-		switch {
-		case matchErr == nil:
-			if existing.Confidence == SeriesConfidenceRejected {
-				return nil // sticky reject — never re-mint at this signature
-			}
-			seriesID = existing.ID
-		case errors.Is(matchErr, pgx.ErrNoRows):
-			inserted, err := qtx.InsertRecurringSeries(ctx, db.InsertRecurringSeriesParams{
-				Name:            key,
-				MerchantKey:     key,
-				Cadence:         SeriesCadenceUnknown,
-				AmountTolerance: pgconv.NumericCents(100),
-				Status:          SeriesStatusCandidate,
-				DetectionSource: SeriesSourceRule,
-				Confidence:      SeriesConfidenceAuto,
-			})
-			if err != nil {
-				return fmt.Errorf("insert rule series: %w", err)
-			}
-			seriesID = inserted.ID
-		default:
-			return fmt.Errorf("match series: %w", matchErr)
+		if err != nil {
+			return fmt.Errorf("mint rule series: %w", err)
 		}
+		seriesID = id
 	default:
 		return nil // nothing actionable
 	}
 
-	if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
-		SeriesID:       seriesID,
-		TransactionIds: []pgtype.UUID{txnID},
-	}); err != nil {
-		return fmt.Errorf("back-link series member: %w", err)
+	if err := backLinkAndTag(ctx, tx, qtx, seriesID, []pgtype.UUID{txnID}, SystemActor()); err != nil {
+		return err
 	}
-	if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
-		SeriesID: seriesID,
-		Column2:  []pgtype.UUID{txnID},
-	}); err != nil {
-		return fmt.Errorf("apply series tags to member: %w", err)
-	}
+	return nil
+}
 
-	row, err := qtx.GetRecurringSeriesByID(ctx, seriesID)
-	if err != nil {
-		return fmt.Errorf("reload series: %w", err)
+// backLinkAndTag back-links members to a series (NULL-fill only), materializes
+// the series' tags onto the freshly-linked members, and emits a series_assigned
+// annotation for the charges this call actually linked. Shared by the mint,
+// link, and rule paths. The caller owns the surrounding transaction.
+func backLinkAndTag(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID pgtype.UUID, memberIDs []pgtype.UUID, actor Actor) error {
+	if len(memberIDs) == 0 {
+		return nil
 	}
-	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, seriesID)
+	// Only the charges actually linked by this call (currently series-less) get a
+	// timeline event — a re-apply NULL-fills already-linked members and must not
+	// re-emit.
+	newlyLinked, err := unlinkedMemberSubset(ctx, tx, memberIDs)
 	if err != nil {
 		return err
 	}
-	upd := updateParamsFromRow(row)
-	upd.OccurrenceCount = occCount
-	upd.LastAmount = lastAmount
-	upd.LastSeenDate = lastSeen
-	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, lastSeen)
-	if _, err := qtx.UpdateRecurringSeries(ctx, upd); err != nil {
-		return fmt.Errorf("update series rollup: %w", err)
+	if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
+		SeriesID:       seriesID,
+		TransactionIds: memberIDs,
+	}); err != nil {
+		return fmt.Errorf("back-link series members: %w", err)
+	}
+	if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
+		SeriesID: seriesID,
+		Column2:  memberIDs,
+	}); err != nil {
+		return fmt.Errorf("apply series tags to members: %w", err)
+	}
+	if len(newlyLinked) > 0 {
+		row, err := qtx.GetRecurringSeriesByID(ctx, seriesID)
+		if err != nil {
+			return fmt.Errorf("reload series for annotation: %w", err)
+		}
+		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, row.ShortID, row.Name, actor); err != nil {
+			return fmt.Errorf("emit series_assigned annotations: %w", err)
+		}
 	}
 	return nil
 }
 
 // linkSeriesMembers back-links transactions to an existing series (NULL-fill
-// only) and recomputes its rollups, in one transaction. Used by the
-// existing-series branch of AssignSeries.
+// only) in one transaction. Used by the existing-series branch of AssignSeries.
 func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, memberIDsOrShorts []string, actor Actor) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
 	if err != nil {
@@ -369,574 +256,37 @@ func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, membe
 		}
 		return nil, fmt.Errorf("get series: %w", err)
 	}
-	if len(memberIDs) > 0 {
-		// Newly-linked subset (before the NULL-fill) drives the timeline event.
-		newlyLinked, err := unlinkedMemberSubset(ctx, tx, memberIDs)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
-			SeriesID:       row.ID,
-			TransactionIds: memberIDs,
-		}); err != nil {
-			return nil, fmt.Errorf("back-link members: %w", err)
-		}
-		if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
-			SeriesID: row.ID,
-			Column2:  memberIDs,
-		}); err != nil {
-			return nil, fmt.Errorf("apply series tags to members: %w", err)
-		}
-		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, row.ShortID, row.Name, actor); err != nil {
-			return nil, fmt.Errorf("emit series_assigned annotations: %w", err)
-		}
-	}
-	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, row.ID)
-	if err != nil {
+	if err := backLinkAndTag(ctx, tx, qtx, row.ID, memberIDs, actor); err != nil {
 		return nil, err
-	}
-	upd := updateParamsFromRow(row)
-	upd.OccurrenceCount = occCount
-	upd.LastAmount = lastAmount
-	upd.LastSeenDate = lastSeen
-	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, lastSeen)
-	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
-	if err != nil {
-		return nil, fmt.Errorf("update series: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit link members: %w", err)
 	}
-	resp := seriesFromRow(updated)
+	resp := seriesFromRow(row)
+	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, row.ID); err == nil {
+		resp.Tags = slugs
+	}
 	return &resp, nil
 }
 
-// seriesSourceForActor maps an actor to the detection_source vocabulary for an
-// imperative write: a real user → "user", everything else (agents, system) →
-// "agent". Rule-authored writes set Source explicitly and don't use this.
-func seriesSourceForActor(actor Actor) string {
-	if actor.Type == "user" {
-		return SeriesSourceUser
-	}
-	return SeriesSourceAgent
-}
-
-// UpsertSeriesCandidate is the single writer of recurring_series from detection.
-// It matches the dedup signature under a row lock, inserts a fresh candidate or
-// refreshes an existing one per the precedence ladder, back-links member
-// transactions (NULL-fill only), and recomputes rollups — all in one
-// transaction so concurrent detector/agent writers converge instead of forking.
-func (s *Service) UpsertSeriesCandidate(ctx context.Context, in SeriesUpsert, actor Actor) (*SeriesResponse, error) {
-	merchantKey := strings.TrimSpace(in.MerchantKey)
-	if merchantKey == "" {
-		return nil, fmt.Errorf("%w: merchant_key is required", ErrInvalidParameter)
-	}
-	cadence := in.Cadence
-	if cadence == "" {
-		cadence = SeriesCadenceUnknown
-	}
-	if !validSeriesCadence[cadence] {
-		return nil, fmt.Errorf("%w: invalid cadence %q", ErrInvalidParameter, cadence)
-	}
-	source := in.Source
-	if source == "" {
-		source = SeriesSourceDeterministic
-	}
-	if !validSeriesSource[source] {
-		return nil, fmt.Errorf("%w: invalid source %q", ErrInvalidParameter, source)
-	}
-	name := strings.TrimSpace(in.Name)
-	if name == "" {
-		name = merchantKey
-	}
-
-	userID, err := s.resolveOptionalUserID(ctx, in.UserID)
-	if err != nil {
-		return nil, err
-	}
-	categoryID, err := s.resolveOptionalCategoryID(ctx, in.CategoryID)
-	if err != nil {
-		return nil, err
-	}
-	memberIDs, err := s.resolveTransactionIDs(ctx, in.MemberTxnIDs)
-	if err != nil {
-		return nil, err
-	}
-	currency := pgconv.TextPtrIfNotEmpty(in.Currency)
-
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin series upsert: %w", err)
-	}
-	defer tx.Rollback(ctx)
-	qtx := s.Queries.WithTx(tx)
-
-	// 1. Match the signature under a row lock.
-	existing, matchErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
-		MerchantKey:     merchantKey,
-		IsoCurrencyCode: currency,
-		UserID:          userID,
-	})
-	haveExisting := matchErr == nil
-	if matchErr != nil && !errors.Is(matchErr, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("match series: %w", matchErr)
-	}
-
-	// 2. A rejected verdict is sticky — never re-propose. Return it untouched
-	// (or refuse, when the caller demanded a fresh create).
-	if haveExisting && existing.Confidence == SeriesConfidenceRejected {
-		if in.FailIfExists {
-			return nil, fmt.Errorf("%w: a recurring series for this merchant was previously dismissed — reopen it from the Recurring list instead of creating a new one", ErrConflict)
-		}
-		resp := seriesFromRow(existing)
-		return &resp, nil
-	}
-
-	// A deliberate "create from scratch" must not silently adopt an existing
-	// live series at the same signature (that would mutate it under the user's
-	// nose and, with Confirm, flip its verdict). Refuse and point them at it.
-	if haveExisting && in.FailIfExists {
-		return nil, fmt.Errorf("%w: a recurring series already exists for this merchant — edit it from the Recurring list instead of creating a new one", ErrConflict)
-	}
-
-	// 3. Establish the target row (insert a fresh candidate, or reuse the match).
-	var base db.RecurringSeries
-	if haveExisting {
-		base = existing
-	} else {
-		tolerance := pgconv.NumericCents(100) // $1.00 default
-		if in.AmountTolerance != nil {
-			tolerance = numericDollars(*in.AmountTolerance)
-		}
-		base, err = qtx.InsertRecurringSeries(ctx, db.InsertRecurringSeriesParams{
-			UserID:           userID,
-			Name:             name,
-			MerchantKey:      merchantKey,
-			Cadence:          cadence,
-			ExpectedDay:      int4Ptr(in.ExpectedDay),
-			ExpectedAmount:   numericDollarsPtr(in.ExpectedAmount),
-			AmountTolerance:  tolerance,
-			IsoCurrencyCode:  currency,
-			CategoryID:       categoryID,
-			Status:           SeriesStatusCandidate,
-			DetectionSource:  source,
-			Confidence:       SeriesConfidenceAuto,
-			ConfirmedByType:  pgtype.Text{},
-			LastAmount:       pgtype.Numeric{},
-			LastSeenDate:     pgtype.Date{},
-			NextExpectedDate: pgtype.Date{},
-			OccurrenceCount:  0,
-			DetectionSignals: in.DetectionSignals,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("insert series: %w", err)
-		}
-	}
-
-	// 4. Back-link member transactions (NULL-fill only) and materialize the
-	// series' tags onto the freshly-linked members (NULL-fill via ON CONFLICT).
-	if len(memberIDs) > 0 {
-		// Only the charges actually linked by this call (currently series-less)
-		// get a timeline event — a re-detect NULL-fills already-linked members
-		// and must not re-emit.
-		newlyLinked, err := unlinkedMemberSubset(ctx, tx, memberIDs)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := qtx.BackLinkSeriesMembers(ctx, db.BackLinkSeriesMembersParams{
-			SeriesID:       base.ID,
-			TransactionIds: memberIDs,
-		}); err != nil {
-			return nil, fmt.Errorf("back-link members: %w", err)
-		}
-		if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
-			SeriesID: base.ID,
-			Column2:  memberIDs,
-		}); err != nil {
-			return nil, fmt.Errorf("apply series tags to members: %w", err)
-		}
-		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, base.ShortID, base.Name, actor); err != nil {
-			return nil, fmt.Errorf("emit series_assigned annotations: %w", err)
-		}
-	}
-
-	// 5. Recompute rollups from the live members.
-	occCount, lastAmount, lastSeen, err := s.seriesRollup(ctx, qtx, base.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 6. Build the merged update per the precedence ladder.
-	upd := updateParamsFromRow(base)
-	upd.OccurrenceCount = occCount
-	upd.LastAmount = lastAmount
-	upd.LastSeenDate = lastSeen
-
-	// Type: sticky once set. updateParamsFromRow already preserved base.Type. On
-	// the FIRST detection of a series (fresh insert) infer it from the members'
-	// dominant category; on later writes leave it alone so a re-detect can't
-	// override a refined value. An explicit caller assertion (in.Type) always
-	// wins — that's how an agent/rule sets the type directly.
-	if !haveExisting {
-		if t := s.inferTypeFromMembers(ctx, qtx, base.ID); t != "" {
-			upd.Type = t
-		}
-	}
-	if in.Type != "" {
-		if !validSeriesType[in.Type] {
-			return nil, fmt.Errorf("%w: invalid type %q", ErrInvalidParameter, in.Type)
-		}
-		upd.Type = in.Type
-	}
-
-	// An unadjudicated (auto) candidate may have its proposed fields sharpened
-	// by a fresh write; a confirmed series gets rollups only (its adjudicated
-	// fields are sacred). Confidence/status are never downgraded by the proposal
-	// path — verdicts flow through ReviewSeries.
-	//
-	// PATCH A — source-precedence guard. A write may sharpen the proposed fields
-	// only when its source ranks >= the row's current detection_source on the
-	// ladder deterministic < rule < agent < user. This stops a lower-precedence
-	// writer (e.g. the next deterministic re-detect, or a thin rule-authored
-	// link) from clobbering values a higher-precedence actor deliberately set.
-	// Two extra carve-outs make a thin write safe regardless of rank:
-	//   - never downgrade a known cadence to "unknown" (a link-only write that
-	//     passes no cadence must not erase the detector's snapped value);
-	//   - never null detection_signals (already guarded by the len>0 check).
-	if base.Confidence == SeriesConfidenceAuto &&
-		seriesSourceRank(source) >= seriesSourceRank(base.DetectionSource) {
-		if cadence != SeriesCadenceUnknown || base.Cadence == SeriesCadenceUnknown {
-			upd.Cadence = cadence
-		}
-		if in.ExpectedAmount != nil {
-			upd.ExpectedAmount = numericDollars(*in.ExpectedAmount)
-		}
-		if in.ExpectedDay != nil {
-			upd.ExpectedDay = pgconv.Int4(*in.ExpectedDay)
-		}
-		if in.AmountTolerance != nil {
-			upd.AmountTolerance = numericDollars(*in.AmountTolerance)
-		}
-		if categoryID.Valid && !base.CategoryID.Valid {
-			upd.CategoryID = categoryID
-		}
-		if strings.TrimSpace(base.Name) == "" || base.Name == base.MerchantKey {
-			upd.Name = name
-		}
-		if len(in.DetectionSignals) > 0 {
-			upd.DetectionSignals = in.DetectionSignals
-		}
-		// Record who last shaped the row so precedence reflects it on the next write.
-		upd.DetectionSource = source
-	}
-	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, upd.LastSeenDate)
-
-	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
-	if err != nil {
-		return nil, fmt.Errorf("update series: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit series upsert: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
-}
-
-// ReviewSeries applies a human/agent verdict to a series. Confirm/reject are
-// the durable verdict on the confidence axis; pause/cancel move the lifecycle
-// status. A user's prior confirmation outranks a later agent write.
-func (s *Service) ReviewSeries(ctx context.Context, idOrShort string, verdict SeriesVerdict, actor Actor) (*SeriesResponse, error) {
+// UpdateSeries applies a partial edit to a series' user-owned attributes (name,
+// type). Renaming onto an existing live name is collision-guarded by the unique
+// index.
+func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSeriesInput, actor Actor) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
 	if err != nil {
 		return nil, err
 	}
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin review series: %w", err)
+	if in.Name == nil && in.Type == nil {
+		return nil, fmt.Errorf("%w: provide name and/or type", ErrInvalidParameter)
 	}
-	defer tx.Rollback(ctx)
-	qtx := s.Queries.WithTx(tx)
-
-	updated, err := reviewSeriesInTx(ctx, qtx, id, verdict, actor)
-	if err != nil {
-		return nil, err
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return nil, fmt.Errorf("%w: name cannot be empty", ErrInvalidParameter)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit review series: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
-}
-
-// reviewSeriesInTx applies a verdict to the row identified by id within an open
-// transaction and returns the updated row. Shared by ReviewSeries (verdict-only)
-// and PatchSeries (edit + verdict in one transaction).
-func reviewSeriesInTx(ctx context.Context, qtx *db.Queries, id pgtype.UUID, verdict SeriesVerdict, actor Actor) (db.RecurringSeries, error) {
-	row, err := qtx.GetRecurringSeriesByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.RecurringSeries{}, ErrNotFound
-		}
-		return db.RecurringSeries{}, fmt.Errorf("get series: %w", err)
-	}
-
-	// User outranks agent on adjudicated rows: an agent cannot overturn a
-	// user's confirm/reject verdict.
-	if (verdict == VerdictConfirm || verdict == VerdictReject) &&
-		row.Confidence == SeriesConfidenceConfirmed &&
-		row.ConfirmedByType.Valid && row.ConfirmedByType.String == "user" &&
-		actor.Type == "agent" {
-		return row, nil
-	}
-
-	upd := updateParamsFromRow(row)
-	switch verdict {
-	case VerdictConfirm:
-		upd.Confidence = SeriesConfidenceConfirmed
-		upd.Status = SeriesStatusActive
-		upd.ConfirmedByType = pgconv.Text(confirmerType(actor))
-		upd.DetectionSource = confirmerType(actor)
-	case VerdictReject:
-		upd.Confidence = SeriesConfidenceRejected
-		upd.ConfirmedByType = pgconv.Text(confirmerType(actor))
-	case VerdictPause:
-		upd.Status = SeriesStatusPaused
-	case VerdictCancel:
-		upd.Status = SeriesStatusCancelled
-	default:
-		return db.RecurringSeries{}, fmt.Errorf("%w: unknown verdict %q", ErrInvalidParameter, verdict)
-	}
-
-	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
-	if err != nil {
-		return db.RecurringSeries{}, fmt.Errorf("review series: %w", err)
-	}
-	return updated, nil
-}
-
-// RekeySeries changes a series' merchant_key (correcting a wrong or over-merged
-// detection key) and repoints its members' transactions.merchant_key to match,
-// so the series and its history stay consistent under the new key. It refuses
-// to silently merge: if a live series already exists at the new signature
-// (merchant_key + currency + user), or that signature is sticky-rejected, it
-// errors and tells the caller to move members instead.
-//
-// Scope note: incoming charges still derive their key from the provider name at
-// sync time, so a future charge of this merchant lands under the
-// provider-derived key, not the re-keyed one — re-key corrects the *historical*
-// grouping, not the normalizer. A merchant-key alias table is future work.
-func (s *Service) RekeySeries(ctx context.Context, idOrShort, newKey string, actor Actor) (*SeriesResponse, error) {
-	newKey = strings.TrimSpace(newKey)
-	if newKey == "" {
-		return nil, fmt.Errorf("%w: new merchant_key is required", ErrInvalidParameter)
-	}
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return nil, err
-	}
-
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin rekey: %w", err)
-	}
-	defer tx.Rollback(ctx)
-	qtx := s.Queries.WithTx(tx)
-
-	row, err := qtx.GetRecurringSeriesByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("get series: %w", err)
-	}
-	if strings.TrimSpace(row.MerchantKey) == newKey {
-		resp := seriesFromRow(row)
-		return &resp, nil // no-op: already at this key
-	}
-
-	// Collision / sticky-reject guard on the target signature.
-	match, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
-		MerchantKey:     newKey,
-		IsoCurrencyCode: row.IsoCurrencyCode,
-		UserID:          row.UserID,
-	})
-	if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("match target key: %w", mErr)
-	}
-	if mErr == nil && match.ID != row.ID {
-		if match.Confidence == SeriesConfidenceRejected {
-			return nil, fmt.Errorf("%w: %q is a sticky-rejected signature; re-key would resurrect it", ErrInvalidParameter, newKey)
-		}
-		return nil, fmt.Errorf("%w: a series already exists at %q — re-key won't merge; move members there instead", ErrInvalidParameter, newKey)
-	}
-
-	// Repoint members' merchant_key so detection stays consistent, then the series'.
-	if _, err := tx.Exec(ctx,
-		`UPDATE transactions SET merchant_key = $2, updated_at = NOW() WHERE series_id = $1 AND deleted_at IS NULL`,
-		row.ID, newKey); err != nil {
-		return nil, fmt.Errorf("repoint member keys: %w", err)
-	}
-	upd := updateParamsFromRow(row)
-	upd.MerchantKey = newKey
-	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
-	if err != nil {
-		return nil, fmt.Errorf("update series key: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit rekey: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
-}
-
-// SplitSeries moves a subset of a series' members into a brand-new series under
-// newKey — the fix for an over-grouped series (e.g. a variable $4.99 charge
-// swept in with a $139/yr renewal). The new series inherits the source's
-// currency / user / category / cadence as a starting point; rollups recompute
-// on both sides. It errors if newKey equals the source key, if a live series
-// already exists at newKey, or if any listed transaction isn't a current member
-// of the source — so a split never steals from a third series or no-ops silently.
-func (s *Service) SplitSeries(ctx context.Context, idOrShort string, memberIDsOrShorts []string, newKey, newName string, actor Actor) (*SeriesResponse, error) {
-	newKey = strings.TrimSpace(newKey)
-	if newKey == "" {
-		return nil, fmt.Errorf("%w: new merchant_key is required", ErrInvalidParameter)
-	}
-	if len(memberIDsOrShorts) == 0 {
-		return nil, fmt.Errorf("%w: at least one transaction to split out is required", ErrInvalidParameter)
-	}
-	if len(memberIDsOrShorts) > seriesAssignMaxMembers {
-		return nil, fmt.Errorf("%w: at most %d transactions per split", ErrInvalidParameter, seriesAssignMaxMembers)
-	}
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return nil, err
-	}
-	memberIDs, err := s.resolveTransactionIDs(ctx, memberIDsOrShorts)
-	if err != nil {
-		return nil, err
-	}
-
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin split: %w", err)
-	}
-	defer tx.Rollback(ctx)
-	qtx := s.Queries.WithTx(tx)
-
-	src, err := qtx.GetRecurringSeriesByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("get series: %w", err)
-	}
-	if strings.TrimSpace(src.MerchantKey) == newKey {
-		return nil, fmt.Errorf("%w: split key must differ from the source key %q", ErrInvalidParameter, newKey)
-	}
-
-	// The target signature must be free — split creates a fresh series.
-	_, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
-		MerchantKey:     newKey,
-		IsoCurrencyCode: src.IsoCurrencyCode,
-		UserID:          src.UserID,
-	})
-	if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("match target key: %w", mErr)
-	}
-	if mErr == nil {
-		return nil, fmt.Errorf("%w: a series already exists at %q — assign the members to it instead of splitting", ErrInvalidParameter, newKey)
-	}
-
-	name := strings.TrimSpace(newName)
-	if name == "" {
-		name = slugs.TitleCase(newKey)
-	}
-	nw, err := qtx.InsertRecurringSeries(ctx, db.InsertRecurringSeriesParams{
-		UserID:           src.UserID,
-		Name:             name,
-		MerchantKey:      newKey,
-		Cadence:          src.Cadence,
-		ExpectedDay:      src.ExpectedDay,
-		ExpectedAmount:   pgtype.Numeric{}, // recomputed from the split-out members
-		AmountTolerance:  src.AmountTolerance,
-		IsoCurrencyCode:  src.IsoCurrencyCode,
-		CategoryID:       src.CategoryID,
-		Status:           SeriesStatusCandidate,
-		DetectionSource:  seriesSourceForActor(actor),
-		Confidence:       SeriesConfidenceAuto,
-		ConfirmedByType:  pgtype.Text{},
-		LastAmount:       pgtype.Numeric{},
-		LastSeenDate:     pgtype.Date{},
-		NextExpectedDate: pgtype.Date{},
-		OccurrenceCount:  0,
-		DetectionSignals: nil,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("insert split series: %w", err)
-	}
-
-	// Move the listed members from source → new (and repoint their merchant_key).
-	// Guarded on series_id = source so it never steals a charge from a third series.
-	ct, err := tx.Exec(ctx,
-		`UPDATE transactions SET series_id = $2, merchant_key = $3, updated_at = NOW()
-		 WHERE id = ANY($4::uuid[]) AND series_id = $1 AND deleted_at IS NULL`,
-		src.ID, nw.ID, newKey, memberIDs)
-	if err != nil {
-		return nil, fmt.Errorf("move members: %w", err)
-	}
-	if moved := ct.RowsAffected(); int(moved) != len(memberIDs) {
-		return nil, fmt.Errorf("%w: %d of %d transactions are not current members of the source series",
-			ErrInvalidParameter, len(memberIDs)-int(moved), len(memberIDs))
-	}
-
-	// Strip the SOURCE series' inherited tags from the moved members — they no
-	// longer belong to it, so its system-provenance tags are stale. Scoped by
-	// provenance (added_by_type='system' + added_by_id=source short_id) so a tag
-	// the user added directly to the transaction survives. The new series has no
-	// tags yet; a later add_series_tag will re-materialize via ApplySeriesTagToAllMembers.
-	if _, err := tx.Exec(ctx,
-		`DELETE FROM transaction_tags
-		 WHERE transaction_id = ANY($1::uuid[]) AND added_by_type = 'system' AND added_by_id = $2`,
-		memberIDs, src.ShortID); err != nil {
-		return nil, fmt.Errorf("strip source-inherited tags from moved members: %w", err)
-	}
-
-	newRow, err := s.applyRollup(ctx, qtx, nw.ID)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := s.applyRollup(ctx, qtx, src.ID); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit split: %w", err)
-	}
-	resp := seriesFromRow(newRow)
-	return &resp, nil
-}
-
-// inferTypeFromMembers derives a recurring-charge type from the dominant
-// category of a series' linked members. Returns "" when every member is
-// uncategorized (caller keeps the existing/default type).
-func (s *Service) inferTypeFromMembers(ctx context.Context, qtx *db.Queries, seriesID pgtype.UUID) string {
-	slug, err := qtx.SeriesDominantMemberCategory(ctx, seriesID)
-	if err != nil || slug == "" {
-		return ""
-	}
-	return inferSeriesType(slug)
-}
-
-// SetSeriesType is the explicit type override (user/agent correction). Unlike
-// detection's first-time inference, this always wins and is sticky thereafter.
-func (s *Service) SetSeriesType(ctx context.Context, idOrShort, seriesType string, actor Actor) (*SeriesResponse, error) {
-	seriesType = strings.TrimSpace(seriesType)
-	if !validSeriesType[seriesType] {
+	if in.Type != nil && !validSeriesType[strings.TrimSpace(*in.Type)] {
 		return nil, fmt.Errorf("%w: type must be one of subscription, bill, loan, other", ErrInvalidParameter)
 	}
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return nil, err
-	}
+
 	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -944,217 +294,46 @@ func (s *Service) SetSeriesType(ctx context.Context, idOrShort, seriesType strin
 		}
 		return nil, fmt.Errorf("get series: %w", err)
 	}
-	upd := updateParamsFromRow(row)
-	upd.Type = seriesType
-	updated, err := s.Queries.UpdateRecurringSeries(ctx, upd)
-	if err != nil {
-		return nil, fmt.Errorf("set series type: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
-}
 
-// UpdateSeries applies a partial edit to a series' user-owned attributes (name,
-// expected amount / tolerance / currency, cadence, expected day, suggested
-// category, owner). It is an explicit override, NOT a detection proposal, so it
-// bypasses UpsertSeriesCandidate's source-precedence ladder entirely and stamps
-// detection_source from the actor — which is precisely what protects the edit
-// from being reverted by the next deterministic re-detect (deterministic ranks
-// below user/agent). Changing the currency or owner moves the row to a new dedup
-// signature, so those are collision-guarded against an existing live series the
-// same way RekeySeries guards a merchant_key change. Editing cadence re-derives
-// the projected next_expected_date so the renewal forecast stays consistent.
-func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSeriesInput, actor Actor) (*SeriesResponse, error) {
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return nil, err
-	}
-	newCategory, newUser, err := s.validateAndResolveEdit(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin update series: %w", err)
-	}
-	defer tx.Rollback(ctx)
-	qtx := s.Queries.WithTx(tx)
-
-	updated, err := s.updateSeriesInTx(ctx, qtx, id, in, newCategory, newUser, actor)
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit update series: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
-}
-
-// PatchSeries applies an optional partial edit and an optional verdict to a
-// series in a SINGLE transaction. A combined REST PATCH (e.g. rename + confirm)
-// is therefore atomic: if the verdict fails, the edit rolls back with it, so a
-// failed response never leaves a half-applied change. Pass nil for either part
-// to skip it; at least one must be non-nil.
-func (s *Service) PatchSeries(ctx context.Context, idOrShort string, edit *EditSeriesInput, verdict *SeriesVerdict, actor Actor) (*SeriesResponse, error) {
-	if edit == nil && verdict == nil {
-		return nil, fmt.Errorf("%w: provide an edit and/or a verdict", ErrInvalidParameter)
-	}
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return nil, err
-	}
-	var newCategory, newUser pgtype.UUID
-	if edit != nil {
-		if newCategory, newUser, err = s.validateAndResolveEdit(ctx, *edit); err != nil {
-			return nil, err
-		}
-	}
-
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin patch series: %w", err)
-	}
-	defer tx.Rollback(ctx)
-	qtx := s.Queries.WithTx(tx)
-
-	var updated db.RecurringSeries
-	if edit != nil {
-		if updated, err = s.updateSeriesInTx(ctx, qtx, id, *edit, newCategory, newUser, actor); err != nil {
-			return nil, err
-		}
-	}
-	if verdict != nil {
-		// reviewSeriesInTx re-reads the row, so it sees the edit applied above
-		// within this same transaction.
-		if updated, err = reviewSeriesInTx(ctx, qtx, id, *verdict, actor); err != nil {
-			return nil, err
-		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit patch series: %w", err)
-	}
-	resp := seriesFromRow(updated)
-	return &resp, nil
-}
-
-// validateAndResolveEdit checks an EditSeriesInput and resolves its category /
-// user references to UUIDs, before any transaction is opened.
-func (s *Service) validateAndResolveEdit(ctx context.Context, in EditSeriesInput) (newCategory, newUser pgtype.UUID, err error) {
-	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
-		return newCategory, newUser, fmt.Errorf("%w: name cannot be empty", ErrInvalidParameter)
-	}
-	if in.Cadence != nil && !validSeriesCadence[strings.TrimSpace(*in.Cadence)] {
-		return newCategory, newUser, fmt.Errorf("%w: invalid cadence %q", ErrInvalidParameter, *in.Cadence)
-	}
-	if in.ExpectedDay != nil && *in.ExpectedDay > 31 {
-		return newCategory, newUser, fmt.Errorf("%w: expected_day must be 1–31 (or 0 to clear)", ErrInvalidParameter)
-	}
-	if in.CategoryID != nil {
-		if newCategory, err = s.resolveOptionalCategoryID(ctx, in.CategoryID); err != nil {
-			return newCategory, newUser, err
-		}
-	}
-	if in.UserID != nil {
-		if newUser, err = s.resolveOptionalUserID(ctx, in.UserID); err != nil {
-			return newCategory, newUser, err
-		}
-	}
-	return newCategory, newUser, nil
-}
-
-// updateSeriesInTx applies a partial edit to the row identified by id within an
-// open transaction (category / user already resolved by the caller) and returns
-// the updated row. Shared by UpdateSeries and PatchSeries.
-func (s *Service) updateSeriesInTx(ctx context.Context, qtx *db.Queries, id pgtype.UUID, in EditSeriesInput, newCategory, newUser pgtype.UUID, actor Actor) (db.RecurringSeries, error) {
-	row, err := qtx.GetRecurringSeriesByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.RecurringSeries{}, ErrNotFound
-		}
-		return db.RecurringSeries{}, fmt.Errorf("get series: %w", err)
-	}
-
-	upd := updateParamsFromRow(row)
+	name := row.Name
 	if in.Name != nil {
-		upd.Name = strings.TrimSpace(*in.Name)
+		name = strings.TrimSpace(*in.Name)
 	}
-	if in.ExpectedAmount != nil {
-		upd.ExpectedAmount = numericDollars(*in.ExpectedAmount)
-	}
-	if in.AmountTolerance != nil {
-		upd.AmountTolerance = numericDollars(*in.AmountTolerance)
-	}
-	if in.ExpectedDay != nil {
-		// 0 (or negative) clears the day anchor back to NULL; 1–31 sets it.
-		if *in.ExpectedDay <= 0 {
-			upd.ExpectedDay = pgtype.Int4{}
-		} else {
-			upd.ExpectedDay = pgconv.Int4(*in.ExpectedDay)
-		}
-	}
-	if in.CategoryID != nil {
-		upd.CategoryID = newCategory
-	}
-	if in.Cadence != nil {
-		upd.Cadence = strings.TrimSpace(*in.Cadence)
-		upd.NextExpectedDate = nextExpectedDate(upd.Cadence, row.LastSeenDate)
-	}
-	currencyChanged := false
-	if in.Currency != nil {
-		cur := pgconv.TextPtrIfNotEmpty(in.Currency)
-		currencyChanged = cur.Valid != row.IsoCurrencyCode.Valid || cur.String != row.IsoCurrencyCode.String
-		upd.IsoCurrencyCode = cur
-	}
-	ownerChanged := false
-	if in.UserID != nil {
-		ownerChanged = newUser.Valid != row.UserID.Valid || newUser.Bytes != row.UserID.Bytes
-		upd.UserID = newUser
+	seriesType := row.Type
+	if in.Type != nil {
+		seriesType = strings.TrimSpace(*in.Type)
 	}
 
-	// Currency and owner are part of the dedup signature (merchant_key, currency,
-	// user_id). A change must not silently collide with — or merge into — another
-	// LIVE series at the new signature; mirror RekeySeries' guard. A cancelled
-	// row is dead (no collision); a rejected row is surfaced with a specific
-	// reason — otherwise the refusal reads as inexplicable, since the user can't
-	// see the conflicting rejected/cancelled series.
-	if currencyChanged || ownerChanged {
-		match, mErr := qtx.MatchSeriesForUpdate(ctx, db.MatchSeriesForUpdateParams{
-			MerchantKey:     upd.MerchantKey,
-			IsoCurrencyCode: upd.IsoCurrencyCode,
-			UserID:          upd.UserID,
-		})
-		if mErr != nil && !errors.Is(mErr, pgx.ErrNoRows) {
-			return db.RecurringSeries{}, fmt.Errorf("match target signature: %w", mErr)
-		}
-		if mErr == nil && match.ID != row.ID && match.Status != SeriesStatusCancelled {
-			if match.Confidence == SeriesConfidenceRejected {
-				return db.RecurringSeries{}, fmt.Errorf("%w: that merchant/currency/owner is a rejected signature — editing onto it would resurrect a dismissed series", ErrInvalidParameter)
-			}
-			return db.RecurringSeries{}, fmt.Errorf("%w: another series already exists for that merchant/currency/owner — editing won't merge them", ErrInvalidParameter)
-		}
-	}
-
-	// An explicit edit records the actor as the row's shaping source, lifting it
-	// above the deterministic detector on the precedence ladder so a later
-	// re-detect can't revert the human's values.
-	upd.DetectionSource = seriesSourceForActor(actor)
-
-	updated, err := qtx.UpdateRecurringSeries(ctx, upd)
+	updated, err := s.Queries.UpdateRecurringSeries(ctx, db.UpdateRecurringSeriesParams{
+		ID:   id,
+		Name: name,
+		Type: seriesType,
+	})
 	if err != nil {
-		return db.RecurringSeries{}, fmt.Errorf("update series: %w", err)
+		return nil, fmt.Errorf("update series: %w", err)
 	}
-	return updated, nil
+	resp := seriesFromRow(updated)
+	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, id); err == nil {
+		resp.Tags = slugs
+	}
+	return &resp, nil
+}
+
+// PatchSeries applies a partial edit (name/type) — the thin entity has no
+// lifecycle verdict, so this is edit-only. Kept as a distinct entry point so the
+// REST PATCH handler and MCP update tool share one shape.
+func (s *Service) PatchSeries(ctx context.Context, idOrShort string, edit *EditSeriesInput, actor Actor) (*SeriesResponse, error) {
+	if edit == nil {
+		return nil, fmt.Errorf("%w: provide an edit", ErrInvalidParameter)
+	}
+	return s.UpdateSeries(ctx, idOrShort, *edit, actor)
 }
 
 // UnlinkSeriesTransactions detaches transactions from a series — the inverse of
-// the link path (BackLinkSeriesMembers / AssignSeries). It clears each charge's
-// series_id, strips the series' system-provenance inherited tags from the
-// detached charges (a tag the user added directly survives, exactly like
-// SplitSeries), and recomputes the series' rollups + projected next charge. It
-// refuses if any listed transaction isn't a current member, so an unlink can
-// neither silently no-op nor touch a charge that belongs to another series.
+// the link path. It clears each charge's series_id, strips the series'
+// system-provenance inherited tags from the detached charges (a tag the user
+// added directly survives), and emits a series_unlinked timeline event. It
+// refuses if any listed transaction isn't a current member.
 func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string, memberIDsOrShorts []string, actor Actor) (*SeriesResponse, error) {
 	if len(memberIDsOrShorts) == 0 {
 		return nil, fmt.Errorf("%w: at least one transaction to unlink is required", ErrInvalidParameter)
@@ -1170,10 +349,6 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 	if err != nil {
 		return nil, err
 	}
-	// Dedup: the same charge passed twice (or its uuid + short_id) resolves to
-	// duplicate UUIDs, but `id = ANY` detaches each row once — so the
-	// detached-count check below would otherwise misfire and falsely reject a
-	// legitimate unlink.
 	memberIDs = dedupeUUIDs(memberIDs)
 
 	tx, err := s.Pool.Begin(ctx)
@@ -1205,7 +380,7 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 
 	// Strip the series' inherited (system-provenance) tags from the detached
 	// charges — they no longer belong to it. Scoped by provenance so a tag the
-	// user added to the transaction directly survives (mirrors SplitSeries).
+	// user added to the transaction directly survives.
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM transaction_tags
 		 WHERE transaction_id = ANY($1::uuid[]) AND added_by_type = 'system' AND added_by_id = $2`,
@@ -1213,23 +388,21 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 		return nil, fmt.Errorf("strip series tags from unlinked members: %w", err)
 	}
 
-	// Timeline event on each detached charge (all confirmed members above).
 	if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesUnlinked, memberIDs, row.ShortID, row.Name, actor); err != nil {
 		return nil, fmt.Errorf("emit series_unlinked annotations: %w", err)
 	}
 
-	updated, err := s.applyRollup(ctx, qtx, row.ID)
-	if err != nil {
-		return nil, err
-	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit unlink: %w", err)
 	}
-	resp := seriesFromRow(updated)
+	resp := seriesFromRow(row)
+	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, row.ID); err == nil {
+		resp.Tags = slugs
+	}
 	return &resp, nil
 }
 
-// GetSeries returns a single series by short_id or uuid.
+// GetSeries returns a single series by short_id or uuid, with its tags.
 func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
 	if err != nil {
@@ -1247,6 +420,63 @@ func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesRespo
 		resp.Tags = slugs
 	}
 	return &resp, nil
+}
+
+// ListSeries returns all live series, alphabetically by name. The status
+// parameter is retained for signature compatibility but is ignored — a thin
+// series has no lifecycle status.
+func (s *Service) ListSeries(ctx context.Context, _ *string) ([]SeriesResponse, error) {
+	rows, err := s.Queries.ListRecurringSeries(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list series: %w", err)
+	}
+	out := make([]SeriesResponse, len(rows))
+	for i, r := range rows {
+		out[i] = seriesFromRow(r)
+	}
+	return out, nil
+}
+
+// ListGoverningRules returns the rules whose `assign_series` action targets this
+// series — by its short_id (assign to existing) or by its name (mint by name).
+// These rules ARE the series' durable definition (rules-as-substrate): its
+// membership is whatever they match. Rules use hand-rolled SQL (not sqlc), so
+// this reuses ruleSelectQuery + convertRuleRows.
+func (s *Service) ListGoverningRules(ctx context.Context, idOrShort string) ([]TransactionRuleResponse, error) {
+	id, err := s.resolveSeriesID(ctx, idOrShort)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get series: %w", err)
+	}
+
+	query := ruleSelectQuery + `
+		WHERE tr.actions @> jsonb_build_array(jsonb_build_object('type', 'assign_series', 'series_short_id', $1::text))
+		   OR tr.actions @> jsonb_build_array(jsonb_build_object('type', 'assign_series', 'series_name', $2::text))
+		ORDER BY tr.priority DESC, tr.created_at ASC`
+	rows, err := s.Pool.Query(ctx, query, row.ShortID, row.Name)
+	if err != nil {
+		return nil, fmt.Errorf("list governing rules: %w", err)
+	}
+	defer rows.Close()
+
+	var scanned []ruleRow
+	for rows.Next() {
+		var rr ruleRow
+		if err := rows.Scan(rr.scanDest()...); err != nil {
+			return nil, fmt.Errorf("scan governing rule: %w", err)
+		}
+		scanned = append(scanned, rr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate governing rules: %w", err)
+	}
+	return s.convertRuleRows(ctx, scanned), nil
 }
 
 // AddSeriesTag attaches an existing tag (by slug) to a series and materializes
@@ -1312,36 +542,6 @@ func (s *Service) ListSeriesTags(ctx context.Context, idOrShort string) ([]strin
 	return slugs, nil
 }
 
-// ListSeries returns series, optionally filtered by status. With no status it
-// returns all live series, candidates first then by occurrence count.
-func (s *Service) ListSeries(ctx context.Context, status *string) ([]SeriesResponse, error) {
-	if status != nil && *status != "" {
-		return s.ListSeriesByStatus(ctx, *status)
-	}
-	rows, err := s.Queries.ListRecurringSeries(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list series: %w", err)
-	}
-	out := make([]SeriesResponse, len(rows))
-	for i, r := range rows {
-		out[i] = seriesFromRow(r)
-	}
-	return out, nil
-}
-
-// ListSeriesByStatus returns series in a given lifecycle status, newest first.
-func (s *Service) ListSeriesByStatus(ctx context.Context, status string) ([]SeriesResponse, error) {
-	rows, err := s.Queries.ListRecurringSeriesByStatus(ctx, status)
-	if err != nil {
-		return nil, fmt.Errorf("list series: %w", err)
-	}
-	out := make([]SeriesResponse, len(rows))
-	for i, r := range rows {
-		out[i] = seriesFromRow(r)
-	}
-	return out, nil
-}
-
 // SeriesMember is one linked transaction (charge) of a recurring series. It
 // carries the category color/icon + pending flag + tag count so the admin UI
 // can render each charge through the shared transaction-row component.
@@ -1386,54 +586,6 @@ func (s *Service) SeriesMembers(ctx context.Context, idOrShort string) ([]Series
 	return out, nil
 }
 
-// seriesRollup recomputes (occurrence_count, last_amount, last_seen_date) from
-// the live members of a series. Zero members → zeros/NULLs (idempotent).
-func (s *Service) seriesRollup(ctx context.Context, q *db.Queries, seriesID pgtype.UUID) (int32, pgtype.Numeric, pgtype.Date, error) {
-	roll, err := q.SeriesMemberRollup(ctx, seriesID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, pgtype.Numeric{}, pgtype.Date{}, nil
-		}
-		return 0, pgtype.Numeric{}, pgtype.Date{}, fmt.Errorf("series rollup: %w", err)
-	}
-	return int32(roll.OccurrenceCount), roll.LastAmount, roll.LastSeenDate, nil
-}
-
-// applyRollup recomputes a series' occurrence/last-amount/last-seen from its
-// live members and persists them (plus the projected next_expected_date),
-// returning the refreshed row. Used after membership changes (re-key keeps
-// membership but is harmless; split changes it on both sides).
-func (s *Service) applyRollup(ctx context.Context, qtx *db.Queries, id pgtype.UUID) (db.RecurringSeries, error) {
-	row, err := qtx.GetRecurringSeriesByID(ctx, id)
-	if err != nil {
-		return db.RecurringSeries{}, fmt.Errorf("get series for rollup: %w", err)
-	}
-	occ, lastAmt, lastSeen, err := s.seriesRollup(ctx, qtx, id)
-	if err != nil {
-		return db.RecurringSeries{}, err
-	}
-	upd := updateParamsFromRow(row)
-	upd.OccurrenceCount = occ
-	upd.LastAmount = lastAmt
-	upd.LastSeenDate = lastSeen
-	upd.NextExpectedDate = nextExpectedDate(upd.Cadence, lastSeen)
-	return qtx.UpdateRecurringSeries(ctx, upd)
-}
-
-func (s *Service) resolveOptionalUserID(ctx context.Context, idOrShort *string) (pgtype.UUID, error) {
-	if idOrShort == nil || strings.TrimSpace(*idOrShort) == "" {
-		return pgtype.UUID{}, nil
-	}
-	return s.resolveUserID(ctx, *idOrShort)
-}
-
-func (s *Service) resolveOptionalCategoryID(ctx context.Context, idOrShort *string) (pgtype.UUID, error) {
-	if idOrShort == nil || strings.TrimSpace(*idOrShort) == "" {
-		return pgtype.UUID{}, nil
-	}
-	return s.resolveCategoryID(ctx, *idOrShort)
-}
-
 func (s *Service) resolveTransactionIDs(ctx context.Context, idsOrShorts []string) ([]pgtype.UUID, error) {
 	out := make([]pgtype.UUID, 0, len(idsOrShorts))
 	for _, raw := range idsOrShorts {
@@ -1458,8 +610,7 @@ const (
 
 // unlinkedMemberSubset returns the subset of ids whose transactions are not yet
 // in any series (series_id IS NULL). Used so series_assigned annotations are
-// emitted only for charges the back-link actually links — never re-emitted on a
-// deterministic re-detect, which NULL-fills already-linked members.
+// emitted only for charges the back-link actually links.
 func unlinkedMemberSubset(ctx context.Context, tx pgx.Tx, ids []pgtype.UUID) ([]pgtype.UUID, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -1525,166 +676,14 @@ func dedupeUUIDs(ids []pgtype.UUID) []pgtype.UUID {
 	return out
 }
 
-// updateParamsFromRow seeds an UpdateRecurringSeriesParams from an existing row
-// so callers override only the fields they intend to change.
-func updateParamsFromRow(r db.RecurringSeries) db.UpdateRecurringSeriesParams {
-	return db.UpdateRecurringSeriesParams{
-		ID:               r.ID,
-		UserID:           r.UserID,
-		Name:             r.Name,
-		MerchantKey:      r.MerchantKey,
-		Cadence:          r.Cadence,
-		ExpectedDay:      r.ExpectedDay,
-		ExpectedAmount:   r.ExpectedAmount,
-		AmountTolerance:  r.AmountTolerance,
-		IsoCurrencyCode:  r.IsoCurrencyCode,
-		CategoryID:       r.CategoryID,
-		Status:           r.Status,
-		DetectionSource:  r.DetectionSource,
-		Confidence:       r.Confidence,
-		ConfirmedByType:  r.ConfirmedByType,
-		LastAmount:       r.LastAmount,
-		LastSeenDate:     r.LastSeenDate,
-		NextExpectedDate: r.NextExpectedDate,
-		OccurrenceCount:  r.OccurrenceCount,
-		DetectionSignals: r.DetectionSignals,
-		Type:             r.Type, // preserve type on every update unless a caller overrides it
-	}
-}
-
-// seriesFromRow converts a db.RecurringSeries to a SeriesResponse.
+// seriesFromRow converts a thin db.RecurringSeries to a SeriesResponse.
 func seriesFromRow(r db.RecurringSeries) SeriesResponse {
-	resp := SeriesResponse{
-		ID:               formatUUID(r.ID),
-		ShortID:          r.ShortID,
-		UserID:           uuidPtr(r.UserID),
-		Name:             r.Name,
-		MerchantKey:      r.MerchantKey,
-		Cadence:          r.Cadence,
-		ExpectedDay:      int4ToIntPtr(r.ExpectedDay),
-		ExpectedAmount:   numericFloat(r.ExpectedAmount),
-		AmountTolerance:  numericFloat(r.AmountTolerance),
-		IsoCurrencyCode:  textPtr(r.IsoCurrencyCode),
-		CategoryID:       uuidPtr(r.CategoryID),
-		Status:           r.Status,
-		Type:             r.Type,
-		DetectionSource:  r.DetectionSource,
-		Confidence:       r.Confidence,
-		ConfirmedByType:  textPtr(r.ConfirmedByType),
-		LastAmount:       numericFloat(r.LastAmount),
-		LastSeenDate:     dateStr(r.LastSeenDate),
-		NextExpectedDate: dateStr(r.NextExpectedDate),
-		OccurrenceCount:  int(r.OccurrenceCount),
-		CreatedAt:        pgconv.TimestampStr(r.CreatedAt),
-		UpdatedAt:        pgconv.TimestampStr(r.UpdatedAt),
+	return SeriesResponse{
+		ID:        formatUUID(r.ID),
+		ShortID:   r.ShortID,
+		Name:      r.Name,
+		Type:      r.Type,
+		CreatedAt: pgconv.TimestampStr(r.CreatedAt),
+		UpdatedAt: pgconv.TimestampStr(r.UpdatedAt),
 	}
-	if len(r.DetectionSignals) > 0 {
-		resp.DetectionSignals = json.RawMessage(r.DetectionSignals)
-	}
-	return resp
-}
-
-// seriesSourceRank orders detection sources for the precedence guard in
-// UpsertSeriesCandidate (PATCH A): a write may sharpen an auto candidate's
-// proposed fields only when its source ranks >= the row's current source.
-// deterministic (1) < rule (2) < agent (3) < user (4). Unknown sources rank 0.
-func seriesSourceRank(source string) int {
-	switch source {
-	case SeriesSourceDeterministic:
-		return 1
-	case SeriesSourceRule:
-		return 2
-	case SeriesSourceAgent:
-		return 3
-	case SeriesSourceUser:
-		return 4
-	default:
-		return 0
-	}
-}
-
-// confirmerType maps an actor to the confirmed_by_type vocabulary (user|agent);
-// system/rule actors attribute as agent.
-func confirmerType(actor Actor) string {
-	if actor.Type == "user" {
-		return "user"
-	}
-	return "agent"
-}
-
-// nextExpectedDate projects the next charge date from the cadence and the last
-// seen date. Returns NULL for irregular/unknown cadences (no prediction).
-func nextExpectedDate(cadence string, lastSeen pgtype.Date) pgtype.Date {
-	if !lastSeen.Valid {
-		return pgtype.Date{}
-	}
-	d := lastSeen.Time
-	var next time.Time
-	switch cadence {
-	case SeriesCadenceWeekly:
-		next = d.AddDate(0, 0, 7)
-	case SeriesCadenceBiweekly:
-		next = d.AddDate(0, 0, 14)
-	case SeriesCadenceMonthly:
-		next = addMonthsClamped(d, 1)
-	case SeriesCadenceQuarterly:
-		next = addMonthsClamped(d, 3)
-	case SeriesCadenceSemiannual:
-		next = addMonthsClamped(d, 6)
-	case SeriesCadenceAnnual:
-		next = addMonthsClamped(d, 12)
-	default:
-		return pgtype.Date{}
-	}
-	return pgconv.Date(next)
-}
-
-// addMonthsClamped adds whole months to d, clamping the day-of-month to the last
-// valid day of the target month instead of letting it overflow into the
-// following month. Go's time.AddDate normalizes Jan 31 + 1 month to Mar 3 (Feb
-// has no 31st), which would make a subscription billed on the 31st skip its
-// renewal month entirely. Clamping keeps the projection in the right month
-// (Jan 31 + 1 month → Feb 28/29). Day-based cadences (weekly/biweekly) don't go
-// through here and are unaffected.
-func addMonthsClamped(d time.Time, months int) time.Time {
-	y, m, day := d.Date()
-	// Normalizing the month arithmetic onto day 1 lets time.Date roll month
-	// overflow into years without disturbing the day-of-month.
-	target := time.Date(y, m+time.Month(months), 1, 0, 0, 0, 0, d.Location())
-	if last := lastDayOfMonth(target.Year(), target.Month()); day > last {
-		day = last
-	}
-	return time.Date(target.Year(), target.Month(), day, 0, 0, 0, 0, d.Location())
-}
-
-// lastDayOfMonth returns the number of days in the given year/month. Day 0 of
-// the following month resolves to the last day of the requested month.
-func lastDayOfMonth(year int, month time.Month) int {
-	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
-}
-
-func numericDollars(f float64) pgtype.Numeric {
-	return pgconv.NumericCents(int64(math.Round(f * 100)))
-}
-
-func numericDollarsPtr(f *float64) pgtype.Numeric {
-	if f == nil {
-		return pgtype.Numeric{}
-	}
-	return numericDollars(*f)
-}
-
-func int4Ptr(i *int32) pgtype.Int4 {
-	if i == nil {
-		return pgtype.Int4{}
-	}
-	return pgconv.Int4(*i)
-}
-
-func int4ToIntPtr(i pgtype.Int4) *int {
-	if !i.Valid {
-		return nil
-	}
-	v := int(i.Int32)
-	return &v
 }
