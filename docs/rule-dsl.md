@@ -337,6 +337,26 @@ Deletes **one key** from the metadata blob. No-op if the key isn't present. Repe
 
 - **Net-diff with `set_metadata`** in a single pass: if an earlier-stage rule sets a key and a later-stage rule removes the same key, they cancel — neither hits the DB. A remove-then-set ends as a set. Mirrors `add_tag` / `remove_tag` net-diff semantics.
 
+### `flag`
+
+```json
+{ "type": "flag" }
+```
+
+Surfaces a matching transaction for human attention by setting `transactions.flagged_at = NOW()`. Takes no parameters. This is the declarative counterpart to the `flag_transaction` MCP tool (minus the tool's optional comment `reason`, which is a per-call affordance). Retrieve flagged rows with `query_transactions(flagged=true)`.
+
+- **Last-writer-wins** across the pipeline: a higher-priority rule's `flag` / `unflag` overrides a lower one (a transaction is flagged or it isn't). Within one rule a `flag` + `unflag` pair resolves to whichever is last.
+- Materializes inside the sync transaction (and on retroactive apply). **No dedicated timeline annotation** is emitted (same as `assign_series` / `set_metadata`); the rule's `hit_count` and the `rule_applied` audit record the firing.
+- Re-flagging an already-flagged row refreshes `flagged_at` (matches the `flag_transaction` tool).
+
+### `unflag`
+
+```json
+{ "type": "unflag" }
+```
+
+Clears the flag (`flagged_at = NULL`) on a matching transaction. Takes no parameters. No-op-safe on an already-unflagged row. Use it to auto-retire flags once a follow-up rule's condition no longer holds, or to clear flags the agent raised after review.
+
 ### Combining actions
 
 A rule can carry multiple actions of different types. Override (`category_override <> 'none'`) suppresses only the `set_category` part — `add_tag` and `add_comment` still fire.
@@ -353,7 +373,7 @@ A rule can carry multiple actions of different types. Override (`category_overri
 
 #### Which combinations make sense
 
-Only `set_category` is singleton per rule — repeating it is rejected at write time. `add_tag`, `remove_tag`, `add_comment`, `set_metadata`, and `remove_metadata` can appear multiple times in one rule (e.g. add two tags at once, or write two metadata keys). The admin UI disables a second `set_category` dropdown option once one is picked; tag and comment rows are freely repeatable.
+Only `set_category` is singleton per rule — repeating it is rejected at write time. `add_tag`, `remove_tag`, `add_comment`, `set_metadata`, and `remove_metadata` can appear multiple times in one rule (e.g. add two tags at once, or write two metadata keys). `flag` / `unflag` carry no value, so a second copy is meaningless — the admin UI treats them as singleton (disables the dropdown option once picked) and warns if you add both. The admin UI also disables a second `set_category` dropdown option once one is picked; tag and comment rows are freely repeatable.
 
 Useful combinations:
 
@@ -436,6 +456,9 @@ The rule engine has two entry points. They share condition evaluation and priori
 | `remove_tag`              | Applied                                 | Applied                                     |
 | `set_metadata`            | Applied                                 | Applied                                     |
 | `remove_metadata`         | Applied                                 | Applied                                     |
+| `assign_series`           | Applied                                 | Applied                                     |
+| `flag`                    | Applied (sets `flagged_at`)             | Applied (sets `flagged_at`)                 |
+| `unflag`                  | Applied (clears `flagged_at`)           | Applied (clears `flagged_at`)               |
 | `add_comment`             | Applied                                 | **Not applied** (by design)                 |
 | `hit_count`               | +1 per condition match                  | +1 per condition match                      |
 | `rule_applied` annotation | Written                                 | Written (with `applied_by = "retroactive"`) |

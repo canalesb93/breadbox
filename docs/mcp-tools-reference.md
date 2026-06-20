@@ -308,14 +308,14 @@ Create a rule that fires during sync. Actions compose (`set_category` + `add_tag
 |-----------|------|-------------|
 | `name` | string | Human-readable rule name |
 | `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. Numeric fields (incl. `amount`) add `approx` (`value` + sibling `tolerance`) and `between` (sibling `min`/`max`). Date-part fields derived from the tz-naive `date` — `day_of_month`, `month`, `day_of_week` (`0`=Sun), `day_of_year` — are numeric; `day_of_month approx` is cyclic + clamped (31 matches Feb's last day). Encode annual cadence as `month` + `day_of_month` (leap-robust), not `day_of_year`. Leaf fields also include `metadata.<key>` to read a key from the free-form metadata blob (ops: `eq`/`neq`/`contains`/`not_contains`/`matches`/`in`/`gt`/`gte`/`lt`/`lte`/`exists`/`not_exists`; an absent key matches only `not_exists`). Full grammar: `docs/rule-dsl.md`. |
-| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`, `set_metadata` (`metadata_key` + `metadata_value`, any JSON), `remove_metadata` (`metadata_key`), `assign_series`. Either this or `category_slug` is required. |
+| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`, `set_metadata` (`metadata_key` + `metadata_value`, any JSON), `remove_metadata` (`metadata_key`), `assign_series`, `flag` (no params — sets `flagged_at`, surfacing the txn for attention), `unflag` (no params — clears `flagged_at`). Either this or `category_slug` is required. |
 | `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
 | `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
 | `stage` | string | **Preferred.** Semantic pipeline stage: `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
 | `priority` | int | Raw pipeline-stage integer, 0–1000. Use for fine-grained slotting within a stage. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard) if neither is provided. |
 | `enabled` | bool | Default true |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
-| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series`; `add_comment` is sync-only) |
+| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series` / `flag` / `unflag`; `add_comment` is sync-only) |
 
 ### list_transaction_rules (Read)
 
@@ -360,7 +360,7 @@ Delete a rule by ID. System-seeded rules can't be deleted — disable them via u
 
 ### apply_rules (Write)
 
-Retroactive apply. Pass `rule_id` for a single rule (no chaining — that rule evaluates in isolation), or omit to run the full active-rule pipeline in priority-ASC order with the same chaining semantics as sync. Materializes `set_category` / `add_tag` / `remove_tag`; skips `add_comment`. Ignores `rule.trigger` (retroactive is a bulk op).
+Retroactive apply. Pass `rule_id` for a single rule (no chaining — that rule evaluates in isolation), or omit to run the full active-rule pipeline in priority-ASC order with the same chaining semantics as sync. Materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series` / `flag` / `unflag`; skips `add_comment`. Ignores `rule.trigger` (retroactive is a bulk op).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|

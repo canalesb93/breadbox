@@ -854,6 +854,8 @@ var validActionTypes = map[string]bool{
 	"assign_series":   true,
 	"set_metadata":    true,
 	"remove_metadata": true,
+	"flag":            true,
+	"unflag":          true,
 }
 
 // tagSlugPattern enforces the tag slug format: lowercase alphanumerics with
@@ -872,7 +874,7 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 	seenCategory := false
 	for _, a := range actions {
 		if !validActionTypes[a.Type] {
-			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series|set_metadata|remove_metadata)", ErrInvalidParameter, a.Type)
+			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series|set_metadata|remove_metadata|flag|unflag)", ErrInvalidParameter, a.Type)
 		}
 		switch a.Type {
 		case "set_category":
@@ -926,6 +928,11 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 			if err := validateMetadataKey(a.MetadataKey); err != nil {
 				return fmt.Errorf("%w (remove_metadata)", err)
 			}
+		case "flag", "unflag":
+			// No parameters: flag sets transactions.flagged_at = NOW(),
+			// unflag clears it. Mirrors the flag_transaction MCP tool (sans the
+			// optional comment reason, which is a tool-only affordance). Last-
+			// writer-wins resolves a flag+unflag pair within one rule.
 		}
 	}
 	return nil
@@ -1695,6 +1702,11 @@ type retroTxnIntent struct {
 	metadataSet    map[string]any
 	metadataRemove []string
 
+	// flag / unflag — last-writer-wins tri-state: "flag" sets flagged_at = NOW(),
+	// "unflag" clears it to NULL, "" leaves it untouched. Mirrors the
+	// flag_transaction MCP tool's flagged_at write (sans the optional comment).
+	flagIntent string
+
 	// ruleApplied drives the generic rule_applied audit annotations. Each path
 	// populates this with its own granularity (per-action for the single-rule
 	// path, per-matching-rule for the bulk path); the materializer just emits.
@@ -1711,7 +1723,8 @@ type retroRuleApplied struct {
 // applyRetroTxnIntent materializes one transaction's net retroactive intent
 // within tx. It is THE shared writer for every state-mutating rule action
 // (set_category, add_tag, remove_tag, assign_series, set_metadata,
-// remove_metadata), so coverage cannot drift between the retroactive paths.
+// remove_metadata, flag, unflag), so coverage cannot drift between the
+// retroactive paths.
 //
 // All writes use ruleapply.AppliedByRetroactive — this function is the
 // retroactive lane by construction.
@@ -1755,6 +1768,24 @@ func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroT
 		}
 	}
 
+	// flag / unflag — set or clear flagged_at, mirroring the flag_transaction
+	// tool's write (transaction_flag.go). Last-writer-wins is already resolved
+	// upstream into a single flagIntent.
+	switch it.flagIntent {
+	case "flag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+			it.txnID); err != nil {
+			return fmt.Errorf("flag transaction: %w", err)
+		}
+	case "unflag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NULL WHERE id = $1 AND deleted_at IS NULL`,
+			it.txnID); err != nil {
+			return fmt.Errorf("unflag transaction: %w", err)
+		}
+	}
+
 	for _, ra := range it.ruleApplied {
 		if err := ruleapply.WriteRuleApplied(ctx, tx, it.txnID, ra.rule, ra.field, ra.value, ruleapply.AppliedByRetroactive); err != nil {
 			return fmt.Errorf("annotate rule_applied: %w", err)
@@ -1767,8 +1798,9 @@ func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroT
 // transactions matching its condition. Materialization flows through the shared
 // applyRetroTxnIntent, so it covers every state-mutating action — set_category
 // (skipped on category_override<>'none' rows), add_tag, remove_tag,
-// assign_series, set_metadata, remove_metadata. add_comment stays sync-only by
-// design — retroactive apply is bulk historical data, not narration.
+// assign_series, set_metadata, remove_metadata, flag, unflag. add_comment stays
+// sync-only by design — retroactive apply is bulk historical data, not
+// narration.
 //
 // Returns the number of transactions that matched the condition (hit count —
 // not the number of rows physically modified). This matches sync-time
@@ -1805,6 +1837,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 	var seriesAssign *RuleAction
 	metadataSet := map[string]any{}
 	var metadataRemove []string
+	var flagIntent string
 	for _, a := range rule.Actions {
 		switch a.Type {
 		case "set_category":
@@ -1843,10 +1876,14 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 			if indexExactStr(metadataRemove, a.MetadataKey) < 0 {
 				metadataRemove = append(metadataRemove, a.MetadataKey)
 			}
+		case "flag":
+			flagIntent = "flag"
+		case "unflag":
+			flagIntent = "unflag"
 		}
 	}
 	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0 || seriesAssign != nil ||
-		len(metadataSet) > 0 || len(metadataRemove) > 0
+		len(metadataSet) > 0 || len(metadataRemove) > 0 || flagIntent != ""
 	if !hasWriteAction {
 		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
@@ -1941,6 +1978,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 				seriesRule:     appliedRule,
 				metadataSet:    metadataSet,
 				metadataRemove: metadataRemove,
+				flagIntent:     flagIntent,
 				ruleApplied:    ruleApplied,
 			}
 			for _, slug := range tagAdds {
@@ -2005,6 +2043,10 @@ func actionAuditFields(a RuleAction) (string, string) {
 		return "metadata", a.MetadataKey
 	case "remove_metadata":
 		return "metadata_remove", a.MetadataKey
+	case "flag":
+		return "flag", ""
+	case "unflag":
+		return "unflag", ""
 	}
 	return "", ""
 }
@@ -2053,7 +2095,7 @@ func indexExactStr(slice []string, target string) int {
 // folds the rule set to a net intent and materializes it through the shared
 // applyRetroTxnIntent, covering every state-mutating action — set_category
 // (last-writer-wins), add_tag, remove_tag, assign_series, set_metadata,
-// remove_metadata. add_comment stays sync-only.
+// remove_metadata, flag, unflag. add_comment stays sync-only.
 //
 // Returns a map of rule_id → match_count. Hit counts include every condition
 // match, not just actions that caused a DB write (sync-time parity).
@@ -2133,6 +2175,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			seriesRule     *compiledRule   // rule that owns the winning series assignment
 			metadataSet    map[string]any  // key → net value to write
 			metadataRemove []string        // net keys to delete
+			flagIntent     string          // "flag" | "unflag" | "" (last-writer-wins)
 			matchingRules  []*compiledRule // every rule whose condition matched (for rule_applied)
 		}
 		var intents []txnIntent
@@ -2235,6 +2278,12 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						aCopy := a
 						intent.series = &aCopy
 						intent.seriesRule = cr
+					case "flag":
+						// Last-writer-wins: a later-stage rule's flag/unflag
+						// overrides an earlier one.
+						intent.flagIntent = "flag"
+					case "unflag":
+						intent.flagIntent = "unflag"
 					case "add_comment":
 						// Narration authored at sync time; intentionally never
 						// replayed on a historical backfill (see retroTxnIntent).
@@ -2242,7 +2291,8 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 				}
 			}
 			if intent.catRule != nil || len(intent.tagAdds) > 0 || len(intent.tagRemoves) > 0 ||
-				intent.series != nil || len(intent.metadataSet) > 0 || len(intent.metadataRemove) > 0 {
+				intent.series != nil || len(intent.metadataSet) > 0 || len(intent.metadataRemove) > 0 ||
+				intent.flagIntent != "" {
 				intents = append(intents, intent)
 			}
 		}
@@ -2279,6 +2329,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 				tagRemoves:     make(map[string]ruleapply.Rule, len(it.tagRemoves)),
 				metadataSet:    it.metadataSet,
 				metadataRemove: it.metadataRemove,
+				flagIntent:     it.flagIntent,
 			}
 			if it.catRule != nil {
 				ri.catID = it.catID
@@ -3036,6 +3087,10 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Add comment"
 	case "assign_series":
 		return "Assign to series"
+	case "flag":
+		return "Flag for attention"
+	case "unflag":
+		return "Clear flag"
 	default:
 		return a.Type
 	}
