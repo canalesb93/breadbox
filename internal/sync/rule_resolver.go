@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"breadbox/internal/pgconv"
 	"breadbox/internal/sliceutil"
@@ -23,9 +25,16 @@ type Condition struct {
 	Field string      `json:"field,omitempty"`
 	Op    string      `json:"op,omitempty"`
 	Value interface{} `json:"value,omitempty"`
-	And   []Condition `json:"and,omitempty"`
-	Or    []Condition `json:"or,omitempty"`
-	Not   *Condition  `json:"not,omitempty"`
+	// Tolerance is the ± window for the numeric `approx` operator; Min/Max
+	// bound the `between` operator. Mirrors service.Condition so a rule's JSONB
+	// round-trips identically between the write-time validator and this
+	// sync-time evaluator.
+	Tolerance *float64    `json:"tolerance,omitempty"`
+	Min       *float64    `json:"min,omitempty"`
+	Max       *float64    `json:"max,omitempty"`
+	And       []Condition `json:"and,omitempty"`
+	Or        []Condition `json:"or,omitempty"`
+	Not       *Condition  `json:"not,omitempty"`
 }
 
 // TransactionContext holds the fields available for rule evaluation during sync.
@@ -65,6 +74,11 @@ type TransactionContext struct {
 	// mid-resolver as earlier-stage set_metadata / remove_metadata actions
 	// apply, so later-stage rules observe the running blob.
 	Metadata map[string]any
+	// Date is the transaction's tz-naive posting date (the `date` column, no
+	// time component). The derived date-part condition fields (day_of_month /
+	// month / day_of_week / day_of_year) are computed from it; a zero Date makes
+	// those conditions evaluate to false.
+	Date time.Time
 }
 
 // RuleActionSource tracks which rule contributed which action for audit.
@@ -176,9 +190,13 @@ type compiledCondition struct {
 	op    string
 	value interface{}
 	regex *regexp.Regexp // pre-compiled for "matches" operator
-	and   []*compiledCondition
-	or    []*compiledCondition
-	not   *compiledCondition
+	// tolerance / min / max carry the approx / between numeric-operator params.
+	tolerance *float64
+	min       *float64
+	max       *float64
+	and       []*compiledCondition
+	or        []*compiledCondition
+	not       *compiledCondition
 }
 
 // ruleRow holds the raw data from the transaction_rules table query.
@@ -437,6 +455,9 @@ func compileCondition(c *Condition) (*compiledCondition, error) {
 	cc.field = c.Field
 	cc.op = c.Op
 	cc.value = c.Value
+	cc.tolerance = c.Tolerance
+	cc.min = c.Min
+	cc.max = c.Max
 
 	// Pre-compile regex for "matches" operator.
 	if c.Op == "matches" {
@@ -930,12 +951,76 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.SeriesShortID)
 	case "in_series":
 		return evaluateBool(c, tctx.InSeries)
+	case "day_of_month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateDayOfMonth(c, tctx.Date)
+	case "month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateNumeric(c, float64(int(tctx.Date.Month())))
+	case "day_of_week":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateNumeric(c, float64(int(tctx.Date.Weekday())))
+	case "day_of_year":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateNumeric(c, float64(tctx.Date.YearDay()))
 	default:
 		if key, ok := metadataKeyFromField(c.field); ok {
 			return evaluateMetadata(c, key, tctx.Metadata)
 		}
 		return false // unknown field
 	}
+}
+
+// evaluateDayOfMonth mirrors service.evalDayOfMonth: approx uses cyclic +
+// clamped matching against the transaction's actual month length; every other
+// operator falls back to a plain numeric comparison on the literal day (1..31).
+func evaluateDayOfMonth(c *compiledCondition, date time.Time) bool {
+	day := date.Day()
+	if c.op != "approx" {
+		return evaluateNumeric(c, float64(day))
+	}
+	if c.tolerance == nil {
+		return false
+	}
+	target := toFloat64(c.value)
+	monthLen := daysInMonth(date.Year(), date.Month())
+	return dayOfMonthApproxMatch(day, int(math.Round(target)), *c.tolerance, monthLen)
+}
+
+// daysInMonth returns the number of days in the given year/month.
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
+// dayOfMonthApproxMatch reports whether actualDay is within tolerance of
+// targetDay on a cyclic month of monthLen days. targetDay clamps into
+// [1, monthLen]; distance is the smaller of the direct and wrap-around gaps.
+func dayOfMonthApproxMatch(actualDay, targetDay int, tolerance float64, monthLen int) bool {
+	if monthLen <= 0 {
+		return false
+	}
+	if targetDay > monthLen {
+		targetDay = monthLen
+	}
+	if targetDay < 1 {
+		targetDay = 1
+	}
+	diff := actualDay - targetDay
+	if diff < 0 {
+		diff = -diff
+	}
+	if wrap := monthLen - diff; wrap < diff {
+		diff = wrap
+	}
+	return float64(diff) <= tolerance
 }
 
 // metadataFieldPrefix marks a condition leaf that reads a key from the
@@ -1109,6 +1194,12 @@ func evaluateString(c *compiledCondition, fieldVal string) bool {
 
 // evaluateNumeric applies numeric operators.
 func evaluateNumeric(c *compiledCondition, fieldVal float64) bool {
+	if c.op == "between" {
+		if c.min == nil || c.max == nil {
+			return false
+		}
+		return fieldVal >= *c.min && fieldVal <= *c.max
+	}
 	v := toFloat64(c.value)
 
 	switch c.op {
@@ -1124,6 +1215,11 @@ func evaluateNumeric(c *compiledCondition, fieldVal float64) bool {
 		return fieldVal < v
 	case "lte":
 		return fieldVal <= v
+	case "approx":
+		if c.tolerance == nil {
+			return false
+		}
+		return math.Abs(fieldVal-v) <= *c.tolerance
 	default:
 		return false
 	}

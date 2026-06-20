@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -43,6 +44,20 @@ var validConditionFields = map[string]string{
 	"tags":                       "tags",
 	"series":                     "string", // recurring-series short_id the txn belongs to
 	"in_series":                  "bool",   // whether the txn belongs to any recurring series
+
+	// Date-part fields — numeric values derived from the tz-naive `date`
+	// column (no timezone math; provider-localized). day_of_week uses Go's
+	// time.Weekday numbering (0=Sunday … 6=Saturday).
+	"day_of_month": "numeric", // 1..31 (clamped/cyclic under approx, see evalDayOfMonth)
+	"month":        "numeric", // 1..12
+	"day_of_week":  "numeric", // 0=Sun .. 6=Sat
+	"day_of_year":  "numeric", // 1..366
+}
+
+// datePartFields is the set of derived date-part condition fields. They are
+// numeric but computed from TransactionContext.Date rather than a stored scalar.
+var datePartFields = map[string]bool{
+	"day_of_month": true, "month": true, "day_of_week": true, "day_of_year": true,
 }
 
 // stringOps are operators valid for string fields.
@@ -51,8 +66,13 @@ var stringOps = map[string]bool{
 }
 
 // numericOps are operators valid for numeric fields.
+//
+//   - approx: amount ≈ value ± tolerance (requires Tolerance ≥ 0). For
+//     day_of_month, the comparison is cyclic + clamped (see evalDayOfMonth).
+//   - between: min ≤ amount ≤ max (requires Min and Max, Min ≤ Max).
 var numericOps = map[string]bool{
 	"eq": true, "neq": true, "gt": true, "gte": true, "lt": true, "lte": true,
+	"approx": true, "between": true,
 }
 
 // boolOps are operators valid for boolean fields.
@@ -175,8 +195,28 @@ func validateConditionDepth(c Condition, depth int) error {
 			if !numericOps[c.Op] {
 				return fmt.Errorf("%w: operator %q not valid for numeric field %q", ErrInvalidParameter, c.Op, c.Field)
 			}
-			if _, ok := toFloat64(c.Value); !ok {
-				return fmt.Errorf("%w: numeric value required for field %q", ErrInvalidParameter, c.Field)
+			switch c.Op {
+			case "between":
+				if c.Min == nil || c.Max == nil {
+					return fmt.Errorf("%w: 'between' operator requires numeric 'min' and 'max' for field %q", ErrInvalidParameter, c.Field)
+				}
+				if *c.Min > *c.Max {
+					return fmt.Errorf("%w: 'between' requires min ≤ max for field %q", ErrInvalidParameter, c.Field)
+				}
+			case "approx":
+				if _, ok := toFloat64(c.Value); !ok {
+					return fmt.Errorf("%w: numeric value required for field %q", ErrInvalidParameter, c.Field)
+				}
+				if c.Tolerance == nil {
+					return fmt.Errorf("%w: 'approx' operator requires a numeric 'tolerance' for field %q", ErrInvalidParameter, c.Field)
+				}
+				if *c.Tolerance < 0 {
+					return fmt.Errorf("%w: 'tolerance' must be ≥ 0 for field %q", ErrInvalidParameter, c.Field)
+				}
+			default:
+				if _, ok := toFloat64(c.Value); !ok {
+					return fmt.Errorf("%w: numeric value required for field %q", ErrInvalidParameter, c.Field)
+				}
 			}
 		case "bool":
 			if !boolOps[c.Op] {
@@ -270,6 +310,13 @@ type CompiledCondition struct {
 	Value interface{}
 	Regex *regexp.Regexp
 
+	// Tolerance / Min / Max carry the extra numeric-operator parameters
+	// (approx tolerance, between bounds) so evalNumeric / evalDayOfMonth can
+	// read them without re-parsing the source Condition.
+	Tolerance *float64
+	Min       *float64
+	Max       *float64
+
 	// Pre-lowercased expected value for case-insensitive string comparisons.
 	// Set at compile time so evalString avoids repeated ToLower on the expected side.
 	lowerValue string
@@ -291,9 +338,12 @@ func CompileCondition(c Condition) (*CompiledCondition, error) {
 		return nil, nil
 	}
 	cc := &CompiledCondition{
-		Field: c.Field,
-		Op:    c.Op,
-		Value: c.Value,
+		Field:     c.Field,
+		Op:        c.Op,
+		Value:     c.Value,
+		Tolerance: c.Tolerance,
+		Min:       c.Min,
+		Max:       c.Max,
 	}
 
 	fieldType := validConditionFields[c.Field]
@@ -429,11 +479,79 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 		return evalString(c, tctx.SeriesShortID)
 	case "in_series":
 		return evalBool(c, tctx.InSeries)
+	case "day_of_month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalDayOfMonth(c, tctx.Date)
+	case "month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalNumeric(c, float64(int(tctx.Date.Month())))
+	case "day_of_week":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalNumeric(c, float64(int(tctx.Date.Weekday())))
+	case "day_of_year":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalNumeric(c, float64(tctx.Date.YearDay()))
 	}
 	if key, ok := metadataKeyFromField(c.Field); ok {
 		return evalMetadata(c, key, tctx.Metadata)
 	}
 	return false
+}
+
+// evalDayOfMonth evaluates a day_of_month leaf. For the approx operator it uses
+// cyclic + clamped matching against the transaction's actual month length: the
+// target is clamped to [1, daysInMonth] (so "the 31st" matches Feb's last day)
+// and the distance wraps around the month (so the 1st and the last day are 1
+// apart). Every other operator falls back to the plain numeric comparison on
+// the literal day-of-month (1..31).
+func evalDayOfMonth(c *CompiledCondition, date time.Time) bool {
+	day := date.Day()
+	if c.Op != "approx" {
+		return evalNumeric(c, float64(day))
+	}
+	target, ok := toFloat64(c.Value)
+	if !ok || c.Tolerance == nil {
+		return false
+	}
+	monthLen := daysInMonth(date.Year(), date.Month())
+	return dayOfMonthApproxMatch(day, int(math.Round(target)), *c.Tolerance, monthLen)
+}
+
+// daysInMonth returns the number of days in the given year/month (handles leap
+// February via the day-0-of-next-month trick).
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
+// dayOfMonthApproxMatch reports whether actualDay is within tolerance of
+// targetDay on a cyclic month of monthLen days. targetDay is first clamped into
+// [1, monthLen]; the distance is the smaller of the direct and wrap-around gaps.
+func dayOfMonthApproxMatch(actualDay, targetDay int, tolerance float64, monthLen int) bool {
+	if monthLen <= 0 {
+		return false
+	}
+	if targetDay > monthLen {
+		targetDay = monthLen
+	}
+	if targetDay < 1 {
+		targetDay = 1
+	}
+	diff := actualDay - targetDay
+	if diff < 0 {
+		diff = -diff
+	}
+	if wrap := monthLen - diff; wrap < diff {
+		diff = wrap
+	}
+	return float64(diff) <= tolerance
 }
 
 // evalMetadata evaluates a metadata.<key> leaf against the transaction's
@@ -626,6 +744,12 @@ func evalString(c *CompiledCondition, actual string) bool {
 }
 
 func evalNumeric(c *CompiledCondition, actual float64) bool {
+	if c.Op == "between" {
+		if c.Min == nil || c.Max == nil {
+			return false
+		}
+		return actual >= *c.Min && actual <= *c.Max
+	}
 	expected, ok := toFloat64(c.Value)
 	if !ok {
 		return false
@@ -643,6 +767,11 @@ func evalNumeric(c *CompiledCondition, actual float64) bool {
 		return actual < expected
 	case "lte":
 		return actual <= expected
+	case "approx":
+		if c.Tolerance == nil {
+			return false
+		}
+		return math.Abs(actual-expected) <= *c.Tolerance
 	}
 	return false
 }
@@ -1464,7 +1593,7 @@ const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provid
 	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
 	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[]),
-	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata
+	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata, t.date
 	FROM transactions t
 	JOIN accounts a ON t.account_id = a.id
 	JOIN bank_connections bc ON a.connection_id = bc.id
@@ -1476,18 +1605,19 @@ const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provid
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
-const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id, t.metadata`
+const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id, t.metadata, t.date`
 
 // transactionContextColumns is the number of columns selected by
 // transactionContextQuery (and bound by scanTransactionContextRow). Callers size
 // their scan-dest slice with this so adding a column is a single-line change.
-const transactionContextColumns = 15
+const transactionContextColumns = 16
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
 	id          pgtype.UUID
 	tctx        TransactionContext
-	metadataRaw []byte // raw JSONB; unmarshalled into tctx.Metadata by finalize
+	metadataRaw []byte      // raw JSONB; unmarshalled into tctx.Metadata by finalize
+	dateRaw     pgtype.Date // tz-naive posting date; copied into tctx.Date by finalize
 }
 
 func scanTransactionContextRow(dest []any) *transactionContextRow {
@@ -1507,6 +1637,7 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	dest[12] = &r.tctx.SeriesShortID
 	dest[13] = &r.tctx.InSeries
 	dest[14] = &r.metadataRaw
+	dest[15] = &r.dateRaw
 	return r
 }
 
@@ -1514,6 +1645,9 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 // rows.Scan. A malformed blob leaves Metadata nil (metadata conditions simply
 // won't match) rather than failing the whole apply pass.
 func (r *transactionContextRow) finalize() {
+	if r.dateRaw.Valid {
+		r.tctx.Date = r.dateRaw.Time
+	}
 	if len(r.metadataRaw) == 0 {
 		return
 	}
@@ -2456,6 +2590,9 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 				if err := json.Unmarshal(metadataRaw, &meta); err == nil {
 					tctx.Metadata = meta
 				}
+			}
+			if date.Valid {
+				tctx.Date = date.Time
 			}
 			lastID = id
 			result.TotalScanned++

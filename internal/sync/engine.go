@@ -691,6 +691,9 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		AccountName: accountName,
 		UserID:      pgconv.FormatUUID(userID),
 		UserName:    userName,
+		// txn.Date is tz-naive (provider-localized); no timezone math. Powers
+		// the day_of_month / month / day_of_week / day_of_year condition fields.
+		Date: txn.Date,
 	}
 	if txn.MerchantName != nil {
 		tctx.MerchantName = *txn.MerchantName
