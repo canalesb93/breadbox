@@ -83,6 +83,10 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	}
 	agentAvatarStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarAgentStyle, avatar.DefaultAgentStyle)
 
+	// Counterparty logo hotlinking (env → app_config → default) for the
+	// Appearance section's toggle + optional logo.dev publishable token.
+	counterpartyLogos, logoDevToken := a.Service.CounterpartyLogoSettings(ctx)
+
 	nextSyncTime := ""
 	if a.Scheduler != nil {
 		nextSyncTime = formatNextSync(a.Scheduler.NextRun())
@@ -113,6 +117,8 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,
 		AvatarStyles:         avatar.AvailableStyles,
+		CounterpartyLogos:    counterpartyLogos,
+		LogoDevToken:         logoDevToken,
 	}
 	if a.VersionChecker != nil {
 		if updateAvailable, latest, err := a.VersionChecker.CheckForUpdate(ctx); err == nil && updateAvailable != nil && *updateAvailable && latest != nil {
@@ -283,6 +289,48 @@ func SettingsAvatarStylePostHandler(a *app.App, sm *scs.SessionManager) http.Han
 
 		SetFlash(ctx, sm, "success", label+" updated.")
 		http.Redirect(w, r, "/settings/general", http.StatusSeeOther)
+	}
+}
+
+// SettingsCounterpartyLogosPostHandler serves POST /settings/counterparty-logos
+// — the auto-save toggle for hotlinking brand logos from logo.dev onto
+// counterparty avatars. An unchecked checkbox omits the field, so absence = off.
+// Returns 204 (the auto-save form shows its own toast).
+func SettingsCounterpartyLogosPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enabled := r.FormValue("counterparty_logos") == "true"
+		val := "false"
+		if enabled {
+			val = "true"
+		}
+		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+			Key:   appconfig.KeyCounterpartyLogos,
+			Value: pgconv.Text(val),
+		}); err != nil {
+			a.Logger.Error("save counterparty logos toggle", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// SettingsLogoDevTokenPostHandler serves POST /settings/logo-dev-token — the
+// auto-save input for the optional logo.dev publishable key appended to
+// hotlinked logo URLs. The key is public by design (it rides in the <img src>),
+// so it's stored in plaintext. Empty clears it. Returns 204.
+func SettingsLogoDevTokenPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimSpace(r.FormValue("logo_dev_token"))
+		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+			Key:   appconfig.KeyLogoDevToken,
+			Value: pgconv.Text(token),
+		}); err != nil {
+			a.Logger.Error("save logo.dev token", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

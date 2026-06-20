@@ -26,7 +26,8 @@ type CounterpartiesListProps struct {
 type CounterpartyRow struct {
 	ShortID            string
 	Name               string
-	LogoURL            string // optional logo image on the row/header (logo_url)
+	LogoURL            string // manual logo image on the row/header (logo_url) — top precedence
+	LogoDevURL         string // hotlinked logo.dev brand logo (derived from website_url) — used only when LogoURL is unset and logos are enabled; degrades to the monogram on error
 	Category           string // resolved display name of the default category, "" when unset
 	MemberCount        int    // linked live charges
 	GoverningRuleCount int    // assign_counterparty rules that define membership

@@ -52,6 +52,10 @@ func CounterpartiesListPageHandler(a *app.App, svc *service.Service, sm *scs.Ses
 		// pass, so the row can show a small category chip without an N+1.
 		catNameByUUID := counterpartyCategoryNames(ctx, svc)
 
+		// Resolve the logo.dev hotlink config once for the whole list (env →
+		// app_config → default); each row derives its own URL from its website.
+		logosEnabled, logoToken := svc.CounterpartyLogoSettings(ctx)
+
 		rows := make([]pages.CounterpartyRow, 0, len(all))
 		for _, c := range all {
 			row := counterpartyRow(c)
@@ -60,6 +64,7 @@ func CounterpartiesListPageHandler(a *app.App, svc *service.Service, sm *scs.Ses
 			if c.CategoryID != nil {
 				row.Category = catNameByUUID[*c.CategoryID]
 			}
+			row.LogoDevURL = counterpartyLogoDevURL(logosEnabled, row.LogoURL, c.WebsiteURL, logoToken)
 			rows = append(rows, row)
 		}
 
@@ -114,6 +119,11 @@ func CounterpartyDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			}
 		}
 		row.GoverningRuleCount = len(governing)
+
+		// Hotlink a logo.dev brand logo into the header avatar (when enabled and
+		// no manual logo_url override), mirroring the list rows.
+		logosEnabled, logoToken := svc.CounterpartyLogoSettings(ctx)
+		row.LogoDevURL = counterpartyLogoDevURL(logosEnabled, row.LogoURL, c.WebsiteURL, logoToken)
 
 		props := pages.CounterpartyDetailProps{
 			CSRFToken:       GetCSRFToken(r),
@@ -307,6 +317,22 @@ func counterpartyCategoryOptions(ctx context.Context, svc *service.Service, curr
 		}
 	}
 	return out
+}
+
+// counterpartyLogoDevURL returns the logo.dev hotlink URL for a counterparty's
+// avatar, or "" to fall back to the gradient monogram. The feature is
+// token-gated: logo.dev's image API requires a publishable key (a tokenless
+// request 401s on every render), so a URL is emitted only when ALL of these
+// hold — logos enabled, a publishable token configured, no manual logo_url
+// override (that wins), and a registrable domain derivable from the website.
+// With no token configured the default state is monograms everywhere, which is
+// correct and complete; paste a key in Settings → General → Counterparties to
+// light up real brand logos.
+func counterpartyLogoDevURL(enabled bool, manualLogoURL string, websiteURL *string, token string) string {
+	if !enabled || token == "" || manualLogoURL != "" {
+		return ""
+	}
+	return components.LogoDevURL(derefStr(websiteURL), token)
 }
 
 // derefStr returns the pointed-to string or "".
