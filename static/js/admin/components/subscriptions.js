@@ -12,6 +12,19 @@
         filterType: 'all',
         filter: '',
 
+        // Scope the keyboard shortcuts to this page while mounted, and
+        // restore the global scope on teardown. Folded in from a bare
+        // x-init/x-destroy div so the factory owns the page's full lifecycle.
+        init: function () {
+          var reg = window.Alpine && Alpine.store('shortcuts');
+          if (reg) reg.setScope('subscriptions');
+        },
+
+        destroy: function () {
+          var reg = window.Alpine && Alpine.store('shortcuts');
+          if (reg) reg.setScope('global');
+        },
+
         // Search filter for the ledger rows (data-search haystack).
         matches: function (el) {
           if (!this.filter) return true;

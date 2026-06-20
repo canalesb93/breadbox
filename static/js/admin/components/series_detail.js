@@ -43,7 +43,8 @@
       return {
         seriesId: '',
         currentTags: [],
-        editOpen: false,
+        // Name/type edit lives in the shared components.Drawer ('series-edit'),
+        // opened via $store.drawers — no local open flag needed here.
         // Link-a-charge modal state.
         linkOpen: false,
         linkQuery: '',
