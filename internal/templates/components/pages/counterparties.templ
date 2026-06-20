@@ -46,25 +46,34 @@ templ CounterpartiesList(p CounterpartiesListProps) {
 	</div>
 }
 
-// counterpartiesListRow renders one counterparty as a daisy list-row: a leading
-// logo thumbnail (or fallback glyph), the name on the title line, the
-// linked-charge + governing-rule counts on the body line, and a chevron. The
-// whole row links to the detail page.
+// counterpartiesListRow renders one counterparty as a daisy list-row in the
+// Workflows-gallery idiom: a leading EntityAvatar (the logo image when set, else
+// a deterministic gradient monogram of the name), the name on the title line
+// with an optional category chip, the linked-charge + governing-rule counts on
+// the body line, and a chevron. The whole row links to the detail page.
 templ counterpartiesListRow(c CounterpartyRow) {
 	<li
-		class="list-row transition-colors hover:bg-base-200/40 items-center"
+		class="list-row rounded-xl transition-colors hover:bg-base-200/40 focus-within:bg-base-200/40 items-center"
 		data-search={ c.Search }
 		x-show="matches($el)"
 	>
 		<a
-			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+			class="contents no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
 			href={ templ.SafeURL("/counterparties/" + c.ShortID) }
 			aria-label={ "Open counterparty " + c.Name }
 		>
-			@counterpartyLogoTile(c.LogoURL, c.Name)
+			@components.EntityAvatar(components.EntityAvatarProps{
+				Name:     c.Name,
+				ImageURL: c.LogoURL,
+				Seed:     c.ShortID,
+				Size:     components.EntityAvatarSizeMD,
+			})
 			<div class="min-w-0">
 				<div class="flex items-center gap-2 min-w-0">
 					<span data-private="merchant" class="font-medium text-sm text-base-content truncate">{ c.Name }</span>
+					if c.Category != "" {
+						<span class="badge badge-ghost badge-sm shrink-0 hidden sm:inline-flex">{ c.Category }</span>
+					}
 				</div>
 				<div class="mt-0.5 text-xs text-base-content/55 min-w-0 line-clamp-1">
 					{ counterpartyRowMeta(c.MemberCount, c.GoverningRuleCount) }
@@ -75,20 +84,6 @@ templ counterpartiesListRow(c CounterpartyRow) {
 			</div>
 		</a>
 	</li>
-}
-
-// counterpartyLogoTile is the leading glyph for a counterparty row/header — the
-// logo image when one is set, otherwise a quiet "store" tile.
-templ counterpartyLogoTile(logoURL, name string) {
-	if logoURL != "" {
-		<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200 overflow-hidden">
-			<img src={ logoURL } alt={ name } class="w-full h-full object-contain" loading="lazy"/>
-		</div>
-	} else {
-		<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200">
-			@components.LucideIcon("store", "w-4 h-4 text-base-content/50")
-		</div>
-	}
 }
 
 // CounterpartyDetail renders /counterparties/{short_id} under the
@@ -102,8 +97,8 @@ templ CounterpartyDetail(p CounterpartyDetailProps) {
 		@components.EntityHeader(components.EntityHeaderProps{
 			Title:            p.Counterparty.Name,
 			TitlePrivateKind: "merchant",
-			IconComponent:    counterpartyHeaderIcon(p.Counterparty.LogoURL, p.Counterparty.Name),
-			IconTone:         components.IconToneNeutral,
+			IconComponent:    counterpartyHeaderIcon(p.Counterparty),
+			IconTone:         components.IconToneDefault,
 			Meta:             counterpartyDetailMeta(p),
 		})
 		<!-- Linked charges (what's bound) + Governing rules (what defines it) -->
@@ -210,14 +205,17 @@ templ CounterpartyForm(p CounterpartyFormProps) {
 	</form>
 }
 
-// counterpartyHeaderIcon renders the EntityHeader leading tile content — the logo
-// image when set, otherwise a store glyph.
-templ counterpartyHeaderIcon(logoURL, name string) {
-	if logoURL != "" {
-		<img src={ logoURL } alt={ name } class="w-6 h-6 object-contain" loading="lazy"/>
-	} else {
-		@components.LucideIcon("store", "w-5 h-5 sm:w-6 sm:h-6")
-	}
+// counterpartyHeaderIcon renders the EntityHeader leading tile content — the same
+// EntityAvatar the list rows use (logo image when set, else a deterministic
+// gradient monogram), sized to fill the header tile slot so the detail hero
+// matches the list.
+templ counterpartyHeaderIcon(c CounterpartyRow) {
+	@components.EntityAvatar(components.EntityAvatarProps{
+		Name:     c.Name,
+		ImageURL: c.LogoURL,
+		Seed:     c.ShortID,
+		Class:    "w-full h-full",
+	})
 }
 
 // counterpartyDetailMeta is the quiet sub-title line — the linked-charge count.

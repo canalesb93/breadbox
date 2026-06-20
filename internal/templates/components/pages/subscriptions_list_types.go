@@ -35,12 +35,13 @@ type SubscriptionTypeFilter struct {
 // detail page). A thin series carries only an identity (short_id, name), a
 // structured type, its linked-charge count, and its inherited tags.
 type SubscriptionRow struct {
-	ShortID     string // short_id — drives the detail link
-	Name        string
-	Type        string // subscription | bill | loan | other (raw, drives the filter)
-	TypeLabel   string // "Subscription" | "Bill" | "Loan" | "Other"
-	MemberCount int    // linked live charges
-	Tags        []string
+	ShortID            string // short_id — drives the detail link
+	Name               string
+	Type               string // subscription | bill | loan | other (raw, drives the filter)
+	TypeLabel          string // "Subscription" | "Bill" | "Loan" | "Other"
+	MemberCount        int    // linked live charges
+	GoverningRuleCount int    // assign_series rules that define membership
+	Tags               []string
 
 	// Search is the lowercase haystack for the client-side filter input.
 	Search string
@@ -122,6 +123,42 @@ func subscriptionMemberCount(n int) string {
 		return "1 charge"
 	}
 	return fmt.Sprintf("%d charges", n)
+}
+
+// subscriptionRowMeta renders the "N charges · M rules" body line on a series
+// row, mirroring counterpartyRowMeta: the charge count always shows; the rule
+// count is appended only when at least one governing rule exists (keeping the
+// line quiet for an as-yet-ungoverned series).
+func subscriptionRowMeta(memberCount, ruleCount int) string {
+	parts := []string{subscriptionMemberCount(memberCount)}
+	switch ruleCount {
+	case 0:
+		// nothing — keep the line quiet when no rules govern it
+	case 1:
+		parts = append(parts, "1 rule")
+	default:
+		parts = append(parts, fmt.Sprintf("%d rules", ruleCount))
+	}
+	return strings.Join(parts, " · ")
+}
+
+// subscriptionTypeTone maps a series type to a calm, distinct EntityAvatar tint.
+// It deliberately uses only the *vivid* semantic tones (success/warning/info) +
+// neutral, because in the dark theme primary/secondary/accent collapse to gray
+// (see the theme's vivid-tones rule) — a primary tint would read identically to
+// neutral. So: subscription → success (green), bill → warning (amber), loan →
+// info (blue), other → neutral (gray, the quiet bucket).
+func subscriptionTypeTone(typ string) components.IconTone {
+	switch typ {
+	case "bill":
+		return components.IconToneWarning
+	case "loan":
+		return components.IconToneInfo
+	case "subscription":
+		return components.IconToneSuccess
+	default:
+		return components.IconToneNeutral
+	}
 }
 
 // subscriptionSearchHaystack builds the lowercase filter haystack for a row.

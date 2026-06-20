@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -451,6 +452,49 @@ func (s *Service) ListSeriesMemberCounts(ctx context.Context) (map[string]int, e
 		out[formatUUID(r.SeriesID)] = int(r.MemberCount)
 	}
 	return out, nil
+}
+
+// ListSeriesGoverningRuleCounts tallies, in one pass over every `assign_series`
+// rule, how many such rules target each series — by its short_id (assign-to-
+// existing) or by its name (mint-by-name). Returns two maps (byShortID, byName)
+// so the /recurring list handler can label each row's governing-rule count
+// without an N+1 of ListGoverningRules. Mirrors
+// ListCounterpartyGoverningRuleCounts.
+func (s *Service) ListSeriesGoverningRuleCounts(ctx context.Context) (byShortID map[string]int, byName map[string]int, err error) {
+	rows, err := s.Pool.Query(ctx,
+		`SELECT actions FROM transaction_rules
+		   WHERE actions @> '[{"type":"assign_series"}]'::jsonb`)
+	if err != nil {
+		return nil, nil, fmt.Errorf("query series governing rule counts: %w", err)
+	}
+	defer rows.Close()
+
+	byShortID = map[string]int{}
+	byName = map[string]int{}
+	for rows.Next() {
+		var raw []byte
+		if err := rows.Scan(&raw); err != nil {
+			return nil, nil, fmt.Errorf("scan rule actions: %w", err)
+		}
+		var actions []RuleAction
+		if err := json.Unmarshal(raw, &actions); err != nil {
+			continue // a malformed action blob shouldn't break the whole tally
+		}
+		for _, a := range actions {
+			if a.Type != "assign_series" {
+				continue
+			}
+			if sid := strings.TrimSpace(a.SeriesShortID); sid != "" {
+				byShortID[sid]++
+			} else if name := strings.TrimSpace(a.SeriesName); name != "" {
+				byName[name]++
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterate rule actions: %w", err)
+	}
+	return byShortID, byName, nil
 }
 
 // ListGoverningRules returns the rules whose `assign_series` action targets this
