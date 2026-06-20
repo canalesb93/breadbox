@@ -223,14 +223,16 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
 		"au.short_id AS attributed_user_short_id, au.name AS attributed_user_name, " +
 		"COALESCE(au.short_id, u.short_id) AS effective_user_short_id, " +
-		"t.metadata, t.flagged_at " +
+		"t.metadata, t.flagged_at, " +
+		"cp.short_id AS counterparty_short_id, cp.name AS counterparty_name, cp.logo_url AS counterparty_logo_url " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
 		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
-		"LEFT JOIN categories pc ON c.parent_id = pc.id")
+		"LEFT JOIN categories pc ON c.parent_id = pc.id " +
+		"LEFT JOIN counterparties cp ON t.counterparty_id = cp.id")
 
 	limit := params.Limit
 	if limit <= 0 {
@@ -449,41 +451,44 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	var transactions []TransactionResponse
 	for rows.Next() {
 		var (
-			id                     pgtype.UUID
-			shortID                string
-			externalTransactionID  string
-			pendingTransactionID   pgtype.Text
-			amount                 pgtype.Numeric
-			isoCurrencyCode        pgtype.Text
-			date                   pgtype.Date
-			authorizedDate         pgtype.Date
-			datetime               pgtype.Timestamptz
-			authorizedDatetime     pgtype.Timestamptz
-			name                   string
-			merchantName           pgtype.Text
-			categoryPrimary        pgtype.Text
-			categoryDetailed       pgtype.Text
-			categoryConfidence     pgtype.Text
-			paymentChannel         pgtype.Text
-			pending                bool
-			deletedAt              pgtype.Timestamptz
-			createdAt              pgtype.Timestamptz
-			updatedAt              pgtype.Timestamptz
-			accountName            string
-			accountShortID         string
-			userName               pgtype.Text
-			categoryID             pgtype.UUID
-			catSlug                pgtype.Text
-			catDisplayName         pgtype.Text
-			catIcon                pgtype.Text
-			catColor               pgtype.Text
-			catPrimarySlug         pgtype.Text
-			catPrimaryDisplayName  pgtype.Text
-			attributedUserShortID  pgtype.Text
-			attributedUserName     pgtype.Text
-			effectiveUserShortID   pgtype.Text
-			metadata               []byte
-			flaggedAt              pgtype.Timestamptz
+			id                    pgtype.UUID
+			shortID               string
+			externalTransactionID string
+			pendingTransactionID  pgtype.Text
+			amount                pgtype.Numeric
+			isoCurrencyCode       pgtype.Text
+			date                  pgtype.Date
+			authorizedDate        pgtype.Date
+			datetime              pgtype.Timestamptz
+			authorizedDatetime    pgtype.Timestamptz
+			name                  string
+			merchantName          pgtype.Text
+			categoryPrimary       pgtype.Text
+			categoryDetailed      pgtype.Text
+			categoryConfidence    pgtype.Text
+			paymentChannel        pgtype.Text
+			pending               bool
+			deletedAt             pgtype.Timestamptz
+			createdAt             pgtype.Timestamptz
+			updatedAt             pgtype.Timestamptz
+			accountName           string
+			accountShortID        string
+			userName              pgtype.Text
+			categoryID            pgtype.UUID
+			catSlug               pgtype.Text
+			catDisplayName        pgtype.Text
+			catIcon               pgtype.Text
+			catColor              pgtype.Text
+			catPrimarySlug        pgtype.Text
+			catPrimaryDisplayName pgtype.Text
+			attributedUserShortID pgtype.Text
+			attributedUserName    pgtype.Text
+			effectiveUserShortID  pgtype.Text
+			metadata              []byte
+			flaggedAt             pgtype.Timestamptz
+			counterpartyShortID   pgtype.Text
+			counterpartyName      pgtype.Text
+			counterpartyLogoURL   pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -499,6 +504,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&catPrimarySlug, &catPrimaryDisplayName,
 			&attributedUserShortID, &attributedUserName,
 			&effectiveUserShortID, &metadata, &flaggedAt,
+			&counterpartyShortID, &counterpartyName, &counterpartyLogoURL,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -531,20 +537,20 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 
 		accountShortIDVal := accountShortID
 		transactions = append(transactions, TransactionResponse{
-			ID:                  formatUUID(id),
-			ShortID:             shortID,
-			AccountID:           &accountShortIDVal,
-			AccountName:         &accountName,
-			UserName:            textPtr(userName),
-			AttributedUserID:    textPtr(attributedUserShortID),
-			AttributedUserName:  textPtr(attributedUserName),
-			EffectiveUserID:     textPtr(effectiveUserShortID),
-			Amount:              amountVal,
-			IsoCurrencyCode:     textPtr(isoCurrencyCode),
-			Date:                dateVal,
-			AuthorizedDate:      dateStr(authorizedDate),
-			Datetime:            timestampStr(datetime),
-			AuthorizedDatetime:  timestampStr(authorizedDatetime),
+			ID:                         formatUUID(id),
+			ShortID:                    shortID,
+			AccountID:                  &accountShortIDVal,
+			AccountName:                &accountName,
+			UserName:                   textPtr(userName),
+			AttributedUserID:           textPtr(attributedUserShortID),
+			AttributedUserName:         textPtr(attributedUserName),
+			EffectiveUserID:            textPtr(effectiveUserShortID),
+			Amount:                     amountVal,
+			IsoCurrencyCode:            textPtr(isoCurrencyCode),
+			Date:                       dateVal,
+			AuthorizedDate:             dateStr(authorizedDate),
+			Datetime:                   timestampStr(datetime),
+			AuthorizedDatetime:         timestampStr(authorizedDatetime),
 			ProviderName:               name,
 			ProviderMerchantName:       textPtr(merchantName),
 			Category:                   catInfo,
@@ -552,11 +558,14 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			ProviderCategoryDetailed:   textPtr(categoryDetailed),
 			ProviderCategoryConfidence: textPtr(categoryConfidence),
 			ProviderPaymentChannel:     textPtr(paymentChannel),
-			Pending:             pending,
-			CreatedAt:           pgconv.TimestampStr(createdAt),
-			UpdatedAt:           pgconv.TimestampStr(updatedAt),
-			Metadata:            metadataToRaw(metadata),
-			FlaggedAt:           timestampStr(flaggedAt),
+			Pending:                    pending,
+			CreatedAt:                  pgconv.TimestampStr(createdAt),
+			UpdatedAt:                  pgconv.TimestampStr(updatedAt),
+			Metadata:                   metadataToRaw(metadata),
+			FlaggedAt:                  timestampStr(flaggedAt),
+			CounterpartyShortID:        textPtr(counterpartyShortID),
+			CounterpartyName:           textPtr(counterpartyName),
+			CounterpartyLogoURL:        textPtr(counterpartyLogoURL),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -804,7 +813,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
 		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id, " +
-		"t.flagged_at " +
+		"t.flagged_at, " +
+		"cp.short_id AS counterparty_short_id, cp.name AS counterparty_name, cp.logo_url AS counterparty_logo_url " +
 		"FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -812,6 +822,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
 		"LEFT JOIN categories pc ON c.parent_id = pc.id " +
+		"LEFT JOIN counterparties cp ON t.counterparty_id = cp.id " +
 		"WHERE t.deleted_at IS NULL")
 
 	// Track which JOINs are needed for the WHERE clause (used by the count query).
@@ -1030,28 +1041,31 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	var transactions []AdminTransactionRow
 	for rows.Next() {
 		var (
-			id               pgtype.UUID
-			accountID        pgtype.UUID
-			accountName      string
-			institutionName  string
-			userName         string
-			date             pgtype.Date
-			name             string
-			merchantName     pgtype.Text
-			amount           pgtype.Numeric
-			isoCurrencyCode  pgtype.Text
-			categoryID       pgtype.UUID
-			catDisplayName   pgtype.Text
-			catSlug          pgtype.Text
-			catIcon          pgtype.Text
-			catColor         pgtype.Text
-			pending          bool
-			commentCount     int64
-			hasPendingReview bool
-			createdAt        pgtype.Timestamptz
-			updatedAt        pgtype.Timestamptz
-			effectiveUserID  pgtype.UUID
-			flaggedAt        pgtype.Timestamptz
+			id                  pgtype.UUID
+			accountID           pgtype.UUID
+			accountName         string
+			institutionName     string
+			userName            string
+			date                pgtype.Date
+			name                string
+			merchantName        pgtype.Text
+			amount              pgtype.Numeric
+			isoCurrencyCode     pgtype.Text
+			categoryID          pgtype.UUID
+			catDisplayName      pgtype.Text
+			catSlug             pgtype.Text
+			catIcon             pgtype.Text
+			catColor            pgtype.Text
+			pending             bool
+			commentCount        int64
+			hasPendingReview    bool
+			createdAt           pgtype.Timestamptz
+			updatedAt           pgtype.Timestamptz
+			effectiveUserID     pgtype.UUID
+			flaggedAt           pgtype.Timestamptz
+			counterpartyShortID pgtype.Text
+			counterpartyName    pgtype.Text
+			counterpartyLogoURL pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -1061,6 +1075,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
 			&pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
 			&effectiveUserID, &flaggedAt,
+			&counterpartyShortID, &counterpartyName, &counterpartyLogoURL,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -1091,6 +1106,9 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			Date:                dateVal,
 			Name:                name,
 			MerchantName:        textPtr(merchantName),
+			CounterpartyShortID: textPtr(counterpartyShortID),
+			CounterpartyName:    textPtr(counterpartyName),
+			CounterpartyLogoURL: textPtr(counterpartyLogoURL),
 			Amount:              amountVal,
 			IsoCurrencyCode:     textPtr(isoCurrencyCode),
 			CategoryID:          catIDPtr,
@@ -1201,7 +1219,8 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
 		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id, " +
-		"t.flagged_at " +
+		"t.flagged_at, " +
+		"cp.short_id AS counterparty_short_id, cp.name AS counterparty_name, cp.logo_url AS counterparty_logo_url " +
 		"FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -1209,6 +1228,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
 		"LEFT JOIN categories pc ON c.parent_id = pc.id " +
+		"LEFT JOIN counterparties cp ON t.counterparty_id = cp.id " +
 		"WHERE t.deleted_at IS NULL AND t.id = ANY($1)"
 
 	rows, err := s.Pool.Query(ctx, query, uuids)
@@ -1220,28 +1240,31 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 	byID := make(map[string]AdminTransactionRow, len(uuids))
 	for rows.Next() {
 		var (
-			id               pgtype.UUID
-			accountID        pgtype.UUID
-			accountName      string
-			institutionName  string
-			userName         string
-			date             pgtype.Date
-			name             string
-			merchantName     pgtype.Text
-			amount           pgtype.Numeric
-			isoCurrencyCode  pgtype.Text
-			categoryID       pgtype.UUID
-			catDisplayName   pgtype.Text
-			catSlug          pgtype.Text
-			catIcon          pgtype.Text
-			catColor         pgtype.Text
-			pending          bool
-			commentCount     int64
-			hasPendingReview bool
-			createdAt        pgtype.Timestamptz
-			updatedAt        pgtype.Timestamptz
-			effectiveUserID  pgtype.UUID
-			flaggedAt        pgtype.Timestamptz
+			id                  pgtype.UUID
+			accountID           pgtype.UUID
+			accountName         string
+			institutionName     string
+			userName            string
+			date                pgtype.Date
+			name                string
+			merchantName        pgtype.Text
+			amount              pgtype.Numeric
+			isoCurrencyCode     pgtype.Text
+			categoryID          pgtype.UUID
+			catDisplayName      pgtype.Text
+			catSlug             pgtype.Text
+			catIcon             pgtype.Text
+			catColor            pgtype.Text
+			pending             bool
+			commentCount        int64
+			hasPendingReview    bool
+			createdAt           pgtype.Timestamptz
+			updatedAt           pgtype.Timestamptz
+			effectiveUserID     pgtype.UUID
+			flaggedAt           pgtype.Timestamptz
+			counterpartyShortID pgtype.Text
+			counterpartyName    pgtype.Text
+			counterpartyLogoURL pgtype.Text
 		)
 		if err := rows.Scan(
 			&id, &accountID, &accountName,
@@ -1250,6 +1273,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
 			&pending, &commentCount, &hasPendingReview, &createdAt, &updatedAt,
 			&effectiveUserID, &flaggedAt,
+			&counterpartyShortID, &counterpartyName, &counterpartyLogoURL,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -1277,6 +1301,9 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			Date:                dateVal,
 			Name:                name,
 			MerchantName:        textPtr(merchantName),
+			CounterpartyShortID: textPtr(counterpartyShortID),
+			CounterpartyName:    textPtr(counterpartyName),
+			CounterpartyLogoURL: textPtr(counterpartyLogoURL),
 			Amount:              amountVal,
 			IsoCurrencyCode:     textPtr(isoCurrencyCode),
 			CategoryID:          catIDPtr,
@@ -1360,12 +1387,14 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 			t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name,
 			t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence,
 			t.provider_payment_channel, t.pending, t.created_at, t.updated_at,
-			t.category_id, t.metadata, t.flagged_at
+			t.category_id, t.metadata, t.flagged_at,
+			cp.short_id AS counterparty_short_id, cp.name AS counterparty_name, cp.logo_url AS counterparty_logo_url
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN bank_connections bc ON bc.id = a.connection_id
 		LEFT JOIN users u ON u.id = bc.user_id
 		LEFT JOIN users au ON au.id = t.attributed_user_id
+		LEFT JOIN counterparties cp ON cp.id = t.counterparty_id
 		WHERE t.id = $1 AND t.deleted_at IS NULL
 	`
 
@@ -1396,6 +1425,9 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		categoryID            pgtype.UUID
 		metadata              []byte
 		flaggedAt             pgtype.Timestamptz
+		counterpartyShortID   pgtype.Text
+		counterpartyName      pgtype.Text
+		counterpartyLogoURL   pgtype.Text
 	)
 
 	if err := s.Pool.QueryRow(ctx, q, uid).Scan(
@@ -1407,6 +1439,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		&providerCatPrimary, &providerCatDetailed, &providerCatConf,
 		&providerChannel, &pending, &createdAt, &updatedAt,
 		&categoryID, &metadata, &flaggedAt,
+		&counterpartyShortID, &counterpartyName, &counterpartyLogoURL,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -1450,6 +1483,9 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		UpdatedAt:                  pgconv.TimestampStr(updatedAt),
 		Metadata:                   metadataToRaw(metadata),
 		FlaggedAt:                  timestampStr(flaggedAt),
+		CounterpartyShortID:        textPtr(counterpartyShortID),
+		CounterpartyName:           textPtr(counterpartyName),
+		CounterpartyLogoURL:        textPtr(counterpartyLogoURL),
 	}
 
 	if categoryID.Valid {

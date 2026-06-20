@@ -24,9 +24,9 @@ type TransactionSummaryParams struct {
 
 // TransactionSummaryResult is the response for a transaction summary query.
 type TransactionSummaryResult struct {
-	Summary []TransactionSummaryRow    `json:"summary"`
-	Totals  TransactionSummaryTotals   `json:"totals"`
-	Filters TransactionSummaryFilters  `json:"filters"`
+	Summary []TransactionSummaryRow   `json:"summary"`
+	Totals  TransactionSummaryTotals  `json:"totals"`
+	Filters TransactionSummaryFilters `json:"filters"`
 }
 
 // TransactionSummaryRow is a single aggregated row.
@@ -257,16 +257,19 @@ func (s *Service) GetMerchantSummary(ctx context.Context, params MerchantSummary
 	args := make([]any, 0, 12)
 	argN := 1
 
-	buf.WriteString(`SELECT COALESCE(t.provider_merchant_name, t.provider_name) AS merchant,
+	buf.WriteString(`SELECT COALESCE(cp.name, t.provider_merchant_name, t.provider_name) AS merchant,
 		COUNT(*) AS transaction_count,
 		SUM(t.amount) AS total_amount,
 		AVG(t.amount) AS avg_amount,
 		MIN(t.date)::text AS first_date,
 		MAX(t.date)::text AS last_date,
-		t.iso_currency_code
+		t.iso_currency_code,
+		cp.short_id AS counterparty_short_id,
+		cp.logo_url AS counterparty_logo_url
 FROM transactions t
 JOIN accounts a ON t.account_id = a.id
-LEFT JOIN bank_connections bc ON a.connection_id = bc.id`)
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+LEFT JOIN counterparties cp ON t.counterparty_id = cp.id`)
 
 	joinCategories := false
 	if params.CategorySlug != nil {
@@ -371,7 +374,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`)
 		argN = ec.ArgN
 	}
 
-	buf.WriteString(" GROUP BY COALESCE(t.provider_merchant_name, t.provider_name), t.iso_currency_code")
+	buf.WriteString(" GROUP BY t.counterparty_id, COALESCE(cp.name, t.provider_merchant_name, t.provider_name), cp.short_id, cp.logo_url, t.iso_currency_code")
 	buf.WriteString(" HAVING COUNT(*) >= $")
 	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, params.MinCount)
@@ -394,7 +397,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`)
 
 	for rows.Next() {
 		var row MerchantSummaryRow
-		err = rows.Scan(&row.Merchant, &row.TransactionCount, &row.TotalAmount, &row.AvgAmount, &row.FirstDate, &row.LastDate, &row.IsoCurrencyCode)
+		err = rows.Scan(&row.Merchant, &row.TransactionCount, &row.TotalAmount, &row.AvgAmount, &row.FirstDate, &row.LastDate, &row.IsoCurrencyCode, &row.CounterpartyShortID, &row.CounterpartyLogoURL)
 		if err != nil {
 			return nil, fmt.Errorf("scan merchant summary row: %w", err)
 		}

@@ -58,7 +58,7 @@ templ TransactionDetail(p TransactionDetailProps) {
 
 templ txdHero(p TransactionDetailProps) {
 	@components.EntityHeader(components.EntityHeaderProps{
-		Title:            p.Transaction.ProviderName,
+		Title:            txdDisplayName(p),
 		TitlePrivateKind: "merchant",
 		TitleClass:       "break-words",
 		Icon:             txdHeroIcon(p.Transaction.Amount),
@@ -164,6 +164,17 @@ templ txdMain(p TransactionDetailProps) {
 					<p class="text-xs text-base-content/40 mb-1">Date</p>
 					<p class="text-sm font-medium">{ components.FormatDate(p.Transaction.Date) }</p>
 				</div>
+				if p.Transaction.CounterpartyName != nil && *p.Transaction.CounterpartyName != "" {
+					<div>
+						<p class="text-xs text-base-content/40 mb-1">Counterparty</p>
+						<div class="flex items-center gap-1.5">
+							if p.Transaction.CounterpartyLogoURL != nil && *p.Transaction.CounterpartyLogoURL != "" {
+								<img src={ *p.Transaction.CounterpartyLogoURL } alt="" loading="lazy" class="w-4 h-4 rounded-sm object-contain shrink-0"/>
+							}
+							<p data-private="merchant" class="text-sm font-medium">{ *p.Transaction.CounterpartyName }</p>
+						</div>
+					</div>
+				}
 				if p.Transaction.ProviderMerchantName != nil && *p.Transaction.ProviderMerchantName != "" {
 					<div>
 						<p class="text-xs text-base-content/40 mb-1">Merchant</p>
@@ -895,6 +906,16 @@ templ txdInlineTagChip(e service.ActivityEntry) {
 }
 
 // ---- helpers ----
+
+// txdDisplayName is the hero title: the assigned counterparty's name when
+// present, otherwise the raw provider description. Mirrors the
+// COALESCE(counterparty_name, provider_name) display convention.
+func txdDisplayName(p TransactionDetailProps) string {
+	if p.Transaction.CounterpartyName != nil && *p.Transaction.CounterpartyName != "" {
+		return *p.Transaction.CounterpartyName
+	}
+	return p.Transaction.ProviderName
+}
 
 // txdHeroIcon returns the hero icon name based on amount sign — a
 // credit (negative) shows the inbound arrow, a debit (positive) shows

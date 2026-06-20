@@ -782,6 +782,7 @@ func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 		ShortID:             tx.ShortID,
 		Name:                tx.Name,
 		MerchantName:        tx.MerchantName,
+		CounterpartyName:    tx.CounterpartyName,
 		Amount:              tx.Amount,
 		Currency:            tx.Currency,
 		Date:                tx.Date,

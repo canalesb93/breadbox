@@ -40,22 +40,29 @@ type TransactionCategoryInfo struct {
 }
 
 type TransactionResponse struct {
-	ID                         string                   `json:"id"`
-	ShortID                    string                   `json:"short_id"`
-	AccountID                  *string                  `json:"account_id"`
-	AccountName                *string                  `json:"account_name"`
-	UserName                   *string                  `json:"user_name"`
-	AttributedUserID           *string                  `json:"attributed_user_id,omitempty"`
-	AttributedUserName         *string                  `json:"attributed_user_name,omitempty"`
-	EffectiveUserID            *string                  `json:"effective_user_id,omitempty"`
-	Amount                     float64                  `json:"amount"`
-	IsoCurrencyCode            *string                  `json:"iso_currency_code"`
-	Date                       string                   `json:"date"`
-	AuthorizedDate             *string                  `json:"authorized_date"`
-	Datetime                   *string                  `json:"datetime"`
-	AuthorizedDatetime         *string                  `json:"authorized_datetime"`
-	ProviderName               string                   `json:"provider_name"`
-	ProviderMerchantName       *string                  `json:"provider_merchant_name"`
+	ID                   string  `json:"id"`
+	ShortID              string  `json:"short_id"`
+	AccountID            *string `json:"account_id"`
+	AccountName          *string `json:"account_name"`
+	UserName             *string `json:"user_name"`
+	AttributedUserID     *string `json:"attributed_user_id,omitempty"`
+	AttributedUserName   *string `json:"attributed_user_name,omitempty"`
+	EffectiveUserID      *string `json:"effective_user_id,omitempty"`
+	Amount               float64 `json:"amount"`
+	IsoCurrencyCode      *string `json:"iso_currency_code"`
+	Date                 string  `json:"date"`
+	AuthorizedDate       *string `json:"authorized_date"`
+	Datetime             *string `json:"datetime"`
+	AuthorizedDatetime   *string `json:"authorized_datetime"`
+	ProviderName         string  `json:"provider_name"`
+	ProviderMerchantName *string `json:"provider_merchant_name"`
+	// Counterparty (the other side of the transaction) when one is assigned
+	// via assign_counterparty rules. CounterpartyName is the preferred display
+	// name, falling back to ProviderMerchantName then ProviderName when nil.
+	// CounterpartyLogoURL is non-nil only once enrichment populates it.
+	CounterpartyShortID        *string                  `json:"counterparty_short_id,omitempty"`
+	CounterpartyName           *string                  `json:"counterparty_name,omitempty"`
+	CounterpartyLogoURL        *string                  `json:"counterparty_logo_url,omitempty"`
 	Category                   *TransactionCategoryInfo `json:"category"`
 	ProviderCategoryPrimary    *string                  `json:"provider_category_primary"`
 	ProviderCategoryDetailed   *string                  `json:"provider_category_detailed"`
@@ -334,15 +341,20 @@ type AdminTransactionListParams struct {
 }
 
 type AdminTransactionRow struct {
-	ID                  string
-	AccountID           string
-	AccountName         string
-	InstitutionName     string
-	UserName            string
-	EffectiveUserID     *string
-	Date                string
-	Name                string
-	MerchantName        *string
+	ID              string
+	AccountID       string
+	AccountName     string
+	InstitutionName string
+	UserName        string
+	EffectiveUserID *string
+	Date            string
+	Name            string
+	MerchantName    *string
+	// Counterparty assigned to this transaction (preferred display name over
+	// MerchantName / Name). CounterpartyLogoURL is non-nil once enriched.
+	CounterpartyShortID *string
+	CounterpartyName    *string
+	CounterpartyLogoURL *string
 	Amount              float64
 	IsoCurrencyCode     *string
 	CategoryID          *string
@@ -854,6 +866,11 @@ type MerchantSummaryRow struct {
 	FirstDate        string  `json:"first_date"`
 	LastDate         string  `json:"last_date"`
 	IsoCurrencyCode  string  `json:"iso_currency_code"`
+	// Counterparty grouping fields — non-nil when the rows in this group are
+	// bound to a canonical counterparty (the merchant string is then the
+	// counterparty name). CounterpartyLogoURL is non-nil once enriched.
+	CounterpartyShortID *string `json:"counterparty_short_id,omitempty"`
+	CounterpartyLogoURL *string `json:"counterparty_logo_url,omitempty"`
 }
 
 type MerchantSummaryResult struct {
