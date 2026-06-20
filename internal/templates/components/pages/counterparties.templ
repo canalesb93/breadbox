@@ -152,10 +152,10 @@ templ CounterpartyDetail(p CounterpartyDetailProps) {
 					@components.SettingsRow(components.SettingsRowProps{Label: "MCC", Caption: "Merchant category code (4 digits)"}) {
 						<input type="text" name="mcc" value={ p.MCC } inputmode="numeric" maxlength="4" placeholder="e.g. 5411" class="input input-sm w-32" aria-label="MCC"/>
 					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Website", Stack: true}) {
+					@components.SettingsRow(components.SettingsRowProps{Label: "Website", Caption: "Its domain auto-fetches a brand logo via logo.dev when counterparty logos are enabled and a logo.dev token is set in Settings", Stack: true}) {
 						<input type="url" name="website_url" value={ p.WebsiteURL } placeholder="https://example.com" class="input input-sm w-full" aria-label="Website URL"/>
 					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Logo URL", Caption: "Image hotlinked on counterparty rows", Stack: true}) {
+					@components.SettingsRow(components.SettingsRowProps{Label: "Logo URL", Caption: "Overrides the auto-fetched logo. Hotlinked on counterparty rows.", Stack: true}) {
 						<input type="url" name="logo_url" value={ p.LogoURL } placeholder="https://logo.example.com/acme.png" class="input input-sm w-full" aria-label="Logo URL"/>
 					}
 				}
