@@ -76,6 +76,7 @@ makes a rule that fights itself or silently stops firing:
 - `account_name`, `user_name` — display labels, renameable.
 - `category` — *output* of categorization; a rule keyed on it chases its own tail.
 - `tags`, `series`, `in_series` — set by rules/agents; not bank facts.
+- `counterparty`, `has_counterparty` — set by `assign_counterparty` rules/agents; not bank facts.
 
 The date-parts are the one safe *derived* exception: they're pure functions of
 the immutable date, so a condition on them is as durable as one on `amount`.
@@ -139,11 +140,33 @@ one-off MCP tools. See `breadbox://rule-dsl` for exact shapes.
 | `set_metadata` | Merge key/value metadata onto the transaction. |
 | `flag` / `unflag` | Raise (or clear) a flag for human attention. |
 | `assign_series` | Link the transaction to a recurring series (the recurrence idiom above). |
-
-<!-- assign_counterparty is intentionally omitted here. Add it to this catalog
-     and document the "known entity worth tracking" idiom once counterparties
-     land (P4). -->
+| `assign_counterparty` | Bind the transaction to a counterparty — the entity on the other side (the counterparties idiom below). |
 
 A transaction joins at most one series; a higher-priority `assign_series`
 overrides a lower one. Pick priority bands per `breadbox://rule-dsl` so
 specific rules outrank broad ones.
+
+## The counterparties idiom — name the entity behind the charge
+
+A **counterparty** is the other side of a transaction — not just merchants,
+but **non-merchants** too: a Venmo recipient, a person, an employer, a
+landlord. When you figure out *who* a charge actually is (the cryptic
+`provider_name` is really your contractor; three different feeds are all the
+same employer), don't fix the one row — author an `assign_counterparty` rule
+on the **raw provider fields**, and every future charge resolves to that
+entity automatically:
+
+```jsonc
+// "ACH credit from cryptic payroll descriptor → my employer"
+{ "field": "provider_name", "op": "contains", "value": "ACME PAYROLL" }
+// action: { "type": "assign_counterparty", "counterparty_name": "Acme Inc", "create_if_missing": true }
+```
+
+**Reuse, don't duplicate.** A counterparty is cross-provider on purpose — the
+same person or business shows up under different descriptors across Plaid,
+Teller, and Venmo. Before minting a new one by name, look for an existing
+counterparty and bind to it by `counterparty_short_id`. The by-name path
+resolves-or-creates (it de-dupes on the live name), but pointing several
+raw-field rules at **one** counterparty is how you collapse those descriptors
+into a single entity. Default is assign-to-existing; nothing is created unless
+you pass `create_if_missing`.

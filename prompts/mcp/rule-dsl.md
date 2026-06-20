@@ -72,11 +72,12 @@ A condition is one of:
 **Identity / membership fields:**
 - `account_id`, `account_name`, `user_id`, `user_name` — string.
 - `series` — short_id of the recurring series the transaction belongs to (`""` when unassigned). `in_series` — bool.
+- `counterparty` — short_id of the counterparty (the other side of the transaction) it's bound to (`""` when unassigned). `has_counterparty` — bool. Both are **derived/mutable** (set by `assign_counterparty` rules/agents, like `series`/`in_series`) — author membership on the **raw provider fields**, not on these.
 - `tags` — current tag slugs (see tags ops above).
 - `metadata.<key>` — reads a key from the transaction's free-form metadata blob (e.g. `metadata.tax_deductible`); supports the string/numeric ops plus `exists` / `not_exists`.
 - `category` — the **assigned** category slug (changes when a rule/agent/user reassigns; useful for rule chaining).
 
-**Stable-vs-mutable guidance.** Condition on the **raw provider fields, date-parts, and `amount`** — they never change, so a rule keeps matching deterministically. Avoid conditioning on `account_name`, `category`, or `series` unless you specifically want to react to a *current, mutable* value (e.g. rule chaining off `category`, or retroactively tagging existing series members) — those can shift out from under the rule.
+**Stable-vs-mutable guidance.** Condition on the **raw provider fields, date-parts, and `amount`** — they never change, so a rule keeps matching deterministically. Avoid conditioning on `account_name`, `category`, `series`, or `counterparty` unless you specifically want to react to a *current, mutable* value (e.g. rule chaining off `category`, or retroactively tagging existing series members) — those can shift out from under the rule.
 
 ## The recurrence idiom
 
@@ -118,6 +119,8 @@ Rules replace the old recurring-charge detector. Express a subscription/recurrin
 { "type": "unflag" }
 { "type": "assign_series",   "series_name": "Spotify", "create_if_missing": true }
 { "type": "assign_series",   "series_short_id": "ab12cd34" }
+{ "type": "assign_counterparty", "counterparty_short_id": "cp01ab23" }
+{ "type": "assign_counterparty", "counterparty_name": "Jane Doe", "create_if_missing": true }
 ```
 
 - `set_category` — at most one per rule. Use `category_slug` (never `category_id`).
@@ -126,8 +129,7 @@ Rules replace the old recurring-charge detector. Express a subscription/recurrin
 - `set_metadata` / `remove_metadata` — write/clear a key on the transaction's metadata blob. `metadata_value` is any JSON value.
 - `flag` / `unflag` — set/clear the transaction's flag (mirrors the `flag_transaction` tool, sans reason).
 - `assign_series` — **surrogate-first**: provide **exactly one** of `series_short_id` (existing series) OR `series_name` + `create_if_missing: true` (resolve-or-mint a thin series by name). There is **no `merchant_key`** — the legacy key is accepted only as a back-compat alias for `series_name`. Link-and-rollup only; never steals a charge already in another series; honors sticky-reject.
-
-> `assign_counterparty` is **not** available yet — it lands in a later phase. Don't author it.
+- `assign_counterparty` — bind matching transactions to a **counterparty** (the other side of the transaction — merchants AND non-merchants: Venmo recipients, people, employers, landlords). Provide **exactly one** of `counterparty_short_id` (an existing counterparty) OR `counterparty_name` + `create_if_missing: true`. Default is **assign-to-existing**: a counterparty is **never** auto-created unless `create_if_missing` is set. By-name is a **resolve-or-create** that de-dupes on the live name (unlike series there is no UNIQUE on name) — so **reuse an existing counterparty across providers** (look one up first) rather than minting a duplicate. Link-only (NULL-fill).
 
 A rule can carry multiple actions of different types (e.g. `set_category` + `add_tag`). Only `set_category` is singleton.
 
