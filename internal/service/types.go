@@ -442,6 +442,53 @@ type CommentResponse struct {
 	UpdatedAt     string  `json:"updated_at"`
 }
 
+// Counterparty types
+
+// CounterpartyResponse is the API/MCP shape of a counterparties row — the
+// canonical, cross-provider "other side" of a transaction (merchant or
+// non-merchant). Enrichment columns are pointers so an un-enriched counterparty
+// omits them.
+type CounterpartyResponse struct {
+	ID                      string  `json:"id"`
+	ShortID                 string  `json:"short_id"`
+	Name                    string  `json:"name"`
+	WebsiteURL              *string `json:"website_url,omitempty"`
+	LogoURL                 *string `json:"logo_url,omitempty"`
+	CategoryID              *string `json:"category_id,omitempty"`
+	MCC                     *string `json:"mcc,omitempty"`
+	CanonicalCounterpartyID *string `json:"canonical_counterparty_id,omitempty"`
+	CreatedAt               string  `json:"created_at"`
+	UpdatedAt               string  `json:"updated_at"`
+}
+
+// AssignCounterpartyInput drives the imperative create/link path (the MCP/REST
+// `assign_counterparty` one-off). Either bind to an existing counterparty
+// (CounterpartyShortID), or resolve-or-create one by name (Name +
+// CreateIfMissing); then link the listed transactions in the same call.
+// Surrogate-first: counterparties are assigned by short_id, not minted-by-name —
+// the by-name path de-dupes on the live name (no UNIQUE constraint).
+type AssignCounterpartyInput struct {
+	CounterpartyShortID *string  // short_id or uuid — bind to an existing counterparty
+	Name                string   // display label + resolve-or-create key (required when CreateIfMissing)
+	CreateIfMissing     bool     // resolve-or-create a counterparty (by Name) when no CounterpartyShortID
+	TransactionIDs      []string // transactions to link (short_id or uuid), ≤50
+	// FailIfExists turns the by-name path into a strict create: return ErrConflict
+	// when a live counterparty already exists with this name. The rule/agent paths
+	// leave this false (resolve-or-create); a deliberate "create from scratch" UI
+	// sets it true.
+	FailIfExists bool
+}
+
+// EditCounterpartyInput is the partial-update payload for UpdateCounterparty —
+// the enrichment lane. Every field is a pointer: nil leaves the column unchanged.
+type EditCounterpartyInput struct {
+	Name       *string // non-empty display label; "" is rejected
+	WebsiteURL *string
+	LogoURL    *string
+	CategoryID *string // category short_id or uuid; resolved before write
+	MCC        *string
+}
+
 // Transaction rule types
 
 // RuleAction is the typed action shape for transaction rules.
@@ -462,6 +509,14 @@ type RuleAction struct {
 	SeriesShortID   string `json:"series_short_id,omitempty"`
 	SeriesName      string `json:"series_name,omitempty"`
 	CreateIfMissing bool   `json:"create_if_missing,omitempty"`
+	// assign_counterparty fields: bind matching transactions to an existing
+	// counterparty (CounterpartyShortID) or, when CreateIfMissing is set, resolve-
+	// or-create one by name (CounterpartyName). Counterparties are surrogate-first
+	// cross-provider entities (rules-as-substrate, P4); unlike series there is no
+	// UNIQUE on name, so the by-name path is a resolve-or-create that de-dupes on
+	// the live name. CreateIfMissing is shared with assign_series.
+	CounterpartyShortID string `json:"counterparty_short_id,omitempty"`
+	CounterpartyName    string `json:"counterparty_name,omitempty"`
 	// set_metadata / remove_metadata fields. MetadataKey is the metadata blob
 	// key (≤128 chars). MetadataValue is the JSON value to write for
 	// set_metadata (any JSON-serializable value); unused by remove_metadata.
@@ -608,6 +663,13 @@ type TransactionContext struct {
 	// InSeries reports whether the transaction is linked to any recurring
 	// series (field: "in_series").
 	InSeries bool
+	// CounterpartyShortID is the short_id of the counterparty this transaction is
+	// bound to (field: "counterparty"), empty when unassigned. Populated from the
+	// counterparties JOIN in the retroactive / preview context query.
+	CounterpartyShortID string
+	// HasCounterparty reports whether the transaction is bound to any counterparty
+	// (field: "has_counterparty").
+	HasCounterparty bool
 	// Metadata holds the transaction's free-form metadata blob so conditions on
 	// dotted fields (field: "metadata.<key>") can read arbitrary enrichment
 	// values. Updated mid-resolver as earlier-stage set_metadata / remove_metadata

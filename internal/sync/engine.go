@@ -74,6 +74,13 @@ type Engine struct {
 	// import cycle — the same pattern as OnSyncComplete). Nil-safe: when unset
 	// (series subsystem not wired) the action is a no-op.
 	AssignSeriesInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, seriesName string, createIfMissing bool) error
+
+	// AssignCounterpartyInTx materializes an `assign_counterparty` rule action
+	// INSIDE the sync transaction — resolving/creating a counterparty and binding
+	// the transaction. Wired by the app layer in serve.go (function pointer, same
+	// decoupling pattern as AssignSeriesInTx). Nil-safe: when unset (counterparty
+	// subsystem not wired) the action is a no-op.
+	AssignCounterpartyInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, counterpartyShortID, counterpartyName string, createIfMissing bool) error
 }
 
 // NewEngine creates a new sync engine.
@@ -711,6 +718,14 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		tctx.InSeries = true
 		tctx.SeriesShortID = resolver.SeriesShortID(dbTxn.SeriesID)
 	}
+	// Seed counterparty binding so rules can condition on it via
+	// field="counterparty" / field="has_counterparty". counterparty_id is NULL on
+	// freshly-synced rows (assign_counterparty rules resolve it post-upsert), so
+	// this is populated mainly on changed / re-synced rows already bound.
+	if dbTxn.CounterpartyID.Valid {
+		tctx.HasCounterparty = true
+		tctx.CounterpartyShortID = resolver.CounterpartyShortID(dbTxn.CounterpartyID)
+	}
 	// Seed the metadata blob so conditions on field="metadata.<key>" can read
 	// the transaction's current enrichment values, and so chaining rules see
 	// earlier-stage set_metadata / remove_metadata writes. A new transaction
@@ -837,6 +852,16 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		if err := e.AssignSeriesInTx(ctx, tx, dbTxn.ID,
 			result.SeriesAssign.SeriesShortID, result.SeriesAssign.SeriesName, result.SeriesAssign.CreateIfMissing); err != nil {
 			return result.Sources, fmt.Errorf("apply assign_series: %w", err)
+		}
+	}
+
+	// assign_counterparty: bind the transaction to a counterparty within the sync
+	// tx (resolve-or-create + link), via the app-wired hook so the sync package
+	// stays decoupled from the counterparty service. No-op when the hook is unset.
+	if result.CounterpartyAssign != nil && e.AssignCounterpartyInTx != nil {
+		if err := e.AssignCounterpartyInTx(ctx, tx, dbTxn.ID,
+			result.CounterpartyAssign.CounterpartyShortID, result.CounterpartyAssign.CounterpartyName, result.CounterpartyAssign.CreateIfMissing); err != nil {
+			return result.Sources, fmt.Errorf("apply assign_counterparty: %w", err)
 		}
 	}
 
