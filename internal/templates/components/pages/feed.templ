@@ -957,6 +957,14 @@ func feedBulkVerb(kind string) string {
 		return "categorised"
 	case "rule_applied":
 		return "ran a rule on"
+	case "series_assigned":
+		return "assigned to a series"
+	case "series_unlinked":
+		return "removed from a series"
+	case "counterparty_assigned":
+		return "assigned to a counterparty"
+	case "counterparty_unlinked":
+		return "removed from a counterparty"
 	case "comment":
 		return "commented on"
 	}
@@ -981,6 +989,10 @@ func feedBulkKindBreakdown(b *FeedBulkAction) string {
 		{"tag_added", "tag-added"},
 		{"tag_removed", "tag-removed"},
 		{"rule_applied", "rule-applied"},
+		{"series_assigned", "series-assigned"},
+		{"series_unlinked", "series-removed"},
+		{"counterparty_assigned", "counterparty-assigned"},
+		{"counterparty_unlinked", "counterparty-removed"},
 		{"comment", "commented"},
 	}
 	parts := []string{}
@@ -1015,6 +1027,14 @@ func feedBulkSubjectLabel(b *FeedBulkAction) string {
 		return "as " + name
 	case "rule_applied":
 		return "with rule " + name
+	case "series_assigned":
+		return "to the " + name + " series"
+	case "series_unlinked":
+		return "from the " + name + " series"
+	case "counterparty_assigned":
+		return "to " + name
+	case "counterparty_unlinked":
+		return "from " + name
 	}
 	return ""
 }
