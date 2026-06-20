@@ -296,9 +296,9 @@ type SubscriptionStatusGroup struct {
 // then paused, then ended/cancelled. Any status outside this set sorts after
 // these, in first-seen order. Pure data so the grouping stays testable.
 var subscriptionStatusOrder = []struct{ status, label string }{
-	{service.SeriesStatusActive, "Active"},
-	{service.SeriesStatusPaused, "Paused"},
-	{service.SeriesStatusCancelled, "Ended"},
+	{"active", "Active"},
+	{"paused", "Paused"},
+	{"cancelled", "Ended"},
 }
 
 // GroupSubscriptionsByStatus buckets the ledger rows by status into Active →
@@ -338,7 +338,7 @@ func GroupSubscriptionsByStatus(rows []SubscriptionRow) []SubscriptionStatusGrou
 			lbl = subscriptionStatusFallbackLabel(st)
 		}
 		g := SubscriptionStatusGroup{Status: st, Label: lbl, Rows: rs}
-		if st == service.SeriesStatusActive {
+		if st == "active" {
 			applySubscriptionMonthlySubtotal(&g)
 		}
 		groups = append(groups, g)
@@ -420,9 +420,9 @@ func subscriptionsRowBodyLine(s SubscriptionRow) string {
 // error, so it stays neutral rather than red).
 func subStatusTileBg(status string) string {
 	switch status {
-	case service.SeriesStatusActive:
+	case "active":
 		return "bg-success/10"
-	case service.SeriesStatusPaused:
+	case "paused":
 		return "bg-warning/10"
 	default:
 		return "bg-base-200"
@@ -431,11 +431,11 @@ func subStatusTileBg(status string) string {
 
 func subStatusTileIcon(status string) string {
 	switch status {
-	case service.SeriesStatusActive:
+	case "active":
 		return "repeat"
-	case service.SeriesStatusPaused:
+	case "paused":
 		return "pause"
-	case service.SeriesStatusCancelled:
+	case "cancelled":
 		return "circle-slash-2"
 	default:
 		return "repeat"
@@ -444,9 +444,9 @@ func subStatusTileIcon(status string) string {
 
 func subStatusTileIconColor(status string) string {
 	switch status {
-	case service.SeriesStatusActive:
+	case "active":
 		return "text-success"
-	case service.SeriesStatusPaused:
+	case "paused":
 		return "text-warning"
 	default:
 		return "text-base-content/50"

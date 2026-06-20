@@ -36,9 +36,13 @@ func TestApplyAllRulesRetroactively_AllStateMutatingActions(t *testing.T) {
 	// A non-matching transaction used only to mint a series we can target by
 	// short_id (its name does NOT contain "Netflix", so the rule won't touch it).
 	seedMember := testutil.MustCreateTransaction(t, queries, acctID, "txn_seed", "Spotify Music", 999, "2025-01-15")
-	seriesResp, err := svc.UpsertSeriesCandidate(ctx, spotifyUpsert([]string{seedMember.ShortID}), service.SystemActor())
+	seriesResp, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
+		Name:            "Spotify",
+		CreateIfMissing: true,
+		TransactionIDs:  []string{seedMember.ShortID},
+	}, service.SystemActor())
 	if err != nil {
-		t.Fatalf("UpsertSeriesCandidate: %v", err)
+		t.Fatalf("AssignSeries: %v", err)
 	}
 	seriesShortID := seriesResp.ShortID
 

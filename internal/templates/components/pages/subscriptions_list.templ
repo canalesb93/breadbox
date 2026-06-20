@@ -452,11 +452,11 @@ func subscriptionsRowItems(s SubscriptionRow) []components.OverflowMenuItem {
 		}
 	}
 	switch s.Status {
-	case service.SeriesStatusActive:
+	case "active":
 		items = append(items, verdict("pause", "Pause", "pause", false), verdict("cancel", "Cancel", "x", true))
-	case service.SeriesStatusPaused:
+	case "paused":
 		items = append(items, verdict("confirm", "Resume", "play", false), verdict("cancel", "Cancel", "x", true))
-	case service.SeriesStatusCancelled:
+	case "cancelled":
 		items = append(items, verdict("confirm", "Reactivate", "rotate-ccw", false))
 	}
 	return items

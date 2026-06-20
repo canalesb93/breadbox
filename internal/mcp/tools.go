@@ -316,7 +316,7 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 type createTransactionRuleInput struct {
 	Name               string           `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
 	Conditions         map[string]any   `json:"conditions,omitempty" jsonschema:"JSON condition tree. Omit or pass {} to match every transaction. Leaf: {\"field\":\"...\",\"op\":\"...\",\"value\":...}. Combinators: {\"and\":[...]}, {\"or\":[...]}, {\"not\":{...}} (nest freely, max depth 10). Fields: provider_name provider_merchant_name amount provider_category_primary provider_category_detailed category(assigned slug, live-updated by earlier-stage rules) pending provider account_id account_name user_id user_name tags series in_series day_of_month month day_of_week(0=Sun..6=Sat) day_of_year (the four date-parts are numeric, derived from the tz-naive date), plus metadata.<key> to read a key from the free-form metadata blob (e.g. metadata.tax_deductible). Ops: string/category=eq|neq|contains|not_contains|matches(RE2)|in; numeric=eq|neq|gt|gte|lt|lte|approx|between; bool=eq|neq; tags=contains|not_contains|in; metadata.<key>=eq|neq|contains|not_contains|matches|in|gt|gte|lt|lte|exists|not_exists (an absent key matches only not_exists; eq/neq comparison type follows the value's type). approx needs a sibling tolerance: {\"field\":\"amount\",\"op\":\"approx\",\"value\":15.49,\"tolerance\":0.5}; between needs sibling min+max: {\"field\":\"day_of_month\",\"op\":\"between\",\"min\":1,\"max\":5}. day_of_month approx is cyclic (1 and the month's last day are 1 apart) and clamps a target past a short month to its last day; encode annual cadence as month + day_of_month (leap-robust): {\"and\":[{\"field\":\"month\",\"op\":\"eq\",\"value\":4},{\"field\":\"day_of_month\",\"op\":\"approx\",\"value\":15,\"tolerance\":2}]}. Nested example: {\"or\":[{\"and\":[{\"field\":\"provider_merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},{\"field\":\"amount\",\"op\":\"gte\",\"value\":5}]},{\"field\":\"metadata.reimbursable\",\"op\":\"eq\",\"value\":true}]}. Full spec: docs/rule-dsl.md."`
-	Actions            []map[string]any `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"} | {\"type\":\"set_metadata\",\"metadata_key\":\"...\",\"metadata_value\":<any JSON>} | {\"type\":\"remove_metadata\",\"metadata_key\":\"...\"} | {\"type\":\"assign_series\",\"series_short_id\":\"...\"} or {\"type\":\"assign_series\",\"merchant_key\":\"...\",\"create_if_missing\":true} | {\"type\":\"flag\"} | {\"type\":\"unflag\"}. Actions compose: a rule can set a category AND add a tag AND write metadata in the same match. set_metadata upserts one key (value may be any JSON type); remove_metadata deletes one key; both repeat freely. flag sets the transaction's flagged_at (surface it for attention, like the flag_transaction tool); unflag clears it; both take no params. add_comment fires only at sync time (not on retroactive apply). remove_tag/remove_metadata net-diff against add_tag/set_metadata within the same sync pass. If omitted, use category_slug instead."`
+	Actions            []map[string]any `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"} | {\"type\":\"set_metadata\",\"metadata_key\":\"...\",\"metadata_value\":<any JSON>} | {\"type\":\"remove_metadata\",\"metadata_key\":\"...\"} | {\"type\":\"assign_series\",\"series_short_id\":\"...\"} or {\"type\":\"assign_series\",\"series_name\":\"...\",\"create_if_missing\":true} | {\"type\":\"flag\"} | {\"type\":\"unflag\"}. Actions compose: a rule can set a category AND add a tag AND write metadata in the same match. set_metadata upserts one key (value may be any JSON type); remove_metadata deletes one key; both repeat freely. flag sets the transaction's flagged_at (surface it for attention, like the flag_transaction tool); unflag clears it; both take no params. add_comment fires only at sync time (not on retroactive apply). remove_tag/remove_metadata net-diff against add_tag/set_metadata within the same sync pass. If omitted, use category_slug instead."`
 	CategorySlug       string           `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
 	Trigger            string           `json:"trigger,omitempty" jsonschema:"When the rule fires during sync: 'on_create' (default — first-synced transactions) | 'on_change' (existing transactions that changed on re-sync) | 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'. Retroactive apply ignores trigger."`
 	Stage              string           `json:"stage,omitempty" jsonschema:"Semantic pipeline stage — preferred over raw priority for agent-authored rules. One of: 'baseline' (runs first, broad defaults), 'standard' (default), 'refinement' (reacts to earlier stages), 'override' (runs last, wins set_category). Resolves to priority 0/10/50/100. If both stage and priority are supplied, priority wins. Leave both unset for 'standard'."`
@@ -687,7 +687,7 @@ func convertMCPActions(actions []map[string]any) []service.RuleAction {
 			TagSlug:         mcpString(a["tag_slug"]),
 			Content:         mcpString(a["content"]),
 			SeriesShortID:   mcpString(a["series_short_id"]),
-			MerchantKey:     mcpString(a["merchant_key"]),
+			SeriesName:      mcpFirstNonEmpty(a["series_name"], a["merchant_key"]),
 			CreateIfMissing: mcpBool(a["create_if_missing"]),
 			MetadataKey:     mcpString(a["metadata_key"]),
 			MetadataValue:   a["metadata_value"],
@@ -709,6 +709,18 @@ func convertMCPActions(actions []map[string]any) []service.RuleAction {
 func mcpString(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+// mcpFirstNonEmpty returns the first value that coerces to a non-empty string.
+// Used for the assign_series mint target, which accepts series_name and falls
+// back to the legacy merchant_key key.
+func mcpFirstNonEmpty(vs ...any) string {
+	for _, v := range vs {
+		if s := mcpString(v); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // mcpBool coerces an untyped JSON action value to a bool, returning false for

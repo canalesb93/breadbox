@@ -380,39 +380,23 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleListWorkflows, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_series", Title: "List Recurring Series", Classification: ToolRead,
-			Description: "List detected recurring series (subscriptions, bills, loans). Optional status filter (active|candidate|paused|cancelled). Lean by default: each row carries identity + renewal prediction (cadence, expected_amount + iso_currency_code — never sum across currencies, next_expected_date, occurrence_count, confidence), but NOT the verbose detection_signals evidence. Read status=candidate to find series awaiting a confirm/reject verdict; pass fields=all (or use get_series for one series) to see detection_signals — interval_cv, amount_branch, merchant_key_is_fallback — before deciding.",
+			Description: "List recurring series (subscriptions, bills, loans) — thin, rule-maintained entities: each is a surrogate identity (id/short_id), a name, and a type, plus its tags. Membership comes from assign_series rules, not a shipped detector. Lean by default (name, type, tags); pass fields=all for timestamps too. Use get_series for one series, query_transactions(series_id=...) for its charges.",
 		}, s.handleListSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "get_series", Title: "Get Recurring Series", Classification: ToolRead,
-			Description: "Get one recurring series by short ID or UUID, including its full detection_signals. Use before reviewing a candidate to inspect the evidence (occurrence_count, interval_cv, cadence_snap_error, amount_branch, monotonic drift).",
+			Description: "Get one recurring series by short ID or UUID: its name, type, and tags. A series' linked charges come from query_transactions(series_id=...); its governing rules (the assign_series rules that define its membership) are visible on the admin Recurring detail page.",
 		}, s.handleGetSeries, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "review_series", Title: "Review Recurring Series", Classification: ToolWrite,
-			Description: "Apply a verdict to a recurring series: confirm (it is recurring → active), reject (NOT recurring → sticky, never re-proposed at that amount band), pause, or cancel. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates the candidates surfaced by list_series(status=candidate).",
-		}, s.handleReviewSeries, s),
-		makeToolDefLogged(ToolSpec{
 			Name: "assign_series", Title: "Assign / Create Recurring Series", Classification: ToolWrite,
-			Description: "Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide series_id to assign to an existing series, OR merchant_key + create_if_missing:true to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass transaction_ids (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). confirm:true flips it straight to active; omit to leave a reviewable candidate. Use after list_series(status=candidate) shows nothing for a recurring charge the user says exists.",
+			Description: "Link transactions to a recurring series, creating it if needed — the agent's path for a one-off assignment (encode a durable pattern as an assign_series RULE instead when you want future charges to resolve automatically). Provide series_id to assign to an existing series, OR series_name + create_if_missing:true to mint/resolve one by name (surrogate-first: the same name always resolves the same series). Optional type (subscription|bill|loan|other) for a minted series. Pass transaction_ids (≤50) to back-link members (NULL-fill only — never steals a charge already in another series).",
 		}, s.handleAssignSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_series", Title: "Edit Recurring Series", Classification: ToolWrite,
-			Description: "Edit a recurring series' user-owned attributes: name, expected_amount (+ currency, amount_tolerance), cadence, expected_day, category_id, user_id (owner). Every field is optional — omit to leave unchanged. This is a deliberate override, not a detection proposal: it bypasses the precedence ladder and protects the edited values from being reverted by the next sync's re-detect. Editing cadence re-derives next_expected_date. Changing currency or owner is collision-guarded (they're part of the dedup signature). Use review_series for confirm/pause/cancel, set_series_type for the type axis, and rekey_series for the merchant_key — those have their own semantics and are NOT editable here.",
+			Description: "Edit a recurring series' name and/or type (subscription, bill, loan, other). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).",
 		}, s.handleUpdateSeries, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "set_series_type", Title: "Set Recurring Type", Classification: ToolWrite,
-			Description: "Set a recurring series' type: subscription (streaming/SaaS/memberships), bill (rent/utilities/insurance/telecom), loan (mortgage/auto/student/personal), or other. Detection infers the type from the charges' category on first detection; use this to correct it. The override is sticky — re-detection won't change it back.",
-		}, s.handleSetSeriesType, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "rekey_series", Title: "Re-key Recurring Series", Classification: ToolWrite,
-			Description: "Correct a series' merchant_key when detection grouped it under a wrong or fallback key (e.g. 'payment' → 'spotify'). Repoints the series and its linked transactions to the new key. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects historical grouping — future charges still key off the provider name.",
-		}, s.handleRekeySeries, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "split_series", Title: "Split Recurring Series", Classification: ToolWrite,
-			Description: "Break an over-grouped series into two: move the given transaction_ids (≤50, each a current member of the source series) into a brand-new series under new_merchant_key. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency/user/category; rollups recompute on both. Errors if new_merchant_key equals the source key or already has a series.",
-		}, s.handleSplitSeries, s),
-		makeToolDefLogged(ToolSpec{
 			Name: "unlink_series_transactions", Title: "Unlink Charges from Series", Classification: ToolWrite,
-			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id, strips the series' inherited tags from them (a tag the user added directly survives), and recomputes the series' rollups + next expected date. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series. Use to remove a charge the detector wrongly swept in; use split_series instead when the stray charges form their own series.",
+			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.",
 		}, s.handleUnlinkSeriesTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "add_series_tag", Title: "Tag Recurring Series", Classification: ToolWrite,
