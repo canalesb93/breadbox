@@ -5,7 +5,6 @@ package pages
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -115,15 +114,6 @@ func BuildGoverningRule(r service.TransactionRuleResponse) components.GoverningR
 		CreatedByType:    r.CreatedByType,
 		CreatedByName:    r.CreatedByName,
 	}
-}
-
-// seriesChargeDate formats an AdminTransactionRow.Date ("2006-01-02") as the
-// leading date label in the series charge list ("Jan 2, 2006"); raw on parse fail.
-func seriesChargeDate(s string) string {
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t.Format("Jan 2, 2006")
-	}
-	return s
 }
 
 // subscriptionMemberCount renders the dimmed "N charges" suffix on a row.

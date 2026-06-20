@@ -1,9 +1,6 @@
 package pages
 
-import (
-	"breadbox/internal/service"
-	"breadbox/internal/templates/components"
-)
+import "breadbox/internal/templates/components"
 
 // SubscriptionsList renders /recurring — the recurring-series ledger under the
 // rules-as-substrate model. A series is a thin entity (name + type) whose
@@ -15,7 +12,6 @@ import (
 // static/js/admin/components/subscriptions.js.
 templ SubscriptionsList(p SubscriptionsListProps) {
 	<script src="/static/js/admin/components/subscriptions.js"></script>
-	<div x-data x-init="$store.shortcuts.setScope('subscriptions')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div x-data="subscriptionsList">
 		@components.PageHeader(components.PageHeaderProps{
 			Title:                "Recurring",
@@ -103,18 +99,6 @@ templ subscriptionsListRow(s SubscriptionRow) {
 templ subscriptionsTypeTile(typ string) {
 	<div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-base-200">
 		@components.LucideIcon(subscriptionTypeIcon(typ), "w-4 h-4 text-base-content/50")
-	</div>
-}
-
-// seriesChargeRow renders one linked charge as a leading date column + the
-// shared TxRowCompact (date suppressed — the left column carries it). Used by
-// the detail-page "Charges in this series" list.
-templ seriesChargeRow(tx service.AdminTransactionRow) {
-	<div class="flex items-center gap-2">
-		<span class="text-xs text-base-content/45 tabular-nums w-24 shrink-0 text-right">{ seriesChargeDate(tx.Date) }</span>
-		<div class="flex-1 min-w-0">
-			@components.TxRowCompactNoDate(tx)
-		</div>
 	</div>
 }
 

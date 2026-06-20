@@ -25,24 +25,41 @@ type GoverningRule struct {
 	CreatedByName    string
 }
 
-// GoverningRulesPanel lists the rules that define this series' membership. Each
+// GoverningRulesPanelProps configures the entity-neutral governing-rules panel.
+// The rule rows are identical across entities; only the empty-state copy differs,
+// so the caller supplies the entity noun and the rule action it's looking for.
+type GoverningRulesPanelProps struct {
+	// Rules are the rules whose action targets this entity — the durable
+	// definition of its membership.
+	Rules []GoverningRule
+	// EntityWord is the singular noun for the entity ("series",
+	// "counterparty") woven into the empty-state copy.
+	EntityWord string
+	// ActionCode is the rule-action enum the empty state names
+	// ("assign_series", "assign_counterparty").
+	ActionCode string
+}
+
+// GoverningRulesPanel lists the rules that define an entity's membership. Each
 // row names the rule, summarizes its match condition, links to the rule editor,
 // and notes whether it's live — making "these rules define what's in this
-// series" legible at a glance. Empty state explains the rule-substrate model so
-// a series with no governing rules doesn't read as broken.
-templ GoverningRulesPanel(rules []GoverningRule) {
+// {entity}" legible at a glance. Entity-neutral: the empty-state copy is
+// parameterized via EntityWord/ActionCode so the series and counterparty detail
+// pages share one panel. The empty state explains the rule-substrate model so an
+// entity with no governing rules doesn't read as broken.
+templ GoverningRulesPanel(p GoverningRulesPanelProps) {
 	<div class="bb-card p-2 sm:p-3">
-		if len(rules) == 0 {
+		if len(p.Rules) == 0 {
 			<div class="px-3 py-6 text-center">
-				<div class="text-sm text-base-content/60">No rules assign charges to this series yet.</div>
+				<div class="text-sm text-base-content/60">No rules assign charges to this { p.EntityWord } yet.</div>
 				<div class="text-xs text-base-content/40 mt-1">
-					A series' membership comes from rules with an <code class="font-mono bg-base-200 rounded px-1">assign_series</code> action.
+					Membership comes from rules with an <code class="font-mono bg-base-200 rounded px-1">{ p.ActionCode }</code> action.
 					Create one on the <a href="/rules" class="link link-hover text-primary">Rules</a> page to define what lands here.
 				</div>
 			</div>
 		} else {
 			<ul class="divide-y divide-base-200">
-				for _, rule := range rules {
+				for _, rule := range p.Rules {
 					@governingRuleRow(rule)
 				}
 			</ul>

@@ -226,14 +226,18 @@ templ SectionRecurringChips() {
 templ SectionRecurringDetail() {
 	<div class="flex flex-col gap-6">
 		@designExample("Governing rules (GoverningRulesPanel)", "A series IS the rules that define it. This panel lists the assign_series rules whose matches put charges into the series — each row links to the rule editor, making the membership relationship explicit. Sits beside the linked-charges list on the detail page.") {
-			@components.GoverningRulesPanel([]components.GoverningRule{
-				{ShortID: "rule0001", Name: "Netflix subscription", ConditionSummary: "merchant contains netflix", ActionSummary: "Assign to series", Enabled: true, HitCount: 11, CreatedByType: "user"},
-				{ShortID: "rule0002", Name: "Streaming round-up", ConditionSummary: "merchant in (netflix, hulu, disney+)", ActionSummary: "2 actions", Enabled: true, HitCount: 4, CreatedByType: "agent"},
-				{ShortID: "rule0003", Name: "Legacy import", ConditionSummary: "Matches all transactions", ActionSummary: "Assign to series", Enabled: false, HitCount: 0, CreatedByType: "user"},
+			@components.GoverningRulesPanel(components.GoverningRulesPanelProps{
+				EntityWord: "series",
+				ActionCode: "assign_series",
+				Rules: []components.GoverningRule{
+					{ShortID: "rule0001", Name: "Netflix subscription", ConditionSummary: "merchant contains netflix", ActionSummary: "Assign to series", Enabled: true, HitCount: 11, CreatedByType: "user"},
+					{ShortID: "rule0002", Name: "Streaming round-up", ConditionSummary: "merchant in (netflix, hulu, disney+)", ActionSummary: "2 actions", Enabled: true, HitCount: 4, CreatedByType: "agent"},
+					{ShortID: "rule0003", Name: "Legacy import", ConditionSummary: "Matches all transactions", ActionSummary: "Assign to series", Enabled: false, HitCount: 0, CreatedByType: "user"},
+				},
 			})
 		}
 		@designExample("Governing rules — empty", "When no rule targets a series, the panel explains the rule-substrate model instead of reading as broken.") {
-			@components.GoverningRulesPanel(nil)
+			@components.GoverningRulesPanel(components.GoverningRulesPanelProps{EntityWord: "series", ActionCode: "assign_series"})
 		}
 	</div>
 }

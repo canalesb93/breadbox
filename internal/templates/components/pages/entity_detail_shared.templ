@@ -1,0 +1,50 @@
+package pages
+
+import (
+	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+)
+
+// Shared detail-page chrome for the thin, rule-maintained entities — recurring
+// series (/recurring/{id}) and counterparties (/counterparties/{id}). Both pages
+// read identically under the rules-as-substrate model: a LINKED CHARGES panel
+// beside a GOVERNING RULES panel, each topped by a panel header. These helpers
+// were originally named for series; they're entity-neutral and shared by both
+// detail pages, so they live here to make the cross-page dependency explicit.
+
+// entityPanelHeader is the "icon · Title · subtitle" row above a detail panel,
+// with an optional trailing action. Shared by the series and counterparty detail
+// pages so their panels read identically.
+templ entityPanelHeader(icon, title, subtitle string, action templ.Component) {
+	<div class="flex items-center justify-between gap-2 mb-3">
+		<div class="flex items-center gap-2 min-w-0">
+			@components.LucideIcon(icon, "w-4 h-4 text-base-content/50 shrink-0")
+			<h2 class="text-sm font-semibold text-base-content">{ title }</h2>
+			<span class="text-xs text-base-content/45 truncate hidden sm:inline">· { subtitle }</span>
+		</div>
+		if action != nil {
+			@action
+		}
+	</div>
+}
+
+// entityChargeRow renders one linked charge as a leading date column + the shared
+// TxRowCompact (date suppressed — the left column carries it). Used by the
+// "Linked charges" list on both the series and counterparty detail pages.
+templ entityChargeRow(tx service.AdminTransactionRow) {
+	<div class="flex items-center gap-2">
+		<span class="text-xs text-base-content/45 tabular-nums w-24 shrink-0 text-right">{ entityChargeDate(tx.Date) }</span>
+		<div class="flex-1 min-w-0">
+			@components.TxRowCompactNoDate(tx)
+		</div>
+	</div>
+}
+
+// entityRulesBtn is the trailing "New rule" affordance in a governing-rules panel
+// header — a link to the rule editor. Shared by both detail pages.
+templ entityRulesBtn() {
+	<a href="/rules/new" class="btn btn-ghost btn-xs gap-1.5 shrink-0">
+		@components.LucideIcon("plus", "w-3.5 h-3.5")
+		New rule
+	</a>
+}
