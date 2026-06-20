@@ -397,9 +397,11 @@ templ ruleDetailRecentApplications(p RuleDetailProps) {
 // ruleDetailPendingMatches renders the "Matching transactions" card — only
 // rendered when preview data is available.
 //
-// Retroactive apply runs set_category + add_tag + remove_tag (add_comment
-// is sync-only). The card always renders when preview data exists so users
-// get explicit confirmation that preview ran, even when there are zero
+// Retroactive apply runs every materializing action the engine supports —
+// set_category, add_tag, remove_tag, assign_series, assign_counterparty,
+// set_metadata, remove_metadata, flag, unflag (add_comment is the only
+// sync-only action). The card always renders when preview data exists so
+// users get explicit confirmation that preview ran, even when there are zero
 // matches or the rule is comment-only (non-retroactive).
 templ ruleDetailPendingMatches(p RuleDetailProps) {
 	if p.Rule != nil && p.Preview != nil {
@@ -532,6 +534,8 @@ templ ruleDetailApplyModal(p RuleDetailProps) {
 							<ul class="mt-3 text-xs text-base-content/50 space-y-1 list-disc pl-4">
 								<li><code class="text-[10px]">set_category</code> writes the category directly — last-writer-wins, no lock.</li>
 								<li><code class="text-[10px]">add_tag</code> / <code class="text-[10px]">remove_tag</code> apply to every match.</li>
+								<li><code class="text-[10px]">assign_series</code> links matching charges to the series; <code class="text-[10px]">assign_counterparty</code> binds them to the counterparty.</li>
+								<li><code class="text-[10px]">set_metadata</code> / <code class="text-[10px]">remove_metadata</code> and <code class="text-[10px]">flag</code> / <code class="text-[10px]">unflag</code> apply to every match.</li>
 								<li><code class="text-[10px]">add_comment</code> is sync-only — it won't fire retroactively.</li>
 							</ul>
 							<div class="form-control mt-4">
