@@ -90,6 +90,49 @@ func TestAssignCounterparty_CreateByName(t *testing.T) {
 	}
 }
 
+// TestAssignCounterparty_EmitsEnrichedAnnotation proves the end-to-end timeline
+// path: assigning a counterparty writes a counterparty_assigned annotation that
+// EnrichAnnotations resolves into the human "set the counterparty to {name}"
+// sentence — the parity twin of the series_assigned timeline event.
+func TestAssignCounterparty_EmitsEnrichedAnnotation(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	_, members := seedCounterpartyCharges(t, queries, "NETFLIX", []string{"2026-04-15"})
+	actor := service.Actor{Type: "user", ID: "u1", Name: "Alice"}
+
+	if _, err := svc.AssignCounterparty(ctx, service.AssignCounterpartyInput{
+		Name:            "Netflix",
+		CreateIfMissing: true,
+		TransactionIDs:  shortIDs(members),
+	}, actor); err != nil {
+		t.Fatalf("AssignCounterparty: %v", err)
+	}
+
+	anns, err := svc.ListAnnotations(ctx, members[0].ShortID, service.ListAnnotationsParams{})
+	if err != nil {
+		t.Fatalf("ListAnnotations: %v", err)
+	}
+	var found *service.Annotation
+	for i := range anns {
+		if anns[i].Kind == "counterparty_assigned" {
+			found = &anns[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("no counterparty_assigned annotation on the linked charge; got %d annotations", len(anns))
+	}
+	if found.Action != "set" {
+		t.Errorf("Action = %q, want set", found.Action)
+	}
+	if found.Subject != "Netflix" {
+		t.Errorf("Subject = %q, want Netflix", found.Subject)
+	}
+	if found.Summary != "Alice set the counterparty to Netflix" {
+		t.Errorf("Summary = %q, want %q", found.Summary, "Alice set the counterparty to Netflix")
+	}
+}
+
 // TestAssignCounterparty_FailIfExists makes the by-name path a strict create.
 func TestAssignCounterparty_FailIfExists(t *testing.T) {
 	svc, _, _ := newService(t)

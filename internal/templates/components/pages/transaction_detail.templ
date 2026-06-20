@@ -455,6 +455,8 @@ templ txdSystemSentence(e service.ActivityEntry) {
 		<span class="font-medium text-base-content break-words">{ e.Summary }</span>
 	} else if e.Type == "series" {
 		<span class="font-medium text-base-content break-words">{ e.Summary }</span>
+	} else if e.Type == "counterparty" {
+		<span class="font-medium text-base-content break-words">{ e.Summary }</span>
 	} else if e.Type == "tag" {
 		if e.ActorName != "" {
 			@txdActorInline(e)
@@ -553,6 +555,10 @@ templ txdSystemIcon(e service.ActivityEntry) {
 	} else if e.Type == "series" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-info/15 ring-4 ring-base-100" aria-hidden="true">
 			@components.LucideIcon("repeat", "w-3 h-3 text-info")
+		</span>
+	} else if e.Type == "counterparty" {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-info/15 ring-4 ring-base-100" aria-hidden="true">
+			@components.LucideIcon("store", "w-3 h-3 text-info")
 		</span>
 	} else if e.Type == "review" {
 		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdReviewBg(e.ReviewStatus) } aria-hidden="true">
