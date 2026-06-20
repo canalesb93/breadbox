@@ -13,6 +13,11 @@ type RuleFormProps struct {
 	Rule           *service.TransactionRuleResponse
 	FlatCategories []service.CategoryResponse
 	Tags           []service.TagResponse
+	// Series + Counterparties feed the assign_series / assign_counterparty action
+	// dropdowns (value = short_id, label = name) so a user can author a
+	// membership-defining rule from the form — not just agents via MCP.
+	Series         []service.SeriesResponse
+	Counterparties []service.CounterpartyResponse
 }
 
 // ruleFormIsEditAttr returns the literal string "true" or "false" for the

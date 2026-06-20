@@ -328,6 +328,8 @@ templ RuleForm(p RuleFormProps) {
 									<option value="tag" :disabled="action.field !== 'tag'        && isActionUsed('tag')">Add tag</option>
 									<option value="tag_remove" :disabled="action.field !== 'tag_remove' && isActionUsed('tag_remove')">Remove tag</option>
 									<option value="comment" :disabled="action.field !== 'comment'    && isActionUsed('comment')">Add comment</option>
+									<option value="series" :disabled="action.field !== 'series'       && isActionUsed('series')">Assign to series</option>
+									<option value="counterparty" :disabled="action.field !== 'counterparty' && isActionUsed('counterparty')">Assign to counterparty</option>
 									<option value="metadata_set">Set metadata</option>
 									<option value="metadata_remove">Remove metadata</option>
 									<option value="flag" :disabled="action.field !== 'flag' && isActionUsed('flag')">Flag for attention</option>
@@ -379,6 +381,42 @@ templ RuleForm(p RuleFormProps) {
 									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
 										<textarea x-model="action.value" rows="2" class="textarea textarea-xs bg-base-100 w-full text-xs" placeholder="Comment to attach to matching transactions..."></textarea>
 										<p class="text-[0.65rem] text-base-content/40 mt-1">Plain text. The comment is attributed to this rule.</p>
+									</div>
+								</template>
+								<!-- Value: assign to series. Two mutually-exclusive modes —
+								     pick an existing series (value = short_id) OR create a new one
+								     by name (createName → series_name + create_if_missing). Filling
+								     one disables the other so exactly one identifier is sent. -->
+								<template x-if="action.field === 'series'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
+										<div class="flex flex-wrap items-center gap-2">
+											<select x-model="action.value" :disabled="!!(action.createName && action.createName.trim())" class="select select-xs bg-base-100 w-full sm:flex-1 sm:min-w-0 mt-px disabled:opacity-40">
+												<option value="">Select series…</option>
+												for _, sr := range p.Series {
+													<option value={ sr.ShortID }>{ sr.Name }</option>
+												}
+											</select>
+											<span class="text-[0.65rem] text-base-content/40 shrink-0">or</span>
+											<input type="text" x-model="action.createName" :disabled="!!(action.value)" class="input input-xs bg-base-100 w-full sm:w-44 mt-px disabled:opacity-40" placeholder="create new named…"/>
+										</div>
+										<p class="text-[0.65rem] text-base-content/40 mt-1">Adds matching transactions to a recurring series. Pick an existing one, or name a new series to mint on first match.</p>
+									</div>
+								</template>
+								<!-- Value: assign to counterparty. Same existing-vs-create-by-name
+								     pattern as series above. -->
+								<template x-if="action.field === 'counterparty'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
+										<div class="flex flex-wrap items-center gap-2">
+											<select x-model="action.value" :disabled="!!(action.createName && action.createName.trim())" class="select select-xs bg-base-100 w-full sm:flex-1 sm:min-w-0 mt-px disabled:opacity-40">
+												<option value="">Select counterparty…</option>
+												for _, cp := range p.Counterparties {
+													<option value={ cp.ShortID }>{ cp.Name }</option>
+												}
+											</select>
+											<span class="text-[0.65rem] text-base-content/40 shrink-0">or</span>
+											<input type="text" x-model="action.createName" :disabled="!!(action.value)" class="input input-xs bg-base-100 w-full sm:w-44 mt-px disabled:opacity-40" placeholder="create new named…"/>
+										</div>
+										<p class="text-[0.65rem] text-base-content/40 mt-1">Binds matching transactions to a counterparty. Pick an existing one, or name a new counterparty to create on first match.</p>
 									</div>
 								</template>
 								<!-- Value: set metadata (key + typed value) -->

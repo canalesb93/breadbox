@@ -92,7 +92,11 @@ document.addEventListener('alpine:init', function () {
     // New action rows start as unpicked drafts so "Action..." is the default
     // and the value input stays disabled until a type is chosen. `key` /
     // `valueType` are only used by the metadata actions.
-    function emptyAction() { return { field: '', value: '', key: '', valueType: 'text', error: '' }; }
+    // `createName` is the membership-defining create-by-name affordance for the
+    // assign_series / assign_counterparty actions: when non-empty it serializes
+    // as *_name + create_if_missing:true; otherwise `value` carries the existing
+    // entity's short_id. The two modes are mutually exclusive in the UI.
+    function emptyAction() { return { field: '', value: '', createName: '', key: '', valueType: 'text', error: '' }; }
 
     // Action type registry — first-class typed actions match the API's
     // supported action.type values (set_category | add_tag | remove_tag |
@@ -103,6 +107,8 @@ document.addEventListener('alpine:init', function () {
       { value: 'tag',             label: 'Add tag' },
       { value: 'tag_remove',      label: 'Remove tag' },
       { value: 'comment',         label: 'Add comment' },
+      { value: 'series',          label: 'Assign to series' },
+      { value: 'counterparty',    label: 'Assign to counterparty' },
       { value: 'metadata_set',    label: 'Set metadata' },
       { value: 'metadata_remove', label: 'Remove metadata' },
       { value: 'flag',            label: 'Flag for attention' },
@@ -126,6 +132,20 @@ document.addEventListener('alpine:init', function () {
       }
       if (a.type === 'add_comment') {
         return { field: 'comment', value: a.content || '', error: '' };
+      }
+      if (a.type === 'assign_series') {
+        // Existing-series mode binds series_short_id; create-by-name mode carries
+        // series_name (+ create_if_missing). Recover whichever was stored.
+        if (a.series_name) {
+          return { field: 'series', value: '', createName: a.series_name, key: '', valueType: 'text', error: '' };
+        }
+        return { field: 'series', value: a.series_short_id || '', createName: '', key: '', valueType: 'text', error: '' };
+      }
+      if (a.type === 'assign_counterparty') {
+        if (a.counterparty_name) {
+          return { field: 'counterparty', value: '', createName: a.counterparty_name, key: '', valueType: 'text', error: '' };
+        }
+        return { field: 'counterparty', value: a.counterparty_short_id || '', createName: '', key: '', valueType: 'text', error: '' };
       }
       if (a.type === 'set_metadata') {
         // Recover the value's type so the editor renders the right control and
@@ -330,8 +350,11 @@ document.addEventListener('alpine:init', function () {
       isActionUsed: function (field) {
         // set_category is backend-singleton; flag/unflag are singleton in the UI
         // (a rule either flags or it doesn't — last-writer-wins makes a second
-        // row meaningless).
-        if (field !== 'category' && field !== 'flag' && field !== 'unflag') return false;
+        // row meaningless). assign_series / assign_counterparty are likewise
+        // singleton: a transaction belongs to one series / one counterparty, so a
+        // second assignment row in the same rule would just be last-writer-wins.
+        if (field !== 'category' && field !== 'flag' && field !== 'unflag' &&
+            field !== 'series' && field !== 'counterparty') return false;
         return this.form.actions.some(function (a) { return a.field === field; });
       },
       // Block "Add action" only while there's an unpicked draft row.
@@ -354,6 +377,7 @@ document.addEventListener('alpine:init', function () {
       onActionTypeChange: function (idx) {
         var a = this.form.actions[idx];
         a.value = '';
+        a.createName = '';
         a.error = '';
         a.key = '';
         a.valueType = 'text';
@@ -537,6 +561,11 @@ document.addEventListener('alpine:init', function () {
             // flag / unflag carry no value — keep them on the field alone.
             if (a.field === 'flag' || a.field === 'unflag') return true;
             if (a.field === 'metadata_set' || a.field === 'metadata_remove') return !!(a.key && a.key.trim());
+            // assign_series / assign_counterparty need EITHER an existing entity
+            // (value = short_id) OR a create-by-name (createName).
+            if (a.field === 'series' || a.field === 'counterparty') {
+              return (a.value && a.value !== '') || !!(a.createName && a.createName.trim());
+            }
             return a.value !== undefined && a.value !== '';
           })
           .map(function (a) {
@@ -546,6 +575,21 @@ document.addEventListener('alpine:init', function () {
             if (a.field === 'comment') return { type: 'add_comment', content: a.value };
             if (a.field === 'flag') return { type: 'flag' };
             if (a.field === 'unflag') return { type: 'unflag' };
+            if (a.field === 'series') {
+              // create-by-name wins when filled; the two modes are mutually
+              // exclusive in the UI, so this yields exactly one identifier — what
+              // ValidateActions requires.
+              if (a.createName && a.createName.trim()) {
+                return { type: 'assign_series', series_name: a.createName.trim(), create_if_missing: true };
+              }
+              return { type: 'assign_series', series_short_id: a.value };
+            }
+            if (a.field === 'counterparty') {
+              if (a.createName && a.createName.trim()) {
+                return { type: 'assign_counterparty', counterparty_name: a.createName.trim(), create_if_missing: true };
+              }
+              return { type: 'assign_counterparty', counterparty_short_id: a.value };
+            }
             if (a.field === 'metadata_set') {
               // Coerce the value to its declared JSON type so the stored blob is
               // typed (boolean true, number 100) rather than always a string.
