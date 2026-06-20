@@ -74,7 +74,7 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 			row := []string{
 				tx.Date,
 				tx.Name,
-				ptrutil.Deref(tx.MerchantName),
+				csvMerchant(tx),
 				strconv.FormatFloat(tx.Amount, 'f', 2, 64),
 				ptrutil.Deref(tx.IsoCurrencyCode),
 				tx.AccountName,
@@ -90,4 +90,14 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 			}
 		}
 	}
+}
+
+// csvMerchant resolves the Merchant column using the read-model display
+// convention: the assigned counterparty's name when present, otherwise the
+// raw provider merchant name (empty when neither is set).
+func csvMerchant(tx service.AdminTransactionRow) string {
+	if tx.CounterpartyName != nil && *tx.CounterpartyName != "" {
+		return *tx.CounterpartyName
+	}
+	return ptrutil.Deref(tx.MerchantName)
 }

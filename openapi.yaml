@@ -3283,6 +3283,9 @@ components:
         iso_currency_code: { type: string }
         name: { type: string }
         merchant_name: { type: string, nullable: true }
+        counterparty_short_id: { type: string, nullable: true, description: "short_id of the assigned counterparty (the other side of the transaction), null when unassigned." }
+        counterparty_name: { type: string, nullable: true, description: "Preferred display name when a counterparty is assigned; falls back to merchant_name then name." }
+        counterparty_logo_url: { type: string, nullable: true, description: "Counterparty logo URL; null until enrichment populates it." }
         category_id: { type: string, nullable: true }
         pending: { type: boolean }
         deleted_at: { type: string, format: date-time, nullable: true }

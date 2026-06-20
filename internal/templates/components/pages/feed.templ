@@ -749,7 +749,7 @@ templ feedCommentRowBody(it FeedItem, c *FeedComment, now time.Time) {
 			<span class="text-base-content/65 shrink-0 font-normal">commented on</span>
 		}
 		<a href={ templ.SafeURL("/transactions/" + c.Transaction.ShortID) } class="font-semibold text-base-content hover:text-primary hover:underline underline-offset-2 decoration-base-content/30 transition-colors no-underline truncate min-w-0">
-			{ components.TitleCase(feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name)) }
+			{ components.TitleCase(feedDisplayName(c.Transaction, feedNonEmpty(c.Transaction.MerchantName, c.Transaction.Name))) }
 		</a>
 		@feedRowTimestamp(it.TimestampStr, now)
 	</div>
@@ -851,7 +851,7 @@ func feedCommentActor(c *FeedComment) components.TimelineActor {
 func feedTxRowProps(tx FeedTransactionRef, dimmed bool) components.TxRowFeedProps {
 	return components.TxRowFeedProps{
 		ShortID:       tx.ShortID,
-		Description:   feedNonEmpty(tx.Name, tx.MerchantName),
+		Description:   feedDisplayName(tx, feedNonEmpty(tx.Name, tx.MerchantName)),
 		Amount:        tx.Amount,
 		Currency:      tx.Currency,
 		Pending:       tx.Pending,
@@ -1022,6 +1022,18 @@ func feedBulkSubjectLabel(b *FeedBulkAction) string {
 func feedNonEmpty(a, fallback string) string {
 	if strings.TrimSpace(a) != "" {
 		return a
+	}
+	return fallback
+}
+
+// feedDisplayName resolves the preferred display label for a feed tx ref:
+// the assigned counterparty's name when present, otherwise the caller's
+// provider/merchant fallback. Mirrors the COALESCE(counterparty_name, ...)
+// display convention used across the read model while preserving each call
+// site's existing fallback ordering.
+func feedDisplayName(ref FeedTransactionRef, fallback string) string {
+	if ref.CounterpartyName != nil && strings.TrimSpace(*ref.CounterpartyName) != "" {
+		return *ref.CounterpartyName
 	}
 	return fallback
 }
