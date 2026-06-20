@@ -806,6 +806,8 @@ CHECK (actor_type IN ('user', 'agent', 'system'))
 
 None on `recurring_series` itself. Member charges reference the series via `transactions.series_id` (`UUID NULL REFERENCES recurring_series(id) ON DELETE SET NULL`) — a charge is a real bank record that outlives a derived grouping. `series_tags.series_id` references it `ON DELETE CASCADE`.
 
+**Governing-rules view.** Because membership comes only from `assign_series` rules, those rules _are_ the series' durable definition. The admin detail page (`/recurring/{short_id}`) renders the linked charges beside the **governing rules** — the rules whose `assign_series` action targets the series by `series_short_id` or `series_name` — surfaced by `Service.ListGoverningRules` and each linking to the rule editor. See `docs/rule-dsl.md` → `assign_series`.
+
 #### Check Constraints
 
 ```sql

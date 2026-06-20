@@ -83,7 +83,7 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 
 > **Raw vs assigned category.** `provider_category_primary` / `provider_category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
 
-> **Series membership timing.** `series` / `in_series` reflect a transaction's *current* `series_id`. A brand-new transaction has no series until the post-sync detector links it, so these fields are `""` / `false` on the create pass — they're most useful for re-synced/changed rows and for **retroactive apply** over historical data (e.g. tag everything already in a series, or exclude series members from a catch-all rule). They are the read-half companion to the `assign_series` action (the write-half). A rule **matches** on series membership but cannot **discover** a series — detection is an aggregate decision the detector owns; see `docs/data-model.md` and the recurring-series design notes.
+> **Series membership timing.** `series` / `in_series` reflect a transaction's *current* `series_id`. A brand-new transaction has no series until an `assign_series` rule (or an agent) links it, so these fields are `""` / `false` until a rule fires — they're the read-half companion to the `assign_series` action (the write-half), most useful for re-synced/changed rows and for **retroactive apply** over historical data (e.g. tag everything already in a series, or exclude series members from a catch-all rule). There is no detector: a series' membership is exactly the set of charges its `assign_series` rules match. See `docs/data-model.md` and the `assign_series` action below.
 
 ### Match-stability contract — what to condition on
 
@@ -296,23 +296,24 @@ Appends a comment authored by the rule. Accumulates — multiple rules can each 
 ### `assign_series`
 
 ```json
-{ "type": "assign_series", "merchant_key": "spotify", "create_if_missing": true }
+{ "type": "assign_series", "series_name": "Spotify", "create_if_missing": true }
 ```
 
-Links the matching transaction to a recurring series (subscription). Provide **exactly one** of:
+Links the matching transaction to a recurring series. Provide **exactly one** of:
 
 - `series_short_id` — assign to an existing series by its short ID. Validated at rule-create time (must resolve).
-- `merchant_key` + `create_if_missing: true` — mint a household series keyed on `merchant_key` if one doesn't already exist at that signature, then assign.
+- `series_name` + `create_if_missing: true` — mint a series by name (surrogate-first) if one doesn't already exist with that live name, then assign. The same name always resolves the same series.
 
 Behavior:
 
-- Materializes **inside the sync transaction** (resolve-or-mint → back-link → recompute rollups), so the link commits atomically with the rest of the sync.
-- **Link-and-rollup only** — it never overwrites a detector-snapped cadence or `detection_signals`, and it back-links NULL-fill only (never steals a charge already in another series).
-- Honors **sticky-reject**: minting at a `rejected` signature is a no-op (a rule can't resurrect a series the user dismissed).
+- Materializes **inside the sync transaction** (resolve-or-mint by name/short_id → back-link), so the link commits atomically with the rest of the sync.
+- **Link only** — back-links NULL-fill only (never steals a charge already in another series). A series is a thin entity (name + type); there is no detector, cadence, or `detection_signals` to overwrite.
 - Last-writer-wins across a pipeline: a higher-priority rule's `assign_series` overrides a lower one (a transaction joins at most one series).
 - **Retroactive apply** is supported via single-rule apply (`POST /rules/{id}/apply` / `apply_rules` with a `rule_id`): every matching existing transaction is linked using the same resolve-or-mint materialization as the sync path. (The bulk *apply-all* path does not yet materialize `assign_series` — apply the rule individually.)
 
 This is the declarative counterpart to the `assign_series` MCP tool: author the rule once and every future matching charge auto-joins the series with zero agent runs.
+
+**A series IS its governing rules.** Because membership comes only from `assign_series` rules (plus first-class agent one-off assigns), the rules that target a series _are_ its durable definition. The admin series detail page (`/recurring/{short_id}`) makes this explicit: it shows the linked charges beside the **governing rules** — every rule whose `assign_series` action points at the series (by `series_short_id` or `series_name`) — each linking to the rule editor. `Service.ListGoverningRules` powers that view.
 
 ### `set_metadata`
 

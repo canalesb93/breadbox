@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -17,18 +16,17 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// NOTE (rules-as-substrate, P2-PR2): a recurring series is now a THIN entity —
-// surrogate id/short_id, a name, a type, and its tags. The shipped detector and
-// every derived stat (cadence, expected amount, next-date, confidence, lifecycle
-// status) are gone. This file is at a MINIMAL COMPILING state: it lists series,
-// shows a detail page (members + tags), and creates a series by name. The full
-// detection-free UI rebuild — linked-charges + governing-rules panels — lands in
-// P2-PR3, which also reshapes the templ prop structs. Detector-era prop fields
-// are left zero-valued for now.
+// Recurring-series admin UI (rules-as-substrate, P2). A recurring series is a
+// THIN entity — surrogate id/short_id, a name, a type, and its tags. There is no
+// shipped detector and no derived stat (cadence, amount, next-date, confidence,
+// lifecycle). Membership comes from `assign_series` rules: the detail page shows
+// the linked charges beside the GOVERNING RULES that define them, making the
+// relationship explicit. The list is a flat ledger of every live series; the
+// create form needs only a name + type.
 
-// SubscriptionsListPageHandler serves GET /subscriptions — the recurring-series
-// ledger. Every live series renders as one row; there is no candidate/review
-// split anymore (membership comes from rules, not a detector).
+// SubscriptionsListPageHandler serves GET /recurring — every live series as one
+// row (name · type · linked-charge count). No candidate/review split: membership
+// comes from rules, not a detector.
 func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -39,23 +37,27 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		counts, err := svc.ListSeriesMemberCounts(ctx)
+		if err != nil {
+			a.Logger.Error("series member counts", "error", err)
+			counts = map[string]int{} // degrade gracefully — rows still render
+		}
 
 		typesPresent := map[string]bool{}
-		active := make([]pages.SubscriptionRow, 0, len(all))
+		rows := make([]pages.SubscriptionRow, 0, len(all))
 		for _, s := range all {
 			row := subscriptionRow(s)
+			row.MemberCount = counts[s.ID]
 			if row.Type != "" {
 				typesPresent[row.Type] = true
 			}
-			active = append(active, row)
+			rows = append(rows, row)
 		}
 
 		props := pages.SubscriptionsListProps{
-			CSRFToken:   GetCSRFToken(r),
-			ActiveTab:   "active",
-			ActiveCount: len(active),
-			Active:      active,
-			Types:       subscriptionTypeFilters(typesPresent),
+			CSRFToken: GetCSRFToken(r),
+			Rows:      rows,
+			Types:     subscriptionTypeFilters(typesPresent),
 		}
 
 		data := map[string]any{
@@ -68,8 +70,8 @@ func SubscriptionsListPageHandler(a *app.App, svc *service.Service, sm *scs.Sess
 	}
 }
 
-// SubscriptionDetailHandler serves GET /subscriptions/{id} — the series' name,
-// type, tags, and linked charges.
+// SubscriptionDetailHandler serves GET /recurring/{id} — the series' name, type,
+// tags, linked charges, and the governing rules that define its membership.
 func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -86,6 +88,7 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 		if err != nil {
 			a.Logger.Error("series members", "error", err)
 		}
+		row.MemberCount = len(members)
 		memberIDs := make([]string, 0, len(members))
 		for _, m := range members {
 			memberIDs = append(memberIDs, m.ShortID)
@@ -93,6 +96,18 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 		memberRows, mrErr := svc.GetAdminTransactionRowsByIDs(ctx, memberIDs)
 		if mrErr != nil {
 			a.Logger.Error("series member rows", "error", mrErr)
+		}
+
+		// Governing rules — the assign_series rules that define this series'
+		// membership. This is the doctrine payoff: a series IS its rules.
+		var governing []components.GoverningRule
+		if rules, grErr := svc.ListGoverningRules(ctx, idStr); grErr != nil {
+			a.Logger.Error("series governing rules", "error", grErr)
+		} else {
+			governing = make([]components.GoverningRule, 0, len(rules))
+			for _, rule := range rules {
+				governing = append(governing, pages.BuildGoverningRule(rule))
+			}
 		}
 
 		// Tags currently on the series → chips; the rest seed the add picker.
@@ -123,17 +138,14 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			}
 		}
 
-		catTree, _ := svc.ListCategories(ctx)
-
 		props := pages.SubscriptionDetailProps{
 			CSRFToken:       GetCSRFToken(r),
 			Series:          row,
-			CreatedAt:       formatSubDate(strPtr(s.CreatedAt), "Jan 2, 2006"),
-			Categories:      flattenCategoryOptions(catTree, ""),
+			CreatedAt:       s.CreatedAt,
 			MemberRows:      memberRows,
+			GoverningRules:  governing,
 			AvailableTags:   tagOptions,
 			TagChips:        tagChips,
-			CategoryTree:    catTree,
 			AllTags:         allTags,
 			CurrentTagSlugs: row.Tags,
 		}
@@ -156,15 +168,9 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 // GET /recurring/new.
 func NewRecurringSeriesPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		var categoryOptions []pages.SubscriptionCategoryOption
-		if cats, cerr := svc.ListCategories(ctx); cerr == nil {
-			categoryOptions = flattenCategoryOptions(cats, "")
-		}
 		props := pages.RecurringSeriesFormProps{
-			CSRFToken:  GetCSRFToken(r),
-			Type:       service.SeriesTypeSubscription,
-			Categories: categoryOptions,
+			CSRFToken: GetCSRFToken(r),
+			Type:      service.SeriesTypeSubscription,
 		}
 		data := map[string]any{
 			"PageTitle":   "New recurring series",
@@ -197,10 +203,6 @@ func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.Sess
 		typ := strings.TrimSpace(r.FormValue("type"))
 
 		rerender := func(msg string) {
-			var categoryOptions []pages.SubscriptionCategoryOption
-			if cats, cerr := svc.ListCategories(ctx); cerr == nil {
-				categoryOptions = flattenCategoryOptions(cats, "")
-			}
 			tr.RenderWithTempl(w, r, map[string]any{
 				"PageTitle":   "New recurring series",
 				"CurrentPage": "recurring",
@@ -209,7 +211,6 @@ func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.Sess
 			}, pages.RecurringSeriesForm(pages.RecurringSeriesFormProps{
 				CSRFToken: GetCSRFToken(r), Error: msg,
 				Name: name, Type: typ,
-				Categories: categoryOptions,
 			}))
 		}
 
@@ -239,20 +240,16 @@ func CreateRecurringSeriesHandler(a *app.App, svc *service.Service, sm *scs.Sess
 }
 
 // subscriptionRow maps a thin service.SeriesResponse to the templ row shape.
-// Detector-era fields (cadence, amount, confidence, renewal, signals) are left
-// at their zero values until the P2-PR3 UI rebuild reshapes the prop struct. The
-// status is fixed to "active" so the ledger groups every series under one header.
+// MemberCount is filled by the caller (it's a separate query).
 func subscriptionRow(s service.SeriesResponse) pages.SubscriptionRow {
+	label := recurringTypeLabel(s.Type)
 	return pages.SubscriptionRow{
-		ShortID:     s.ShortID,
-		Name:        s.Name,
-		Status:      "active",
-		StatusLabel: "Active",
-		StatusTone:  "success",
-		Type:        s.Type,
-		TypeLabel:   recurringTypeLabel(s.Type),
-		Tags:        s.Tags,
-		Search:      strings.ToLower(strings.Join([]string{s.Name, recurringTypeLabel(s.Type)}, " ")),
+		ShortID:   s.ShortID,
+		Name:      s.Name,
+		Type:      s.Type,
+		TypeLabel: label,
+		Tags:      s.Tags,
+		Search:    strings.ToLower(strings.Join([]string{s.Name, label}, " ")),
 	}
 }
 
@@ -288,38 +285,6 @@ func subscriptionTypeFilters(present map[string]bool) []pages.SubscriptionTypeFi
 	for _, o := range order {
 		if present[o.value] {
 			out = append(out, pages.SubscriptionTypeFilter{Value: o.value, Label: o.label})
-		}
-	}
-	return out
-}
-
-// formatSubDate reparses a service date/timestamp string and reformats it.
-// Accepts "2006-01-02" and RFC3339; returns the raw string on parse failure.
-func formatSubDate(s *string, layout string) string {
-	if s == nil || *s == "" {
-		return ""
-	}
-	if t, err := time.Parse("2006-01-02", *s); err == nil {
-		return t.Format(layout)
-	}
-	if t, err := time.Parse(time.RFC3339, *s); err == nil {
-		return t.Format(layout)
-	}
-	return *s
-}
-
-func strPtr(s string) *string {
-	return &s
-}
-
-// flattenCategoryOptions walks the category tree into a flat select list,
-// indenting children under their parent so the hierarchy stays legible.
-func flattenCategoryOptions(cats []service.CategoryResponse, prefix string) []pages.SubscriptionCategoryOption {
-	var out []pages.SubscriptionCategoryOption
-	for _, c := range cats {
-		out = append(out, pages.SubscriptionCategoryOption{ID: c.ID, Name: prefix + c.DisplayName})
-		if len(c.Children) > 0 {
-			out = append(out, flattenCategoryOptions(c.Children, prefix+"— ")...)
 		}
 	}
 	return out
