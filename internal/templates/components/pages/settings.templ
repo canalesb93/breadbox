@@ -79,7 +79,7 @@ templ settingsCounterpartiesSection(p SettingsProps) {
 	}) {
 		@components.SettingsRow(components.SettingsRowProps{
 			Label:   "Counterparty logos",
-			Caption: "Hotlink brand logos from logo.dev (the domain is sent to logo.dev on render); falls back to a monogram",
+			Caption: "Hotlink brand logos from logo.dev (the domain is sent to logo.dev on render); needs a token below, else falls back to a monogram",
 		}) {
 			@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
 				Action:    "/settings/counterparty-logos",
@@ -91,7 +91,7 @@ templ settingsCounterpartiesSection(p SettingsProps) {
 		}
 		@components.SettingsRow(components.SettingsRowProps{
 			Label:   "logo.dev token",
-			Caption: "Optional publishable key (pk_…) for higher rate limits — public by design",
+			Caption: "Publishable key (pk_…) — required for logos to appear. Get a free token at logo.dev. Public by design.",
 			Stack:   true,
 		}) {
 			@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
@@ -99,7 +99,7 @@ templ settingsCounterpartiesSection(p SettingsProps) {
 				CSRFToken: p.CSRFToken,
 				Label:     "logo.dev token saved",
 			}) {
-				<input type="text" name="logo_dev_token" value={ p.LogoDevToken } placeholder="pk_… (optional)" autocomplete="off" spellcheck="false" class="input input-sm w-full font-mono" aria-label="logo.dev publishable token"/>
+				<input type="text" name="logo_dev_token" value={ p.LogoDevToken } placeholder="pk_… (paste to enable logos)" autocomplete="off" spellcheck="false" class="input input-sm w-full font-mono" aria-label="logo.dev publishable token"/>
 			}
 		}
 	}

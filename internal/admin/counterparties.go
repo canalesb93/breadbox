@@ -320,11 +320,16 @@ func counterpartyCategoryOptions(ctx context.Context, svc *service.Service, curr
 }
 
 // counterpartyLogoDevURL returns the logo.dev hotlink URL for a counterparty's
-// avatar, or "" to fall back to the monogram. It emits a URL only when logos are
-// enabled, there is no manual logo_url override (that wins), and a registrable
-// domain can be derived from the website. token is the optional publishable key.
+// avatar, or "" to fall back to the gradient monogram. The feature is
+// token-gated: logo.dev's image API requires a publishable key (a tokenless
+// request 401s on every render), so a URL is emitted only when ALL of these
+// hold — logos enabled, a publishable token configured, no manual logo_url
+// override (that wins), and a registrable domain derivable from the website.
+// With no token configured the default state is monograms everywhere, which is
+// correct and complete; paste a key in Settings → General → Counterparties to
+// light up real brand logos.
 func counterpartyLogoDevURL(enabled bool, manualLogoURL string, websiteURL *string, token string) string {
-	if !enabled || manualLogoURL != "" {
+	if !enabled || token == "" || manualLogoURL != "" {
 		return ""
 	}
 	return components.LogoDevURL(derefStr(websiteURL), token)
