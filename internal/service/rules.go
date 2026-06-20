@@ -3156,6 +3156,16 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Flag for attention"
 	case "unflag":
 		return "Clear flag"
+	case "set_metadata":
+		if a.MetadataKey != "" {
+			return "Set metadata: " + a.MetadataKey
+		}
+		return "Set metadata"
+	case "remove_metadata":
+		if a.MetadataKey != "" {
+			return "Remove metadata: " + a.MetadataKey
+		}
+		return "Remove metadata"
 	default:
 		return a.Type
 	}

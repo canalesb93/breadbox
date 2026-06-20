@@ -4,6 +4,7 @@ package pages
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -26,8 +27,8 @@ type RuleDetailProps struct {
 	ActionCategoryName  string
 	Categories          []service.CategoryResponse
 	// LastActiveTime is the parsed last_hit_at; zero value means "never".
-	LastActiveTime time.Time
-	HasLastActive  bool
+	LastActiveTime   time.Time
+	HasLastActive    bool
 	ConditionSummary string
 	// ConditionRows is the pre-formatted list of ConditionRowProps the handler
 	// computes for non-match-all rules. Empty when the rule matches everything
@@ -244,4 +245,33 @@ func syncHistoryHitCount(h map[string]any) int {
 		return int(v)
 	}
 	return 0
+}
+
+// ruleActionEntityName returns the human display name for an assign_series /
+// assign_counterparty action — the by-name value when the rule mints/binds by
+// name, otherwise the short ID it targets, otherwise "". Used by the rule
+// detail "Then" card so surrogate-first actions read legibly.
+func ruleActionEntityName(a service.RuleAction) string {
+	switch a.Type {
+	case "assign_series":
+		if n := strings.TrimSpace(a.SeriesName); n != "" {
+			return n
+		}
+		return strings.TrimSpace(a.SeriesShortID)
+	case "assign_counterparty":
+		if n := strings.TrimSpace(a.CounterpartyName); n != "" {
+			return n
+		}
+		return strings.TrimSpace(a.CounterpartyShortID)
+	}
+	return ""
+}
+
+// ruleMetadataValueText renders a set_metadata action's value for display.
+// Returns "" when there is no value so the caller can omit the "= value" tail.
+func ruleMetadataValueText(a service.RuleAction) string {
+	if a.MetadataValue == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", a.MetadataValue)
 }

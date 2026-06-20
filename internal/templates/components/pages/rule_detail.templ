@@ -230,6 +230,75 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 					<p class="text-sm">Add comment</p>
 					<p class="text-xs text-base-content/60 mt-0.5 italic">{ "“" + a.Content + "”" }</p>
 				</div>
+			case "assign_series":
+				<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+					@components.LucideIcon("repeat", "w-4 h-4 text-primary")
+				</div>
+				<div class="flex-1 min-w-0">
+					if ruleActionEntityName(a) != "" {
+						<p class="text-sm">Assign to series <span class="font-semibold">{ ruleActionEntityName(a) }</span></p>
+					} else {
+						<p class="text-sm">Assign to series</p>
+					}
+					<p class="text-xs text-base-content/40">Matching transactions are linked to the series during sync.</p>
+				</div>
+			case "assign_counterparty":
+				<div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+					@components.LucideIcon("store", "w-4 h-4 text-secondary")
+				</div>
+				<div class="flex-1 min-w-0">
+					if ruleActionEntityName(a) != "" {
+						<p class="text-sm">Assign to counterparty <span class="font-semibold">{ ruleActionEntityName(a) }</span></p>
+					} else {
+						<p class="text-sm">Assign to counterparty</p>
+					}
+					<p class="text-xs text-base-content/40">Matching transactions are bound to the counterparty during sync.</p>
+				</div>
+			case "flag":
+				<div class="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+					@components.LucideIcon("flag", "w-4 h-4 text-warning")
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">Flag for attention</p>
+					<p class="text-xs text-base-content/40">Surfaces matching transactions via the flagged filter.</p>
+				</div>
+			case "unflag":
+				<div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+					@components.LucideIcon("flag-off", "w-4 h-4 text-base-content opacity-40")
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">Clear flag</p>
+					<p class="text-xs text-base-content/40">Clears the flag on matching transactions.</p>
+				</div>
+			case "set_metadata":
+				<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+					@components.LucideIcon("braces", "w-4 h-4 text-info")
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">
+						Set metadata
+						if a.MetadataKey != "" {
+							<span class="font-semibold">{ a.MetadataKey }</span>
+						}
+						if ruleMetadataValueText(a) != "" {
+							= <span class="font-semibold">{ ruleMetadataValueText(a) }</span>
+						}
+					</p>
+					<p class="text-xs text-base-content/40">Upserts one metadata key on matching transactions.</p>
+				</div>
+			case "remove_metadata":
+				<div class="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
+					@components.LucideIcon("braces", "w-4 h-4 text-error")
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">
+						Remove metadata
+						if a.MetadataKey != "" {
+							<span class="font-semibold">{ a.MetadataKey }</span>
+						}
+					</p>
+					<p class="text-xs text-base-content/40">Deletes one metadata key from matching transactions.</p>
+				</div>
 			default:
 				<div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
 					@components.LucideIcon("settings", "w-4 h-4 text-base-content opacity-40")
