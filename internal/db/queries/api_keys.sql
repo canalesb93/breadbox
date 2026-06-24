@@ -22,13 +22,35 @@ WHERE ak.id = $1;
 SELECT * FROM api_keys WHERE key_prefix = $1 LIMIT 1;
 
 -- name: ListApiKeys :many
--- Filters out auto-managed MCP-client identities (client_fingerprint
--- IS NOT NULL). Those rows exist to anchor agent attribution + the
--- per-client avatar to a stable api_keys.id; they're not user-revocable
--- credentials and showing them in /settings/api-keys would confuse
--- users who don't recognise the "mcp-client:claude-desktop@@stdio"
--- prefix or have no way to act on the row.
-SELECT * FROM api_keys WHERE client_fingerprint IS NULL ORDER BY created_at DESC;
+-- Returns only user-manageable credentials. Drives /settings/api-keys, the
+-- REST GET /api/v1/api-keys list, and `breadbox keys list`.
+--
+-- Hides agent machinery — keys a user neither created nor can act on — but
+-- identifies it STRUCTURALLY, never by actor_type. The actor_type column was
+-- added with DEFAULT 'agent' (migration 20260512061200), so every key minted
+-- before that migration — including legitimate user keys — carries
+-- actor_type='agent'. Filtering on `actor_type <> 'agent'` would make those
+-- still-valid user credentials vanish from every management surface while
+-- staying live and un-revocable. So we match the two positively-identifiable
+-- machine shapes instead:
+--   * client_fingerprint IS NOT NULL — auto-managed MCP-client identity rows
+--     (CreateMCPClientApiKey), which anchor per-client agent avatars.
+--   * per-run keys minted by Orchestrator.MintRunAPIKey, identified by a set
+--     workflow_id (modern) OR the `agent:<slug>:<runID>` name (run keys minted
+--     before workflow_id existed). The name match mirrors ParseAgentKeySlug.
+-- These churned on every workflow run — flickering into the list mid-run and
+-- piling up under "revoked" — which is what looked like unexplained key
+-- activity. Their identity + run history surface on the Workflows / agent-runs
+-- pages; the avatar resolver still reads the rows by id (ResolveAgentSlugForActor),
+-- so they're hidden from management, not deleted.
+--
+-- Everything else — user keys (any name), the `system` stdio bootstrap key, and
+-- legacy user keys mislabeled actor_type='agent' by the DEFAULT — stays visible.
+SELECT * FROM api_keys
+WHERE client_fingerprint IS NULL
+  AND workflow_id IS NULL
+  AND name NOT LIKE 'agent:%:%'
+ORDER BY created_at DESC;
 
 -- name: GetApiKeyByClientFingerprint :one
 -- Drives EnsureMCPClientAgentKey's lookup half. Returns the per-client
