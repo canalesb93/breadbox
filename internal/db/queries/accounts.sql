@@ -13,6 +13,26 @@ ON CONFLICT (external_account_id) DO UPDATE SET
   updated_at = NOW()
 RETURNING *;
 
+-- name: UpsertAccountMetadata :one
+-- Inserts a freshly discovered account or refreshes the metadata of an existing
+-- one WITHOUT touching balances. Used by the sync engine when a provider returns
+-- its current account set mid-sync (e.g. SimpleFIN, where one access URL grows
+-- new accounts as the user links banks at the bridge). Balances are owned by the
+-- separate balance-refresh path, so this upsert deliberately omits them to avoid
+-- clobbering live values with NULLs. connection_id is set only on INSERT; an
+-- existing account keeps its connection.
+INSERT INTO accounts (connection_id, external_account_id, name, official_name, type, subtype, mask, iso_currency_code)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (external_account_id) DO UPDATE SET
+  name = EXCLUDED.name,
+  official_name = EXCLUDED.official_name,
+  type = EXCLUDED.type,
+  subtype = EXCLUDED.subtype,
+  mask = EXCLUDED.mask,
+  iso_currency_code = EXCLUDED.iso_currency_code,
+  updated_at = NOW()
+RETURNING id, external_account_id, name, display_name;
+
 -- name: ListAccountsByConnection :many
 SELECT * FROM accounts WHERE connection_id = $1 ORDER BY name;
 
