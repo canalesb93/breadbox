@@ -380,11 +380,11 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleListWorkflows, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_series", Title: "List Recurring Series", Classification: ToolRead,
-			Description: "List recurring series (subscriptions, bills, loans) — thin, rule-maintained entities: each is a surrogate identity (id/short_id), a name, and a type, plus its tags. Membership comes from assign_series rules, not a shipped detector. Lean by default (name, type, tags); pass fields=all for timestamps too. Use get_series for one series, query_transactions(series_id=...) for its charges.",
+			Description: "List recurring series (subscriptions, bills, loans) — thin, rule-maintained entities: each is a surrogate identity (id/short_id), a name, and a type. Membership comes from assign_series rules, not a shipped detector. Lean by default (name, type); pass fields=all for timestamps too. Use get_series for one series, query_transactions(series_id=...) for its charges.",
 		}, s.handleListSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "get_series", Title: "Get Recurring Series", Classification: ToolRead,
-			Description: "Get one recurring series by short ID or UUID: its name, type, and tags. A series' linked charges come from query_transactions(series_id=...); its governing rules (the assign_series rules that define its membership) are visible on the admin Recurring detail page.",
+			Description: "Get one recurring series by short ID or UUID: its name and type. A series' linked charges come from query_transactions(series_id=...); its governing rules (the assign_series rules that define its membership) are visible on the admin Recurring detail page.",
 		}, s.handleGetSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "assign_series", Title: "Assign / Create Recurring Series", Classification: ToolWrite,
@@ -396,16 +396,8 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleUpdateSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "unlink_series_transactions", Title: "Unlink Charges from Series", Classification: ToolWrite,
-			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.",
+			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.",
 		}, s.handleUnlinkSeriesTransactions, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "add_series_tag", Title: "Tag Recurring Series", Classification: ToolWrite,
-			Description: "Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it first with create_tag).",
-		}, s.handleAddSeriesTag, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "remove_series_tag", Title: "Untag Recurring Series", Classification: ToolWrite,
-			Description: "Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.",
-		}, s.handleRemoveSeriesTag, s),
 
 		// --- Counterparties (rules-as-substrate, P4) ---
 		makeToolDefLogged(ToolSpec{

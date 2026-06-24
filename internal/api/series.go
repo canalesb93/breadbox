@@ -4,7 +4,6 @@ package api
 
 import (
 	"net/http"
-	"strings"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -96,57 +95,6 @@ func LinkSeriesTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		}, actor)
 		if err != nil {
 			writeServiceError(w, err, "Series not found", "Failed to link transactions")
-			return
-		}
-		writeData(w, s)
-	}
-}
-
-// addSeriesTagRequest is the body for POST /api/v1/series/{id}/tags.
-type addSeriesTagRequest struct {
-	TagSlug string `json:"tag_slug"`
-}
-
-// AddSeriesTagHandler attaches a tag to a series; the tag is materialized onto
-// the series' linked transactions. POST /api/v1/series/{id}/tags (write).
-func AddSeriesTagHandler(svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
-		var body addSeriesTagRequest
-		if !decodeJSON(w, r, &body) {
-			return
-		}
-		if strings.TrimSpace(body.TagSlug) == "" {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "tag_slug is required")
-			return
-		}
-		actor := service.ActorFromContext(r.Context())
-		if err := svc.AddSeriesTag(r.Context(), id, body.TagSlug, actor); err != nil {
-			writeServiceError(w, err, "Series or tag not found", "Failed to add series tag")
-			return
-		}
-		s, err := svc.GetSeries(r.Context(), id)
-		if err != nil {
-			writeServiceError(w, err, "Series not found", "Failed to load series")
-			return
-		}
-		writeData(w, s)
-	}
-}
-
-// RemoveSeriesTagHandler detaches a tag from a series and strips the
-// series-inherited copies from its members. DELETE /api/v1/series/{id}/tags/{slug} (write).
-func RemoveSeriesTagHandler(svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
-		slug := chi.URLParam(r, "slug")
-		if err := svc.RemoveSeriesTag(r.Context(), id, slug); err != nil {
-			writeServiceError(w, err, "Series or tag not found", "Failed to remove series tag")
-			return
-		}
-		s, err := svc.GetSeries(r.Context(), id)
-		if err != nil {
-			writeServiceError(w, err, "Series not found", "Failed to load series")
 			return
 		}
 		writeData(w, s)

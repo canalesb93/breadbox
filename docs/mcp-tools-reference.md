@@ -262,15 +262,7 @@ Edit a recurring series' `name` and/or `type` (`subscription` | `bill` | `loan` 
 
 ### unlink_series_transactions (Write)
 
-Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id` and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.
-
-### add_series_tag (Write)
-
-Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it with `create_tag` first). Returns the updated series (including its `tags`).
-
-### remove_series_tag (Write)
-
-Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.
+Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.
 
 ---
 

@@ -349,39 +349,6 @@ func TestSeriesCascadeDelete_NullsSeriesID(t *testing.T) {
 	}
 }
 
-// TestSeriesTags_MembersInherit covers tag materialization onto members.
-func TestSeriesTags_MembersInherit(t *testing.T) {
-	svc, queries, pool := newService(t)
-	ctx := context.Background()
-	testutil.MustCreateTag(t, queries, "subscriptions", "Subscriptions")
-	acctID := seedTxnFixture(t, queries)
-	t1 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_1", "Netflix", 1599, "2026-03-15")
-	t2 := testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX_2", "Netflix", 1599, "2026-04-15")
-	actor := service.Actor{Type: "user", Name: "Tester"}
-
-	series, err := svc.AssignSeries(ctx, service.AssignSeriesInput{
-		Name: "Netflix", CreateIfMissing: true, TransactionIDs: []string{t1.ShortID, t2.ShortID},
-	}, actor)
-	if err != nil {
-		t.Fatalf("create series: %v", err)
-	}
-
-	if err := svc.AddSeriesTag(ctx, series.ShortID, "subscriptions", actor); err != nil {
-		t.Fatalf("AddSeriesTag: %v", err)
-	}
-	if !txnHasTag(t, pool, t1.ID, "subscriptions") || !txnHasTag(t, pool, t2.ID, "subscriptions") {
-		t.Error("expected both members to inherit the series tag")
-	}
-
-	// Removing the series tag strips the inherited copies.
-	if err := svc.RemoveSeriesTag(ctx, series.ShortID, "subscriptions"); err != nil {
-		t.Fatalf("RemoveSeriesTag: %v", err)
-	}
-	if txnHasTag(t, pool, t1.ID, "subscriptions") {
-		t.Error("expected the inherited tag stripped from member after RemoveSeriesTag")
-	}
-}
-
 // TestRuleConditions_InSeriesAndSeries exercises the read-half of the
 // rules-engine composition: a rule conditioned on series membership (in_series)
 // or a specific series (series eq short_id) matches only the linked

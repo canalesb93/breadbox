@@ -36,13 +36,12 @@ var validSeriesType = map[string]bool{
 
 // SeriesResponse is the thin API/MCP shape of a recurring_series row.
 type SeriesResponse struct {
-	ID        string   `json:"id"`
-	ShortID   string   `json:"short_id"`
-	Name      string   `json:"name"`
-	Type      string   `json:"type"`
-	Tags      []string `json:"tags,omitempty"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	ID        string `json:"id"`
+	ShortID   string `json:"short_id"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // AssignSeriesInput is the input to AssignSeries — the imperative create/link
@@ -53,7 +52,7 @@ type SeriesResponse struct {
 type AssignSeriesInput struct {
 	SeriesID        *string  // short_id or uuid — assign to an existing series
 	Name            string   // display label + mint key (required when CreateIfMissing)
-	CreateIfMissing bool      // mint a series (by Name) if no SeriesID
+	CreateIfMissing bool     // mint a series (by Name) if no SeriesID
 	Type            string   // optional subscription|bill|loan|other for a minted series
 	TransactionIDs  []string // members to back-link (short_id or uuid), ≤50
 	// FailIfExists turns a mint into a strict create: return ErrConflict when a
@@ -136,7 +135,7 @@ func (s *Service) mintSeriesByName(ctx context.Context, in AssignSeriesInput, ac
 	}
 
 	if len(memberIDs) > 0 {
-		if err := backLinkAndTag(ctx, tx, qtx, seriesID, memberIDs, actor); err != nil {
+		if err := backLinkMembers(ctx, tx, qtx, seriesID, memberIDs, actor); err != nil {
 			return nil, err
 		}
 	}
@@ -186,17 +185,17 @@ func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID p
 		return nil // nothing actionable
 	}
 
-	if err := backLinkAndTag(ctx, tx, qtx, seriesID, []pgtype.UUID{txnID}, SystemActor()); err != nil {
+	if err := backLinkMembers(ctx, tx, qtx, seriesID, []pgtype.UUID{txnID}, SystemActor()); err != nil {
 		return err
 	}
 	return nil
 }
 
-// backLinkAndTag back-links members to a series (NULL-fill only), materializes
-// the series' tags onto the freshly-linked members, and emits a series_assigned
-// annotation for the charges this call actually linked. Shared by the mint,
-// link, and rule paths. The caller owns the surrounding transaction.
-func backLinkAndTag(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID pgtype.UUID, memberIDs []pgtype.UUID, actor Actor) error {
+// backLinkMembers back-links members to a series (NULL-fill only) and emits a
+// series_assigned annotation for the charges this call actually linked. Shared
+// by the mint, link, and rule paths. The caller owns the surrounding
+// transaction.
+func backLinkMembers(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID pgtype.UUID, memberIDs []pgtype.UUID, actor Actor) error {
 	if len(memberIDs) == 0 {
 		return nil
 	}
@@ -212,12 +211,6 @@ func backLinkAndTag(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID pg
 		TransactionIds: memberIDs,
 	}); err != nil {
 		return fmt.Errorf("back-link series members: %w", err)
-	}
-	if err := qtx.ApplySeriesTagsToTransactions(ctx, db.ApplySeriesTagsToTransactionsParams{
-		SeriesID: seriesID,
-		Column2:  memberIDs,
-	}); err != nil {
-		return fmt.Errorf("apply series tags to members: %w", err)
 	}
 	if len(newlyLinked) > 0 {
 		row, err := qtx.GetRecurringSeriesByID(ctx, seriesID)
@@ -257,16 +250,13 @@ func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, membe
 		}
 		return nil, fmt.Errorf("get series: %w", err)
 	}
-	if err := backLinkAndTag(ctx, tx, qtx, row.ID, memberIDs, actor); err != nil {
+	if err := backLinkMembers(ctx, tx, qtx, row.ID, memberIDs, actor); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit link members: %w", err)
 	}
 	resp := seriesFromRow(row)
-	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, row.ID); err == nil {
-		resp.Tags = slugs
-	}
 	return &resp, nil
 }
 
@@ -314,9 +304,6 @@ func (s *Service) UpdateSeries(ctx context.Context, idOrShort string, in EditSer
 		return nil, fmt.Errorf("update series: %w", err)
 	}
 	resp := seriesFromRow(updated)
-	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, id); err == nil {
-		resp.Tags = slugs
-	}
 	return &resp, nil
 }
 
@@ -331,10 +318,8 @@ func (s *Service) PatchSeries(ctx context.Context, idOrShort string, edit *EditS
 }
 
 // UnlinkSeriesTransactions detaches transactions from a series — the inverse of
-// the link path. It clears each charge's series_id, strips the series'
-// system-provenance inherited tags from the detached charges (a tag the user
-// added directly survives), and emits a series_unlinked timeline event. It
-// refuses if any listed transaction isn't a current member.
+// the link path. It clears each charge's series_id and emits a series_unlinked
+// timeline event. It refuses if any listed transaction isn't a current member.
 func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string, memberIDsOrShorts []string, actor Actor) (*SeriesResponse, error) {
 	if len(memberIDsOrShorts) == 0 {
 		return nil, fmt.Errorf("%w: at least one transaction to unlink is required", ErrInvalidParameter)
@@ -379,16 +364,6 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 			ErrInvalidParameter, len(memberIDs)-int(detached), len(memberIDs))
 	}
 
-	// Strip the series' inherited (system-provenance) tags from the detached
-	// charges — they no longer belong to it. Scoped by provenance so a tag the
-	// user added to the transaction directly survives.
-	if _, err := tx.Exec(ctx,
-		`DELETE FROM transaction_tags
-		 WHERE transaction_id = ANY($1::uuid[]) AND added_by_type = 'system' AND added_by_id = $2`,
-		memberIDs, row.ShortID); err != nil {
-		return nil, fmt.Errorf("strip series tags from unlinked members: %w", err)
-	}
-
 	if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesUnlinked, memberIDs, row.ShortID, row.Name, actor); err != nil {
 		return nil, fmt.Errorf("emit series_unlinked annotations: %w", err)
 	}
@@ -397,13 +372,10 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 		return nil, fmt.Errorf("commit unlink: %w", err)
 	}
 	resp := seriesFromRow(row)
-	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, row.ID); err == nil {
-		resp.Tags = slugs
-	}
 	return &resp, nil
 }
 
-// GetSeries returns a single series by short_id or uuid, with its tags.
+// GetSeries returns a single series by short_id or uuid.
 func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesResponse, error) {
 	id, err := s.resolveSeriesID(ctx, idOrShort)
 	if err != nil {
@@ -417,9 +389,6 @@ func (s *Service) GetSeries(ctx context.Context, idOrShort string) (*SeriesRespo
 		return nil, fmt.Errorf("get series: %w", err)
 	}
 	resp := seriesFromRow(row)
-	if slugs, err := s.Queries.ListSeriesTagSlugs(ctx, id); err == nil {
-		resp.Tags = slugs
-	}
 	return &resp, nil
 }
 
@@ -537,69 +506,6 @@ func (s *Service) ListGoverningRules(ctx context.Context, idOrShort string) ([]T
 		return nil, fmt.Errorf("iterate governing rules: %w", err)
 	}
 	return s.convertRuleRows(ctx, scanned), nil
-}
-
-// AddSeriesTag attaches an existing tag (by slug) to a series and materializes
-// it onto the series' current members (NULL-fill, provenance=system+series).
-func (s *Service) AddSeriesTag(ctx context.Context, idOrShort, tagSlug string, actor Actor) error {
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return err
-	}
-	tag, err := s.Queries.GetTagBySlug(ctx, tagSlug)
-	if err != nil {
-		return fmt.Errorf("%w: tag %q not found", ErrInvalidParameter, tagSlug)
-	}
-	if _, err := s.Queries.AddSeriesTag(ctx, db.AddSeriesTagParams{SeriesID: id, TagID: tag.ID}); err != nil {
-		return fmt.Errorf("add series tag: %w", err)
-	}
-	if err := s.Queries.ApplySeriesTagToAllMembers(ctx, db.ApplySeriesTagToAllMembersParams{ID: id, TagID: tag.ID}); err != nil {
-		return fmt.Errorf("apply series tag to members: %w", err)
-	}
-	return nil
-}
-
-// RemoveSeriesTag detaches a tag from a series and strips the series-inherited
-// copies from its members (provenance-scoped, so user-added tags survive).
-func (s *Service) RemoveSeriesTag(ctx context.Context, idOrShort, tagSlug string) error {
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return err
-	}
-	row, err := s.Queries.GetRecurringSeriesByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrNotFound
-		}
-		return fmt.Errorf("get series: %w", err)
-	}
-	tag, err := s.Queries.GetTagBySlug(ctx, tagSlug)
-	if err != nil {
-		return fmt.Errorf("%w: tag %q not found", ErrInvalidParameter, tagSlug)
-	}
-	if _, err := s.Queries.RemoveSeriesTag(ctx, db.RemoveSeriesTagParams{SeriesID: id, TagID: tag.ID}); err != nil {
-		return fmt.Errorf("remove series tag: %w", err)
-	}
-	if err := s.Queries.RemoveSeriesTagFromMembers(ctx, db.RemoveSeriesTagFromMembersParams{
-		TagID:     tag.ID,
-		AddedByID: pgconv.Text(row.ShortID),
-	}); err != nil {
-		return fmt.Errorf("remove series tag from members: %w", err)
-	}
-	return nil
-}
-
-// ListSeriesTags returns the tag slugs attached to a series.
-func (s *Service) ListSeriesTags(ctx context.Context, idOrShort string) ([]string, error) {
-	id, err := s.resolveSeriesID(ctx, idOrShort)
-	if err != nil {
-		return nil, err
-	}
-	slugs, err := s.Queries.ListSeriesTagSlugs(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("list series tags: %w", err)
-	}
-	return slugs, nil
 }
 
 // SeriesMember is one linked transaction (charge) of a recurring series. It

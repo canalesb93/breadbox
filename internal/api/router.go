@@ -203,8 +203,6 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/series", AssignSeriesHandler(svc))
 			r.Post("/series/{id}/transactions", LinkSeriesTransactionsHandler(svc))
 			r.Delete("/series/{id}/transactions/{txid}", UnlinkSeriesTransactionHandler(svc))
-			r.Post("/series/{id}/tags", AddSeriesTagHandler(svc))
-			r.Delete("/series/{id}/tags/{slug}", RemoveSeriesTagHandler(svc))
 			r.Patch("/series/{id}", PatchSeriesHandler(svc))
 			r.Post("/counterparties", CreateCounterpartyHandler(svc))
 			r.Patch("/counterparties/{id}", PatchCounterpartyHandler(svc))

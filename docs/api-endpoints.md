@@ -93,9 +93,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | GET | `/series/{id}` | R | Single series (accepts UUID or short_id) |
 | POST | `/series` | W | Assign by `series_id`, or mint/resolve by `series_name`+`create_if_missing` (optional `type`); links `transaction_ids` (≤50, NULL-fill only) |
 | POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series |
-| DELETE | `/series/{id}/transactions/{txid}` | W | Unlink a transaction from a series; strips inherited tags; errors if not a member |
-| POST | `/series/{id}/tags` | W | Attach a tag to a series; linked transactions inherit it |
-| DELETE | `/series/{id}/tags/{slug}` | W | Detach a tag; strips series-inherited copies from members (keeps user-added) |
+| DELETE | `/series/{id}/transactions/{txid}` | W | Unlink a transaction from a series; errors if not a member |
 | PATCH | `/series/{id}` | W | Edit a thin series' `name` and/or `type` (`subscription`/`bill`/`loan`/`other`) |
 
 ## Counterparties

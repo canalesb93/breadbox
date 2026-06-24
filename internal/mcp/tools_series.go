@@ -40,11 +40,6 @@ type unlinkSeriesInput struct {
 	TransactionIDs []string `json:"transaction_ids" jsonschema:"required,Transactions (short ID or UUID) to detach from the series. Each must currently belong to it. Max 50."`
 }
 
-type seriesTagInput struct {
-	ID      string `json:"id" jsonschema:"required,Series short ID or UUID."`
-	TagSlug string `json:"tag_slug" jsonschema:"required,Tag slug (must already exist)."`
-}
-
 func (s *MCPServer) handleListSeries(_ context.Context, _ *mcpsdk.CallToolRequest, input listSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	// Lean-by-default: list_series returns the overview projection (identity +
@@ -149,47 +144,6 @@ func (s *MCPServer) handleUnlinkSeriesTransactions(ctx context.Context, _ *mcpsd
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("series not found")), nil, nil
 		}
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(series)
-}
-
-func (s *MCPServer) handleAddSeriesTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input seriesTagInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.ID == "" || input.TagSlug == "" {
-		return errorResult(fmt.Errorf("id and tag_slug are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	if err := s.svc.AddSeriesTag(context.Background(), input.ID, input.TagSlug, actor); err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			return errorResult(fmt.Errorf("series not found")), nil, nil
-		}
-		return errorResult(err), nil, nil
-	}
-	series, err := s.svc.GetSeries(context.Background(), input.ID)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(series)
-}
-
-func (s *MCPServer) handleRemoveSeriesTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input seriesTagInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.ID == "" || input.TagSlug == "" {
-		return errorResult(fmt.Errorf("id and tag_slug are required")), nil, nil
-	}
-	if err := s.svc.RemoveSeriesTag(context.Background(), input.ID, input.TagSlug); err != nil {
-		if errors.Is(err, service.ErrNotFound) {
-			return errorResult(fmt.Errorf("series not found")), nil, nil
-		}
-		return errorResult(err), nil, nil
-	}
-	series, err := s.svc.GetSeries(context.Background(), input.ID)
-	if err != nil {
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(series)

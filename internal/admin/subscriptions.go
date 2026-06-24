@@ -116,44 +116,12 @@ func SubscriptionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 			}
 		}
 
-		// Tags currently on the series → chips; the rest seed the add picker.
-		onSeries := map[string]bool{}
-		for _, tg := range row.Tags {
-			onSeries[tg] = true
-		}
-		allTags, _ := svc.ListTags(ctx)
-		bySlug := make(map[string]service.TagResponse, len(allTags))
-		var tagOptions []pages.SubscriptionTagOption
-		var tagChips []components.TagChipData
-		for _, t := range allTags {
-			bySlug[t.Slug] = t
-			if onSeries[t.Slug] {
-				continue
-			}
-			name := t.DisplayName
-			if name == "" {
-				name = t.Slug
-			}
-			tagOptions = append(tagOptions, pages.SubscriptionTagOption{Slug: t.Slug, Name: name})
-		}
-		for _, slug := range row.Tags {
-			if t, ok := bySlug[slug]; ok {
-				tagChips = append(tagChips, components.TagChipDataFromResponse(t))
-			} else {
-				tagChips = append(tagChips, components.TagChipData{Slug: slug, DisplayName: slug})
-			}
-		}
-
 		props := pages.SubscriptionDetailProps{
-			CSRFToken:       GetCSRFToken(r),
-			Series:          row,
-			CreatedAt:       s.CreatedAt,
-			MemberRows:      memberRows,
-			GoverningRules:  governing,
-			AvailableTags:   tagOptions,
-			TagChips:        tagChips,
-			AllTags:         allTags,
-			CurrentTagSlugs: row.Tags,
+			CSRFToken:      GetCSRFToken(r),
+			Series:         row,
+			CreatedAt:      s.CreatedAt,
+			MemberRows:     memberRows,
+			GoverningRules: governing,
 		}
 
 		data := map[string]any{
@@ -254,7 +222,6 @@ func subscriptionRow(s service.SeriesResponse) pages.SubscriptionRow {
 		Name:      s.Name,
 		Type:      s.Type,
 		TypeLabel: label,
-		Tags:      s.Tags,
 		Search:    strings.ToLower(strings.Join([]string{s.Name, label}, " ")),
 	}
 }
