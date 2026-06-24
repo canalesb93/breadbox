@@ -277,6 +277,8 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, syncLogS
 				pendingRemovals = nil
 				pendingAdded = nil
 				pendingModified = nil
+				pendingAccounts = nil
+				seenAccountExternalIDs = make(map[string]struct{})
 				continue
 			}
 			if errors.Is(syncErr, provider.ErrReauthRequired) {

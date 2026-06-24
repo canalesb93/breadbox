@@ -331,6 +331,18 @@ func TestSync_DiscoversNewAccountsMidSync(t *testing.T) {
 	if txnCount != 1 {
 		t.Errorf("expected 1 transaction on the newly discovered account, got %d", txnCount)
 	}
+
+	// The pre-existing account must be left intact — discovery must skip accounts
+	// already linked to the connection, not duplicate or re-create them.
+	var existingCount int
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM accounts WHERE external_account_id = $1 AND connection_id = $2",
+		"ext_acct_1", conn.ID).Scan(&existingCount); err != nil {
+		t.Fatalf("count existing account rows: %v", err)
+	}
+	if existingCount != 1 {
+		t.Errorf("expected exactly 1 row for the pre-existing account, got %d (discovery duplicated it)", existingCount)
+	}
 }
 
 func TestSync_ModifyTransactions(t *testing.T) {

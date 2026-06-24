@@ -226,9 +226,9 @@ func TestSyncTransactions_ReturnsDiscoveredAccounts(t *testing.T) {
 	conn := provider.Connection{ProviderName: "simplefin", EncryptedCredentials: enc}
 
 	// Empty cursor → multi-window backfill. Every window re-returns the full
-	// account list, but SyncTransactions captures it once (the engine is the
-	// dedup authority), so the result carries each account exactly once — not
-	// one copy per window.
+	// account list, so SyncTransactions must take the union deduped by external
+	// id — each account appears exactly once in the result, not one copy per
+	// window.
 	res, err := p.SyncTransactions(context.Background(), conn, "")
 	if err != nil {
 		t.Fatalf("SyncTransactions: %v", err)
@@ -237,7 +237,7 @@ func TestSyncTransactions_ReturnsDiscoveredAccounts(t *testing.T) {
 		t.Fatalf("expected multiple windows for a backfill, got %d hits", fb.accountsHits)
 	}
 	if len(res.Accounts) != 2 {
-		t.Fatalf("accounts = %d, want 2 (captured once across %d windows)", len(res.Accounts), fb.accountsHits)
+		t.Fatalf("accounts = %d, want 2 (deduped across %d windows)", len(res.Accounts), fb.accountsHits)
 	}
 	byID := map[string]provider.Account{}
 	for _, a := range res.Accounts {
