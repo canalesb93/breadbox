@@ -554,27 +554,10 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 		</div>
 	}
 	if len(s.RuleOutcomes) > 0 {
-		<div class="mt-1 flex items-center gap-1.5 flex-wrap text-base-content/55">
+		<a href={ templ.SafeURL("/logs/sync-logs/" + s.SyncLogID) } class="mt-1 inline-flex items-center gap-1.5 text-base-content/55 hover:text-primary transition-colors no-underline">
 			@components.LucideIcon("zap", "w-3 h-3 text-primary opacity-70")
-			for i, ro := range s.RuleOutcomes {
-				if i > 0 {
-					<span class="text-base-content/25">·</span>
-				}
-				if ro.RuleShortID != "" {
-					<a href={ templ.SafeURL("/rules/" + ro.RuleShortID) } class="hover:text-primary transition-colors no-underline">
-						<span class="font-medium text-base-content/85">{ feedNonEmpty(ro.RuleName, "A rule") }</span>
-						<span>&nbsp;applied to&nbsp;</span>
-						<span class="font-medium tabular-nums text-base-content/85">{ fmt.Sprintf("%d", ro.Count) }</span>
-					</a>
-				} else {
-					<span>
-						<span class="font-medium text-base-content/85">{ feedNonEmpty(ro.RuleName, "A rule") }</span>
-						<span>&nbsp;applied to&nbsp;</span>
-						<span class="font-medium tabular-nums text-base-content/85">{ fmt.Sprintf("%d", ro.Count) }</span>
-					</span>
-				}
-			}
-		</div>
+			<span class="font-medium text-base-content/85">{ feedRuleSummaryText(s.RuleOutcomes) }</span>
+		</a>
 	}
 }
 
@@ -1044,6 +1027,21 @@ func feedNonEmpty(a, fallback string) string {
 		return a
 	}
 	return fallback
+}
+
+// feedRuleSummaryText renders the one-line rule-application summary shown on
+// a sync card — e.g. "3 rules applied · 12 hits". The per-rule breakdown
+// (which rule, how many each) lives on the sync-log detail page that the
+// summary links to, so the feed stays a glanceable headline.
+func feedRuleSummaryText(outcomes []FeedRuleOutcome) string {
+	rules := len(outcomes)
+	total := 0
+	for _, o := range outcomes {
+		total += o.Count
+	}
+	return fmt.Sprintf("%d %s applied · %d %s",
+		rules, pluralLabel("rule", rules != 1),
+		total, pluralLabel("hit", total != 1))
 }
 
 // feedDisplayName resolves the preferred display label for a feed tx ref:
