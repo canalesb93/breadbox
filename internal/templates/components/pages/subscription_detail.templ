@@ -10,14 +10,9 @@ import (
 // model: a series IS the rules that define it. The page pairs the LINKED CHARGES
 // (what's currently in the series) with the GOVERNING RULES (the assign_series
 // rules whose matches put them there), making the membership relationship
-// explicit. Name + type edit in a thin right-side drawer (one Save); tags edit
-// inline and are inherited by linked charges. All mutations run through the
-// `seriesDetail` Alpine factory.
+// explicit. Name + type edit in a thin right-side drawer (one Save). All
+// mutations run through the `seriesDetail` Alpine factory.
 templ SubscriptionDetail(p SubscriptionDetailProps) {
-	<!-- Tag-picker payload must precede the factory's synchronous <script src> so
-	     seedGlobals() finds it (window.__bbAllTags) on first render. -->
-	@templ.JSONScript("series-detail-alltags", p.AllTags)
-	@templ.JSONScript("series-detail-current-tags", p.CurrentTagSlugs)
 	<script src="/static/js/admin/components/series_detail.js"></script>
 	<div x-data="seriesDetail" data-series-id={ p.Series.ShortID }>
 		@components.EntityHeader(components.EntityHeaderProps{
@@ -54,34 +49,6 @@ templ SubscriptionDetail(p SubscriptionDetailProps) {
 					EntityWord: "series",
 					ActionCode: "assign_series",
 				})
-			</div>
-		</div>
-		<!-- Tags — inherited by linked charges -->
-		<div class="mt-5">
-			@entityPanelHeader("tag", "Tags", "Inherited by every linked charge", nil)
-			<div class="bb-card p-5">
-				<div
-					class="flex flex-wrap items-center gap-2"
-					@tag-selection-commit.window="if ($event.detail.sourceId === 'series-tag') { applyTagDiff($event.detail.adds, $event.detail.removes) }"
-				>
-					for _, chip := range p.TagChips {
-						<span class="inline-flex items-center gap-1">
-							@components.TagChipSm(chip)
-							<button
-								type="button"
-								@click={ fmt.Sprintf("removeSeriesTag(%q, %q)", p.Series.ShortID, chip.Slug) }
-								class="cursor-pointer opacity-60 hover:opacity-100 bg-transparent inline-flex"
-								aria-label="Remove tag"
-							>
-								@components.LucideIcon("x", "w-3 h-3")
-							</button>
-						</span>
-					}
-					<button type="button" class="bb-tag bb-tag-add" @click="openTagPicker()">
-						@components.LucideIcon("plus", "")
-						<span>{ seriesAddTagLabel(len(p.TagChips)) }</span>
-					</button>
-				</div>
 			</div>
 		</div>
 		@seriesEditDrawer(p)
@@ -215,11 +182,4 @@ func seriesGoverningSubtitle(n int) string {
 	default:
 		return fmt.Sprintf("%d rules define membership", n)
 	}
-}
-
-func seriesAddTagLabel(n int) string {
-	if n == 0 {
-		return "Add tag"
-	}
-	return "Edit tags"
 }

@@ -15,7 +15,6 @@ var seriesValidFields = map[string]bool{
 	"short_id":   true,
 	"name":       true,
 	"type":       true,
-	"tags":       true,
 	"created_at": true,
 	"updated_at": true,
 }
@@ -23,8 +22,8 @@ var seriesValidFields = map[string]bool{
 var seriesFieldAliases = map[string][]string{
 	// minimal: just enough to recognize a series in a list.
 	"minimal": {"name", "type"},
-	// overview: identity + type + tags — the useful default for list_series.
-	"overview": {"name", "type", "tags"},
+	// overview: identity + type — the useful default for list_series.
+	"overview": {"name", "type"},
 }
 
 // DefaultSeriesFields is the lean projection list_series returns when the caller
@@ -56,8 +55,6 @@ func FilterSeriesFields(s SeriesResponse, fields map[string]bool) map[string]any
 			m["name"] = s.Name
 		case "type":
 			m["type"] = s.Type
-		case "tags":
-			m["tags"] = s.Tags
 		case "created_at":
 			m["created_at"] = s.CreatedAt
 		case "updated_at":

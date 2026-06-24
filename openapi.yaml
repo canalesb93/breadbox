@@ -1927,7 +1927,7 @@ paths:
     get:
       tags: [Series]
       summary: List recurring series (subscriptions)
-      description: "Recurring series are thin, rule-maintained entities — surrogate id/short_id, name, type, tags. Membership comes from `assign_series` rules, not a shipped detector."
+      description: "Recurring series are thin, rule-maintained entities — surrogate id/short_id, name, type. Membership comes from `assign_series` rules, not a shipped detector."
       responses:
         "200":
           description: Recurring series.
@@ -2025,45 +2025,7 @@ paths:
     delete:
       tags: [Series]
       summary: Unlink a transaction from a recurring series
-      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`) and strips the series' inherited tags from it (a user-added tag survives). Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
-      responses:
-        "200":
-          description: Updated series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/tags:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Attach a tag to a recurring series
-      description: "**Requires `full_access` scope.** Attaches an existing tag to the series and materializes it onto the series' linked transactions (they inherit the tag). Returns the updated series."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [tag_slug]
-              properties:
-                tag_slug: { type: string }
-      responses:
-        "200":
-          description: Updated series (includes its tags).
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/tags/{slug}:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-      - { name: slug, in: path, required: true, schema: { type: string } }
-    delete:
-      tags: [Series]
-      summary: Detach a tag from a recurring series
-      description: "**Requires `full_access` scope.** Detaches the tag and strips the series-inherited copies from its members (provenance-scoped, so user-added tags survive)."
+      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`). Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
       responses:
         "200":
           description: Updated series.
@@ -3452,13 +3414,12 @@ components:
         color: { type: string }
     RecurringSeries:
       type: object
-      description: "A thin, rule-maintained recurring series (subscription/bill/loan). Surrogate identity + name + type + tags; membership comes from `assign_series` rules, not a shipped detector."
+      description: "A thin, rule-maintained recurring series (subscription/bill/loan). Surrogate identity + name + type; membership comes from `assign_series` rules, not a shipped detector."
       properties:
         id: { type: string }
         short_id: { type: string }
         name: { type: string }
         type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`." }
-        tags: { type: array, items: { type: string } }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
       additionalProperties: true
