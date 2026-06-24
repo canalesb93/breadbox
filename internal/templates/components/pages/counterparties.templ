@@ -89,18 +89,22 @@ templ counterpartiesListRow(c CounterpartyRow) {
 
 // CounterpartyDetail renders /counterparties/{short_id} under the
 // rules-as-substrate model: a counterparty IS the rules that define it. The page
-// pairs the LINKED CHARGES (what's bound to it) with the GOVERNING RULES (the
-// assign_counterparty rules that put them there), and adds a manual ENRICHMENT
-// form (name, category, mcc, website, logo). Enrichment is a plain POST →
-// UpdateCounterparty; no auto-fetch.
+// reads as a calm brand profile — the header carries the identity (logo, name,
+// category chip, website · MCC · charge-count facts), and the body pairs the
+// LINKED CHARGES (what's bound to it) with the GOVERNING RULES (the
+// assign_counterparty rules that put them there). Enrichment (name, category,
+// mcc, website, logo) edits in a right-side Drawer opened from the header — the
+// detail-page sibling of the series edit drawer (design-system principle #5).
 templ CounterpartyDetail(p CounterpartyDetailProps) {
-	<div data-counterparty-id={ p.Counterparty.ShortID }>
+	<div data-counterparty-id={ p.Counterparty.ShortID } x-data>
 		@components.EntityHeader(components.EntityHeaderProps{
 			Title:            p.Counterparty.Name,
 			TitlePrivateKind: "merchant",
 			IconComponent:    counterpartyHeaderIcon(p.Counterparty),
 			IconTone:         components.IconToneDefault,
+			Badges:           counterpartyDetailBadges(p),
 			Meta:             counterpartyDetailMeta(p),
+			Action:           counterpartyEditBtn(),
 		})
 		<!-- Linked charges (what's bound) + Governing rules (what defines it) -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
@@ -129,45 +133,80 @@ templ CounterpartyDetail(p CounterpartyDetailProps) {
 				})
 			</div>
 		</div>
-		<!-- Enrichment — manual edit lane (no auto-fetch) -->
-		<div class="mt-5 max-w-3xl">
-			@entityPanelHeader("sparkles", "Enrichment", "Name, category, and brand details", nil)
-			<form method="POST" action={ templ.SafeURL("/counterparties/" + p.Counterparty.ShortID) }>
-				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				@components.SettingsSection(components.SettingsSectionProps{
-					Icon:  "store",
-					Title: "Details",
-				}) {
-					@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "Display label for this counterparty"}) {
-						<input type="text" name="name" value={ p.Counterparty.Name } required class="input input-sm w-full sm:w-80" aria-label="Name"/>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Category", Caption: "Default category for its charges"}) {
-						<select name="category_id" class="select select-sm w-auto max-w-full" aria-label="Category">
-							<option value="" selected?={ p.CategoryID == "" }>— None —</option>
-							for _, opt := range p.CategoryOptions {
-								<option value={ opt.Value } selected?={ opt.Selected }>{ opt.Label }</option>
-							}
-						</select>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "MCC", Caption: "Merchant category code (4 digits)"}) {
-						<input type="text" name="mcc" value={ p.MCC } inputmode="numeric" maxlength="4" placeholder="e.g. 5411" class="input input-sm w-32" aria-label="MCC"/>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Website", Caption: "Its domain auto-fetches a brand logo via logo.dev when counterparty logos are enabled and a logo.dev token is set in Settings", Stack: true}) {
-						<input type="url" name="website_url" value={ p.WebsiteURL } placeholder="https://example.com" class="input input-sm w-full" aria-label="Website URL"/>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Logo URL", Caption: "Overrides the auto-fetched logo. Hotlinked on counterparty rows.", Stack: true}) {
-						<input type="url" name="logo_url" value={ p.LogoURL } placeholder="https://logo.example.com/acme.png" class="input input-sm w-full" aria-label="Logo URL"/>
-					}
-				}
-				<div class="bb-action-row">
-					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-						@components.LucideIcon("check", "w-4 h-4")
-						Save enrichment
-					</button>
-				</div>
-			</form>
-		</div>
+		@counterpartyEditDrawer(p)
 	</div>
+}
+
+// counterpartyDetailBadges is the EntityHeader badge row — a quiet category chip
+// when the counterparty has a default category set. Neutral metadata, so a ghost
+// badge (vivid tones are reserved for status per the design system).
+templ counterpartyDetailBadges(p CounterpartyDetailProps) {
+	if cat := counterpartyCategoryLabel(p); cat != "" {
+		<span class="badge badge-ghost badge-sm">{ cat }</span>
+	}
+}
+
+// counterpartyEditBtn is the EntityHeader trailing action — a single Edit
+// affordance that opens the enrichment drawer (matches the series detail).
+templ counterpartyEditBtn() {
+	<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="$store.drawers.open('counterparty-edit')">
+		@components.LucideIcon("pencil", "w-4 h-4")
+		Edit
+	</button>
+}
+
+// counterpartyEditDrawer is the right-side slide-over for enrichment — name,
+// category, mcc, website, logo — committed with one explicit Save. Plain POST →
+// UpdateCounterparty (no Alpine factory); the Drawer shell handles open/close via
+// $store.drawers. Single-column stacked fields (the drawer is narrow).
+templ counterpartyEditDrawer(p CounterpartyDetailProps) {
+	@components.Drawer(components.DrawerProps{ID: "counterparty-edit", Title: "Edit counterparty"}) {
+		<form method="POST" action={ templ.SafeURL("/counterparties/" + p.Counterparty.ShortID) } class="flex flex-col h-full">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			@components.DrawerHeader(components.DrawerHeaderProps{Icon: "store", Title: "Edit counterparty", Subtitle: "Name, category, and brand details"})
+			<div class="flex-1 overflow-y-auto p-5 space-y-4">
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-name">
+						Name <span class="text-error">*</span>
+					</label>
+					<input type="text" id="cp-name" name="name" value={ p.Counterparty.Name } required class="bb-form-input" aria-label="Name"/>
+					<p class="text-xs text-base-content/40 mt-1.5">Display label for this counterparty.</p>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-category">Category</label>
+					<select id="cp-category" name="category_id" class="bb-form-select" aria-label="Category">
+						<option value="" selected?={ p.CategoryID == "" }>— None —</option>
+						for _, opt := range p.CategoryOptions {
+							<option value={ opt.Value } selected?={ opt.Selected }>{ opt.Label }</option>
+						}
+					</select>
+					<p class="text-xs text-base-content/40 mt-1.5">Default category for its charges.</p>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-mcc">MCC</label>
+					<input type="text" id="cp-mcc" name="mcc" value={ p.MCC } inputmode="numeric" maxlength="4" placeholder="e.g. 5411" class="bb-form-input" aria-label="MCC"/>
+					<p class="text-xs text-base-content/40 mt-1.5">Merchant category code (4 digits).</p>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-website">Website</label>
+					<input type="url" id="cp-website" name="website_url" value={ p.WebsiteURL } placeholder="https://example.com" class="bb-form-input" aria-label="Website URL"/>
+					<p class="text-xs text-base-content/40 mt-1.5">Its domain auto-fetches a brand logo via logo.dev when counterparty logos are enabled and a token is set in Settings.</p>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-logo">Logo URL</label>
+					<input type="url" id="cp-logo" name="logo_url" value={ p.LogoURL } placeholder="https://logo.example.com/acme.png" class="bb-form-input" aria-label="Logo URL"/>
+					<p class="text-xs text-base-content/40 mt-1.5">Overrides the auto-fetched logo. Hotlinked on counterparty rows.</p>
+				</div>
+			</div>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("check", "w-4 h-4")
+					Save
+				</button>
+			}
+		</form>
+	}
 }
 
 // CounterpartyForm renders /counterparties/new — a from-scratch create form. A
@@ -180,30 +219,33 @@ templ CounterpartyForm(p CounterpartyFormProps) {
 		Subtitle:             "Name a counterparty, then enrich it and author rules that assign charges to it. It starts empty.",
 		SubtitleHideOnMobile: true,
 	})
-	<form method="POST" action="/counterparties/new" class="max-w-2xl">
-		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-		if p.Error != "" {
-			<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
-				@components.LucideIcon("alert-triangle", "w-4 h-4")
-				<span>{ p.Error }</span>
+	<div class="max-w-lg">
+		<form method="POST" action="/counterparties/new" class="bb-card p-0 overflow-hidden">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<div class="p-5 sm:p-6">
+				if p.Error != "" {
+					<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
+						@components.LucideIcon("alert-triangle", "w-4 h-4")
+						<span>{ p.Error }</span>
+					</div>
+				}
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-new-name">
+						Name <span class="text-error">*</span>
+					</label>
+					<input type="text" id="cp-new-name" name="name" value={ p.Name } required placeholder="e.g. Amazon" class="bb-form-input" aria-label="Name"/>
+					<p class="text-xs text-base-content/40 mt-1.5">What you call this counterparty. Enrich it (category, logo, website) after creating.</p>
+				</div>
 			</div>
-		}
-		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:  "store",
-			Title: "Details",
-		}) {
-			@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "What you call this counterparty"}) {
-				<input type="text" name="name" value={ p.Name } required placeholder="e.g. Amazon" class="input input-sm w-full sm:w-80" aria-label="Name"/>
-			}
-		}
-		<div class="bb-action-row">
-			<a href="/counterparties" class="btn btn-ghost btn-sm">Cancel</a>
-			<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-				@components.LucideIcon("plus", "w-4 h-4")
-				Create counterparty
-			</button>
-		</div>
-	</form>
+			<div class="bb-action-row">
+				<a href="/counterparties" class="btn btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("plus", "w-4 h-4")
+					Create counterparty
+				</button>
+			</div>
+		</form>
+	</div>
 }
 
 // counterpartyHeaderIcon renders the EntityHeader leading tile content — the same
@@ -220,7 +262,27 @@ templ counterpartyHeaderIcon(c CounterpartyRow) {
 	})
 }
 
-// counterpartyDetailMeta is the quiet sub-title line — the linked-charge count.
+// counterpartyDetailMeta is the quiet bullet-separated facts line under the
+// title — website (linked) · MCC · linked-charge count. Each fact only renders
+// when set; the charge count always anchors the end so the bullet logic stays
+// trivial (a bullet trails each optional fact, never the last).
 templ counterpartyDetailMeta(p CounterpartyDetailProps) {
-	<span class="text-sm text-base-content/55">{ counterpartyMemberCount(len(p.MemberRows)) }</span>
+	if p.WebsiteURL != "" {
+		<a
+			href={ templ.SafeURL(p.WebsiteURL) }
+			target="_blank"
+			rel="noopener"
+			class="link link-hover inline-flex items-center gap-0.5"
+			@click.stop
+		>
+			{ counterpartyWebsiteHost(p.WebsiteURL) }
+			@components.LucideIcon("external-link", "w-3 h-3")
+		</a>
+		<span class="text-base-content/20">·</span>
+	}
+	if p.MCC != "" {
+		<span>MCC { p.MCC }</span>
+		<span class="text-base-content/20">·</span>
+	}
+	<span>{ counterpartyMemberCount(len(p.MemberRows)) }</span>
 }
