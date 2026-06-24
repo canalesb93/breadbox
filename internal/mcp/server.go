@@ -380,43 +380,23 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleListWorkflows, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "list_series", Title: "List Recurring Series", Classification: ToolRead,
-			Description: "List detected recurring series (subscriptions, bills, loans). Optional status filter (active|candidate|paused|cancelled). Lean by default: each row carries identity + renewal prediction (cadence, expected_amount + iso_currency_code — never sum across currencies, next_expected_date, occurrence_count, confidence), but NOT the verbose detection_signals evidence. Read status=candidate to find series awaiting a confirm/reject verdict; pass fields=all (or use get_series for one series) to see detection_signals — interval_cv, amount_branch, merchant_key_is_fallback — before deciding.",
+			Description: "List recurring series (subscriptions, bills, loans) — thin, rule-maintained entities: each is a surrogate identity (id/short_id), a name, and a type, plus its tags. Membership comes from assign_series rules, not a shipped detector. Lean by default (name, type, tags); pass fields=all for timestamps too. Use get_series for one series, query_transactions(series_id=...) for its charges.",
 		}, s.handleListSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "get_series", Title: "Get Recurring Series", Classification: ToolRead,
-			Description: "Get one recurring series by short ID or UUID, including its full detection_signals. Use before reviewing a candidate to inspect the evidence (occurrence_count, interval_cv, cadence_snap_error, amount_branch, monotonic drift).",
+			Description: "Get one recurring series by short ID or UUID: its name, type, and tags. A series' linked charges come from query_transactions(series_id=...); its governing rules (the assign_series rules that define its membership) are visible on the admin Recurring detail page.",
 		}, s.handleGetSeries, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "explain_series_candidates", Title: "Explain Near-Miss Series", Classification: ToolRead,
-			Description: "Answer \"why isn't <merchant> a subscription?\". Reports every recurring-looking merchant group that is NOT already a series, with the detector's verdict: qualifies=true (eligible but not tracked yet — confirm it with assign_series) or a specific reason it fell short (too_few_occurrences, irregular_cadence, interval_too_variable, amount_unstable, same_day_duplicates). Each row carries a human explanation plus the numbers (occurrence_count, nearest_cadence, median_gap_days, interval_cv, amount min/max). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this is how you surface what it skipped.",
-		}, s.handleExplainSeriesCandidates, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "review_series", Title: "Review Recurring Series", Classification: ToolWrite,
-			Description: "Apply a verdict to a recurring series: confirm (it is recurring → active), reject (NOT recurring → sticky, never re-proposed at that amount band), pause, or cancel. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates the candidates surfaced by list_series(status=candidate).",
-		}, s.handleReviewSeries, s),
-		makeToolDefLogged(ToolSpec{
 			Name: "assign_series", Title: "Assign / Create Recurring Series", Classification: ToolWrite,
-			Description: "Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide series_id to assign to an existing series, OR merchant_key + create_if_missing:true to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass transaction_ids (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). confirm:true flips it straight to active; omit to leave a reviewable candidate. Use after list_series(status=candidate) shows nothing for a recurring charge the user says exists.",
+			Description: "Link transactions to a recurring series, creating it if needed — the agent's path for a one-off assignment (encode a durable pattern as an assign_series RULE instead when you want future charges to resolve automatically). Provide series_id to assign to an existing series, OR series_name + create_if_missing:true to mint/resolve one by name (surrogate-first: the same name always resolves the same series). Optional type (subscription|bill|loan|other) for a minted series. Pass transaction_ids (≤50) to back-link members (NULL-fill only — never steals a charge already in another series).",
 		}, s.handleAssignSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_series", Title: "Edit Recurring Series", Classification: ToolWrite,
-			Description: "Edit a recurring series' user-owned attributes: name, expected_amount (+ currency, amount_tolerance), cadence, expected_day, category_id, user_id (owner). Every field is optional — omit to leave unchanged. This is a deliberate override, not a detection proposal: it bypasses the precedence ladder and protects the edited values from being reverted by the next sync's re-detect. Editing cadence re-derives next_expected_date. Changing currency or owner is collision-guarded (they're part of the dedup signature). Use review_series for confirm/pause/cancel, set_series_type for the type axis, and rekey_series for the merchant_key — those have their own semantics and are NOT editable here.",
+			Description: "Edit a recurring series' name and/or type (subscription, bill, loan, other). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).",
 		}, s.handleUpdateSeries, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "set_series_type", Title: "Set Recurring Type", Classification: ToolWrite,
-			Description: "Set a recurring series' type: subscription (streaming/SaaS/memberships), bill (rent/utilities/insurance/telecom), loan (mortgage/auto/student/personal), or other. Detection infers the type from the charges' category on first detection; use this to correct it. The override is sticky — re-detection won't change it back.",
-		}, s.handleSetSeriesType, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "rekey_series", Title: "Re-key Recurring Series", Classification: ToolWrite,
-			Description: "Correct a series' merchant_key when detection grouped it under a wrong or fallback key (e.g. 'payment' → 'spotify'). Repoints the series and its linked transactions to the new key. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects historical grouping — future charges still key off the provider name.",
-		}, s.handleRekeySeries, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "split_series", Title: "Split Recurring Series", Classification: ToolWrite,
-			Description: "Break an over-grouped series into two: move the given transaction_ids (≤50, each a current member of the source series) into a brand-new series under new_merchant_key. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency/user/category; rollups recompute on both. Errors if new_merchant_key equals the source key or already has a series.",
-		}, s.handleSplitSeries, s),
-		makeToolDefLogged(ToolSpec{
 			Name: "unlink_series_transactions", Title: "Unlink Charges from Series", Classification: ToolWrite,
-			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id, strips the series' inherited tags from them (a tag the user added directly survives), and recomputes the series' rollups + next expected date. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series. Use to remove a charge the detector wrongly swept in; use split_series instead when the stray charges form their own series.",
+			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.",
 		}, s.handleUnlinkSeriesTransactions, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "add_series_tag", Title: "Tag Recurring Series", Classification: ToolWrite,
@@ -426,6 +406,32 @@ func (s *MCPServer) buildToolRegistry() {
 			Name: "remove_series_tag", Title: "Untag Recurring Series", Classification: ToolWrite,
 			Description: "Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.",
 		}, s.handleRemoveSeriesTag, s),
+
+		// --- Counterparties (rules-as-substrate, P4) ---
+		makeToolDefLogged(ToolSpec{
+			Name: "list_counterparties", Title: "List Counterparties", Classification: ToolRead,
+			Description: "List counterparties — the canonical, cross-provider 'other side' of a charge (merchants AND non-merchants: Venmo, people, employers). Each is a surrogate identity (id/short_id) with a name and optional enrichment (website_url, logo_url, category, mcc). Membership comes from assign_counterparty rules, not a normalizer. Use get_counterparty for one, query_transactions for its charges.",
+		}, s.handleListCounterparties, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "get_counterparty", Title: "Get Counterparty", Classification: ToolRead,
+			Description: "Get one counterparty by short ID or UUID: its name and enrichment fields. Its governing rules (the assign_counterparty rules that define its membership) are on the admin Counterparties detail page; its linked charges come from query_transactions.",
+		}, s.handleGetCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "create_counterparty", Title: "Create Counterparty", Classification: ToolWrite,
+			Description: "Create a new counterparty with a name and optional enrichment (website_url, logo_url, category_id, mcc). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use assign_counterparty (one-off) or author an assign_counterparty RULE (durable).",
+		}, s.handleCreateCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "update_counterparty", Title: "Enrich Counterparty", Classification: ToolWrite,
+			Description: "Enrich a counterparty: edit its name, website_url, logo_url, category_id (slug or short ID), and/or mcc. Every field optional — omit to leave unchanged; an empty name is rejected. This is the enrichment lane (no auto-fetch).",
+		}, s.handleUpdateCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "assign_counterparty", Title: "Assign Counterparty", Classification: ToolWrite,
+			Description: "Bind transactions to a counterparty, creating it if needed. This is a ONE-OFF assignment. For durable patterns, author an assign_counterparty RULE instead so every future matching charge resolves automatically. Provide counterparty_id to bind to an existing counterparty, OR name + create_if_missing:true to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass transaction_ids (≤50) to link members (NULL-fill only — never steals a charge already bound to another counterparty).",
+		}, s.handleAssignCounterparty, s),
+		makeToolDefLogged(ToolSpec{
+			Name: "unlink_counterparty_transaction", Title: "Unlink Charge from Counterparty", Classification: ToolWrite,
+			Description: "Detach transactions (≤50, each a current member) from a counterparty — the inverse of assign_counterparty's link path. Clears each charge's counterparty_id. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.",
+		}, s.handleUnlinkCounterpartyTransaction, s),
 
 		// --- Query + aggregate ---
 		makeToolDefLogged(ToolSpec{
@@ -450,7 +456,7 @@ func (s *MCPServer) buildToolRegistry() {
 		// the row settles in the same place), so hosts can retry safely.
 		makeToolDefLogged(ToolSpec{
 			Name: "update_transactions", Title: "Update Transactions", Classification: ToolWrite,
-			Description: "Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The canonical tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Category writes follow precedence user > agent > rule: an agent op that targets a user-locked row comes back with status 'skipped' (its category is left alone; any tags/comment in that op still apply). The response summary carries succeeded / skipped / failed counts.",
+			Description: "Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The canonical tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Category writes are last-writer-wins (no provenance/locks). The response summary carries succeeded / failed counts.",
 			Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: boolPtr(false), IdempotentHint: true},
 		}, s.handleUpdateTransactions, s),
 
@@ -522,7 +528,7 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleDeleteTransactionRule, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "apply_rules", Title: "Apply Rules Retroactively", Classification: ToolWrite,
-			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (skips rows where category_override <> 'none' — an agent or user already set it), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
+			Description: "Apply rules retroactively to existing transactions. Pass rule_id to run a single rule in isolation, or omit to run the full active-rule pipeline in priority-ASC order (same chaining semantics as sync). Materializes set_category (writes category_id directly — last-writer-wins, no override protection), add_tag, and remove_tag. add_comment is sync-only and won't fire here. Hit count increments per condition match, matching sync-time semantics. Use for initial setup or explicit back-fills only — routine syncs apply rules automatically.",
 			// Not idempotent — hit_count increments on every run.
 		}, s.handleApplyRules, s),
 		makeToolDefLogged(ToolSpec{
@@ -849,6 +855,15 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		MIMEType:    "application/json",
 		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
 	}, s.handleUserTemplate)
+
+	server.AddResourceTemplate(&mcpsdk.ResourceTemplate{
+		Name:        "Counterparty",
+		Title:       "Counterparty Detail",
+		URITemplate: "breadbox://counterparty/{short_id}",
+		Description: "Single counterparty (merchant or non-merchant) with its enrichment fields and the governing rules (assign_counterparty rules) that define its membership. short_id is the 8-char base62 id surfaced by list_counterparties.",
+		MIMEType:    "application/json",
+		Annotations: resourceAnnotations(audienceUserAndAssistant, 0.7, liveResourceModTime),
+	}, s.handleCounterpartyTemplate)
 }
 
 // AllToolDefs returns the full tool registry for admin display.

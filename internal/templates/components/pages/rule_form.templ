@@ -175,15 +175,15 @@ templ RuleForm(p RuleFormProps) {
 								<select x-model="cond.field" @change="onFieldChange(idx)" class="select select-xs bg-base-100 flex-1 min-w-0">
 									<option value="">Field...</option>
 									<optgroup label="Transaction">
-										<option value="name">Name</option>
-										<option value="merchant_name">Merchant</option>
+										<option value="provider_name">Name</option>
+										<option value="provider_merchant_name">Merchant</option>
 										<option value="amount">Amount</option>
 										<option value="pending">Pending</option>
 									</optgroup>
 									<optgroup label="Category">
 										<option value="category">Category (assigned)</option>
-										<option value="category_primary">Category (raw primary)</option>
-										<option value="category_detailed">Category (raw detail)</option>
+										<option value="provider_category_primary">Category (raw primary)</option>
+										<option value="provider_category_detailed">Category (raw detail)</option>
 									</optgroup>
 									<optgroup label="Tags">
 										<option value="tags">Tag</option>
@@ -192,6 +192,12 @@ templ RuleForm(p RuleFormProps) {
 										<option value="account_name">Account name</option>
 										<option value="user_name">Family member</option>
 										<option value="provider">Provider</option>
+									</optgroup>
+									<optgroup label="Date (from posting date)">
+										<option value="day_of_month">Day of month (1-31)</option>
+										<option value="month">Month (1-12)</option>
+										<option value="day_of_week">Day of week (0=Sun)</option>
+										<option value="day_of_year">Day of year (1-366)</option>
 									</optgroup>
 									<optgroup label="Metadata">
 										<option value="metadata">Metadata field</option>
@@ -224,6 +230,8 @@ templ RuleForm(p RuleFormProps) {
 									<option value="lte" x-show="cond.field && fieldType(cond.field) === 'numeric'">≤</option>
 									<option value="gt" x-show="cond.field && fieldType(cond.field) === 'numeric'">&gt;</option>
 									<option value="lt" x-show="cond.field && fieldType(cond.field) === 'numeric'">&lt;</option>
+									<option value="approx" x-show="cond.field && fieldType(cond.field) === 'numeric'">≈ ±</option>
+									<option value="between" x-show="cond.field && fieldType(cond.field) === 'numeric'">between</option>
 								</select>
 								<!-- Metadata operator — own select (the inline-option select above
 								     can't cleanly host the exists/not_exists presence ops). -->
@@ -247,7 +255,14 @@ templ RuleForm(p RuleFormProps) {
 									<option value="true">true</option>
 									<option value="false">false</option>
 								</select>
-								<input type="number" x-model="cond.value" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-xs bg-base-100 w-24 shrink-0" placeholder="0.00"/>
+								<input type="number" x-model="cond.value" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op !== 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-24 shrink-0" placeholder="0.00"/>
+								<!-- approx ± tolerance window -->
+								<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" class="text-xs opacity-60 shrink-0">±</span>
+								<input type="number" x-model="cond.tolerance" step="0.01" min="0" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'approx'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="tol"/>
+								<!-- between min/max bounds (inclusive) -->
+								<input type="number" x-model="cond.min" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="min"/>
+								<span x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" class="text-xs opacity-60 shrink-0">–</span>
+								<input type="number" x-model="cond.max" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric' && cond.op === 'between'" @input="syncToJson()" class="input input-xs bg-base-100 w-20 shrink-0" placeholder="max"/>
 								<!-- Category (assigned) with eq/neq — show the same category
 								     picker we use in actions instead of a free-text slug input.
 								     For contains/matches/in we fall back to text so power users
@@ -313,8 +328,12 @@ templ RuleForm(p RuleFormProps) {
 									<option value="tag" :disabled="action.field !== 'tag'        && isActionUsed('tag')">Add tag</option>
 									<option value="tag_remove" :disabled="action.field !== 'tag_remove' && isActionUsed('tag_remove')">Remove tag</option>
 									<option value="comment" :disabled="action.field !== 'comment'    && isActionUsed('comment')">Add comment</option>
+									<option value="series" :disabled="action.field !== 'series'       && isActionUsed('series')">Assign to series</option>
+									<option value="counterparty" :disabled="action.field !== 'counterparty' && isActionUsed('counterparty')">Assign to counterparty</option>
 									<option value="metadata_set">Set metadata</option>
 									<option value="metadata_remove">Remove metadata</option>
+									<option value="flag" :disabled="action.field !== 'flag' && isActionUsed('flag')">Flag for attention</option>
+									<option value="unflag" :disabled="action.field !== 'unflag' && isActionUsed('unflag')">Clear flag</option>
 								</select>
 								<!-- Remove — pinned to the right of the Action select on mobile,
 								     moves to the far right of the row on sm+. Rendered here (not at
@@ -364,6 +383,42 @@ templ RuleForm(p RuleFormProps) {
 										<p class="text-[0.65rem] text-base-content/40 mt-1">Plain text. The comment is attributed to this rule.</p>
 									</div>
 								</template>
+								<!-- Value: assign to series. Two mutually-exclusive modes —
+								     pick an existing series (value = short_id) OR create a new one
+								     by name (createName → series_name + create_if_missing). Filling
+								     one disables the other so exactly one identifier is sent. -->
+								<template x-if="action.field === 'series'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
+										<div class="flex flex-wrap items-center gap-2">
+											<select x-model="action.value" :disabled="!!(action.createName && action.createName.trim())" class="select select-xs bg-base-100 w-full sm:flex-1 sm:min-w-0 mt-px disabled:opacity-40">
+												<option value="">Select series…</option>
+												for _, sr := range p.Series {
+													<option value={ sr.ShortID }>{ sr.Name }</option>
+												}
+											</select>
+											<span class="text-[0.65rem] text-base-content/40 shrink-0">or</span>
+											<input type="text" x-model="action.createName" :disabled="!!(action.value)" class="input input-xs bg-base-100 w-full sm:w-44 mt-px disabled:opacity-40" placeholder="create new named…"/>
+										</div>
+										<p class="text-[0.65rem] text-base-content/40 mt-1">Adds matching transactions to a recurring series. Pick an existing one, or name a new series to mint on first match.</p>
+									</div>
+								</template>
+								<!-- Value: assign to counterparty. Same existing-vs-create-by-name
+								     pattern as series above. -->
+								<template x-if="action.field === 'counterparty'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
+										<div class="flex flex-wrap items-center gap-2">
+											<select x-model="action.value" :disabled="!!(action.createName && action.createName.trim())" class="select select-xs bg-base-100 w-full sm:flex-1 sm:min-w-0 mt-px disabled:opacity-40">
+												<option value="">Select counterparty…</option>
+												for _, cp := range p.Counterparties {
+													<option value={ cp.ShortID }>{ cp.Name }</option>
+												}
+											</select>
+											<span class="text-[0.65rem] text-base-content/40 shrink-0">or</span>
+											<input type="text" x-model="action.createName" :disabled="!!(action.value)" class="input input-xs bg-base-100 w-full sm:w-44 mt-px disabled:opacity-40" placeholder="create new named…"/>
+										</div>
+										<p class="text-[0.65rem] text-base-content/40 mt-1">Binds matching transactions to a counterparty. Pick an existing one, or name a new counterparty to create on first match.</p>
+									</div>
+								</template>
 								<!-- Value: set metadata (key + typed value) -->
 								<template x-if="action.field === 'metadata_set'">
 									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
@@ -390,6 +445,19 @@ templ RuleForm(p RuleFormProps) {
 									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
 										<input type="text" x-model="action.key" class="input input-xs bg-base-100 w-full mt-px" placeholder="key to remove"/>
 										<p class="text-[0.65rem] text-base-content/40 mt-1">Deletes one metadata key from matching transactions.</p>
+									</div>
+								</template>
+								<!-- Value: flag / unflag take no parameters — just a hint. -->
+								<template x-if="action.field === 'flag'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none flex items-center gap-1.5 mt-px h-6">
+										@components.LucideIcon("flag", "w-3.5 h-3.5 text-warning shrink-0")
+										<p class="text-[0.65rem] text-base-content/40">Surfaces matching transactions for attention (sets the flag). Find them with the flagged filter.</p>
+									</div>
+								</template>
+								<template x-if="action.field === 'unflag'">
+									<div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none flex items-center gap-1.5 mt-px h-6">
+										@components.LucideIcon("flag-off", "w-3.5 h-3.5 text-base-content/40 shrink-0")
+										<p class="text-[0.65rem] text-base-content/40">Clears the flag on matching transactions.</p>
 									</div>
 								</template>
 							</div>

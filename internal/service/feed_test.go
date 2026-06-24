@@ -130,3 +130,73 @@ func typesOf(evs []FeedEvent) []string {
 	}
 	return out
 }
+
+// TestBulkSubjectKeyMembership verifies the bulk-action dedup key + slug for
+// series / counterparty membership annotations read their short_id out of the
+// untyped payload so same-series rows collapse into one subject (mirroring how
+// category_set keys on the category slug). Without these cases the subjects
+// never group and the bucket can't render a single-subject label.
+func TestBulkSubjectKeyMembership(t *testing.T) {
+	cases := []struct {
+		name    string
+		ann     Annotation
+		wantKey string
+		wantSlug string
+	}{
+		{
+			name: "series_assigned keys on series_id",
+			ann: Annotation{
+				Kind:    "series_assigned",
+				Subject: "Netflix",
+				Payload: map[string]interface{}{"series_id": "ser123ab", "series_name": "Netflix"},
+			},
+			wantKey:  "series:ser123ab",
+			wantSlug: "ser123ab",
+		},
+		{
+			name: "series_unlinked keys on series_id",
+			ann: Annotation{
+				Kind:    "series_unlinked",
+				Payload: map[string]interface{}{"series_id": "ser123ab"},
+			},
+			wantKey:  "series:ser123ab",
+			wantSlug: "ser123ab",
+		},
+		{
+			name: "counterparty_assigned keys on counterparty_id",
+			ann: Annotation{
+				Kind:    "counterparty_assigned",
+				Payload: map[string]interface{}{"counterparty_id": "cp9988xy"},
+			},
+			wantKey:  "counterparty:cp9988xy",
+			wantSlug: "cp9988xy",
+		},
+		{
+			name: "missing payload yields empty short_id, not a panic",
+			ann: Annotation{
+				Kind: "series_assigned",
+			},
+			wantKey:  "series:",
+			wantSlug: "",
+		},
+		{
+			name: "category_set still keys on the slug (regression guard)",
+			ann: Annotation{
+				Kind:         "category_set",
+				CategorySlug: "groceries",
+			},
+			wantKey:  "category:groceries",
+			wantSlug: "groceries",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := bulkSubjectKey(c.ann); got != c.wantKey {
+				t.Errorf("bulkSubjectKey = %q, want %q", got, c.wantKey)
+			}
+			if got := bulkSubjectSlug(c.ann); got != c.wantSlug {
+				t.Errorf("bulkSubjectSlug = %q, want %q", got, c.wantSlug)
+			}
+		})
+	}
+}

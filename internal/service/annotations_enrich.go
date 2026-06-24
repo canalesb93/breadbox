@@ -280,6 +280,16 @@ func enrichOne(a Annotation, tagDisplay, categoryDisplay func(string) string) An
 		}
 		a.Subject = seriesName
 		a.Summary = formatSeriesMembershipSummary(a.ActorName, a.Action, seriesName)
+
+	case "counterparty_assigned", "counterparty_unlinked":
+		cpName, _ := a.Payload["counterparty_name"].(string)
+		if a.Kind == "counterparty_assigned" {
+			a.Action = "set"
+		} else {
+			a.Action = "removed"
+		}
+		a.Subject = cpName
+		a.Summary = formatCounterpartyMembershipSummary(a.ActorName, a.Action, cpName)
 	}
 
 	return a
@@ -301,6 +311,29 @@ func formatSeriesMembershipSummary(actor, action, seriesName string) string {
 		return capVerb + " " + prep + " " + seriesName
 	}
 	return actor + " " + verb + " this " + prep + " " + seriesName
+}
+
+// formatCounterpartyMembershipSummary renders the timeline sentence for a
+// counterparty_assigned / counterparty_unlinked row, e.g.
+// "Alice set the counterparty to Netflix" / "Counterparty set to Netflix"
+// (system) and "Alice removed the counterparty" / "Counterparty removed".
+// Mirrors formatSeriesMembershipSummary — counterparty events read the same
+// as series events, just pointing at a counterparty instead of a series.
+func formatCounterpartyMembershipSummary(actor, action, cpName string) string {
+	if action == "removed" {
+		if actor == "" {
+			return "Counterparty removed"
+		}
+		return actor + " removed the counterparty"
+	}
+	if cpName == "" {
+		cpName = "a counterparty"
+	}
+	if actor == "" {
+		// System-attributed (rule / detection): no actor name.
+		return "Counterparty set to " + cpName
+	}
+	return actor + " set the counterparty to " + cpName
 }
 
 // formatDeletedCommentSummary renders the tombstone sentence shown in place

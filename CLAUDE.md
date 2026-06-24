@@ -2,6 +2,19 @@
 
 Self-hosted financial data aggregation for households. Syncs bank data via Plaid, Teller, and CSV; stores it in PostgreSQL; exposes it to AI agents via MCP and REST API.
 
+## Operating Model — the reconciliation flywheel (READ FIRST for any data/identity/enrichment design)
+
+> **Holy rule:** *Provider data is immutable; breadbox intelligence accrues as rules, which improve the enrichment layer on every sync.*
+
+Multiple sources (Plaid, Teller, SimpleFIN, CSV, …) describe the same entities differently. Any design that *identifies*, *standardizes*, or *enriches* synced data follows this — uniformly across counterparties, series, categories, attribution, future dimensions:
+
+1. **Identity is a stable surrogate** (`id`/`short_id`), never a derived/normalized string. The same counterparty keys differently per source (`STARBUCKS #123` vs `SQ *STARBUCKS`); never let one derived key `UNIQUE`-own an identity.
+2. **Rules are the only deterministic layer — authored, not shipped.** No built-in/system resolution tier, no shipped detectors or normalizers. Rules match **raw immutable provider fields** (`provider_name`, …) plus values stably derived from immutable ones (`amount`, `day_of_month`), so they're transparent, per-user, and drift-proof across upgrades.
+3. **Agents are the intelligence; rules are how it persists.** An agent reviews transactions against guidelines and either does a one-off edit (exceptions) or — the compounding path — authors a rule on raw fields so the next sync resolves it automatically. Both are first-class; the workflow decides which. Accepted cost: no identity without intelligence — a fresh install resolves nothing until an agent/rule runs; agent-less users keep the raw provider string as display fallback.
+4. **No shipped resolution.** Detection is the agent's job — it analyzes patterns, then encodes findings as rule conditions (e.g. `amount ≈ X ± Y AND day_of_month ≈ D ± N → assign_series`). Membership/identity is the rule's. (Precedence between user/agent/rule writes is deferred — annotations are an audit log only; no logic keys off them for now.)
+
+Full design + rollout: Obsidian `planned-features/rules-as-universal-substrate.md` + `rules-substrate-implementation-roadmap.md`.
+
 ## Stack
 
 Go 1.24+ single binary. PostgreSQL, chi/v5, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: `html/template` + DaisyUI 5 + Tailwind v4 + Alpine.js v3 (CDN, no Node). MCP: `github.com/modelcontextprotocol/go-sdk` v1.4.0 (Streamable HTTP at `/mcp`, stdio via `breadbox mcp-stdio`).
@@ -44,7 +57,7 @@ These bite in every session regardless of what you're touching.
 - **Soft deletes**: transactions use `deleted_at`; connections set `status='disconnected'`. FK policy: accounts/transactions `SET NULL` on connection delete (preserve history); `sync_logs` `CASCADE`.
 - **Encryption**: access tokens and Teller PEM files are AES-256-GCM encrypted at rest. `ENCRYPTION_KEY` (64-char hex) required at startup if any provider is configured — fail fast, not runtime.
 - **Attribution-aware filtering**: transaction queries use `COALESCE(t.attributed_user_id, bc.user_id)` for user filtering. Dependent-linked accounts excluded from totals via `a.is_dependent_linked = FALSE`.
-- **`category_override`** is a source enum (`none`/`agent`/`user`), not a boolean — it records who set the category, with precedence **user > agent > rule**. Rules write only `'none'` rows; agents write where `<> 'user'` (stamping `'agent'`); a `'user'` lock is sacred (nothing auto-overwrites it). See `docs/rule-dsl.md`.
+- **Category writes are last-writer-wins.** Provenance/precedence was removed in the rules-substrate sprint (P3) — there is no `category_override` column. Rules, agents, and users all write `category_id` directly; the sync engine only runs rules on `isNew||isChanged` transactions, so a manual edit on an unchanged row is not continuously re-clobbered (good-enough stickiness without a provenance column). Annotations remain the audit log; no logic keys off them. See `docs/rule-dsl.md` and `docs/transaction-columns.md`.
 - **Shared dev DB**: multiple worktrees/agents run against one `breadbox` database. Additive migrations only (`ADD COLUMN`, `CREATE TABLE`, `CREATE INDEX`). Destructive changes (`DROP`, `ALTER TYPE`) break other running servers — coordinate first.
 - **Error envelope**: JSON `{ "error": { "code": "UPPER_SNAKE_CASE", "message": "..." } }`.
 - **Config precedence**: env vars → `app_config` DB table → defaults. Tracked in `ConfigSources` for badge rendering.

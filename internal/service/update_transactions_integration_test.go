@@ -61,9 +61,6 @@ func TestUpdateTransactions_CompoundOp(t *testing.T) {
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "food_and_drink_groceries" {
 		t.Errorf("expected category food_and_drink_groceries, got %+v", got.Category)
 	}
-	if got.CategoryOverride == "none" {
-		t.Error("expected category_override=true after set_category")
-	}
 
 	// Verify tag state.
 	tags, err := svc.ListTransactionTags(ctx, txn.ShortID)
@@ -253,13 +250,10 @@ func TestUpdateTransactions_ResetCategory(t *testing.T) {
 		t.Fatalf("expected ok, got %+v", results)
 	}
 
-	// Verify the override flag is cleared and category is uncategorized.
+	// Verify the category is reset to uncategorized.
 	got, err := svc.GetTransaction(ctx, txn.ShortID)
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
-	}
-	if got.CategoryOverride != "none" {
-		t.Errorf("category_override = true, want false after reset")
 	}
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
 		t.Errorf("expected category=uncategorized after reset, got %+v", got.Category)
@@ -313,12 +307,13 @@ func TestUpdateTransactions_RejectsTooMany(t *testing.T) {
 }
 
 // TestUpdateTransactions_ResetCategoryNoOverride guards against the edge case
-// where reset_category fires on a transaction that never had a manual override.
-// The collapse of reset_transaction_category into update_transactions made this
-// path easy to silently break: the SQL `UPDATE … SET category_override=FALSE`
-// is idempotent (rows-affected stays 1 because the row exists), so we want to
-// confirm the handler still drops to uncategorized AND still emits the
-// category_set annotation rather than short-circuiting on the no-op flag flip.
+// where reset_category fires on a transaction that already sits at the default
+// (uncategorized) category. The collapse of reset_transaction_category into
+// update_transactions made this path easy to silently break: the reset
+// `UPDATE … SET category_id=<uncategorized>` is idempotent (rows-affected stays
+// 1 because the row exists), so we want to confirm the handler still drops to
+// uncategorized AND still emits the category_set annotation rather than
+// short-circuiting on the no-op.
 func TestUpdateTransactions_ResetCategoryNoOverride(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
@@ -328,13 +323,13 @@ func TestUpdateTransactions_ResetCategoryNoOverride(t *testing.T) {
 	testutil.MustCreateCategory(t, queries, "uncategorized", "Uncategorized")
 	actor := service.Actor{Type: "user", ID: "u1", Name: "Tester"}
 
-	// Pre-condition: brand-new transaction, no manual override, no category set.
+	// Pre-condition: brand-new transaction, no category set.
 	pre, err := svc.GetTransaction(ctx, txn.ShortID)
 	if err != nil {
 		t.Fatalf("GetTransaction pre: %v", err)
 	}
-	if pre.CategoryOverride != "none" {
-		t.Fatalf("seed precondition: expected category_override=false on fresh txn, got true")
+	if pre.Category != nil && pre.Category.Slug != nil && *pre.Category.Slug != "uncategorized" {
+		t.Fatalf("seed precondition: expected no category on fresh txn, got %+v", pre.Category)
 	}
 
 	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
@@ -355,13 +350,10 @@ func TestUpdateTransactions_ResetCategoryNoOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction post: %v", err)
 	}
-	if got.CategoryOverride != "none" {
-		t.Errorf("category_override=true after reset, want false")
-	}
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
 		t.Errorf("expected category=uncategorized after reset, got %+v", got.Category)
 	}
-	// Annotation must still be written even when the override was already false —
+	// Annotation must still be written even when the category was already uncategorized —
 	// the audit trail is what callers (and the timeline UI) rely on.
 	if n := testutil.MustCountAnnotations(t, queries, txn.ID, "category_set"); n != 1 {
 		t.Errorf("expected exactly 1 category_set annotation from the reset, got %d", n)
@@ -413,13 +405,10 @@ func TestUpdateTransactions_ResetCombinedWithTagAndComment(t *testing.T) {
 		t.Fatalf("expected per-op ok, got %+v", results)
 	}
 
-	// Final state: override cleared, dropped to uncategorized, new tag attached.
+	// Final state: dropped to uncategorized, new tag attached.
 	got, err := svc.GetTransaction(ctx, txn.ShortID)
 	if err != nil {
 		t.Fatalf("GetTransaction: %v", err)
-	}
-	if got.CategoryOverride != "none" {
-		t.Error("category_override=true after reset, want false")
 	}
 	if got.Category == nil || got.Category.Slug == nil || *got.Category.Slug != "uncategorized" {
 		t.Errorf("expected uncategorized after reset, got %+v", got.Category)
@@ -452,26 +441,24 @@ func TestUpdateTransactions_ResetCombinedWithTagAndComment(t *testing.T) {
 	}
 }
 
-// TestApplyRulesRespectsOverrideFromUpdateTransactions covers the cross-cutting
-// invariant that update_transactions' category_slug write sets
-// category_override=true, and that retroactive ApplyAllRulesRetroactively
-// honors that flag. Before the collapse, the categorize_transaction tool
-// was the canonical override-setter; folding it into update_transactions
-// made it easy to drop the override flag silently. This test would catch
-// that regression.
-func TestApplyRulesRespectsOverrideFromUpdateTransactions(t *testing.T) {
+// TestApplyRulesOverwritesPriorCategoryFromUpdateTransactions covers the P3
+// last-writer-wins model: provenance/locks were removed, so an explicit
+// retroactive ApplyAllRulesRetroactively now OVERWRITES whatever category a
+// prior update_transactions write set. (Pre-P3 this was a "sacred lock" test;
+// it has been inverted.)
+func TestApplyRulesOverwritesPriorCategoryFromUpdateTransactions(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
 
-	// Two categories: the user-pinned one and the one the rule would set.
-	pinnedCat := testutil.MustCreateCategory(t, queries, "personal_misc", "Personal")
-	testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+	// Two categories: a prior one and the one the rule would set.
+	testutil.MustCreateCategory(t, queries, "personal_misc", "Personal")
+	ruleCat := testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
 
-	// Transaction that would otherwise match a "Costco → groceries" rule.
+	// Transaction that matches a "Costco → groceries" rule.
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "extOverride", "Costco Wholesale", 5000, "2026-04-06")
 
-	// Pin via update_transactions (the canonical override-setter post-collapse).
+	// Seed a prior category via update_transactions.
 	if _, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
 		Operations: []service.UpdateTransactionsOp{{
 			TransactionID: txn.ShortID,
@@ -479,7 +466,7 @@ func TestApplyRulesRespectsOverrideFromUpdateTransactions(t *testing.T) {
 		}},
 		Actor: service.Actor{Type: "user", ID: "u1", Name: "Tester"},
 	}); err != nil {
-		t.Fatalf("seed override via update_transactions: %v", err)
+		t.Fatalf("seed prior category via update_transactions: %v", err)
 	}
 
 	// Create a competing rule that would set groceries.
@@ -497,7 +484,7 @@ func TestApplyRulesRespectsOverrideFromUpdateTransactions(t *testing.T) {
 		t.Fatalf("create rule: %v", err)
 	}
 
-	// Run the retroactive pipeline. The override must hold.
+	// Run the retroactive pipeline. Last-writer-wins: the rule's category wins.
 	if _, err := svc.ApplyAllRulesRetroactively(ctx); err != nil {
 		t.Fatalf("ApplyAllRulesRetroactively: %v", err)
 	}
@@ -507,8 +494,8 @@ func TestApplyRulesRespectsOverrideFromUpdateTransactions(t *testing.T) {
 		"SELECT category_id FROM transactions WHERE id = $1", txn.ID).Scan(&catID); err != nil {
 		t.Fatalf("query category_id: %v", err)
 	}
-	if catID != pinnedCat.ID {
-		t.Errorf("expected user-pinned category to survive apply_rules; got category_id=%v want %v",
-			catID, pinnedCat.ID)
+	if catID != ruleCat.ID {
+		t.Errorf("expected retroactive rule to overwrite prior category; got category_id=%v want %v",
+			catID, ruleCat.ID)
 	}
 }

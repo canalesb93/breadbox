@@ -422,6 +422,51 @@ func TestActionsSummary(t *testing.T) {
 			expected: "Add comment",
 		},
 		{
+			name:     "single remove_tag",
+			actions:  []RuleAction{{Type: "remove_tag", TagSlug: "needs-review"}},
+			expected: "Remove tag needs-review",
+		},
+		{
+			name:     "single assign_series",
+			actions:  []RuleAction{{Type: "assign_series", SeriesName: "Netflix"}},
+			expected: "Assign to series",
+		},
+		{
+			name:     "single assign_counterparty",
+			actions:  []RuleAction{{Type: "assign_counterparty", CounterpartyName: "Amazon"}},
+			expected: "Assign counterparty",
+		},
+		{
+			name:     "single flag",
+			actions:  []RuleAction{{Type: "flag"}},
+			expected: "Flag for attention",
+		},
+		{
+			name:     "single unflag",
+			actions:  []RuleAction{{Type: "unflag"}},
+			expected: "Clear flag",
+		},
+		{
+			name:     "single set_metadata with key",
+			actions:  []RuleAction{{Type: "set_metadata", MetadataKey: "tax_deductible", MetadataValue: true}},
+			expected: "Set metadata: tax_deductible",
+		},
+		{
+			name:     "single set_metadata without key",
+			actions:  []RuleAction{{Type: "set_metadata"}},
+			expected: "Set metadata",
+		},
+		{
+			name:     "single remove_metadata with key",
+			actions:  []RuleAction{{Type: "remove_metadata", MetadataKey: "tax_deductible"}},
+			expected: "Remove metadata: tax_deductible",
+		},
+		{
+			name:     "single remove_metadata without key",
+			actions:  []RuleAction{{Type: "remove_metadata"}},
+			expected: "Remove metadata",
+		},
+		{
 			name: "multiple actions returns count",
 			actions: []RuleAction{
 				{Type: "set_category", CategorySlug: "x"},

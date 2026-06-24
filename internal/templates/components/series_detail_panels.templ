@@ -1,227 +1,111 @@
 package components
 
-// Detection-forward detail components for a recurring series (/recurring/{id}).
-// These render a series as a DETECTION RULE + EVIDENCE rather than a settings
-// form: a plain-language detection summary with a match-window range viz, a
-// charge-evidence timeline, and a read-only fact strip. All presentation —
+import "strconv"
+
+// Detail components for a recurring series (/recurring/{id}) under the
+// rules-as-substrate model. A series is a THIN entity — a name + a type — whose
+// membership is defined entirely by the `assign_series` rules that target it.
+// The detail page therefore makes that relationship explicit: the linked
+// charges (what's in the series) sit beside the GOVERNING RULES (what put them
+// there). No detector, no cadence/amount/confidence panels. All presentation —
 // the handler assembles the values. Registered in the /design sandbox.
 
-// --- Detection panel -------------------------------------------------------
-
-// SeriesMatchWindowProps positions the markers on the amount axis. All Pct
-// fields are 0–100 strings (the handler computes them); the component just
-// places elements with inline left/width offsets.
-type SeriesMatchWindowProps struct {
-	RangeText    string // "$14.99 – $16.99" (the tolerance band)
-	AxisMinText  string // far-left axis label, e.g. "$13"
-	AxisMaxText  string // far-right axis label, e.g. "$18"
-	ExpectedText string // "$15.99 expected"
-	InWindowText string // "2 charges" (matched within the band)
-	BandLeftPct  string // left edge of the tolerance band
-	BandWidthPct string // width of the tolerance band
-	ExpectedPct  string // expected-amount marker position
-	HasPrior     bool
-	PriorPct     string
-	PriorText    string // "$13.99 · prior price"
+// GoverningRule is one rule whose `assign_series` action targets this series —
+// i.e. a rule that defines the series' membership. It's a flattened, pure-view
+// projection of service.TransactionRuleResponse so this component stays
+// decoupled from the service layer (the handler maps the response → this).
+type GoverningRule struct {
+	ShortID          string // → /rules/<short_id>
+	Name             string
+	ConditionSummary string // "merchant contains netflix" | "Matches all transactions"
+	ActionSummary    string // "Assign to series" (+ "2 actions" etc.)
+	Enabled          bool
+	HitCount         int
+	CreatedByType    string // user | agent | system
+	CreatedByName    string
 }
 
-// SeriesDetectionProps is the detection summary: a match-strength badge, a
-// plain-language sentence, and (when an amount is known) the match-window viz.
-type SeriesDetectionProps struct {
-	StrengthLabel string // "Strong match" | "Likely match" | "Weak match"
-	StrengthTone  string // success | warning | neutral
-	MerchantKey   string
-	HasAmount     bool
-	AmountText    string // "$15.99"
-	ToleranceText string // "$1.00"
-	CadencePhrase string // "about every month" | "on an irregular cadence"
-	DayPhrase     string // "around the 15th" (optional)
-	Window        *SeriesMatchWindowProps
+// GoverningRulesPanelProps configures the entity-neutral governing-rules panel.
+// The rule rows are identical across entities; only the empty-state copy differs,
+// so the caller supplies the entity noun and the rule action it's looking for.
+type GoverningRulesPanelProps struct {
+	// Rules are the rules whose action targets this entity — the durable
+	// definition of its membership.
+	Rules []GoverningRule
+	// EntityWord is the singular noun for the entity ("series",
+	// "counterparty") woven into the empty-state copy.
+	EntityWord string
+	// ActionCode is the rule-action enum the empty state names
+	// ("assign_series", "assign_counterparty").
+	ActionCode string
 }
 
-templ SeriesDetectionPanel(p SeriesDetectionProps) {
-	<div class="bb-card p-5 sm:p-6">
-		<div class="flex items-center justify-between gap-3 mb-4">
-			<div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/50">
-				@LucideIcon("target", "w-4 h-4 text-success")
-				Detection
+// GoverningRulesPanel lists the rules that define an entity's membership. Each
+// row names the rule, summarizes its match condition, links to the rule editor,
+// and notes whether it's live — making "these rules define what's in this
+// {entity}" legible at a glance. Entity-neutral: the empty-state copy is
+// parameterized via EntityWord/ActionCode so the series and counterparty detail
+// pages share one panel. The empty state explains the rule-substrate model so an
+// entity with no governing rules doesn't read as broken.
+templ GoverningRulesPanel(p GoverningRulesPanelProps) {
+	<div class="bb-card p-2 sm:p-3">
+		if len(p.Rules) == 0 {
+			<div class="px-3 py-6 text-center">
+				<div class="text-sm text-base-content/60">No rules assign charges to this { p.EntityWord } yet.</div>
+				<div class="text-xs text-base-content/40 mt-1">
+					Membership comes from rules with an <code class="font-mono bg-base-200 rounded px-1">{ p.ActionCode }</code> action.
+					Create one on the <a href="/rules" class="link link-hover text-primary">Rules</a> page to define what lands here.
+				</div>
 			</div>
-			<span class={ "badge badge-soft badge-sm gap-1", "badge-" + p.StrengthTone }>
-				@LucideIcon("check", "w-3.5 h-3.5")
-				{ p.StrengthLabel }
-			</span>
-		</div>
-		<p class="text-sm leading-relaxed text-base-content/70">
-			Matches charges from <code data-private="merchant" class="font-mono text-xs bg-base-200 text-base-content/80 rounded px-1.5 py-0.5">{ p.MerchantKey }</code>
-			if p.HasAmount {
-				near <span data-private="amount" class="font-medium text-base-content">{ p.AmountText }</span> <span data-private="amount" class="text-base-content/45">(±{ p.ToleranceText })</span>,
-			} else {
-				,
-			}
-			if p.DayPhrase != "" {
-				<span class="font-medium text-base-content">{ p.CadencePhrase }</span>
-				<span class="font-medium text-base-content">{ p.DayPhrase }.</span>
-			} else {
-				<span class="font-medium text-base-content">{ p.CadencePhrase }.</span>
-			}
-		</p>
-		if p.Window != nil {
-			<div class="mt-6">
-				@SeriesMatchWindow(*p.Window)
-			</div>
+		} else {
+			<ul class="divide-y divide-base-200">
+				for _, rule := range p.Rules {
+					@governingRuleRow(rule)
+				}
+			</ul>
 		}
 	</div>
 }
 
-templ SeriesMatchWindow(p SeriesMatchWindowProps) {
-	<div class="rounded-xl bg-base-200/50 border border-base-300/60 px-4 sm:px-6 pt-4 pb-3">
-		<div class="flex items-center justify-between text-xs mb-2">
-			<span class="font-medium text-base-content/60">Match window</span>
-			<span data-private="amount" class="text-base-content/45 tabular-nums">{ p.RangeText }</span>
-		</div>
-		<!-- Rail with room above (expected label) and below (prior / in-window). -->
-		<div class="relative mx-1 pt-7 pb-9">
-			<div class="relative h-1.5">
-				<!-- base track -->
-				<div class="absolute inset-0 rounded-full bg-base-300"></div>
-				<!-- tolerance band -->
-				<div class="absolute top-0 bottom-0 rounded-full bg-success/55" style={ "left:" + p.BandLeftPct + "%; width:" + p.BandWidthPct + "%" }></div>
-				<!-- prior-price marker (hollow) -->
-				if p.HasPrior {
-					<div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-base-100 border-2 border-base-content/30 z-10" style={ "left:" + p.PriorPct + "%" }></div>
-					<div data-private="amount" class="absolute top-6 -translate-x-1/2 text-[0.7rem] text-base-content/45 whitespace-nowrap" style={ "left:" + p.PriorPct + "%" }>{ p.PriorText }</div>
-				}
-				<!-- expected marker (filled, ringed) + labels -->
-				<div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-success ring-4 ring-success/20 z-20" style={ "left:" + p.ExpectedPct + "%" }></div>
-				<div data-private="amount" class="absolute -top-6 -translate-x-1/2 text-xs font-semibold text-success whitespace-nowrap" style={ "left:" + p.ExpectedPct + "%" }>{ p.ExpectedText }</div>
-				<div class="absolute top-6 -translate-x-1/2 text-xs text-success whitespace-nowrap inline-flex items-center gap-1" style={ "left:" + p.ExpectedPct + "%" }>
-					{ p.InWindowText }
-					@LucideIcon("check", "w-3 h-3")
-				</div>
+// governingRuleRow is one rule in the governing-rules panel: a leading "rule"
+// glyph, the rule name + condition summary, an enabled/disabled cue, and a link
+// to the rule editor. The whole row links to /rules/<short_id> so the user can
+// jump straight to the definition.
+templ governingRuleRow(rule GoverningRule) {
+	<li>
+		<a
+			href={ templ.SafeURL("/rules/" + rule.ShortID) }
+			class="flex items-center gap-3 px-2.5 py-2.5 rounded-lg hover:bg-base-200/50 transition-colors no-underline group"
+			aria-label={ "Open rule " + rule.Name }
+		>
+			<div class="w-9 h-9 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+				@LucideIcon("filter", "w-4 h-4 text-base-content/55")
 			</div>
-		</div>
-		<div class="flex items-center justify-between text-[0.7rem] text-base-content/35 tabular-nums">
-			<span data-private="amount">{ p.AxisMinText }</span>
-			<span data-private="amount">{ p.AxisMaxText }</span>
-		</div>
-	</div>
-}
-
-// --- Evidence timeline -----------------------------------------------------
-
-// SeriesEvidenceRow is one charge (or the projected next charge) on the
-// evidence timeline. State drives the marker; an optional price-change marker
-// renders as an inset band beneath the row.
-type SeriesEvidenceRow struct {
-	ShortID    string // links to /transactions/{id} when set (matched/prior rows)
-	Date       string
-	AmountText string
-	State      string // "projected" | "matched" | "prior"
-	Note       string // "first at new price" | "projected" | ""
-	NoteTone   string // success | neutral
-	HasPrice   bool   // render the price-change inset under this row
-	PriceFrom  string
-	PriceTo    string
-}
-
-type SeriesEvidenceProps struct {
-	Rows []SeriesEvidenceRow
-	// Unlinkable opts the linked (non-projected) rows into a hover-revealed
-	// unlink control that calls unlinkCharge(seriesShortID, txShortID) in the
-	// page's Alpine scope. Left false (the default) the timeline is read-only,
-	// which is how the /design sandbox renders it.
-	Unlinkable    bool
-	SeriesShortID string
-}
-
-templ SeriesEvidenceTimeline(p SeriesEvidenceProps) {
-	<div class="bb-card p-4 sm:p-5">
-		<div class="relative pl-1">
-			<!-- continuous rail behind the markers — centered on the w-7 marker
-			     column (pl-1 = 4px + half of 28px = 18px). -->
-			<div class="absolute left-[18px] top-5 bottom-5 w-px bg-base-300"></div>
-			for _, row := range p.Rows {
-				<div class="group relative flex items-center gap-3 py-1.5">
-					<div class="relative z-10 w-7 h-7 rounded-full bg-base-100 flex items-center justify-center shrink-0">
-						@seriesEvidenceMarker(row.State)
-					</div>
-					<div class="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-						if row.ShortID != "" {
-							<a href={ templ.SafeURL("/transactions/" + row.ShortID) } class={ "text-sm tabular-nums hover:underline", templ.KV("text-base-content/40", row.State == "projected") }>{ row.Date }</a>
-						} else {
-							<span class={ "text-sm tabular-nums", templ.KV("text-base-content/40", row.State == "projected") }>{ row.Date }</span>
-						}
-						if row.Note != "" {
-							<span class={ "text-xs", templ.KV("text-success", row.NoteTone == "success"), templ.KV("text-base-content/45", row.NoteTone != "success") }>{ row.Note }</span>
-						}
-					</div>
-					if p.Unlinkable && row.ShortID != "" && row.State != "projected" {
-						<button
-							type="button"
-							class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error shrink-0"
-							@click={ "unlinkCharge('" + p.SeriesShortID + "', '" + row.ShortID + "')" }
-							aria-label="Unlink charge"
-							title="Unlink from this series"
-						>
-							@LucideIcon("unlink", "w-3.5 h-3.5")
-						</button>
+			<div class="min-w-0 flex-1">
+				<div class="flex items-center gap-2 min-w-0">
+					<span class="font-medium text-sm text-base-content truncate">{ rule.Name }</span>
+					if !rule.Enabled {
+						<span class="badge badge-ghost badge-xs shrink-0">Disabled</span>
 					}
-					<div data-private="amount" class={ "text-sm font-semibold tabular-nums shrink-0", templ.KV("text-base-content/40 font-normal", row.State == "projected") }>{ row.AmountText }</div>
+					if rule.CreatedByType == "agent" {
+						<span class="badge badge-ghost badge-xs shrink-0">Agent</span>
+					}
 				</div>
-				if row.HasPrice {
-					<div class="relative flex items-center gap-2 ml-10 mr-1 my-1 rounded-lg bg-warning/15 border border-warning/30 px-3 py-1.5">
-						@LucideIcon("trending-up", "w-3.5 h-3.5 text-warning shrink-0")
-						<span class="text-xs font-medium text-warning/90">Price change</span>
-						<span class="flex-1"></span>
-						<span data-private="amount" class="text-xs tabular-nums text-warning/90">{ row.PriceFrom } → { row.PriceTo }</span>
-					</div>
-				}
-			}
-		</div>
-	</div>
+				<div class="mt-0.5 text-xs text-base-content/55 truncate">{ rule.ConditionSummary }</div>
+			</div>
+			<div class="shrink-0 text-right hidden sm:block">
+				<div class="text-xs text-base-content/45">{ rule.ActionSummary }</div>
+				<div class="text-[0.7rem] text-base-content/35 mt-0.5">{ governingRuleHits(rule.HitCount) }</div>
+			</div>
+			@LucideIcon("chevron-right", "w-4 h-4 text-base-content/25 shrink-0 group-hover:text-base-content/50 transition-colors")
+		</a>
+	</li>
 }
 
-templ seriesEvidenceMarker(state string) {
-	switch state {
-		case "matched":
-			<span class="w-5 h-5 rounded-full bg-success/15 text-success flex items-center justify-center">
-				@LucideIcon("check", "w-3 h-3")
-			</span>
-		case "projected":
-			<span class="w-4 h-4 rounded-full border border-dashed border-base-content/40"></span>
-		default:
-			<span class="w-2 h-2 rounded-full bg-base-content/25"></span>
+// governingRuleHits renders the rule's lifetime application count.
+func governingRuleHits(n int) string {
+	if n == 1 {
+		return "1 charge matched"
 	}
-}
-
-// --- Fact strip ------------------------------------------------------------
-
-type SeriesFact struct {
-	Label string
-	Value string
-	// Private, when set, marks the value node with data-private="<kind>" so
-	// privacy mode obfuscates it (e.g. "amount" for the last-charge value).
-	// Left empty for non-sensitive facts (dates, the detected-by label).
-	Private string
-}
-
-type SeriesFactStripProps struct {
-	Facts []SeriesFact
-}
-
-templ SeriesFactStrip(p SeriesFactStripProps) {
-	<div class="bb-card overflow-hidden">
-		<div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-base-300/60">
-			for _, f := range p.Facts {
-				<div class="px-4 py-3.5 min-w-0">
-					<div class="text-xs text-base-content/45 truncate">{ f.Label }</div>
-					if f.Private != "" {
-						<div data-private={ f.Private } class="text-sm font-semibold mt-1 tabular-nums truncate">{ f.Value }</div>
-					} else {
-						<div class="text-sm font-semibold mt-1 tabular-nums truncate">{ f.Value }</div>
-					}
-				</div>
-			}
-		</div>
-	</div>
+	return strconv.Itoa(n) + " charges matched"
 }

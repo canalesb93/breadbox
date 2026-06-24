@@ -251,6 +251,24 @@ var workflowPresets = []WorkflowPreset{
 		Options:               []WorkflowPresetOption{applyModeOption},
 	},
 	{
+		Slug:        "transaction-reviewer",
+		Name:        "Transaction Reviewer",
+		Category:    "Categorization & Review",
+		Icon:        "scan-search",
+		Description: "Reviews each newly-synced transaction and, when a pattern recurs, writes a rule so future syncs resolve it automatically — categories, recurring series, and all.",
+		PromptBlocks: []string{
+			"strategy-transaction-reviewer",
+			"rules-curriculum",
+			"category-system",
+		},
+		ToolScope:             "read_write", // categorizes, assigns series, and authors rules
+		TriggerOnSyncComplete: true,
+		// Per-sync like the Routine Reviewer, but it also investigates recurrence
+		// and authors rules — a bit more reasoning per run, hence slightly higher.
+		EstCostPerRunUSD: 0.04,
+		Options:          []WorkflowPresetOption{applyModeOption},
+	},
+	{
 		Slug:        "weekly-money-digest",
 		Name:        "Weekly Money Digest",
 		Category:    "Insights & Reports",

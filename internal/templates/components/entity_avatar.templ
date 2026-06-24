@@ -1,0 +1,41 @@
+package components
+
+// EntityAvatar — the shared rounded-square identity tile (see entity_avatar.go
+// for the prop contract and the three render shapes). Image → tinted icon →
+// gradient monogram, in that precedence.
+templ EntityAvatar(p EntityAvatarProps) {
+	if p.ImageURL != "" {
+		<div class={ entityAvatarTileClass(p.Size, p.Class) + " bg-base-200" }>
+			<img src={ p.ImageURL } alt={ p.Name } class="w-full h-full object-contain" loading="lazy"/>
+		</div>
+	} else if p.LogoDevURL != "" {
+		<!-- Hotlinked logo.dev brand logo over the gradient monogram: the image
+		     covers the monogram on load and self-removes on error (unknown
+		     domain / no token / network), revealing the monogram underneath. -->
+		<div
+			class={ entityAvatarTileClass(p.Size, p.Class) + " bb-entity-avatar--mono relative" }
+			style={ entityAvatarHueStyle(entityAvatarSeed(p)) }
+		>
+			<span class={ entityAvatarLetterClass(p.Size, len(entityAvatarLetters(p.Name)) > 1) } aria-hidden="true">{ entityAvatarLetters(p.Name) }</span>
+			<img
+				src={ p.LogoDevURL }
+				alt={ p.Name }
+				class="absolute inset-0 w-full h-full object-contain bg-base-200"
+				loading="lazy"
+				onerror="this.remove()"
+			/>
+		</div>
+	} else if p.Icon != "" {
+		<div class={ entityAvatarTileClass(p.Size, p.Class), entityAvatarToneClass(p.Tone) }>
+			@LucideIcon(p.Icon, entityAvatarIconClass(p.Size))
+		</div>
+	} else {
+		<div
+			class={ entityAvatarTileClass(p.Size, p.Class) + " bb-entity-avatar--mono" }
+			style={ entityAvatarHueStyle(entityAvatarSeed(p)) }
+			aria-hidden="true"
+		>
+			<span class={ entityAvatarLetterClass(p.Size, len(entityAvatarLetters(p.Name)) > 1) }>{ entityAvatarLetters(p.Name) }</span>
+		</div>
+	}
+}

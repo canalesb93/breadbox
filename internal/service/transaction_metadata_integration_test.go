@@ -114,16 +114,11 @@ func TestTransactionMetadata_Validation(t *testing.T) {
 	if err := svc.SetTransactionMetadata(ctx, "nonexistent", "k", "v"); !errors.Is(err, service.ErrNotFound) {
 		t.Fatalf("missing txn err = %v, want ErrNotFound", err)
 	}
-	// The metadata ops never touch a first-class field: setting metadata must
-	// not change the category override flag.
+	// The metadata ops never touch a first-class field.
 	if err := svc.SetTransactionMetadata(ctx, id, "note", "hello"); err != nil {
 		t.Fatalf("SetTransactionMetadata: %v", err)
 	}
-	resp, err := svc.GetTransaction(ctx, id)
-	if err != nil {
+	if _, err := svc.GetTransaction(ctx, id); err != nil {
 		t.Fatalf("GetTransaction: %v", err)
-	}
-	if resp.CategoryOverride != "none" {
-		t.Fatalf("metadata write flipped category_override")
 	}
 }

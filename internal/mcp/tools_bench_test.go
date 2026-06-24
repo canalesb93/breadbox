@@ -129,7 +129,6 @@ func makeTransaction(i int) map[string]any {
 		"authorized_date":      "2026-03-31",
 		"provider_name":              fmt.Sprintf("TRADER JOES #%d", 100+i),
 		"provider_merchant_name":     "Trader Joe's",
-		"category_override":          false,
 		"provider_category_primary":  "FOOD_AND_DRINK",
 		"provider_category_detailed": "FOOD_AND_DRINK_GROCERIES",
 		"pending":              false,

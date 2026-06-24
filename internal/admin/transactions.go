@@ -1163,6 +1163,26 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			entry.ActorID = &id
 		}
 		return entry, true
+
+	case "counterparty_assigned", "counterparty_unlinked":
+		// Counterparty membership: actor is the user/agent who set it, or the
+		// system (rule / detection). Mirrors series exactly — Summary is the
+		// canonical sentence built by EnrichAnnotations; both kinds collapse to
+		// a single "counterparty" type (the icon is identical and the Summary
+		// differentiates the verb).
+		entry := service.ActivityEntry{
+			Type:               "counterparty",
+			Timestamp:          a.CreatedAt,
+			ActorName:          a.ActorName,
+			ActorType:          a.ActorType,
+			ActorAvatarVersion: a.ActorAvatarVersion,
+			Summary:            a.Summary,
+		}
+		if a.ActorID != nil && *a.ActorID != "" {
+			id := *a.ActorID
+			entry.ActorID = &id
+		}
+		return entry, true
 	}
 	return service.ActivityEntry{}, false
 }

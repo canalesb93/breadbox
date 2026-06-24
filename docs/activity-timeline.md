@@ -163,14 +163,22 @@ fields the service layer doesn't know about: `TagColor`, `CategoryColor`,
 
 Today's `Type` values:
 
-| Type       | Source kind(s)                   | Renderer                |
-|------------|----------------------------------|-------------------------|
-| `comment`  | `comment`                        | `txdTimelineComment`    |
-| `tag`      | `tag_added`, `tag_removed`       | `txdTimelineSystem`     |
-| `category` | `category_set`                   | `txdTimelineSystem`     |
-| `rule`     | `rule_applied`                   | `txdTimelineSystem`     |
-| `sync`     | `sync_started`, `sync_updated`   | `txdTimelineSystem`     |
-| `review`   | (legacy, retained for fallback)  | `txdTimelineSystem`     |
+| Type           | Source kind(s)                                  | Renderer             |
+|----------------|-------------------------------------------------|----------------------|
+| `comment`      | `comment`                                       | `txdTimelineComment` |
+| `tag`          | `tag_added`, `tag_removed`                       | `txdTimelineSystem`  |
+| `category`     | `category_set`                                  | `txdTimelineSystem`  |
+| `rule`         | `rule_applied`                                  | `txdTimelineSystem`  |
+| `sync`         | `sync_started`, `sync_updated`                   | `txdTimelineSystem`  |
+| `series`       | `series_assigned`, `series_unlinked`             | `txdTimelineSystem`  |
+| `counterparty` | `counterparty_assigned`, `counterparty_unlinked` | `txdTimelineSystem`  |
+| `review`       | (legacy, retained for fallback)                  | `txdTimelineSystem`  |
+
+Both `series` and `counterparty` collapse their two source kinds onto a
+single UI `Type` (the icon is identical; the prebuilt `Summary` from
+`EnrichAnnotations` differentiates the verb — `repeat` for series, `store`
+for counterparty). They render via the `txdSystemSentence` Summary-fallback
+branch, the same path `rule` and `sync` use.
 
 The `transaction_deleted` and `transaction_restored` kinds are written by the REST API soft-delete / restore endpoints (`internal/service/transactions_lifecycle.go`) but are **not yet rendered** by `activityEntryFromAnnotation` — the renderer drops them as unknown. Surfacing them in the timeline is a known follow-up. Until then they're visible to MCP via `list_annotations` (`Raw: true` or filtered by kind) and via the raw annotations table for audit.
 
@@ -656,12 +664,14 @@ and commit both `*.templ` and the generated `*_templ.go` siblings.
 
 ```go
 var mcpAnnotationKinds = map[string][]string{
-    "comment":  {"comment"},
-    "rule":     {"rule_applied"},
-    "tag":      {"tag_added", "tag_removed"},
-    "category": {"category_set"},
-    "sync":     {"sync_started", "sync_updated"},
-    "your":     {"your_new_kind"},
+    "comment":      {"comment"},
+    "rule":         {"rule_applied"},
+    "tag":          {"tag_added", "tag_removed"},
+    "category":     {"category_set"},
+    "sync":         {"sync_started", "sync_updated"},
+    "series":       {"series_assigned", "series_unlinked"},
+    "counterparty": {"counterparty_assigned", "counterparty_unlinked"},
+    "your":         {"your_new_kind"},
 }
 ```
 

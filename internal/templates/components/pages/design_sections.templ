@@ -210,7 +210,7 @@ templ SectionBadges() {
 
 templ SectionRecurringChips() {
 	<div class="flex flex-col gap-6">
-		@designExample("Type (SeriesTypeChip)", "Structured recurring type — quiet metadata badge. size \"xs\" on dense ledger rows, \"sm\" on the detail header/config.") {
+		@designExample("Type (SeriesTypeChip)", "Structured recurring type — quiet metadata badge. size \"xs\" on dense ledger rows, \"sm\" on the detail header. The only series chip under the rules-as-substrate model (a thin series has no detector-derived renewal/confidence state).") {
 			<div class="flex flex-wrap items-center gap-2">
 				@components.SeriesTypeChip("Subscription", "xs")
 				@components.SeriesTypeChip("Bill", "xs")
@@ -219,107 +219,25 @@ templ SectionRecurringChips() {
 				@components.SeriesTypeChip("Loan", "sm")
 			</div>
 		}
-		@designExample("Renewal health (SeriesRenewalChip)", "Attention chip for an active series' next charge. Only due-soon / overdue / stale earn one; type-aware copy (bill/loan \"Lapsed?\" vs subscription \"Likely cancelled\"). Empty label renders nothing.") {
-			<div class="flex flex-wrap items-center gap-2">
-				@components.SeriesRenewalChip("Due tomorrow", "info")
-				@components.SeriesRenewalChip("Renews in 5d", "info")
-				@components.SeriesRenewalChip("5d overdue", "warning")
-				@components.SeriesRenewalChip("Likely cancelled", "error")
-				@components.SeriesRenewalChip("Lapsed?", "error")
-			</div>
-		}
-		@designExample("Detection confidence (SeriesConfidenceChip)", "Candidate detection band, derived from detection_signals. success / warning / neutral by band.") {
-			<div class="flex flex-wrap items-center gap-2">
-				@components.SeriesConfidenceChip("High", "success")
-				@components.SeriesConfidenceChip("Medium", "warning")
-				@components.SeriesConfidenceChip("Low", "neutral")
-			</div>
-		}
 	</div>
 }
 
 // ─── Recurring detail panels ─────────────────────────────────────────────
 templ SectionRecurringDetail() {
 	<div class="flex flex-col gap-6">
-		@designExample("Detection panel (SeriesDetectionPanel)", "The detection-forward hero: a match-strength badge, a plain-language summary, and the match-window range viz. Reframes a series as a detection rule, not a settings form.") {
-			@components.SeriesDetectionPanel(components.SeriesDetectionProps{
-				StrengthLabel: "Strong match",
-				StrengthTone:  "success",
-				MerchantKey:   "lumio*tv",
-				HasAmount:     true,
-				AmountText:    "$15.99",
-				ToleranceText: "$1.00",
-				CadencePhrase: "about every month",
-				DayPhrase:     "around the 15th",
-				Window: &components.SeriesMatchWindowProps{
-					RangeText:    "$14.99 – $16.99",
-					AxisMinText:  "$13",
-					AxisMaxText:  "$18",
-					ExpectedText: "$15.99 expected",
-					InWindowText: "2 charges",
-					BandLeftPct:  "39.8",
-					BandWidthPct: "40",
-					ExpectedPct:  "59.8",
-					HasPrior:     true,
-					PriorPct:     "19.8",
-					PriorText:    "$13.99 · prior price",
+		@designExample("Governing rules (GoverningRulesPanel)", "A series IS the rules that define it. This panel lists the assign_series rules whose matches put charges into the series — each row links to the rule editor, making the membership relationship explicit. Sits beside the linked-charges list on the detail page.") {
+			@components.GoverningRulesPanel(components.GoverningRulesPanelProps{
+				EntityWord: "series",
+				ActionCode: "assign_series",
+				Rules: []components.GoverningRule{
+					{ShortID: "rule0001", Name: "Netflix subscription", ConditionSummary: "merchant contains netflix", ActionSummary: "Assign to series", Enabled: true, HitCount: 11, CreatedByType: "user"},
+					{ShortID: "rule0002", Name: "Streaming round-up", ConditionSummary: "merchant in (netflix, hulu, disney+)", ActionSummary: "2 actions", Enabled: true, HitCount: 4, CreatedByType: "agent"},
+					{ShortID: "rule0003", Name: "Legacy import", ConditionSummary: "Matches all transactions", ActionSummary: "Assign to series", Enabled: false, HitCount: 0, CreatedByType: "user"},
 				},
 			})
 		}
-		@designExample("Detection panel — no amount yet", "When the detector hasn't pinned an expected amount, the panel drops the match-window viz and reads as a weaker (warning-tone) match. The merchant key + cadence still anchor the rule.") {
-			@components.SeriesDetectionPanel(components.SeriesDetectionProps{
-				StrengthLabel: "Likely match",
-				StrengthTone:  "warning",
-				MerchantKey:   "acme*gym",
-				HasAmount:     false,
-				CadencePhrase: "on an irregular cadence",
-			})
-		}
-		@designExample("Match window (SeriesMatchWindow)", "The amount-axis range viz on its own — tolerance band, expected marker, and (optionally) a hollow prior-price marker when the charge stepped up. Embedded inside the detection panel on the live page; shown here standalone with no prior price.") {
-			@components.SeriesMatchWindow(components.SeriesMatchWindowProps{
-				RangeText:    "$8.99 – $10.99",
-				AxisMinText:  "$7",
-				AxisMaxText:  "$13",
-				ExpectedText: "$9.99 expected",
-				InWindowText: "4 charges",
-				BandLeftPct:  "33.3",
-				BandWidthPct: "33.3",
-				ExpectedPct:  "50",
-				HasPrior:     false,
-			})
-		}
-		@designExample("Evidence timeline (SeriesEvidenceTimeline)", "The charges a series was detected from: projected next (dashed), matched (✓), and prior-price (·) markers on a continuous rail, with a price-change inset where the amount stepped.") {
-			@components.SeriesEvidenceTimeline(components.SeriesEvidenceProps{
-				Rows: []components.SeriesEvidenceRow{
-					{Date: "Jun 15, 2026", AmountText: "~$15.99", State: "projected", Note: "projected", NoteTone: "neutral"},
-					{Date: "May 15, 2026", AmountText: "$15.99", State: "matched"},
-					{Date: "Apr 15, 2026", AmountText: "$15.99", State: "matched", Note: "first at new price", NoteTone: "success", HasPrice: true, PriceFrom: "$13.99", PriceTo: "$15.99"},
-					{Date: "Mar 15, 2026", AmountText: "$13.99", State: "prior"},
-					{Date: "Feb 15, 2026", AmountText: "$13.99", State: "prior"},
-					{Date: "Jan 15, 2026", AmountText: "$13.99", State: "prior"},
-				},
-			})
-		}
-		@designExample("Evidence timeline — unlinkable (live)", "On the detail page the timeline opts into a hover-revealed unlink control on each linked (non-projected) row, wired to the page's unlinkCharge() Alpine action. Hover a matched/prior row to reveal it.") {
-			@components.SeriesEvidenceTimeline(components.SeriesEvidenceProps{
-				Unlinkable:    true,
-				SeriesShortID: "demo1234",
-				Rows: []components.SeriesEvidenceRow{
-					{ShortID: "tx000001", Date: "May 15, 2026", AmountText: "$15.99", State: "matched"},
-					{ShortID: "tx000002", Date: "Apr 15, 2026", AmountText: "$15.99", State: "matched"},
-					{ShortID: "tx000003", Date: "Mar 15, 2026", AmountText: "$15.99", State: "prior"},
-				},
-			})
-		}
-		@designExample("Fact strip (SeriesFactStrip)", "Read-only derived facts pinned to the page foot — last charge, next renewal, last seen, detected-by. Hairline-divided, no icons. The money facts carry Private: \"amount\" so privacy mode obfuscates them.") {
-			@components.SeriesFactStrip(components.SeriesFactStripProps{
-				Facts: []components.SeriesFact{
-					{Label: "Last charge", Value: "$15.99", Private: "amount"},
-					{Label: "Next renewal", Value: "Jun 15, 2026"},
-					{Label: "Last seen", Value: "May 15, 2026"},
-					{Label: "Detected by", Value: "Auto-matched"},
-				},
-			})
+		@designExample("Governing rules — empty", "When no rule targets a series, the panel explains the rule-substrate model instead of reading as broken.") {
+			@components.GoverningRulesPanel(components.GoverningRulesPanelProps{EntityWord: "series", ActionCode: "assign_series"})
 		}
 	</div>
 }

@@ -190,6 +190,11 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Patch("/tags/{slug}", UpdateTagHandler(svc))
 			r.Delete("/tags/{slug}", DeleteTagHandler(svc))
 			r.Patch("/series/{id}", PatchSeriesHandler(svc))
+			r.Post("/series", AssignSeriesHandler(svc))
+			r.Post("/series/{id}/transactions", LinkSeriesTransactionsHandler(svc))
+			r.Delete("/series/{id}/transactions/{txid}", UnlinkSeriesTransactionHandler(svc))
+			r.Post("/series/{id}/tags", AddSeriesTagHandler(svc))
+			r.Delete("/series/{id}/tags/{slug}", RemoveSeriesTagHandler(svc))
 			r.Post("/sync", TriggerSyncHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))
@@ -995,8 +1000,9 @@ func TestAPI_SetTransactionCategory_Success(t *testing.T) {
 	assertStatus(t, getResp, http.StatusOK)
 	var txnData map[string]any
 	parseJSON(t, getResp, &txnData)
-	if txnData["category_override"] != "user" {
-		t.Error("expected category_override=true after manual set")
+	cat2, _ := txnData["category"].(map[string]any)
+	if cat2 == nil || cat2["slug"] != "coffee" {
+		t.Errorf("expected category slug 'coffee' after manual set, got %v", txnData["category"])
 	}
 }
 
@@ -1022,17 +1028,21 @@ func TestAPI_ResetTransactionCategory_Success(t *testing.T) {
 	assertStatus(t, resp, http.StatusNoContent)
 	resp.Body.Close()
 
-	// Verify override is cleared
+	// Verify the category was reset to uncategorized
 	getResp := env.doGet(t, "/api/v1/transactions/"+txnID)
 	var txnData map[string]any
 	parseJSON(t, getResp, &txnData)
-	if txnData["category_override"] == "user" {
-		t.Error("expected category_override=false after reset")
+	cat2, _ := txnData["category"].(map[string]any)
+	if cat2 == nil || cat2["slug"] != "uncategorized" {
+		t.Errorf("expected category slug 'uncategorized' after reset, got %v", txnData["category"])
 	}
 }
 
 func TestAPI_ResetTransactionCategory_NotFound(t *testing.T) {
 	env := setupTestEnv(t)
+	// Reset resolves the "uncategorized" target before reaching the
+	// not-found path, so seed it; the missing transaction still yields 404.
+	seedUncategorized(t, env.Queries)
 
 	resp := env.doDelete(t, "/api/v1/transactions/00000000-0000-0000-0000-000000000000/category")
 	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")

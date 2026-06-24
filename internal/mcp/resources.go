@@ -361,3 +361,31 @@ func (s *MCPServer) handleUserTemplate(ctx context.Context, req *mcpsdk.ReadReso
 		"accounts": accounts,
 	})
 }
+
+func (s *MCPServer) handleCounterpartyTemplate(ctx context.Context, req *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	uri := req.Params.URI
+	id, err := extractTemplateParam(uri, "breadbox://counterparty/")
+	if err != nil {
+		return nil, err
+	}
+
+	cp, err := s.svc.GetCounterparty(ctx, id)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return nil, templateNotFound(uri)
+		}
+		return nil, fmt.Errorf("get counterparty %s: %w", id, err)
+	}
+
+	// Governing rules — the assign_counterparty rules that define this
+	// counterparty's membership (rules-as-substrate).
+	governing, err := s.svc.ListCounterpartyGoverningRules(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list governing rules for %s: %w", id, err)
+	}
+
+	return jsonResourceResult(uri, map[string]any{
+		"counterparty":   cp,
+		"governing_rules": governing,
+	})
+}

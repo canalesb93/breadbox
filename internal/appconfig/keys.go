@@ -151,6 +151,23 @@ const (
 	// Settings → Developer. The BB_ARTIFACTS_UPLOAD_TOKEN env var overrides it.
 	KeyDevModeUploadToken = "devmode.upload_token"
 
+	// KeyCounterpartyLogos toggles hotlinking real brand logos from logo.dev on
+	// counterparty rows and detail headers. "true" (the default) emits a
+	// logo.dev image URL for any counterparty with a derivable website domain
+	// (and no manual logo_url override); "false" disables the hotlink so every
+	// counterparty falls back to its gradient monogram. Precedence env →
+	// app_config → default; the BREADBOX_COUNTERPARTY_LOGOS env var overrides.
+	KeyCounterpartyLogos = "counterparty_logos"
+
+	// KeyLogoDevToken is an OPTIONAL logo.dev publishable key (pk_…) appended to
+	// hotlinked logo URLs for higher rate limits. Publishable keys are public by
+	// design — they ride in the <img src> visible in page source — so this is
+	// stored in plaintext (not AES-GCM encrypted like real secrets). Empty =
+	// unauthenticated hotlinks; logo.dev then answers 401 and the avatar
+	// degrades to the monogram. Precedence env → app_config → default; the
+	// LOGO_DEV_TOKEN env var overrides.
+	KeyLogoDevToken = "logo_dev_token"
+
 	// KeyInstanceTimezone is the IANA timezone (e.g. "America/Los_Angeles")
 	// every cron schedule — sync schedules AND agent/workflow schedules — is
 	// evaluated in, and that schedule previews are rendered in. Unset or

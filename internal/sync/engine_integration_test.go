@@ -1654,10 +1654,11 @@ func TestRule_Trigger_OnUpdate_SkipsOnCreate(t *testing.T) {
 	}
 }
 
-// TestRule_TypedActions_SetCategory_RespectsOverride verifies that a rule with a
-// typed set_category action does not overwrite a transaction whose
-// category_override flag is true.
-func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
+// TestRule_TypedActions_SetCategory_OverwritesOnChange verifies P3
+// last-writer-wins: when a CHANGED transaction (isChanged=true) is re-synced,
+// the rule's typed set_category action fires and overwrites whatever category
+// was previously set (there is no override lock anymore).
+func TestRule_TypedActions_SetCategory_OverwritesOnChange(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
@@ -1717,18 +1718,17 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 		t.Fatalf("expected initial category=%v, got %v", food.ID, initialCatID)
 	}
 
-	// Set a manual override pointing at the other category.
-	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE provider_transaction_id = 'txn_override'",
+	// Set a prior manual category pointing at the other category.
+	if _, err := pool.Exec(ctx,
+		"UPDATE transactions SET category_id = $1 WHERE provider_transaction_id = 'txn_override'",
 		other.ID,
-	)
-	if err != nil {
-		t.Fatalf("set override: %v", err)
+	); err != nil {
+		t.Fatalf("set prior category: %v", err)
 	}
 
 	// Second sync changes the transaction so the rule is re-evaluated. Because
 	// the rule trigger is "always" and the data changed (isChanged=true), the
-	// rule fires — but the override must be respected.
+	// rule fires — and last-writer-wins overwrites the prior category.
 	mock.syncResult = provider.SyncResult{
 		Modified: []provider.Transaction{
 			{
@@ -1755,8 +1755,8 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query transaction after second sync: %v", err)
 	}
-	if finalCatID != other.ID {
-		t.Errorf("rule overwrote category_override=true; expected %v, got %v", other.ID, finalCatID)
+	if finalCatID != food.ID {
+		t.Errorf("last-writer-wins: rule should overwrite prior category on a changed re-sync; expected %v, got %v", food.ID, finalCatID)
 	}
 }
 
@@ -1913,19 +1913,19 @@ func TestRule_DisabledRule_NotFired_DuringSync(t *testing.T) {
 	}
 }
 
-// TestRule_OverrideSuppressesSetCategoryButNotOthers verifies that when a
-// transaction has category_override=TRUE, a rule that set_category + add_tag
-// still applies the tag — override only suppresses the category write.
-func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
+// TestRule_SetCategoryAndAddTagOnChange verifies P3 last-writer-wins: when a
+// CHANGED transaction is re-synced, a rule that set_category + add_tag applies
+// BOTH — the category overwrites the prior value AND the tag is attached.
+func TestRule_SetCategoryAndAddTagOnChange(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
 	_, food := seedCategoriesWithFood(t, queries)
-	overrideCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+	priorCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
 		Slug: "user_pick", DisplayName: "User Pick",
 	})
 	if err != nil {
-		t.Fatalf("create override category: %v", err)
+		t.Fatalf("create prior category: %v", err)
 	}
 
 	rule := testutil.MustCreateTransactionRule(
@@ -1962,13 +1962,13 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 		t.Fatalf("first sync: %v", err)
 	}
 
-	// Pin a manual override on the row, swap the user's category, and remove
-	// the tag so the second sync has a clean slate to re-apply it.
+	// Set a prior manual category on the row and remove the tag so the second
+	// sync has a clean slate to re-apply it.
 	if _, err := pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE provider_transaction_id = 'txn_override_combo'",
-		overrideCat.ID,
+		"UPDATE transactions SET category_id = $1 WHERE provider_transaction_id = 'txn_override_combo'",
+		priorCat.ID,
 	); err != nil {
-		t.Fatalf("set override: %v", err)
+		t.Fatalf("set prior category: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`DELETE FROM transaction_tags WHERE transaction_id = (SELECT id FROM transactions WHERE provider_transaction_id = 'txn_override_combo')`,
@@ -1993,19 +1993,19 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 		t.Fatalf("second sync: %v", err)
 	}
 
-	// Category override should still be pointing at the user's choice, not
-	// the rule's food_and_drink.
+	// Last-writer-wins: the category should now be the rule's food_and_drink,
+	// overwriting the prior user_pick.
 	var finalCatID pgtype.UUID
 	if err := pool.QueryRow(ctx,
 		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_override_combo'",
 	).Scan(&finalCatID); err != nil {
 		t.Fatalf("query transaction: %v", err)
 	}
-	if finalCatID != overrideCat.ID {
-		t.Errorf("override suppressed failed; expected %v, got %v (food=%v)", overrideCat.ID, finalCatID, food.ID)
+	if finalCatID != food.ID {
+		t.Errorf("expected rule category to win on changed re-sync; expected %v, got %v (prior=%v)", food.ID, finalCatID, priorCat.ID)
 	}
 
-	// But the add_tag action should have still run — tag is attached.
+	// The add_tag action should also have run — tag is attached.
 	var tagAttached int
 	if err := pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM transaction_tags tt
