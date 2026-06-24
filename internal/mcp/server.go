@@ -402,20 +402,12 @@ func (s *MCPServer) buildToolRegistry() {
 		}, s.handleAssignSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "update_series", Title: "Edit Recurring Series", Classification: ToolWrite,
-			Description: "Edit a recurring series' name and/or type (subscription, bill, loan, other). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).",
+			Description: "Edit a recurring series in one call: its name, type (subscription, bill, loan, other), and tag membership (tags_to_add / tags_to_remove). Every field is optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key). Tags must already exist (create_tag); an added tag is materialized onto every linked charge and applied to future members, a removed tag strips the series-inherited copies (a tag a user added directly to a charge survives).",
 		}, s.handleUpdateSeries, s),
 		makeToolDefLogged(ToolSpec{
 			Name: "unlink_series_transactions", Title: "Unlink Charges from Series", Classification: ToolWrite,
 			Description: "Detach transactions (≤50, each a current member) from a recurring series — the inverse of assign_series' link path. Clears each charge's series_id and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.",
 		}, s.handleUnlinkSeriesTransactions, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "add_series_tag", Title: "Tag Recurring Series", Classification: ToolWrite,
-			Description: "Attach an existing tag to a recurring series. The tag is materialized onto every linked transaction (they inherit it) and applied to future members as they join — so tagging the Netflix series tags all its charges. The tag must already exist (create it first with create_tag).",
-		}, s.handleAddSeriesTag, s),
-		makeToolDefLogged(ToolSpec{
-			Name: "remove_series_tag", Title: "Untag Recurring Series", Classification: ToolWrite,
-			Description: "Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.",
-		}, s.handleRemoveSeriesTag, s),
 
 		// --- Counterparties (rules-as-substrate, P4) ---
 		makeToolDefLogged(ToolSpec{
@@ -427,19 +419,15 @@ func (s *MCPServer) buildToolRegistry() {
 			Description: "Get one counterparty by short ID or UUID: its name and enrichment fields. Its governing rules (the assign_counterparty rules that define its membership) are on the admin Counterparties detail page; its linked charges come from query_transactions.",
 		}, s.handleGetCounterparty, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "create_counterparty", Title: "Create Counterparty", Classification: ToolWrite,
-			Description: "Create a new counterparty with a name and optional enrichment (website_url, logo_url, category_id, mcc). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use assign_counterparty (one-off) or author an assign_counterparty RULE (durable).",
-		}, s.handleCreateCounterparty, s),
-		makeToolDefLogged(ToolSpec{
 			Name: "update_counterparty", Title: "Enrich Counterparty", Classification: ToolWrite,
 			Description: "Enrich a counterparty: edit its name, website_url, logo_url, category_id (slug or short ID), and/or mcc. Every field optional — omit to leave unchanged; an empty name is rejected. This is the enrichment lane (no auto-fetch).",
 		}, s.handleUpdateCounterparty, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "assign_counterparty", Title: "Assign Counterparty", Classification: ToolWrite,
-			Description: "Bind transactions to a counterparty, creating it if needed. This is a ONE-OFF assignment. For durable patterns, author an assign_counterparty RULE instead so every future matching charge resolves automatically. Provide counterparty_id to bind to an existing counterparty, OR name + create_if_missing:true to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass transaction_ids (≤50) to link members (NULL-fill only — never steals a charge already bound to another counterparty).",
+			Name: "assign_counterparty", Title: "Assign / Create Counterparty", Classification: ToolWrite,
+			Description: "Bind transactions to a counterparty, minting it if needed — the agent's path for a one-off assignment (author an assign_counterparty RULE instead when you want future charges to resolve automatically). Provide counterparty_id to bind to an existing one, OR name + create_if_missing:true to resolve-or-create by name (surrogate-first; de-dupes on the live name). Mint a bare counterparty by passing name + create_if_missing with no transaction_ids; pass fail_if_exists:true for a strict 'make a brand-new one' intent. Optional enrichment (website_url, logo_url, category_id, mcc) is applied to the resolved/minted counterparty in the same call. Pass transaction_ids (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).",
 		}, s.handleAssignCounterparty, s),
 		makeToolDefLogged(ToolSpec{
-			Name: "unlink_counterparty_transaction", Title: "Unlink Charge from Counterparty", Classification: ToolWrite,
+			Name: "unlink_counterparty_transactions", Title: "Unlink Charges from Counterparty", Classification: ToolWrite,
 			Description: "Detach transactions (≤50, each a current member) from a counterparty — the inverse of assign_counterparty's link path. Clears each charge's counterparty_id. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.",
 		}, s.handleUnlinkCounterpartyTransaction, s),
 

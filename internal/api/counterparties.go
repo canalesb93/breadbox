@@ -155,7 +155,7 @@ func AssignCounterpartyTransactionsHandler(svc *service.Service) http.HandlerFun
 
 // UnlinkCounterpartyTransactionHandler detaches a single transaction from a
 // counterparty. DELETE /api/v1/counterparties/{id}/transactions/{txid} — mirrors
-// the unlink_counterparty_transaction MCP tool. Requires full_access scope.
+// the unlink_counterparty_transactions MCP tool. Requires full_access scope.
 func UnlinkCounterpartyTransactionHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")

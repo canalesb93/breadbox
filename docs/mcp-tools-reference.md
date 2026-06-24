@@ -281,7 +281,7 @@ Link transactions to a recurring series, creating it if needed — the agent's p
 
 ### update_series (Write)
 
-Edit a recurring series' `name` and/or `type` (`subscription` | `bill` | `loan` | `other`). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).
+Edit a recurring series in one call: its `name`, `type` (`subscription` | `bill` | `loan` | `other`), and tag membership (`tags_to_add` / `tags_to_remove`). Every field optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key). Tags must already exist (`create_tag`); an added tag is materialized onto every linked charge and applied to future members, a removed tag strips the series-inherited copies (a tag a user added directly to a charge survives).
 
 ### unlink_series_transactions (Write)
 
@@ -301,11 +301,7 @@ List every live counterparty with its `name` and enrichment fields. Get a counte
 
 ### get_counterparty (Read)
 
-Get one counterparty by short ID or UUID: its `name` and enrichment fields. Its governing rules (the `assign_counterparty` rules that define its membership) are visible on the admin Counterparties detail page; its linked charges come from `query_transactions`. Also exposed as the `breadbox://counterparty/{short_id}` resource (detail + governing rules).
-
-### create_counterparty (Write)
-
-Create a new counterparty with a `name` and optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use `assign_counterparty` (one-off) or author an `assign_counterparty` **rule** (durable).
+Get one counterparty by short ID or UUID: its `name` and enrichment fields. Its governing rules (the `assign_counterparty` rules that define its membership) are visible on the admin Counterparties detail page; its linked charges come from `query_transactions`.
 
 ### update_counterparty (Write)
 
@@ -313,11 +309,13 @@ Enrich a counterparty: edit its `name`, `website_url`, `logo_url`, `category_id`
 
 ### assign_counterparty (Write)
 
-Bind transactions to a counterparty, creating it if needed — a **one-off** assignment. For durable patterns, author an `assign_counterparty` **rule** so every future matching charge resolves automatically. Provide `counterparty_id` to bind to an existing counterparty, **or** `name` + `create_if_missing:true` to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass `transaction_ids` (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).
+Bind transactions to a counterparty, minting it if needed — a **one-off** assignment. For durable patterns, author an `assign_counterparty` **rule** so every future matching charge resolves automatically. Provide `counterparty_id` to bind to an existing counterparty, **or** `name` + `create_if_missing:true` to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Mint a **bare** counterparty by passing `name` + `create_if_missing` with no `transaction_ids`; pass `fail_if_exists:true` for a strict "make a brand-new one" intent. Optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`) is applied to the resolved/minted counterparty in the same call. Pass `transaction_ids` (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).
 
-### unlink_counterparty_transaction (Write)
+### unlink_counterparty_transactions (Write)
 
 Detach `transaction_ids` (≤50, each a current member) from a counterparty — the inverse of `assign_counterparty`' link path. Clears each charge's `counterparty_id`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.
+
+> Counterparty **creation** folds into `assign_counterparty` (`name` + `create_if_missing`, optional `fail_if_exists` + enrichment) — there is no standalone `create_counterparty` tool.
 
 ---
 
