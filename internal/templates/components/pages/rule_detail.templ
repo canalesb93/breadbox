@@ -354,31 +354,21 @@ templ ruleDetailRecentApplications(p RuleDetailProps) {
 		</div>
 		<p class="text-xs text-base-content/40 mb-3">Transactions this rule has touched during syncs</p>
 		if len(p.ApplicationTxns) > 0 {
-			<!-- One card wraps the stream: per-application action strip + full tx-row.
-			     Each application is grouped in a divider-separated block so scanning
-			     top-to-bottom reads as "this is what the rule did, on this transaction". -->
+			<!-- One card wraps the stream: a divider-separated full tx-row per
+			     application. How the row got here ("Retroactive") rides inline in
+			     the row's meta line rather than as a floating top-right label —
+			     the rule's action itself is already described in the "Then" card
+			     above, so it isn't repeated per row. -->
 			<div class="bb-card overflow-hidden">
 				<div class="divide-y divide-base-300/50">
 					for _, tx := range p.ApplicationTxns {
 						{{ meta := p.ApplicationMeta[tx.ID] }}
 						<div>
-							if meta.AppliedBy != "sync" {
-								<!-- The rule's action is already described in the "Then" card above,
-								     so don't repeat it per row. Only surface how the row got here
-								     when it wasn't the default ("via sync"). -->
-								<div class="flex items-center justify-end px-4 pt-2 text-[0.65rem] uppercase tracking-wider text-base-content/40">
-									<span class="inline-flex items-center gap-1">
-										if meta.AppliedBy == "retroactive" {
-											@components.LucideIcon("rewind", "w-3 h-3")
-											retroactive
-										} else {
-											@components.LucideIcon("wrench", "w-3 h-3")
-											{ meta.AppliedBy }
-										}
-									</span>
-								</div>
+							if meta.AppliedBy != "" && meta.AppliedBy != "sync" {
+								@components.TxRow(tx, components.WithMetaBadge(ruleAppliedByBadge(meta.AppliedBy)))
+							} else {
+								@components.TxRow(tx)
 							}
-							@components.TxRow(tx)
 						</div>
 					}
 				</div>
@@ -392,6 +382,28 @@ templ ruleDetailRecentApplications(p RuleDetailProps) {
 			</div>
 		}
 	</div>
+}
+
+// ruleAppliedByBadge renders a compact inline meta chip describing how a
+// Recent-Applications row was touched by this rule. It rides in the TxRow
+// meta (subtitle) line via components.WithMetaBadge, replacing the old
+// floating top-right "RETROACTIVE" strip (#1917). Only non-"sync" origins
+// surface a badge — sync is the default firing path and stays unlabeled.
+// Styling matches the row's other meta chips (muted icon + text) so it reads
+// as just another subtitle detail rather than a separate banner.
+templ ruleAppliedByBadge(appliedBy string) {
+	<span class="inline-flex items-center gap-1 text-base-content/40 shrink-0" title={ ruleAppliedByTitle(appliedBy) }>
+		if appliedBy == "retroactive" {
+			@components.LucideIcon("rewind", "w-3 h-3")
+			<!-- Label hides below sm where the row meta is cramped; the icon +
+			     title carry the meaning there. The desktop meta line is itself
+			     sm+ only, so it always shows the full label. -->
+			<span class="hidden sm:inline">Retroactive</span>
+		} else {
+			@components.LucideIcon("wrench", "w-3 h-3")
+			<span class="hidden sm:inline">{ appliedBy }</span>
+		}
+	</span>
 }
 
 // ruleDetailPendingMatches renders the "Matching transactions" card — only

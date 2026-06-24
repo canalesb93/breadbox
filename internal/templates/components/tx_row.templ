@@ -21,7 +21,15 @@ import (
 //
 // The inline category picker still reads window.__bbCategories from the
 // page; pages that render tx rows must continue to populate that global.
-templ TxRow(tx service.AdminTransactionRow) {
+//
+// Optional TxRowOption values let a page embellish the row without forcing
+// the ~50 existing call sites to thread a props struct. The only option
+// today is WithMetaBadge, which renders a small chip at the tail of the
+// meta (subtitle) line — the rule-detail "Recent Applications" list uses it
+// to mark how a row was touched (e.g. "Retroactive") inline, instead of
+// floating a separate label above the row.
+templ TxRow(tx service.AdminTransactionRow, opts ...TxRowOption) {
+	{{ cfg := buildTxRowConfig(opts) }}
 	<div
 		class="bb-tx-row group"
 		x-data="{ expanded: false }"
@@ -133,6 +141,13 @@ templ TxRow(tx service.AdminTransactionRow) {
 							@LucideIcon("flag", "w-3 h-3")
 						</span>
 					}
+					<!-- Slot 6 — optional caller-supplied meta badge (e.g. the
+					     rule-detail "Retroactive" marker). Self-contained so the
+					     leading separator vanishes with it when no badge is set. -->
+					if cfg.MetaBadge != nil {
+						<span class="text-base-content/20">&middot;</span>
+						@cfg.MetaBadge
+					}
 				</div>
 				<!-- Mobile-only sub-line (<sm): date + category dot.
 				     Keeps the row informative on iPhone without crowding the name.
@@ -169,6 +184,10 @@ templ TxRow(tx service.AdminTransactionRow) {
 							@LucideIcon("messages-square", "w-3 h-3")
 							<span class="text-[0.65rem] tabular-nums font-medium">{ strconv.Itoa(tx.CommentCount) }</span>
 						</span>
+					}
+					if cfg.MetaBadge != nil {
+						<span class="text-base-content/20 shrink-0">&middot;</span>
+						@cfg.MetaBadge
 					}
 				</div>
 			</div>
@@ -334,6 +353,36 @@ func txAvatarColorStyle(color *string) string {
 		return "--avatar-color: " + *color
 	}
 	return "--avatar-color: " + txNeutralCategoryColor
+}
+
+// TxRowOption configures optional, page-specific embellishments on a TxRow
+// without forcing the ~50 existing call sites to thread a props struct.
+type TxRowOption func(*txRowConfig)
+
+// txRowConfig holds resolved TxRow options.
+type txRowConfig struct {
+	// MetaBadge, when non-nil, renders inline at the tail of the row's meta
+	// (subtitle) line.
+	MetaBadge templ.Component
+}
+
+// WithMetaBadge injects a small inline chip at the end of the meta line.
+// Used by the rule-detail "Recent Applications" list to mark how a row was
+// touched (e.g. "Retroactive") without floating a separate label above it.
+func WithMetaBadge(c templ.Component) TxRowOption {
+	return func(cfg *txRowConfig) { cfg.MetaBadge = c }
+}
+
+// buildTxRowConfig folds the variadic options into a config, tolerating nil
+// options so callers can pass WithMetaBadge(maybeNil) without branching.
+func buildTxRowConfig(opts []TxRowOption) txRowConfig {
+	var cfg txRowConfig
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+	return cfg
 }
 
 // txCategoryInitial returns the category UUID for the picker's data-initial
