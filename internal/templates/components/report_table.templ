@@ -59,14 +59,14 @@ templ ReportsList(rows []ReportRowProps) {
 // line. A small, bare priority glyph leads the row — vivid ink only for
 // warning/critical, a muted glyph for routine — replacing the old 40×40
 // tinted tile so the inbox reads calm (Mintlify-clean: color is an accent,
-// not a per-row fill). Read rows fade and drop the dot; unread rows keep a
-// slightly stronger summary. Status is a small glyph, not a parallel badge.
+// not a per-row fill). Unread rows render the summary bold and carry the
+// dot; read rows drop the dot and fall to a normal-weight (but still
+// full-strength) summary. Status is a small glyph, not a parallel badge.
 templ ReportRow(r ReportRowProps) {
 	<li
 		x-show={ fmt.Sprintf("!dismissed['%s']", r.ID) }
 		x-transition.opacity.duration.200ms
-		class={ "list-row py-3.5 gap-3 transition-colors hover:bg-base-200/40 items-center",
-			templ.KV("opacity-55", r.IsRead) }
+		class="list-row py-3.5 gap-3 transition-colors hover:bg-base-200/40 items-center"
 		data-report-id={ r.ID }
 	>
 		<a
@@ -140,8 +140,8 @@ func reportRowMenuItems(r ReportRowProps) []OverflowMenuItem {
 // reserved for the priorities that actually warrant a glance — warning and
 // critical; routine reports get a quiet muted glyph so the inbox doesn't
 // repeat a loud tinted square down every row (Mintlify-clean restraint:
-// color is a small accent, not a per-row fill). Read rows desaturate
-// further via the row-level opacity.
+// color is a small accent, not a per-row fill). Read/unread is carried by
+// the summary weight + unread dot, not by fading the whole row.
 func reportGlyphClass(priority string) string {
 	switch priority {
 	case "critical":
@@ -197,12 +197,14 @@ func reportAuthorLabel(author string) string {
 }
 
 // reportSummaryClass styles the summary line — the row's prominent content
-// line. Medium + full-strength ink when unread; lighter + muted when read.
+// line. Like an unread message thread, an unread report is bold; once read
+// it drops to normal weight but stays full-strength ink (read ≠ faded), so
+// the title is still perfectly legible.
 func reportSummaryClass(isRead bool) string {
 	if isRead {
-		return "font-normal text-base-content/50"
+		return "font-normal text-base-content"
 	}
-	return "font-medium text-base-content"
+	return "font-bold text-base-content"
 }
 
 // reportRowLinkLabel builds the row link's accessible name. The row's

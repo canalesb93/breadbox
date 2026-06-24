@@ -155,7 +155,7 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
 		}
-		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) = $")
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
@@ -313,7 +313,7 @@ LEFT JOIN counterparties cp ON t.counterparty_id = cp.id`)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
 		}
-		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) = $")
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++

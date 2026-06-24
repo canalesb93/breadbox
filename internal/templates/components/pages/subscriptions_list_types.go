@@ -33,7 +33,7 @@ type SubscriptionTypeFilter struct {
 
 // SubscriptionRow is one series row on the ledger (and the header chrome on the
 // detail page). A thin series carries only an identity (short_id, name), a
-// structured type, its linked-charge count, and its inherited tags.
+// structured type, and its linked-charge count.
 type SubscriptionRow struct {
 	ShortID            string // short_id — drives the detail link
 	Name               string
@@ -41,7 +41,6 @@ type SubscriptionRow struct {
 	TypeLabel          string // "Subscription" | "Bill" | "Loan" | "Other"
 	MemberCount        int    // linked live charges
 	GoverningRuleCount int    // assign_series rules that define membership
-	Tags               []string
 
 	// Search is the lowercase haystack for the client-side filter input.
 	Search string
@@ -50,7 +49,7 @@ type SubscriptionRow struct {
 // SubscriptionDetailProps is the typed input for /recurring/{short_id}. The page
 // makes the rule-substrate relationship explicit: the LINKED CHARGES (what's in
 // the series) sit beside the GOVERNING RULES (the assign_series rules that
-// define its membership). Name + type edit in a thin drawer; tags edit inline.
+// define its membership). Name + type edit in a thin drawer.
 type SubscriptionDetailProps struct {
 	CSRFToken string
 
@@ -65,25 +64,6 @@ type SubscriptionDetailProps struct {
 	// GoverningRules are the rules whose assign_series action targets this
 	// series — the durable definition of its membership (rules-as-substrate).
 	GoverningRules []components.GoverningRule
-
-	// AvailableTags is every tag not already on the series (slug + name), for
-	// the inline tag editor's add-control.
-	AvailableTags []SubscriptionTagOption
-	// TagChips is the resolved chip data (display/color/icon) for the tags
-	// currently on the series — rendered through the shared TagChip component.
-	TagChips []components.TagChipData
-
-	// AllTags seeds window.__bbAllTags + the tag picker's availableTags list.
-	AllTags []service.TagResponse
-	// CurrentTagSlugs are the tags already on the series (the picker shows them
-	// as "present" so the user can add/remove in one session).
-	CurrentTagSlugs []string
-}
-
-// SubscriptionTagOption is one option in the detail page's add-tag picker.
-type SubscriptionTagOption struct {
-	Slug string
-	Name string
 }
 
 // RecurringSeriesFormProps drives the /recurring/new create form. On a

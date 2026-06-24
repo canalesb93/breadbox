@@ -255,7 +255,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
 		// Attribution-aware: use attributed_user_id if set, otherwise connection user.
-		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) = $")
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
@@ -679,7 +679,7 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		if err != nil {
 			return 0, fmt.Errorf("invalid user id: %w", err)
 		}
-		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) = $")
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
@@ -812,7 +812,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
-		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id, " +
+		"COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) AS effective_user_id, " +
 		"t.flagged_at, " +
 		"cp.short_id AS counterparty_short_id, cp.name AS counterparty_name, cp.logo_url AS counterparty_logo_url " +
 		"FROM transactions t " +
@@ -840,7 +840,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) = $")
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
@@ -1218,7 +1218,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
-		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id, " +
+		"COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) AS effective_user_id, " +
 		"t.flagged_at, " +
 		"cp.short_id AS counterparty_short_id, cp.name AS counterparty_name, cp.logo_url AS counterparty_logo_url " +
 		"FROM transactions t " +

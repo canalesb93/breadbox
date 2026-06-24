@@ -4,8 +4,10 @@ import "breadbox/internal/templates/components"
 
 // RecurringSeriesForm renders /recurring/new — a from-scratch create form for a
 // recurring series. A thin series needs only a name and a type; its membership
-// comes from the rules you point at it afterwards. Composed from the settings
-// vocabulary (SettingsSection / SettingsRow) for consistency. Plain POST form
+// comes from the rules you point at it afterwards. Built in the standard
+// page-form vocabulary (a single bb-card with stacked label-over-input fields +
+// a bb-action-row footer), matching the category/tag create forms — NOT the
+// settings two-column gutter, which is reserved for /settings/*. Plain POST form
 // (no Alpine) → CreateRecurringSeriesHandler mints the series and redirects to
 // its detail page.
 templ RecurringSeriesForm(p RecurringSeriesFormProps) {
@@ -14,35 +16,41 @@ templ RecurringSeriesForm(p RecurringSeriesFormProps) {
 		Subtitle:             "Name a recurring series, then author rules that assign charges to it. The series starts empty.",
 		SubtitleHideOnMobile: true,
 	})
-	<form method="POST" action="/recurring/new" class="max-w-2xl">
-		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-		if p.Error != "" {
-			<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
-				@components.LucideIcon("alert-triangle", "w-4 h-4")
-				<span>{ p.Error }</span>
+	<div class="max-w-lg">
+		<form method="POST" action="/recurring/new" class="bb-card p-0 overflow-hidden">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<div class="p-5 sm:p-6">
+				if p.Error != "" {
+					<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
+						@components.LucideIcon("alert-triangle", "w-4 h-4")
+						<span>{ p.Error }</span>
+					</div>
+				}
+				<div class="space-y-4">
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="series-name">
+							Name <span class="text-error">*</span>
+						</label>
+						<input type="text" id="series-name" name="name" value={ p.Name } required placeholder="e.g. Netflix" class="bb-form-input" aria-label="Name"/>
+						<p class="text-xs text-base-content/40 mt-1.5">What you call this series. Its charges arrive from the rules you point at it.</p>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="series-type">Type</label>
+						<select id="series-type" name="type" class="bb-form-select" aria-label="Type">
+							for _, opt := range seriesTypeOptions {
+								<option value={ opt.Value } selected?={ p.Type == opt.Value }>{ opt.Label }</option>
+							}
+						</select>
+					</div>
+				</div>
 			</div>
-		}
-		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:  "repeat",
-			Title: "Details",
-		}) {
-			@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "What you call this recurring series"}) {
-				<input type="text" name="name" value={ p.Name } required placeholder="e.g. Netflix" class="input input-sm w-full sm:w-80" aria-label="Name"/>
-			}
-			@components.SettingsRow(components.SettingsRowProps{Label: "Type"}) {
-				<select name="type" class="select select-sm w-auto" aria-label="Type">
-					for _, opt := range seriesTypeOptions {
-						<option value={ opt.Value } selected?={ p.Type == opt.Value }>{ opt.Label }</option>
-					}
-				</select>
-			}
-		}
-		<div class="bb-action-row">
-			<a href="/recurring" class="btn btn-ghost btn-sm">Cancel</a>
-			<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-				@components.LucideIcon("plus", "w-4 h-4")
-				Create series
-			</button>
-		</div>
-	</form>
+			<div class="bb-action-row">
+				<a href="/recurring" class="btn btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("plus", "w-4 h-4")
+					Create series
+				</button>
+			</div>
+		</form>
+	</div>
 }

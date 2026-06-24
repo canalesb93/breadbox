@@ -7,7 +7,6 @@
 // `assign_series` rules that target it. This component covers the small set of
 // direct edits the detail page still exposes:
 //   - DRAWER + explicit Save: name + type -> PATCH /api/v1/series/{id}.
-//   - Tags: inline add/remove via the shared tag picker -> series tag endpoints.
 //   - Linked charges: per-row unlink (DELETE) + a "Link a charge" search modal.
 //
 // Every write reloads on success so the server re-renders the linked charges and
@@ -33,16 +32,10 @@
     try { return JSON.parse(el.textContent) || fallback; } catch (e) { return fallback; }
   }
 
-  // Seed the globals the shared tag picker reads on first render.
-  (function seedGlobals() {
-    window.__bbAllTags = parseJSONScript('series-detail-alltags', window.__bbAllTags || []);
-  })();
-
   document.addEventListener('alpine:init', function () {
     Alpine.data('seriesDetail', function () {
       return {
         seriesId: '',
-        currentTags: [],
         // Name/type edit lives in the shared components.Drawer ('series-edit'),
         // opened via $store.drawers — no local open flag needed here.
         // Link-a-charge modal state.
@@ -54,7 +47,6 @@
 
         init: function () {
           this.seriesId = (this.$root && this.$root.dataset.seriesId) || '';
-          this.currentTags = parseJSONScript('series-detail-current-tags', []);
         },
 
         // --- Generic writer: mutate then reload on success ------------------
@@ -83,49 +75,6 @@
           var body = { name: (f.get('name') || '').trim(), type: f.get('type') };
           if (!body.name) { toast('Name cannot be empty.'); return; }
           this._write('PATCH', '/api/v1/series/' + encodeURIComponent(this.seriesId), body, 'Saved', 'Failed to save.');
-        },
-
-        // --- Tags: shared picker + per-chip remove --------------------------
-        openTagPicker: function () {
-          var counts = {};
-          this.currentTags.forEach(function (slug) { counts[slug] = 1; });
-          window.dispatchEvent(new CustomEvent('open-tag-picker', {
-            detail: {
-              sourceId: 'series-tag',
-              transactionIds: [],
-              txCount: 0,
-              appliedCounts: counts,
-              availableTags: window.__bbAllTags || [],
-            },
-          }));
-        },
-
-        // Apply the picker's add/remove diff via the series tag endpoints, then
-        // reload once (so members re-inherit / shed the tags).
-        applyTagDiff: function (adds, removes) {
-          var self = this;
-          var ops = [];
-          (adds || []).forEach(function (slug) {
-            ops.push(self._tagOp('POST', '/api/v1/series/' + encodeURIComponent(self.seriesId) + '/tags', { tag_slug: slug }));
-          });
-          (removes || []).forEach(function (slug) {
-            ops.push(self._tagOp('DELETE', '/api/v1/series/' + encodeURIComponent(self.seriesId) + '/tags/' + encodeURIComponent(slug), null));
-          });
-          if (ops.length === 0) return;
-          Promise.all(ops).then(function () {
-            toast('Tags updated', 'success');
-            window.location.reload();
-          }).catch(function () { restorePageState(); toast('Failed to update tags.'); });
-        },
-
-        removeSeriesTag: function (seriesId, slug) {
-          this._write('DELETE', '/api/v1/series/' + encodeURIComponent(seriesId) + '/tags/' + encodeURIComponent(slug), null, 'Tag removed', 'Failed to remove tag.');
-        },
-
-        _tagOp: function (method, url, body) {
-          var opts = { method: method, headers: { Accept: 'application/json' } };
-          if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-          return fetch(url, opts).then(function (res) { if (!res.ok) throw new Error('tag op failed'); });
         },
 
         // --- Member charges -------------------------------------------------

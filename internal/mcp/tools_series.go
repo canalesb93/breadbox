@@ -30,11 +30,9 @@ type assignSeriesInput struct {
 }
 
 type updateSeriesInput struct {
-	ID           string   `json:"id" jsonschema:"required,Series short ID or UUID to edit."`
-	Name         string   `json:"name,omitempty" jsonschema:"New display name. Renaming onto an existing live series name is rejected. Omit to leave unchanged."`
-	Type         string   `json:"type,omitempty" jsonschema:"New recurring-charge type: subscription, bill, loan, or other. Omit to leave unchanged."`
-	TagsToAdd    []string `json:"tags_to_add,omitempty" jsonschema:"Tag slugs to attach to the series (each must already exist — create with create_tag). An added tag is materialized onto every linked charge and applied to future members as they join."`
-	TagsToRemove []string `json:"tags_to_remove,omitempty" jsonschema:"Tag slugs to detach from the series, stripping the series-inherited copies from its linked charges (a tag a user added directly to a charge survives)."`
+	ID   string `json:"id" jsonschema:"required,Series short ID or UUID to edit."`
+	Name string `json:"name,omitempty" jsonschema:"New display name. Renaming onto an existing live series name is rejected. Omit to leave unchanged."`
+	Type string `json:"type,omitempty" jsonschema:"New recurring-charge type: subscription, bill, loan, or other. Omit to leave unchanged."`
 }
 
 type unlinkSeriesInput struct {
@@ -45,7 +43,7 @@ type unlinkSeriesInput struct {
 func (s *MCPServer) handleListSeries(_ context.Context, _ *mcpsdk.CallToolRequest, input listSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	// Lean-by-default: list_series returns the overview projection (identity +
-	// type + tags) unless the caller asks for more.
+	// type) unless the caller asks for more.
 	fieldsRaw := input.Fields
 	switch fieldsRaw {
 	case "":
@@ -119,39 +117,15 @@ func (s *MCPServer) handleUpdateSeries(ctx context.Context, _ *mcpsdk.CallToolRe
 		Name: optStr(input.Name),
 		Type: optStr(input.Type),
 	}
-	if edit.Name == nil && edit.Type == nil && len(input.TagsToAdd) == 0 && len(input.TagsToRemove) == 0 {
-		return errorResult(fmt.Errorf("provide name, type, tags_to_add, or tags_to_remove to update")), nil, nil
+	if edit.Name == nil && edit.Type == nil {
+		return errorResult(fmt.Errorf("provide name and/or type to update")), nil, nil
 	}
 	actor := service.ActorFromContext(ctx)
-	// Name/type edit first (only when supplied), then tag membership. Each
-	// sub-change calls the same service method the standalone tools used, so the
-	// semantics (rename collision guard, tag inheritance/provenance) are unchanged.
-	if edit.Name != nil || edit.Type != nil {
-		if _, err := s.svc.UpdateSeries(context.Background(), input.ID, edit, actor); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				return errorResult(fmt.Errorf("series not found")), nil, nil
-			}
-			return errorResult(err), nil, nil
-		}
-	}
-	for _, slug := range input.TagsToAdd {
-		if err := s.svc.AddSeriesTag(context.Background(), input.ID, slug, actor); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				return errorResult(fmt.Errorf("series not found")), nil, nil
-			}
-			return errorResult(err), nil, nil
-		}
-	}
-	for _, slug := range input.TagsToRemove {
-		if err := s.svc.RemoveSeriesTag(context.Background(), input.ID, slug); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				return errorResult(fmt.Errorf("series not found")), nil, nil
-			}
-			return errorResult(err), nil, nil
-		}
-	}
-	series, err := s.svc.GetSeries(context.Background(), input.ID)
+	series, err := s.svc.UpdateSeries(context.Background(), input.ID, edit, actor)
 	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("series not found")), nil, nil
+		}
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(series)

@@ -16,12 +16,12 @@ func TestParseSeriesFields(t *testing.T) {
 		t.Errorf("empty selection should be nil, got %v", f)
 	}
 
-	// overview alias → name, type, tags; id/short_id always present.
+	// overview alias → name, type; id/short_id always present.
 	f, err = ParseSeriesFields("overview")
 	if err != nil {
 		t.Fatalf("overview: %v", err)
 	}
-	for _, want := range []string{"id", "short_id", "name", "type", "tags"} {
+	for _, want := range []string{"id", "short_id", "name", "type"} {
 		if !f[want] {
 			t.Errorf("overview missing %q", want)
 		}
@@ -39,7 +39,6 @@ func TestFilterSeriesFields_Thin(t *testing.T) {
 		ShortID: "abc123",
 		Name:    "Netflix",
 		Type:    SeriesTypeSubscription,
-		Tags:    []string{"streaming"},
 	}
 	f, err := ParseSeriesFields(DefaultSeriesFields)
 	if err != nil {

@@ -285,9 +285,7 @@ Edit a recurring series in one call: its `name`, `type` (`subscription` | `bill`
 
 ### unlink_series_transactions (Write)
 
-Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id` and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.
-
-> Series **type** and **tag** edits fold into `update_series` (`type`, `tags_to_add`, `tags_to_remove`) — there are no standalone `set_series_type` / `add_series_tag` / `remove_series_tag` tools.
+Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.
 
 ---
 

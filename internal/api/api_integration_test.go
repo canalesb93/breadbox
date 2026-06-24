@@ -193,8 +193,6 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/series", AssignSeriesHandler(svc))
 			r.Post("/series/{id}/transactions", LinkSeriesTransactionsHandler(svc))
 			r.Delete("/series/{id}/transactions/{txid}", UnlinkSeriesTransactionHandler(svc))
-			r.Post("/series/{id}/tags", AddSeriesTagHandler(svc))
-			r.Delete("/series/{id}/tags/{slug}", RemoveSeriesTagHandler(svc))
 			r.Post("/sync", TriggerSyncHandler(svc))
 			r.Post("/connections/csv/preview", CSVPreviewHandler(svc))
 			r.Post("/connections/csv/import", CSVImportHandler(svc))

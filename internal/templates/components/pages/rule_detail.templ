@@ -183,7 +183,7 @@ templ ruleDetailWhatItDoes(p RuleDetailProps) {
 
 // ruleDetailActionRow renders one action card under the "Then" header.
 templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
-	<div class="flex items-center gap-3 p-3 bg-base-200/40 rounded-xl">
+	<div class="flex items-center gap-3 p-3 bg-base-200/50 border border-base-content/10 rounded-xl">
 		switch a.Type {
 			case "set_category":
 				<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={ ruleCategoryTileBgStyle(p.Rule) }>
@@ -235,20 +235,20 @@ templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
 					@components.LucideIcon("repeat", "w-4 h-4 text-primary")
 				</div>
 				<div class="flex-1 min-w-0">
-					if ruleActionEntityName(a) != "" {
-						<p class="text-sm">Assign to series <span class="font-semibold">{ ruleActionEntityName(a) }</span></p>
+					if ruleActionEntityName(p, a) != "" {
+						<p class="text-sm">Assign to series <span class="font-semibold">{ ruleActionEntityName(p, a) }</span></p>
 					} else {
 						<p class="text-sm">Assign to series</p>
 					}
 					<p class="text-xs text-base-content/40">Matching transactions are linked to the series during sync.</p>
 				</div>
 			case "assign_counterparty":
-				<div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
-					@components.LucideIcon("store", "w-4 h-4 text-secondary")
+				<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+					@components.LucideIcon("store", "w-4 h-4 text-info")
 				</div>
 				<div class="flex-1 min-w-0">
-					if ruleActionEntityName(a) != "" {
-						<p class="text-sm">Assign to counterparty <span class="font-semibold">{ ruleActionEntityName(a) }</span></p>
+					if ruleActionEntityName(p, a) != "" {
+						<p class="text-sm">Assign to counterparty <span class="font-semibold">{ ruleActionEntityName(p, a) }</span></p>
 					} else {
 						<p class="text-sm">Assign to counterparty</p>
 					}

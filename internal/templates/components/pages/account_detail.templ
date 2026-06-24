@@ -199,12 +199,14 @@ templ acctSettings(p AccountDetailProps) {
 						<p class="text-xs text-base-content/40 mb-1">Connection</p>
 						<a data-private="institution" href={ templ.SafeURL("/connections/" + p.Account.ConnectionID) } class="text-sm font-medium hover:text-primary transition-colors no-underline">{ p.Account.InstitutionName }</a>
 					</div>
-					if p.Account.UserName != "" {
-						<div>
-							<p class="text-xs text-base-content/40 mb-1">Family Member</p>
-							<p class="text-sm font-medium">{ p.Account.UserName }</p>
-						</div>
-					}
+					<div>
+						<p class="text-xs text-base-content/40 mb-1">Owner</p>
+						if len(p.Members) > 0 {
+							@templ.Raw(acctOwnerSelectHTML(p))
+						} else {
+							<p class="text-sm font-medium">{ acctEffectiveOwnerName(p) }</p>
+						}
+					</div>
 					if p.Account.IsDependentLinked {
 						<div class="sm:col-span-2 lg:col-span-4">
 							<p class="text-xs text-base-content/40 mb-1">Attribution</p>
@@ -620,6 +622,53 @@ func acctExcludedCheckboxHTML(p AccountDetailProps) string {
 		checked,
 		htmlAttrEscape(p.AccountID),
 	)
+}
+
+// acctOwnerSelectHTML emits the per-account owner <select> with the inline
+// onchange="updateOwner(...)" binding. The first option ("Inherit from
+// connection (…)" → value "") clears the override; the rest are household
+// members keyed by short_id so the current override pre-selects. Built here
+// and inserted via @templ.Raw for the same reason as the display-name input.
+func acctOwnerSelectHTML(p AccountDetailProps) string {
+	current := ""
+	if p.Account != nil && p.Account.OwnerUserID != nil {
+		current = *p.Account.OwnerUserID
+	}
+	// Keep the inherit label short. Appending the connection owner's name would
+	// overflow the narrow settings cell: daisy 5's appearance:base-select does
+	// not clip a long selected value (text-overflow is ignored on the select),
+	// so the value bleeds over the dropdown arrow and out of the card.
+	var b strings.Builder
+	fmt.Fprintf(&b, `<select onchange="updateOwner('%s', this.value)" class="select select-sm w-full">`, htmlAttrEscape(p.AccountID))
+	inheritSel := ""
+	if current == "" {
+		inheritSel = " selected"
+	}
+	fmt.Fprintf(&b, `<option value=""%s>Inherit from connection</option>`, inheritSel)
+	for _, m := range p.Members {
+		sel := ""
+		if m.ShortID == current {
+			sel = " selected"
+		}
+		fmt.Fprintf(&b, `<option value="%s"%s>%s</option>`, htmlAttrEscape(m.ShortID), sel, htmlAttrEscape(m.Name))
+	}
+	b.WriteString(`</select>`)
+	return b.String()
+}
+
+// acctEffectiveOwnerName resolves the read-only owner label shown to viewers:
+// the per-account override if set, else the connection owner, else Unassigned.
+func acctEffectiveOwnerName(p AccountDetailProps) string {
+	if p.Account == nil {
+		return "Unassigned"
+	}
+	if p.Account.OwnerUserName != nil && *p.Account.OwnerUserName != "" {
+		return *p.Account.OwnerUserName
+	}
+	if p.Account.UserName != "" {
+		return p.Account.UserName
+	}
+	return "Unassigned"
 }
 
 // htmlAttrEscape escapes the four characters that matter inside a

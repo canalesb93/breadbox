@@ -75,7 +75,10 @@ SELECT EXISTS(
 UPDATE accounts SET is_dependent_linked = $2, updated_at = NOW() WHERE id = $1;
 
 -- name: GetDependentUserID :one
-SELECT u.id FROM accounts a
-JOIN bank_connections bc ON a.connection_id = bc.id
-JOIN users u ON bc.user_id = u.id
-WHERE a.id = $1;
+-- Effective owner of the dependent account: its per-account owner override if
+-- set, else the connection owner. Returns no row when neither resolves to a
+-- user, so the caller skips attribution rather than clearing it.
+SELECT COALESCE(a.owner_user_id, bc.user_id) AS user_id
+FROM accounts a
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+WHERE a.id = $1 AND COALESCE(a.owner_user_id, bc.user_id) IS NOT NULL;

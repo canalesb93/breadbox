@@ -520,20 +520,14 @@ templ feedSyncBody(it FeedItem, s *FeedSync, now time.Time) {
 		}
 		@feedRowTimestamp(it.TimestampStr, now)
 	</div>
-	if s.AddedCount+s.ModifiedCount+s.RemovedCount > 0 {
+	// The added/modified/removed breakdown is intentionally omitted here:
+	// feedSyncAction already states the primary count ("1 new transaction",
+	// "5 transactions updated"), so repeating it as chips is redundant (#1910).
+	// The trigger context (manual run / webhook / first sync) is not in the
+	// headline, so it stays.
+	if s.Trigger != "" && s.Trigger != "cron" {
 		<div class="text-base-content/55 mt-0.5 flex items-center gap-2 flex-wrap">
-			if s.AddedCount > 0 {
-				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-success" aria-hidden="true"></span>{ fmt.Sprintf("%d added", s.AddedCount) }</span>
-			}
-			if s.ModifiedCount > 0 {
-				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-info" aria-hidden="true"></span>{ fmt.Sprintf("%d modified", s.ModifiedCount) }</span>
-			}
-			if s.RemovedCount > 0 {
-				<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-base-content/30" aria-hidden="true"></span>{ fmt.Sprintf("%d removed", s.RemovedCount) }</span>
-			}
-			if s.Trigger != "" && s.Trigger != "cron" {
-				<span class="text-base-content/45">&middot; { feedTriggerLabel(s.Trigger) }</span>
-			}
+			<span class="text-base-content/45">{ feedTriggerLabel(s.Trigger) }</span>
 		</div>
 	}
 	if s.Status == "error" && s.ErrorMessage != "" {
