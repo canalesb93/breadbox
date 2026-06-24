@@ -37,6 +37,14 @@ type RuleDetailProps struct {
 	ConditionRows []components.ConditionRowProps
 	// TriggerLabel is the human label for Rule.Trigger (service.TriggerLabel).
 	TriggerLabel string
+	// ActionEntityNames maps a short_id targeted by an assign_series /
+	// assign_counterparty action to the live entity's display name. The
+	// handler hydrates it so the "Then" card can show "Assign to
+	// counterparty Netflix" instead of the opaque surrogate "wvmXi45D" when
+	// the rule binds by short_id (no inline name stored). Keyed by short_id;
+	// empty when the action already carries an inline name or the lookup
+	// failed.
+	ActionEntityNames map[string]string
 }
 
 // RuleApplicationMeta carries the per-application action info shown above
@@ -258,20 +266,30 @@ func syncHistoryHitCount(h map[string]any) int {
 
 // ruleActionEntityName returns the human display name for an assign_series /
 // assign_counterparty action — the by-name value when the rule mints/binds by
-// name, otherwise the short ID it targets, otherwise "". Used by the rule
-// detail "Then" card so surrogate-first actions read legibly.
-func ruleActionEntityName(a service.RuleAction) string {
+// name, else the resolved name for the short_id it targets (hydrated by the
+// handler into p.ActionEntityNames), else the short_id as a last resort,
+// otherwise "". Used by the rule detail "Then" card so surrogate-first actions
+// read legibly ("Netflix" rather than the opaque "wvmXi45D").
+func ruleActionEntityName(p RuleDetailProps, a service.RuleAction) string {
 	switch a.Type {
 	case "assign_series":
 		if n := strings.TrimSpace(a.SeriesName); n != "" {
 			return n
 		}
-		return strings.TrimSpace(a.SeriesShortID)
+		sid := strings.TrimSpace(a.SeriesShortID)
+		if n := strings.TrimSpace(p.ActionEntityNames[sid]); n != "" {
+			return n
+		}
+		return sid
 	case "assign_counterparty":
 		if n := strings.TrimSpace(a.CounterpartyName); n != "" {
 			return n
 		}
-		return strings.TrimSpace(a.CounterpartyShortID)
+		sid := strings.TrimSpace(a.CounterpartyShortID)
+		if n := strings.TrimSpace(p.ActionEntityNames[sid]); n != "" {
+			return n
+		}
+		return sid
 	}
 	return ""
 }

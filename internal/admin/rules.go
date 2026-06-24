@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -312,8 +313,38 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 			}
 		}
 
+		// Resolve display names for assign_series / assign_counterparty actions
+		// that bind by short_id only (no inline name). Without this the "Then"
+		// card shows the opaque surrogate ("wvmXi45D") instead of the entity's
+		// name ("Netflix"). Keyed by short_id; a failed lookup just leaves the
+		// short_id fallback in place. A rule carries at most a handful of
+		// actions, so these per-action lookups are cheap.
+		actionEntityNames := make(map[string]string)
+		for _, a := range rule.Actions {
+			switch a.Type {
+			case "assign_series":
+				if strings.TrimSpace(a.SeriesName) != "" {
+					continue
+				}
+				if sid := strings.TrimSpace(a.SeriesShortID); sid != "" {
+					if sr, err := svc.GetSeries(ctx, sid); err == nil {
+						actionEntityNames[sid] = sr.Name
+					}
+				}
+			case "assign_counterparty":
+				if strings.TrimSpace(a.CounterpartyName) != "" {
+					continue
+				}
+				if sid := strings.TrimSpace(a.CounterpartyShortID); sid != "" {
+					if cp, err := svc.GetCounterparty(ctx, sid); err == nil {
+						actionEntityNames[sid] = cp.Name
+					}
+				}
+			}
+		}
+
 		data := BaseTemplateData(r, sm, "rules", rule.Name)
-		renderRuleDetail(w, r, tr, data, rule, preview, stats, applications, applicationTxns, applicationMeta, previewTxns, hasMoreApps, syncHistory, actionCategoryName, categories)
+		renderRuleDetail(w, r, tr, data, rule, preview, stats, applications, applicationTxns, applicationMeta, previewTxns, hasMoreApps, syncHistory, actionCategoryName, actionEntityNames, categories)
 	}
 }
 
@@ -337,6 +368,7 @@ func renderRuleDetail(
 	hasMoreApps bool,
 	syncHistory []map[string]any,
 	actionCategoryName string,
+	actionEntityNames map[string]string,
 	categories []service.CategoryResponse,
 ) {
 	data["Breadcrumbs"] = []components.Breadcrumb{
@@ -354,6 +386,7 @@ func renderRuleDetail(
 		HasMoreApplications: hasMoreApps,
 		SyncHistory:         syncHistory,
 		ActionCategoryName:  actionCategoryName,
+		ActionEntityNames:   actionEntityNames,
 		Categories:          categories,
 		ConditionSummary:    service.ConditionSummary(rule.Conditions),
 		TriggerLabel:        service.TriggerLabel(rule.Trigger),
