@@ -12,20 +12,3 @@ package components
 templ SeriesTypeChip(label, size string) {
 	<span class={ "badge badge-ghost shrink-0", "badge-" + size }>{ label }</span>
 }
-
-// SeriesRenewalChip renders the renewal-health attention chip (e.g. "Renews in
-// 3d", "5d overdue", "Lapsed?"). tone is a daisy color token (info / warning /
-// error). Renders nothing when label is empty — only the states a user should
-// act on earn a chip, so callers can drop the surrounding guard.
-templ SeriesRenewalChip(label, tone string) {
-	if label != "" {
-		<span class={ "badge badge-soft badge-xs", "badge-" + tone }>{ label }</span>
-	}
-}
-
-// SeriesConfidenceChip renders a candidate's detection-confidence band
-// ("High confidence" etc.). tone is the daisy color for the band
-// (success / warning / neutral).
-templ SeriesConfidenceChip(band, tone string) {
-	<span class={ "badge badge-soft badge-sm", "badge-" + tone }>{ band } confidence</span>
-}

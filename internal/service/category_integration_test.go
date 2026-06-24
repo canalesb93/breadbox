@@ -634,21 +634,17 @@ func TestSetTransactionCategory_Success(t *testing.T) {
 		t.Fatalf("SetTransactionCategory: %v", err)
 	}
 
-	// Verify category changed and override is set
+	// Verify category changed
 	var gotCatID pgtype.UUID
-	var override string
 	err = pool.QueryRow(ctx,
-		"SELECT category_id, category_override FROM transactions WHERE id = $1", txn.ID,
-	).Scan(&gotCatID, &override)
+		"SELECT category_id FROM transactions WHERE id = $1", txn.ID,
+	).Scan(&gotCatID)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
 	tgtUID, _ := parseUUIDForTest(target.ID)
 	if gotCatID != tgtUID {
 		t.Errorf("category not set correctly")
-	}
-	if override == "none" {
-		t.Errorf("category_override should be true")
 	}
 }
 
@@ -688,12 +684,12 @@ func TestResetTransactionCategory_NotFound(t *testing.T) {
 
 // --- BatchSetTransactionCategory ---
 
-func TestBatchSetTransactionCategory_SetsOverrideFlag(t *testing.T) {
+func TestBatchSetTransactionCategory_SetsCategory(t *testing.T) {
 	svc, q, pool := newService(t)
 	ctx := context.Background()
 
 	uncat := mustSeedUncategorized(t, q)
-	mustCreateCategoryViaService(t, svc, "batch_groceries", "Groceries", nil)
+	groceries := mustCreateCategoryViaService(t, svc, "batch_groceries", "Groceries", nil)
 
 	acctID := seedTxnFixture(t, q)
 	txn1 := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "batch_txn_1", "Txn 1", 100, "2025-01-10")
@@ -708,14 +704,15 @@ func TestBatchSetTransactionCategory_SetsOverrideFlag(t *testing.T) {
 		t.Errorf("expected 1 succeeded, got %d", result.Succeeded)
 	}
 
-	// Verify category_override is set to TRUE
-	var override string
-	err = pool.QueryRow(ctx, "SELECT category_override FROM transactions WHERE id = $1", txn1.ID).Scan(&override)
+	// Verify the category_id was set to the target.
+	var gotCatID pgtype.UUID
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE id = $1", txn1.ID).Scan(&gotCatID)
 	if err != nil {
-		t.Fatalf("query override: %v", err)
+		t.Fatalf("query category_id: %v", err)
 	}
-	if override == "none" {
-		t.Errorf("category_override should be true after batch categorize")
+	wantUID, _ := parseUUIDForTest(groceries.ID)
+	if gotCatID != wantUID {
+		t.Errorf("category_id not set to batch_groceries after batch categorize")
 	}
 }
 

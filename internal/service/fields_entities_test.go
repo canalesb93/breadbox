@@ -3,7 +3,6 @@
 package service
 
 import (
-	"encoding/json"
 	"testing"
 )
 
@@ -17,15 +16,12 @@ func TestParseSeriesFields(t *testing.T) {
 		t.Errorf("empty selection should be nil, got %v", f)
 	}
 
-	// overview alias excludes detection_signals; id/short_id always present.
+	// overview alias → name, type, tags; id/short_id always present.
 	f, err = ParseSeriesFields("overview")
 	if err != nil {
 		t.Fatalf("overview: %v", err)
 	}
-	if f["detection_signals"] {
-		t.Error("overview must not include detection_signals")
-	}
-	for _, want := range []string{"id", "short_id", "name", "status", "next_expected_date"} {
+	for _, want := range []string{"id", "short_id", "name", "type", "tags"} {
 		if !f[want] {
 			t.Errorf("overview missing %q", want)
 		}
@@ -37,24 +33,24 @@ func TestParseSeriesFields(t *testing.T) {
 	}
 }
 
-func TestFilterSeriesFields_DropsDetectionSignals(t *testing.T) {
+func TestFilterSeriesFields_Thin(t *testing.T) {
 	s := SeriesResponse{
-		ID:               "uuid",
-		ShortID:          "abc123",
-		Name:             "Netflix",
-		Status:           "active",
-		DetectionSignals: json.RawMessage(`{"interval_cv":0.02}`),
+		ID:      "uuid",
+		ShortID: "abc123",
+		Name:    "Netflix",
+		Type:    SeriesTypeSubscription,
+		Tags:    []string{"streaming"},
 	}
 	f, err := ParseSeriesFields(DefaultSeriesFields)
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := FilterSeriesFields(s, f)
-	if _, present := m["detection_signals"]; present {
-		t.Error("default projection must omit detection_signals")
-	}
 	if m["name"] != "Netflix" {
 		t.Errorf("name = %v, want Netflix", m["name"])
+	}
+	if m["type"] != SeriesTypeSubscription {
+		t.Errorf("type = %v, want subscription", m["type"])
 	}
 	if m["id"] != "uuid" || m["short_id"] != "abc123" {
 		t.Errorf("id/short_id must always be present, got id=%v short_id=%v", m["id"], m["short_id"])

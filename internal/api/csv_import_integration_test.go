@@ -350,7 +350,12 @@ func TestCSVImport_RequiresWriteScope(t *testing.T) {
 	readErrorCode(t, resp, http.StatusForbidden, "INSUFFICIENT_SCOPE")
 }
 
-func TestCSVImport_PreservesCategoryOverride(t *testing.T) {
+// TestCSVImport_PreservesTransactionCategory is the P0-T5 re-sync guard: a raw
+// re-import (re-sync) of an UNCHANGED transaction must PRESERVE its existing
+// category_id (the UpsertTransaction on-conflict sets category_id =
+// transactions.category_id). There is no override column anymore — the
+// preserve-on-resync behavior is what protects a manual category edit.
+func TestCSVImport_PreservesTransactionCategory(t *testing.T) {
 	env := setupTestEnv(t)
 	user := testutil.MustCreateUser(t, env.Queries, "Eve")
 	uncat := seedUncategorized(t, env.Queries)
@@ -372,9 +377,9 @@ func TestCSVImport_PreservesCategoryOverride(t *testing.T) {
 		t.Fatalf("first import: want 2 imported, got %+v", first)
 	}
 
-	// Pick the "Grocery Store" transaction by description and force a
-	// manual category override. The rest of the test asserts that
-	// re-importing the same CSV does NOT clobber that override.
+	// Pick the "Grocery Store" transaction by description and manually set its
+	// category. The rest of the test asserts that re-importing the same CSV
+	// (an unchanged re-sync) does NOT clobber that category.
 	var groceriesTxnID = ""
 	if err := env.Pool.QueryRow(context.Background(),
 		`SELECT id::text FROM transactions WHERE provider_name = 'Grocery Store'`).Scan(&groceriesTxnID); err != nil {
@@ -382,46 +387,41 @@ func TestCSVImport_PreservesCategoryOverride(t *testing.T) {
 	}
 
 	if _, err := env.Pool.Exec(context.Background(),
-		`UPDATE transactions SET category_id = $1, category_override = 'user' WHERE id = $2`,
+		`UPDATE transactions SET category_id = $1 WHERE id = $2`,
 		groceries.ID, groceriesTxnID); err != nil {
-		t.Fatalf("set override: %v", err)
+		t.Fatalf("set category: %v", err)
 	}
 
-	// Sanity: the row really is overridden.
-	var beforeOverride string
+	// Sanity: the row really carries the manual category.
 	var beforeCategory string
 	if err := env.Pool.QueryRow(context.Background(),
-		`SELECT category_override, category_id::text FROM transactions WHERE id = $1`,
-		groceriesTxnID).Scan(&beforeOverride, &beforeCategory); err != nil {
+		`SELECT category_id::text FROM transactions WHERE id = $1`,
+		groceriesTxnID).Scan(&beforeCategory); err != nil {
 		t.Fatalf("read pre-state: %v", err)
 	}
-	if beforeOverride == "none" {
-		t.Fatalf("override flag did not stick")
+	if beforeCategory != pgconv.FormatUUID(groceries.ID) {
+		t.Fatalf("category did not stick before re-import")
 	}
 
-	// Re-import the same CSV.
+	// Re-import the same CSV (unchanged re-sync).
 	body["connection_id"] = first.ConnectionID
 	delete(body, "user_id")
 	resp = env.doPost(t, "/api/v1/connections/csv/import", body)
 	assertStatus(t, resp, http.StatusCreated)
 
-	// Override must still be true and category must still point at
-	// groceries — not be reset to uncategorized.
-	var afterOverride string
+	// Category must still point at groceries — the re-sync must preserve it,
+	// not reset it to uncategorized.
 	var afterCategory string
 	if err := env.Pool.QueryRow(context.Background(),
-		`SELECT category_override, category_id::text FROM transactions WHERE id = $1`,
-		groceriesTxnID).Scan(&afterOverride, &afterCategory); err != nil {
+		`SELECT category_id::text FROM transactions WHERE id = $1`,
+		groceriesTxnID).Scan(&afterCategory); err != nil {
 		t.Fatalf("read post-state: %v", err)
 	}
-	if afterOverride == "none" {
-		t.Fatalf("re-import cleared category_override flag")
-	}
 	if afterCategory != beforeCategory {
-		t.Fatalf("re-import changed category_id (was %s, now %s); should have respected override", beforeCategory, afterCategory)
+		t.Fatalf("re-import changed category_id (was %s, now %s); re-sync must preserve the existing category", beforeCategory, afterCategory)
 	}
 	if afterCategory == pgconv.FormatUUID(uncat.ID) {
-		t.Fatalf("re-import reset to uncategorized; override was sacred")
+		t.Fatalf("re-import reset to uncategorized; re-sync must preserve the manual category")
 	}
 }
 

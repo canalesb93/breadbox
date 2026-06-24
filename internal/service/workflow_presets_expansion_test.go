@@ -230,8 +230,5 @@ func TestF4NewPromptBlocksLoad(t *testing.T) {
 		if strings.TrimSpace(b.Content) == "" {
 			t.Errorf("new prompt block %q has empty content", id)
 		}
-		if b.Group != GroupStrategy {
-			t.Errorf("new prompt block %q group = %q, want strategy", id, b.Group)
-		}
 	}
 }

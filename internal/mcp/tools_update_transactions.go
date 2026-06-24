@@ -21,8 +21,8 @@ type updateTransactionsInput struct {
 // one transaction.
 type transactionOperationInput struct {
 	TransactionID string            `json:"transaction_id" jsonschema:"required,UUID or short ID."`
-	CategorySlug  *string           `json:"category_slug,omitempty" jsonschema:"Category slug to set (e.g. 'food_and_drink_groceries'). Omit to leave the category unchanged. Mutually exclusive with reset_category. Precedence is user > agent > rule: your write stamps the row as an agent override and can replace a rule's or another agent's category, but it will NOT overwrite a category a human has set — that op comes back with status 'skipped' (tags/comment in the same op still apply)."`
-	ResetCategory bool              `json:"reset_category,omitempty" jsonschema:"Clear an existing manual category override and drop the transaction back to 'uncategorized' so rules can re-categorize it. Mutually exclusive with category_slug. Use this to undo a prior categorize/update_transactions decision."`
+	CategorySlug  *string           `json:"category_slug,omitempty" jsonschema:"Category slug to set (e.g. 'food_and_drink_groceries'). Omit to leave the category unchanged. Mutually exclusive with reset_category. Category writes are last-writer-wins — there is no provenance or lock, so your write always lands (rules only re-run on changed transactions, so a manual edit on an unchanged row is not re-clobbered)."`
+	ResetCategory bool              `json:"reset_category,omitempty" jsonschema:"Drop the transaction back to 'uncategorized' so rules can re-categorize it. Mutually exclusive with category_slug. Use this to undo a prior categorize/update_transactions decision."`
 	TagsToAdd     []tagOpEntryInput `json:"tags_to_add,omitempty" jsonschema:"List of tags to add. Each item: {slug}. Auto-creates persistent tags if the slug is unknown."`
 	TagsToRemove  []tagOpEntryInput `json:"tags_to_remove,omitempty" jsonschema:"List of tags to remove. Each item: {slug}."`
 	Comment       *string           `json:"comment,omitempty" jsonschema:"Free-form comment written as an annotation attributed to you. Max 10000 chars. This is the canonical place to record decision context (e.g. why a tag was added or a category set) — prefer the comment over a per-tag note. When you set flagged:true, put the flag's reason here — it lands as the same comment annotation."`
@@ -118,20 +118,13 @@ func (s *MCPServer) handleUpdateTransactions(ctx context.Context, _ *mcpsdk.Call
 		return errorResult(err), nil, nil
 	}
 
-	// Count successes/skips/failures for the summary block. A "skipped" op is one
-	// whose category write was blocked because the row is locked to a user
-	// override (precedence user > agent > rule) — not an error, but the agent
-	// should know its category change did not land.
+	// Count successes/failures for the summary block.
 	succeeded := 0
-	skipped := 0
 	failed := 0
 	for _, r := range results {
-		switch r.Status {
-		case "ok":
+		if r.Status == "ok" {
 			succeeded++
-		case "skipped":
-			skipped++
-		default:
+		} else {
 			failed++
 		}
 	}
@@ -139,7 +132,6 @@ func (s *MCPServer) handleUpdateTransactions(ctx context.Context, _ *mcpsdk.Call
 	payload := map[string]any{
 		"results":   results,
 		"succeeded": succeeded,
-		"skipped":   skipped,
 		"failed":    failed,
 	}
 	if err != nil {

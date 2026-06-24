@@ -46,7 +46,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/transactions/update` | W | Atomic multi-field batch (category + tags + comment per row, max 50) |
 | POST | `/transactions/batch-categorize` | W | Set category on many transactions (max 500) |
 | POST | `/transactions/bulk-recategorize` | W | Server-side recategorize by filter |
-| PATCH | `/transactions/{id}/category` | W | Set category (`category_override='user'`) |
+| PATCH | `/transactions/{id}/category` | W | Set category (`category_id`; last-writer-wins) |
 | DELETE | `/transactions/{id}/category` | W | Reset category to provider default |
 | DELETE | `/transactions/{id}` | W | Soft-delete (sets `deleted_at`) |
 | POST | `/transactions/{id}/restore` | W | Restore a soft-deleted transaction |
@@ -89,18 +89,25 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| GET | `/series` | R | List recurring series; optional `?status=active\|candidate\|paused\|cancelled` |
-| GET | `/series/explain` | R | Near-miss feed: recurring-looking merchants not yet a series + the detector's verdict (why) |
+| GET | `/series` | R | List recurring series (thin: id, short_id, name, type, tags) |
 | GET | `/series/{id}` | R | Single series (accepts UUID or short_id) |
-| POST | `/series` | W | Create a missed series (`merchant_key`+`create_if_missing`) or assign by `series_id`; links `transaction_ids` (≤50), optional `confirm` |
-| POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series; optional `confirm` |
-| DELETE | `/series/{id}/transactions/{txid}` | W | Unlink a transaction from a series; strips inherited tags, recomputes rollups; errors if not a member |
-| POST | `/series/{id}/rekey` | W | Correct a series' `merchant_key` (+ repoint members); errors on collision / sticky-reject |
-| POST | `/series/{id}/split` | W | Move `transaction_ids` (≤50, current members) into a new series under `new_merchant_key` |
-| POST | `/series/{id}/type` | W | Set the series type (`subscription`/`bill`/`loan`/`other`); sticky override of the inferred type |
+| POST | `/series` | W | Assign by `series_id`, or mint/resolve by `series_name`+`create_if_missing` (optional `type`); links `transaction_ids` (≤50, NULL-fill only) |
+| POST | `/series/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a series |
+| DELETE | `/series/{id}/transactions/{txid}` | W | Unlink a transaction from a series; strips inherited tags; errors if not a member |
 | POST | `/series/{id}/tags` | W | Attach a tag to a series; linked transactions inherit it |
 | DELETE | `/series/{id}/tags/{slug}` | W | Detach a tag; strips series-inherited copies from members (keeps user-added) |
-| PATCH | `/series/{id}` | W | Partial update — edit attributes (`name`, `expected_amount`+`currency`, `amount_tolerance`, `cadence`, `expected_day`, `category_id`, `user_id`) and/or apply a `verdict` (`confirm`/`reject`/`pause`/`cancel`); edits apply first; user confirmation outranks agent |
+| PATCH | `/series/{id}` | W | Edit a thin series' `name` and/or `type` (`subscription`/`bill`/`loan`/`other`) |
+
+## Counterparties
+
+| Method | Path | Scope | Description |
+|--------|------|-------|-------------|
+| GET | `/counterparties` | R | List counterparties (id, short_id, name, enrichment fields) |
+| GET | `/counterparties/{id}` | R | Single counterparty (accepts UUID or short_id) |
+| POST | `/counterparties` | W | Create by `name` + optional `website_url`/`logo_url`/`category_id`/`mcc`; duplicate live name rejected |
+| PATCH | `/counterparties/{id}` | W | Enrich `name`/`website_url`/`logo_url`/`category_id`/`mcc` (partial; empty body rejected) |
+| POST | `/counterparties/{id}/transactions` | W | Link transactions (≤50, NULL-fill only) to a counterparty |
+| DELETE | `/counterparties/{id}/transactions/{txid}` | W | Unlink a transaction; errors if not a current member |
 
 ## Rules
 
@@ -112,7 +119,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | POST | `/rules` | W | Create a rule |
 | POST | `/rules/batch` | W | Bulk create; per-op results, `on_error: continue\|abort` |
 | POST | `/rules/preview` | W | Dry-run — show which transactions would match |
-| POST | `/rules/{id}/apply` | W | Apply one rule retroactively (respects `category_override`) |
+| POST | `/rules/{id}/apply` | W | Apply one rule retroactively (set_category last-writer-wins) |
 | POST | `/rules/apply-all` | W | Apply every active rule retroactively |
 | PUT | `/rules/{id}` | W | Replace a rule |
 | DELETE | `/rules/{id}` | W | Delete a rule |
@@ -291,7 +298,6 @@ Workflows are scheduled Claude Agent SDK runs that call breadbox MCP to enrich, 
 | POST | `/workflows/cleanup` | W | Run the agent cleanup pass on demand; returns `{runs_deleted, transcripts_deleted, transcripts_scanned, retention_days, transcript_dir}` |
 | GET | `/workflows/{slug}/runs` | R | Offset-paginated run history; `?limit=50&offset=0` (max 200); filters: `status`, `trigger`, `hit_cap` (`max_turns`/`max_budget`/`any`), `start`, `end` |
 | GET | `/workflows/runs` | R | Cross-agent run history with `agent_slug`+`agent_name` per row; same filters as `/workflows/{slug}/runs` plus optional `agent=<slug>` to narrow to one definition |
-| GET | `/workflows/prompt-blocks` | R | Parsed view of the embedded `prompts/agents/*.md` library — id, title, description, group (`strategy`/`depth`/`integration`/`knowledge`), and full markdown content |
 | GET | `/workflow-presets` | R | List the code-defined Workflow preset gallery, annotated with enabled-state |
 | POST | `/workflow-presets/{slug}/enable` | W | Instantiate a workflow from a preset (409 if already enabled) |
 | GET | `/workflows/runs/recent-errors` | R | Errored runs across all agents in the last `hours` (default 24, max 168); `?limit=5` (max 50); joined with `agent_slug`+`agent_name` for deep-link |

@@ -513,6 +513,23 @@
   .bb-icon-tile--error   { @apply bg-error/10 text-error; }
   .bb-icon-tile--neutral { @apply bg-base-200 text-base-content/60; }
 
+  /* Entity-avatar gradient monogram — the deterministic-color fallback tile for
+     an entity with no logo (a counterparty without a logo_url). The hue is
+     pinned per-name via an inline `--bb-avatar-hue` (0–360), the same way
+     .bb-tx-avatar reads an inline `--avatar-color`. OKLCH keeps the two stops
+     legible at every hue (fixed lightness/chroma, hue-only spin) so the white
+     monogram letters always read; the slight diagonal + darker second stop give
+     it the calm depth of the Workflows custom-avatar tiles without shouting.
+     Theme-independent on purpose: an identity color, like a DiceBear avatar. */
+  .bb-entity-avatar--mono {
+    background-image: linear-gradient(
+      135deg,
+      oklch(0.64 0.13 var(--bb-avatar-hue)),
+      oklch(0.52 0.15 var(--bb-avatar-hue))
+    );
+    color: oklch(0.99 0 0);
+  }
+
   /* Detail-page entity header — 40×40 tile on mobile, 48×48 at sm+
      for the top-of-page row that pairs an icon with the entity name +
      badges + meta line. The mobile shrink reclaims horizontal space
@@ -603,7 +620,7 @@
      brackets them. Flatter than .bb-card (no shadow) so it reads as a
      quiet container, not a raised panel. */
   .bb-settings-card {
-    @apply rounded-xl border border-base-300 bg-base-100 overflow-hidden;
+    @apply rounded-xl border border-base-300 bg-base-100;
   }
   .bb-settings-card--danger {
     @apply border-error/25 bg-error/[0.025];
@@ -626,6 +643,16 @@
      reveals. */
   .bb-settings-row {
     @apply flex items-center justify-between gap-4 px-4 sm:px-5 py-3.5 min-h-[3rem];
+  }
+  /* The card no longer clips with overflow-hidden (so row tooltips can escape
+     its bounds), so round whichever child sits at the top/bottom edge — keeps a
+     `--link` row's hover background, the footer's tint, and the hairline
+     dividers flush with the card's rounded border instead of poking past it. */
+  .bb-settings-card > :first-child {
+    @apply rounded-t-xl;
+  }
+  .bb-settings-card > :last-child {
+    @apply rounded-b-xl;
   }
   .bb-settings-card > .bb-settings-row + .bb-settings-row,
   .bb-settings-card__body > .bb-settings-row + .bb-settings-row,

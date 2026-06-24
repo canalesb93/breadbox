@@ -213,6 +213,41 @@ func TestSyncTransactions_MappingAndSigns(t *testing.T) {
 	}
 }
 
+func TestSyncTransactions_ReturnsDiscoveredAccounts(t *testing.T) {
+	// Two banks under one access URL — the SimpleFIN aggregator case. The sync
+	// must surface the full account set so the engine can pick up banks the user
+	// linked at the bridge after the initial connect.
+	fb := newFakeBridge(t, `{"errors":[],"accounts":[
+		{"org":{"name":"Bank A"},"id":"acct-1","name":"Checking","currency":"USD","balance":"50.00","transactions":[]},
+		{"org":{"name":"Bank B"},"id":"acct-2","name":"Savings","currency":"USD","balance":"100.00","transactions":[]}
+	]}`)
+	p := testProvider()
+	enc, _ := crypto.Encrypt([]byte(fb.accessURL()), testKey)
+	conn := provider.Connection{ProviderName: "simplefin", EncryptedCredentials: enc}
+
+	// Empty cursor → multi-window backfill. Every window re-returns the full
+	// account list, so SyncTransactions must take the union deduped by external
+	// id — each account appears exactly once in the result, not one copy per
+	// window.
+	res, err := p.SyncTransactions(context.Background(), conn, "")
+	if err != nil {
+		t.Fatalf("SyncTransactions: %v", err)
+	}
+	if fb.accountsHits < 2 {
+		t.Fatalf("expected multiple windows for a backfill, got %d hits", fb.accountsHits)
+	}
+	if len(res.Accounts) != 2 {
+		t.Fatalf("accounts = %d, want 2 (deduped across %d windows)", len(res.Accounts), fb.accountsHits)
+	}
+	byID := map[string]provider.Account{}
+	for _, a := range res.Accounts {
+		byID[a.ExternalID] = a
+	}
+	if byID["acct-1"].Name != "Checking" || byID["acct-2"].Name != "Savings" {
+		t.Errorf("account names not mapped: %+v", res.Accounts)
+	}
+}
+
 func TestSyncTransactions_WindowsLongBackfill(t *testing.T) {
 	fb := newFakeBridge(t, `{"errors":[],"accounts":[{"org":{"name":"Bank"},"id":"a","name":"Checking","currency":"USD","balance":"0","transactions":[]}]}`)
 	p := testProvider()

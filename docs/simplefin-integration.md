@@ -58,6 +58,20 @@ window each sync, the engine soft-deletes stale pending rows via the
 `ReconcilesPendingByPolling()` capability (shared with Teller — see
 `.claude/rules/providers.md`).
 
+### Account discovery on every sync
+
+One access URL spans every bank at the bridge, and the user can link more banks
+there *after* connecting Breadbox. So `SyncTransactions` also returns the
+connection's **full current account set** in `SyncResult.Accounts` (captured once
+per sync — the bridge lists the full set on every window, so there's no need to
+re-collect per window). Before processing transactions, the sync engine upserts
+that set with `UpsertAccountMetadata` — **metadata only, never balances** (those
+are owned by the balance-refresh path) and `connection_id` is set only on INSERT,
+so an existing account keeps its connection. A bank added at the bridge after
+connect therefore appears in Breadbox on the next sync automatically — no
+reconnect, no new token. Providers whose account set is fixed at connect time
+(Plaid, CSV) leave `SyncResult.Accounts` nil and the engine skips the upsert.
+
 ### Rate limits
 
 The SimpleFIN Bridge expects **≤ 24 requests/day** ("daily updates"). New

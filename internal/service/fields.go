@@ -23,8 +23,9 @@ var validFields = map[string]bool{
 	"authorized_datetime":          true,
 	"provider_name":                true,
 	"provider_merchant_name":       true,
+	"counterparty_short_id":        true,
+	"counterparty_name":            true,
 	"category":                     true,
-	"category_override":            true,
 	"provider_category_primary":    true,
 	"provider_category_detailed":   true,
 	"provider_category_confidence": true,
@@ -153,10 +154,12 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 			m["provider_name"] = t.ProviderName
 		case "provider_merchant_name":
 			m["provider_merchant_name"] = t.ProviderMerchantName
+		case "counterparty_short_id":
+			m["counterparty_short_id"] = t.CounterpartyShortID
+		case "counterparty_name":
+			m["counterparty_name"] = t.CounterpartyName
 		case "category":
 			m["category"] = t.Category
-		case "category_override":
-			m["category_override"] = t.CategoryOverride
 		case "provider_category_primary":
 			m["provider_category_primary"] = t.ProviderCategoryPrimary
 		case "provider_category_detailed":

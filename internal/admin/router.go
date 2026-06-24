@@ -173,6 +173,15 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			http.Redirect(w, req, "/recurring/"+chi.URLParam(req, "id"), http.StatusFound)
 		})
 
+		// Counterparties — the canonical "other side" of a charge (merchants AND
+		// non-merchants). List + detail (enrichment form, linked charges,
+		// governing rules). Editor scope. Static /new before the {id} param.
+		r.Get("/counterparties", CounterpartiesListPageHandler(a, svc, sm, tr))
+		r.Get("/counterparties/new", NewCounterpartyPageHandler(a, svc, sm, tr))
+		r.Post("/counterparties/new", CreateCounterpartyPageHandler(a, svc, sm, tr))
+		r.Get("/counterparties/{id}", CounterpartyDetailHandler(a, sm, tr, svc))
+		r.Post("/counterparties/{id}", UpdateCounterpartyPageHandler(a, svc, sm, tr))
+
 		// Design-system sandbox. /design is the full gallery; /design/c/{slug}
 		// renders a single component family in isolation for focused screenshots.
 		// Editor scope: developer tooling, not user-facing.
@@ -439,6 +448,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/sync/schedules/{shortID}/toggle", ScheduleToggleHandler(a, svc, sm))
 		r.Post("/settings/sync/schedules/{shortID}/delete", ScheduleDeleteHandler(a, svc, sm))
 		r.Post("/settings/avatar-style", SettingsAvatarStylePostHandler(a, sm))
+		r.Post("/settings/counterparty-logos", SettingsCounterpartyLogosPostHandler(a, sm))
+		r.Post("/settings/logo-dev-token", SettingsLogoDevTokenPostHandler(a, sm))
 	})
 
 	// Admin API (authenticated, JSON responses).
@@ -481,10 +492,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Group(func(r chi.Router) {
 			r.Use(RequireEditor(sm))
 
-			// Transaction category override
+			// Transaction category
 			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc, sm))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc, sm))
-			r.Patch("/transactions/{id}/category-override", SetCategoryOverrideAdminHandler(svc, sm))
 
 			// Transaction bulk categorize
 			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc, sm))

@@ -15,7 +15,6 @@
 //
 // Scalars flow via data-* attributes on each factory's root (see templ):
 //   data-tx-id              -> p.TransactionID (all three factories)
-//   data-category-override  -> p.Transaction.CategoryOverride ("true"/"false")
 //   data-max-comment-length -> p.MaxCommentLength
 //
 // Back-compat note: the inline `categoryPicker` factory in tx_row.templ
@@ -381,18 +380,14 @@ document.addEventListener('alpine:init', function () {
     });
   }
 
-  // Category editor sidebar. Reads transaction id + override flag from
-  // data-* attributes on its root.
+  // Category editor sidebar. Reads transaction id from a data-* attribute.
   Alpine.data('txdCategoryEditor', function () {
     return {
       saving: false,
-      isOverride: false,
       txId: '',
 
       init: function () {
-        var ds = this.$el.dataset;
-        this.txId = ds.txId || '';
-        this.isOverride = ds.categoryOverride === 'true';
+        this.txId = this.$el.dataset.txId || '';
       },
 
       setCategoryFromPicker: function (detail) {
@@ -401,11 +396,7 @@ document.addEventListener('alpine:init', function () {
           return;
         }
         var self = this;
-        var prevOverride = this.isOverride;
         this.saving = true;
-        // Optimistic chip-state update: flip override badge immediately
-        // so the sidebar reads as "manual" while the request flies.
-        this.isOverride = true;
         fetch('/-/transactions/' + this.txId + '/category', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -425,7 +416,6 @@ document.addEventListener('alpine:init', function () {
           })
           .catch(function (e) {
             self.saving = false;
-            self.isOverride = prevOverride;
             restorePageState();
             showToast((e && e.message) || 'Network error.');
           });
@@ -433,9 +423,7 @@ document.addEventListener('alpine:init', function () {
 
       resetCategory: function () {
         var self = this;
-        var prevOverride = this.isOverride;
         this.saving = true;
-        this.isOverride = false;
         fetch('/-/transactions/' + this.txId + '/category', { method: 'DELETE' })
           .then(function (r) {
             if (!r.ok && r.status !== 204) {
@@ -449,44 +437,7 @@ document.addEventListener('alpine:init', function () {
           })
           .catch(function (e) {
             self.saving = false;
-            self.isOverride = prevOverride;
             restorePageState();
-            showToast((e && e.message) || 'Network error.');
-          });
-      },
-
-      // Flips the override flag without changing the category. Locked rows are
-      // protected from transaction rules; unlocked rows can be re-categorized
-      // on the next sync if a matching rule fires.
-      toggleOverride: function () {
-        if (this.saving) return;
-        var self = this;
-        var prevOverride = this.isOverride;
-        var next = !prevOverride;
-        this.saving = true;
-        this.isOverride = next;
-        fetch('/-/transactions/' + this.txId + '/category-override', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ override: next }),
-        })
-          .then(function (r) {
-            if (!r.ok && r.status !== 204) {
-              return r.json().then(function (d) {
-                throw new Error((d && d.error && d.error.message) || 'Failed to update lock.');
-              });
-            }
-          })
-          .then(function () {
-            self.saving = false;
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-              window.lucide.createIcons();
-            }
-            showToast(next ? 'Category locked.' : 'Category unlocked.', 'success');
-          })
-          .catch(function (e) {
-            self.saving = false;
-            self.isOverride = prevOverride;
             showToast((e && e.message) || 'Network error.');
           });
       },

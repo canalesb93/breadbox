@@ -16,7 +16,7 @@ icon: shapes
 ### Categorization
 
 - `update_transactions`: the preferred write for routine work — combines set-category, tag changes, and a comment into one atomic operation per transaction (max 50 per call). Use this when finishing a review: set the category AND remove the `needs-review` tag in one write.
-- `categorize_transaction`: manually override a single transaction (sets `category_override='user'`). Use only when you don't need the compound op.
+- `categorize_transaction`: set the category on a single transaction (writes `category_id`; last-writer-wins, no provenance). Use only when you don't need the compound op.
 - `batch_categorize_transactions`: override multiple transactions at once (max 500) without touching tags.
 - `reset_transaction_category`: remove a manual override, let rules re-resolve the category.
 - `bulk_recategorize`: move ALL transactions matching filters from one category to another.

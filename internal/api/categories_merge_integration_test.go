@@ -86,14 +86,14 @@ func TestMergeCategories_TargetGetsTransactions(t *testing.T) {
 	tgtTxn := testutil.MustCreateTransaction(t, env.Queries, acct.ID, "ext_t1", "T1", 300, "2025-03-03")
 
 	for _, txn := range srcTxns {
-		if _, err := env.Queries.SetTransactionCategoryOverride(context.Background(), db.SetTransactionCategoryOverrideParams{
+		if _, err := env.Queries.SetTransactionCategory(context.Background(), db.SetTransactionCategoryParams{
 			ID:         txn.ID,
 			CategoryID: src.ID,
 		}); err != nil {
 			t.Fatalf("attach src txn: %v", err)
 		}
 	}
-	if _, err := env.Queries.SetTransactionCategoryOverride(context.Background(), db.SetTransactionCategoryOverrideParams{
+	if _, err := env.Queries.SetTransactionCategory(context.Background(), db.SetTransactionCategoryParams{
 		ID:         tgtTxn.ID,
 		CategoryID: tgt.ID,
 	}); err != nil {

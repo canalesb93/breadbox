@@ -143,7 +143,7 @@ func pageSectionLabel(currentPage string) string {
 		return "Setup"
 	case "feed", "transactions", "accounts", "recurring", "reports":
 		return "Overview"
-	case "workflows", "agents", "rules", "categories", "tags":
+	case "workflows", "agents", "rules", "categories", "counterparties", "tags":
 		return "Manage"
 	case "connections", "household", "logs":
 		return "System"
@@ -332,7 +332,6 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		p.UnreadReports = badges.UnreadReports
 		p.ConnectionsAttention = badges.ConnectionsAttention
 		p.PendingReviews = badges.PendingReviews
-		p.SeriesCandidates = badges.SeriesCandidates
 		p.WorkflowFailures = badges.WorkflowFailures
 	}
 	return p

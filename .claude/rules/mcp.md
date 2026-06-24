@@ -91,8 +91,9 @@ Several writes are deliberately compound so the registry stays small and an agen
 
 - `update_transactions` — see above (category, tags, comment, flag).
 - `set_transaction_metadata` — the single op over the free-form metadata JSONB column: `set` (merge keys), `unset` (delete keys), `replace:true` (swap/clear the whole blob). Absorbed `remove_`/`replace_`/`clear_transaction_metadata`.
-- `update_series` — edits a recurring series' attributes **plus** `type` (absorbed `set_series_type`) and tag membership via `tags_to_add` / `tags_to_remove` (absorbed `add_series_tag` / `remove_series_tag`). Each sub-change still calls the same service method, so the semantics (collision guards, sticky type, tag provenance) are unchanged.
 - `create_transaction_rule` — takes a `rules` array of 1..N specs (absorbed `batch_create_rules`); each spec may carry `apply_retroactively`.
+
+The recurring-series subsystem (rules-as-substrate) keeps its writes split — `assign_series`, `update_series` (name/type), `unlink_series_transactions`, `add_series_tag`, `remove_series_tag` — to mirror the rule-driven membership model; don't fold those.
 
 When folding a tool, prefer reusing the existing service methods from the compound handler over re-implementing the write — the MCP layer is where the consolidation lives.
 

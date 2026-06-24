@@ -49,30 +49,19 @@ UPDATE transactions
 SET category_id = $2, updated_at = NOW()
 WHERE category_id = $1 AND deleted_at IS NULL;
 
--- name: SetTransactionCategoryOverride :execrows
+-- name: SetTransactionCategory :execrows
+-- Set a transaction's category. Provenance was removed in P3 (rules-substrate):
+-- rules, agents, and users all write category_id directly (last-writer-wins).
 UPDATE transactions
-SET category_id = $2, category_override = 'user', updated_at = NOW()
+SET category_id = $2, updated_at = NOW()
 WHERE id = $1;
 
--- name: SetTransactionCategoryOverrideAgent :execrows
--- Agent category write. Precedence user > agent > rule: an agent may overwrite
--- a 'none' or 'agent' row but NEVER a 'user' lock. Returns 0 rows affected when
--- the row exists but is user-locked, so the caller can report a skip.
+-- name: ClearTransactionCategory :execrows
+-- Reset a transaction's category to a target category (uncategorized). Replaces
+-- the old override-clearing reset path; there is no longer a provenance flag to
+-- clear.
 UPDATE transactions
-SET category_id = $2, category_override = 'agent', updated_at = NOW()
-WHERE id = $1 AND category_override <> 'user';
-
--- name: ClearTransactionCategoryOverride :execrows
-UPDATE transactions
-SET category_override = 'none', updated_at = NOW()
-WHERE id = $1;
-
--- name: SetCategoryOverrideFlag :execrows
--- Flips the override flag without changing the category. Used by the
--- detail-page lock toggle, which only governs whether transaction rules
--- may re-categorize the row.
-UPDATE transactions
-SET category_override = $2, updated_at = NOW()
+SET category_id = $2, updated_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- ReassignRulesCategory was removed in 20260415070000_rule_actions_v2 — rule

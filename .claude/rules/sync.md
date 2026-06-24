@@ -34,7 +34,7 @@ On startup, `MarkOrphanedSyncLogs()` sets any `in_progress` log to `error` with 
 
 After each transaction upsert inside the sync transaction:
 
-1. **Transaction rules** — `ApplyRulesToTransaction` matches active non-expired rules filtered by `trigger × isNew`. Typed actions (`set_category`, `add_tag`, `add_comment`) execute atomically inside the same DB tx. `set_category` skips `category_override=true` rows. Batched hit-count increments via `BatchIncrementHitCounts`. Each fired action writes an annotation (`rule_applied`, `category_set`, `tag_added`, `comment`) for the unified audit log.
+1. **Transaction rules** — `ApplyRulesToTransaction` matches active non-expired rules filtered by `trigger × isNew`. Typed actions (`set_category`, `add_tag`, `add_comment`) execute atomically inside the same DB tx. `set_category` writes `category_id` directly (last-writer-wins; provenance/`category_override` removed in P3, rules only run on `isNew||isChanged`). Batched hit-count increments via `BatchIncrementHitCounts`. Each fired action writes an annotation (`rule_applied`, `category_set`, `tag_added`, `comment`) for the unified audit log.
 2. **Review tagging** — handled entirely by the rule engine. The seeded system rule (NULL conditions, `trigger=on_create`, action `add_tag: needs-review`) attaches `needs-review` to every newly-synced transaction. Disable that rule to opt out. No separate enqueue path.
 
 Everything lives inside the sync tx — either it all commits or nothing does.

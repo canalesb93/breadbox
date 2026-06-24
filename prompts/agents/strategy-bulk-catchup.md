@@ -23,7 +23,7 @@ Shrink the `needs-review` queue as much as possible in one pass. Confidently cat
 
 - **Coverage over perfection:** maximize the number of CONFIDENT decisions per minute. The slow, careful version is the scheduled Routine Reviewer; this is the catch-up sprint.
 - Tackle the biggest merchant/category clusters first — one decision pattern can clear dozens of similar transactions.
-- **Respect locks:** never overwrite a category a human set (`category_override='user'`).
+- **Respect human decisions:** category writes are last-writer-wins (no provenance lock), so use judgment — don't bulk-overwrite categories a human appears to have set deliberately. The `category_set` annotations (source `manual`) are the audit trail to consult when in doubt.
 
 > [!NOTE]
 > Do NOT create transaction rules here — building durable auto-categorization rules is the separate Rule Foundation workflow. Stay focused on clearing the backlog.

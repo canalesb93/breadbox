@@ -6,6 +6,8 @@
 
 This document defines the complete PostgreSQL database schema for the Breadbox MVP. An engineer should be able to write all migration files directly from this document without consulting any other source.
 
+> **Governing doctrine.** How synced data is identified, standardized, and enriched on top of this schema is governed by the **"Operating Model — the reconciliation flywheel"** section of the root `CLAUDE.md` (provider data is immutable; intelligence accrues as rules). The full design + rollout lives in Obsidian `planned-features/rules-as-universal-substrate.md` and `rules-substrate-implementation-roadmap.md`. The matchable-field stability contract is in `docs/rule-dsl.md`.
+
 ---
 
 ## Table of Contents
@@ -619,6 +621,42 @@ The following keys are seeded during initial migration and used by the applicati
 | `webhook_url` | `(empty)` | Publicly accessible URL for Plaid webhooks. Optional. |
 | `sync_interval_hours` | `12` | How often the cron sync runs, in hours. |
 | `setup_complete` | `false` | Whether the first-run setup wizard has been completed. |
+| `counterparty_logos` | `true` | Whether counterparty avatars hotlink brand logos from logo.dev (see below). `false` disables it (monogram everywhere). Overridable via `BREADBOX_COUNTERPARTY_LOGOS`. |
+| `logo_dev_token` | `(empty)` | logo.dev publishable key (`pk_…`). **Required for logos to appear** — logo.dev's image API 401s without a token. Stored in plaintext (publishable keys are public by design). Overridable via `LOGO_DEV_TOKEN`. |
+
+#### Counterparty brand logos (logo.dev)
+
+Counterparty avatars (`/counterparties` rows and detail headers) show real brand
+logos **hotlinked** from the [logo.dev](https://logo.dev) image API
+(`https://img.logo.dev/{domain}?token={pk}&size=128&format=png&retina=true&fallback=404`).
+The domain is derived at render time from the counterparty's `website_url`
+(scheme + leading `www.` stripped); a counterparty with no website, or with a
+manual `logo_url` override, never hits logo.dev.
+
+**Token-gated.** logo.dev's image API requires a publishable key — a tokenless
+request 401s on every render. The feature is therefore gated on a configured
+`logo_dev_token`: with no token (the default), every counterparty renders its
+gradient monogram and **no request leaves the browser for logo.dev** — a correct,
+complete default. Paste a free publishable key in Settings → General →
+Counterparties to light up real logos. The full resolution chain per avatar is:
+manual `logo_url` → (`counterparty_logos` enabled + token + derivable domain)
+logo.dev hotlink → gradient monogram.
+
+**Hotlink, not fetch-and-store.** Breadbox does not download or cache the logo;
+the browser loads it directly from logo.dev. `fallback=404` makes an unknown
+domain 404 (rather than logo.dev's own placeholder), so the avatar's `<img>`
+`onerror` removes the image and reveals the gradient monogram underneath — it
+never shows a broken image.
+
+**Privacy.** Because logos are hotlinked, the counterparty's **domain is sent to
+logo.dev on every render** of a counterparty surface. Households that prefer not
+to leak counterparty domains can disable hotlinking from
+**Settings → General → Counterparties** (writes `counterparty_logos=false`), at
+which point every counterparty falls back to its monogram and no request leaves
+the browser for logo.dev. A self-hosted, single-household deployment is exempt
+from logo.dev's commercial link-back/attribution requirement (it's personal,
+non-commercial use). An optional publishable token (`logo_dev_token` /
+`LOGO_DEV_TOKEN`) raises rate limits; it is a public key by design.
 
 ---
 
@@ -782,7 +820,7 @@ CHECK (actor_type IN ('user', 'agent', 'system'))
 
 ### 2.12 `recurring_series`
 
-**Purpose:** The durable "this merchant is a recurring charge" fact — subscriptions, bills, and loans. One row per detected (or user-created) series; member charges link back via `transactions.series_id`. The deterministic detector mints candidates; users/agents adjudicate them (`confidence`) and edit their attributes. "subscription" is one `type`, not the umbrella.
+**Purpose:** A **thin, rule-maintained** recurring series — a subscription, bill, or loan. Surrogate identity (`id`/`short_id`), an agent/user-authored `name`, and a `type`. **There is no shipped detector** (rules-as-universal-substrate, P2): membership comes entirely from `assign_series` rules (plus first-class agent one-off assigns), and member charges link back via `transactions.series_id`. No computed stats (cadence, expected amount, next-date, occurrence count, detection signals) and no lifecycle/confidence axis — a series' "definition" is its governing `assign_series` rules.
 
 #### Columns
 
@@ -790,28 +828,11 @@ CHECK (actor_type IN ('user', 'agent', 'system'))
 |---|---|---|---|---|
 | `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
 | `short_id` | `TEXT` | No | trigger-generated | 8-character base62 alias. |
-| `user_id` | `UUID` | Yes | `NULL` | FK → `users(id)`. SET NULL on delete. `NULL` = shared/household series. Part of the dedup signature. |
-| `name` | `TEXT` | No | — | Display label. User-editable; protected from re-detection once a user/agent edits it. |
-| `merchant_key` | `TEXT` | No | — | Normalized detection anchor. Part of the dedup signature. Corrected via re-key, not a free edit. |
-| `cadence` | `TEXT` | No | `'unknown'` | `weekly`/`biweekly`/`monthly`/`quarterly`/`semiannual`/`annual`/`irregular`/`unknown`. Drives `next_expected_date`. |
-| `expected_day` | `INTEGER` | Yes | `NULL` | Day-of-month / day-of-week anchor, when known. |
-| `expected_amount` | `NUMERIC(12,2)` | Yes | `NULL` | Expected charge amount; pair with `iso_currency_code`. |
-| `amount_tolerance` | `NUMERIC(12,2)` | No | `1.00` | ± band the detector matches charges within. |
-| `iso_currency_code` | `TEXT` | Yes | `NULL` | Currency for the amounts. Part of the dedup signature. |
-| `category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. SET NULL on delete. Advisory suggested category. |
-| `status` | `TEXT` | No | `'active'` | `active`/`paused`/`cancelled`/`candidate`. Changed via verdicts, not raw edits. |
-| `type` | `TEXT` | No | `'subscription'` | `subscription`/`bill`/`loan`/`other`. Inferred from members' dominant category at first detection; sticky override via `update_series` (`type`). |
-| `detection_source` | `TEXT` | No | `'deterministic'` | `deterministic`/`agent`/`user`/`rule` — who last shaped the row. The precedence ladder (deterministic < rule < agent < user) protects higher-ranked writes from being clobbered by re-detection. |
-| `confidence` | `TEXT` | No | `'auto'` | `auto` (unreviewed candidate) / `confirmed` (adjudicated, fields frozen to rollups) / `rejected` (sticky — never re-proposed at this signature). |
-| `confirmed_by_type` | `TEXT` | Yes | `NULL` | `user` or `agent` — who adjudicated. A user's confirmation outranks a later agent write. |
-| `last_amount` | `NUMERIC(12,2)` | Yes | `NULL` | Rollup: amount of the most-recent member charge. |
-| `last_seen_date` | `DATE` | Yes | `NULL` | Rollup: date of the most-recent member charge. |
-| `next_expected_date` | `DATE` | Yes | `NULL` | **Derived** from `cadence` + `last_seen_date`; never set directly. Drives the read-side `renewal_health` bucket. |
-| `occurrence_count` | `INTEGER` | No | `0` | Rollup: number of live member charges. |
-| `detection_signals` | `JSONB` | Yes | `NULL` | Raw detector evidence (`interval_cv`, `amount_branch`, `merchant_key_is_fallback`, …). |
+| `name` | `TEXT` | No | — | Agent/user-authored intent + display label. **Unique** among live rows (the mint key — `assign_series(name, create_if_missing)` resolves the same surrogate every time). |
+| `type` | `TEXT` | No | `'subscription'` | `subscription`/`bill`/`loan`/`other`. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Row creation. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last write. |
-| `deleted_at` | `TIMESTAMPTZ` | Yes | `NULL` | Soft-delete tombstone (reserved). |
+| `deleted_at` | `TIMESTAMPTZ` | Yes | `NULL` | Soft-delete tombstone. |
 
 #### Primary Key
 
@@ -819,27 +840,19 @@ CHECK (actor_type IN ('user', 'agent', 'system'))
 
 #### Foreign Keys
 
-| Column | References | On Delete |
-|---|---|---|
-| `user_id` | `users(id)` | `SET NULL` |
-| `category_id` | `categories(id)` | `SET NULL` |
+None on `recurring_series` itself. Member charges reference the series via `transactions.series_id` (`UUID NULL REFERENCES recurring_series(id) ON DELETE SET NULL`) — a charge is a real bank record that outlives a derived grouping. `series_tags.series_id` references it `ON DELETE CASCADE`.
 
-Member charges reference the series via `transactions.series_id` (`UUID NULL REFERENCES recurring_series(id) ON DELETE SET NULL`) — a charge is a real bank record that outlives a derived grouping. `transactions.merchant_key` is the normalized anchor the detector groups on (`NULL` = no usable merchant signal → excluded from auto-detection).
+**Governing-rules view.** Because membership comes only from `assign_series` rules, those rules _are_ the series' durable definition. The admin detail page (`/recurring/{short_id}`) renders the linked charges beside the **governing rules** — the rules whose `assign_series` action targets the series by `series_short_id` or `series_name` — surfaced by `Service.ListGoverningRules` and each linking to the rule editor. See `docs/rule-dsl.md` → `assign_series`.
 
 #### Check Constraints
 
 ```sql
-CHECK (cadence IN ('weekly','biweekly','monthly','quarterly','semiannual','annual','irregular','unknown'))
-CHECK (status IN ('active','paused','cancelled','candidate'))
-CHECK (detection_source IN ('deterministic','agent','user','rule'))
-CHECK (confidence IN ('auto','confirmed','rejected'))
-CHECK (confirmed_by_type IN ('user','agent'))   -- or NULL
 CHECK (type IN ('subscription','bill','loan','other'))
 ```
 
 #### Uniqueness / dedup
 
-There is **no** unique constraint on the dedup signature `(merchant_key, iso_currency_code, user_id)`. Arbitration is application-level: `UpsertSeriesCandidate` does `SELECT … FOR UPDATE` on the signature, then inserts or updates in one transaction. `recurring_series_signature_idx` (partial, `WHERE deleted_at IS NULL`) only accelerates that match; `NULL` currency/user are matched with `IS NOT DISTINCT FROM`.
+`recurring_series_name_unique_idx` — a **partial unique index** on `name WHERE deleted_at IS NULL`. The name is the surrogate-first mint key, so creating a series by an existing live name resolves the same row (`INSERT … ON CONFLICT (name) … DO UPDATE`). A soft-deleted series never blocks reusing its name.
 
 #### Indexes
 
@@ -847,14 +860,11 @@ There is **no** unique constraint on the dedup signature `(merchant_key, iso_cur
 |---|---|---|---|
 | `recurring_series_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
 | `recurring_series_short_id_key` | `short_id` | B-tree (unique) | Short ID lookup. |
-| `recurring_series_signature_idx` | `(merchant_key, iso_currency_code, user_id)` | B-tree (partial) | Accelerates the dedup-signature match in the detection funnel. |
-| `recurring_series_status_idx` | `status` | B-tree (partial: `active`/`candidate`) | List the active ledger + the review queue. |
-| `recurring_series_user_idx` | `user_id` | B-tree (partial) | Per-member filtering. |
-| `recurring_series_type_idx` | `type` | B-tree (partial) | Filter by recurring-charge type. |
+| `recurring_series_name_unique_idx` | `name` | B-tree (partial unique, `WHERE deleted_at IS NULL`) | Mint-by-name uniqueness + lookup. |
 
 #### Field ownership (edit surface)
 
-User/agent-editable (via `PATCH /series/{id}` / `update_series`, protected from re-detection): `name`, `expected_amount` (+ `iso_currency_code`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id`, `type`, and tag membership (`tags_to_add`/`tags_to_remove`). `merchant_key` is edited via `rekey_series`; `status`/`confidence` via verdicts (`review_series`). Detector-owned (read-only): `detection_source`, `last_amount`, `last_seen_date`, `occurrence_count`, `detection_signals`. Derived (read-only): `next_expected_date`.
+Editable via `PATCH /series/{id}` / `update_series`: `name` and `type`. There is nothing else to edit — the series carries no detector-derived state.
 
 ---
 

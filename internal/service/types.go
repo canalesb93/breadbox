@@ -40,24 +40,30 @@ type TransactionCategoryInfo struct {
 }
 
 type TransactionResponse struct {
-	ID                         string                   `json:"id"`
-	ShortID                    string                   `json:"short_id"`
-	AccountID                  *string                  `json:"account_id"`
-	AccountName                *string                  `json:"account_name"`
-	UserName                   *string                  `json:"user_name"`
-	AttributedUserID           *string                  `json:"attributed_user_id,omitempty"`
-	AttributedUserName         *string                  `json:"attributed_user_name,omitempty"`
-	EffectiveUserID            *string                  `json:"effective_user_id,omitempty"`
-	Amount                     float64                  `json:"amount"`
-	IsoCurrencyCode            *string                  `json:"iso_currency_code"`
-	Date                       string                   `json:"date"`
-	AuthorizedDate             *string                  `json:"authorized_date"`
-	Datetime                   *string                  `json:"datetime"`
-	AuthorizedDatetime         *string                  `json:"authorized_datetime"`
-	ProviderName               string                   `json:"provider_name"`
-	ProviderMerchantName       *string                  `json:"provider_merchant_name"`
+	ID                   string  `json:"id"`
+	ShortID              string  `json:"short_id"`
+	AccountID            *string `json:"account_id"`
+	AccountName          *string `json:"account_name"`
+	UserName             *string `json:"user_name"`
+	AttributedUserID     *string `json:"attributed_user_id,omitempty"`
+	AttributedUserName   *string `json:"attributed_user_name,omitempty"`
+	EffectiveUserID      *string `json:"effective_user_id,omitempty"`
+	Amount               float64 `json:"amount"`
+	IsoCurrencyCode      *string `json:"iso_currency_code"`
+	Date                 string  `json:"date"`
+	AuthorizedDate       *string `json:"authorized_date"`
+	Datetime             *string `json:"datetime"`
+	AuthorizedDatetime   *string `json:"authorized_datetime"`
+	ProviderName         string  `json:"provider_name"`
+	ProviderMerchantName *string `json:"provider_merchant_name"`
+	// Counterparty (the other side of the transaction) when one is assigned
+	// via assign_counterparty rules. CounterpartyName is the preferred display
+	// name, falling back to ProviderMerchantName then ProviderName when nil.
+	// CounterpartyLogoURL is non-nil only once enrichment populates it.
+	CounterpartyShortID        *string                  `json:"counterparty_short_id,omitempty"`
+	CounterpartyName           *string                  `json:"counterparty_name,omitempty"`
+	CounterpartyLogoURL        *string                  `json:"counterparty_logo_url,omitempty"`
 	Category                   *TransactionCategoryInfo `json:"category"`
-	CategoryOverride           string                   `json:"category_override"`
 	ProviderCategoryPrimary    *string                  `json:"provider_category_primary"`
 	ProviderCategoryDetailed   *string                  `json:"provider_category_detailed"`
 	ProviderCategoryConfidence *string                  `json:"provider_category_confidence"`
@@ -335,15 +341,20 @@ type AdminTransactionListParams struct {
 }
 
 type AdminTransactionRow struct {
-	ID                  string
-	AccountID           string
-	AccountName         string
-	InstitutionName     string
-	UserName            string
-	EffectiveUserID     *string
-	Date                string
-	Name                string
-	MerchantName        *string
+	ID              string
+	AccountID       string
+	AccountName     string
+	InstitutionName string
+	UserName        string
+	EffectiveUserID *string
+	Date            string
+	Name            string
+	MerchantName    *string
+	// Counterparty assigned to this transaction (preferred display name over
+	// MerchantName / Name). CounterpartyLogoURL is non-nil once enriched.
+	CounterpartyShortID *string
+	CounterpartyName    *string
+	CounterpartyLogoURL *string
 	Amount              float64
 	IsoCurrencyCode     *string
 	CategoryID          *string
@@ -351,7 +362,6 @@ type AdminTransactionRow struct {
 	CategorySlug        *string
 	CategoryIcon        *string
 	CategoryColor       *string
-	CategoryOverride    string
 	Pending             bool
 	CommentCount        int
 	HasPendingReview    bool
@@ -444,6 +454,53 @@ type CommentResponse struct {
 	UpdatedAt     string  `json:"updated_at"`
 }
 
+// Counterparty types
+
+// CounterpartyResponse is the API/MCP shape of a counterparties row — the
+// canonical, cross-provider "other side" of a transaction (merchant or
+// non-merchant). Enrichment columns are pointers so an un-enriched counterparty
+// omits them.
+type CounterpartyResponse struct {
+	ID                      string  `json:"id"`
+	ShortID                 string  `json:"short_id"`
+	Name                    string  `json:"name"`
+	WebsiteURL              *string `json:"website_url,omitempty"`
+	LogoURL                 *string `json:"logo_url,omitempty"`
+	CategoryID              *string `json:"category_id,omitempty"`
+	MCC                     *string `json:"mcc,omitempty"`
+	CanonicalCounterpartyID *string `json:"canonical_counterparty_id,omitempty"`
+	CreatedAt               string  `json:"created_at"`
+	UpdatedAt               string  `json:"updated_at"`
+}
+
+// AssignCounterpartyInput drives the imperative create/link path (the MCP/REST
+// `assign_counterparty` one-off). Either bind to an existing counterparty
+// (CounterpartyShortID), or resolve-or-create one by name (Name +
+// CreateIfMissing); then link the listed transactions in the same call.
+// Surrogate-first: counterparties are assigned by short_id, not minted-by-name —
+// the by-name path de-dupes on the live name (no UNIQUE constraint).
+type AssignCounterpartyInput struct {
+	CounterpartyShortID *string  // short_id or uuid — bind to an existing counterparty
+	Name                string   // display label + resolve-or-create key (required when CreateIfMissing)
+	CreateIfMissing     bool     // resolve-or-create a counterparty (by Name) when no CounterpartyShortID
+	TransactionIDs      []string // transactions to link (short_id or uuid), ≤50
+	// FailIfExists turns the by-name path into a strict create: return ErrConflict
+	// when a live counterparty already exists with this name. The rule/agent paths
+	// leave this false (resolve-or-create); a deliberate "create from scratch" UI
+	// sets it true.
+	FailIfExists bool
+}
+
+// EditCounterpartyInput is the partial-update payload for UpdateCounterparty —
+// the enrichment lane. Every field is a pointer: nil leaves the column unchanged.
+type EditCounterpartyInput struct {
+	Name       *string // non-empty display label; "" is rejected
+	WebsiteURL *string
+	LogoURL    *string
+	CategoryID *string // category short_id or uuid; resolved before write
+	MCC        *string
+}
+
 // Transaction rule types
 
 // RuleAction is the typed action shape for transaction rules.
@@ -458,10 +515,50 @@ type RuleAction struct {
 	TagSlug      string `json:"tag_slug,omitempty"`
 	Content      string `json:"content,omitempty"`
 	// assign_series fields: assign matching transactions to an existing series
-	// (SeriesShortID) or mint one keyed on MerchantKey (CreateIfMissing).
+	// (SeriesShortID) or mint one by name (SeriesName + CreateIfMissing). Series
+	// are surrogate-first thin entities (rules-as-substrate, P2); the mint resolves
+	// the same surrogate for a given name every time.
 	SeriesShortID   string `json:"series_short_id,omitempty"`
-	MerchantKey     string `json:"merchant_key,omitempty"`
+	SeriesName      string `json:"series_name,omitempty"`
 	CreateIfMissing bool   `json:"create_if_missing,omitempty"`
+	// assign_counterparty fields: bind matching transactions to an existing
+	// counterparty (CounterpartyShortID) or, when CreateIfMissing is set, resolve-
+	// or-create one by name (CounterpartyName). Counterparties are surrogate-first
+	// cross-provider entities (rules-as-substrate, P4); unlike series there is no
+	// UNIQUE on name, so the by-name path is a resolve-or-create that de-dupes on
+	// the live name. CreateIfMissing is shared with assign_series.
+	CounterpartyShortID string `json:"counterparty_short_id,omitempty"`
+	CounterpartyName    string `json:"counterparty_name,omitempty"`
+	// set_metadata / remove_metadata fields. MetadataKey is the metadata blob
+	// key (≤128 chars). MetadataValue is the JSON value to write for
+	// set_metadata (any JSON-serializable value); unused by remove_metadata.
+	MetadataKey   string `json:"metadata_key,omitempty"`
+	MetadataValue any    `json:"metadata_value,omitempty"`
+}
+
+// ruleActionAlias is RuleAction without the custom UnmarshalJSON, used to avoid
+// infinite recursion while decoding.
+type ruleActionAlias RuleAction
+
+// UnmarshalJSON decodes a RuleAction, mapping the legacy assign_series
+// `merchant_key` key onto SeriesName so rules authored before the surrogate-first
+// rebuild (P2) keep working. An explicit `series_name` always wins.
+// TODO: remove after existing assign_series rules are migrated off merchant_key
+func (a *RuleAction) UnmarshalJSON(data []byte) error {
+	var alias ruleActionAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	*a = RuleAction(alias)
+	if a.SeriesName == "" {
+		var legacy struct {
+			MerchantKey string `json:"merchant_key"`
+		}
+		if err := json.Unmarshal(data, &legacy); err == nil && legacy.MerchantKey != "" {
+			a.SeriesName = legacy.MerchantKey
+		}
+	}
+	return nil
 }
 
 // ActivityEntry represents a single event in a transaction's activity timeline.
@@ -540,6 +637,15 @@ type Condition struct {
 	Op    string      `json:"op,omitempty"`
 	Value interface{} `json:"value,omitempty"`
 
+	// Tolerance is the ± window for the numeric `approx` operator
+	// (e.g. amount ≈ value ± tolerance). Required (and must be ≥ 0) when
+	// Op == "approx"; ignored otherwise.
+	Tolerance *float64 `json:"tolerance,omitempty"`
+	// Min / Max bound the numeric `between` operator (inclusive on both ends).
+	// Both required when Op == "between"; ignored otherwise.
+	Min *float64 `json:"min,omitempty"`
+	Max *float64 `json:"max,omitempty"`
+
 	And []Condition `json:"and,omitempty"`
 	Or  []Condition `json:"or,omitempty"`
 	Not *Condition  `json:"not,omitempty"`
@@ -570,6 +676,24 @@ type TransactionContext struct {
 	// InSeries reports whether the transaction is linked to any recurring
 	// series (field: "in_series").
 	InSeries bool
+	// CounterpartyShortID is the short_id of the counterparty this transaction is
+	// bound to (field: "counterparty"), empty when unassigned. Populated from the
+	// counterparties JOIN in the retroactive / preview context query.
+	CounterpartyShortID string
+	// HasCounterparty reports whether the transaction is bound to any counterparty
+	// (field: "has_counterparty").
+	HasCounterparty bool
+	// Metadata holds the transaction's free-form metadata blob so conditions on
+	// dotted fields (field: "metadata.<key>") can read arbitrary enrichment
+	// values. Updated mid-resolver as earlier-stage set_metadata / remove_metadata
+	// actions apply, so later-stage rules observe the running blob.
+	Metadata map[string]any
+	// Date is the transaction's tz-naive posting date (the provider-localized
+	// `date` column, no time component). The derived date-part condition fields
+	// (day_of_month / month / day_of_week / day_of_year) are computed from it.
+	// Zero (IsZero) when the row carries no date — date-part conditions then
+	// evaluate to false.
+	Date time.Time
 }
 
 type TransactionRuleResponse struct {
@@ -743,6 +867,11 @@ type MerchantSummaryRow struct {
 	FirstDate        string  `json:"first_date"`
 	LastDate         string  `json:"last_date"`
 	IsoCurrencyCode  string  `json:"iso_currency_code"`
+	// Counterparty grouping fields — non-nil when the rows in this group are
+	// bound to a canonical counterparty (the merchant string is then the
+	// counterparty name). CounterpartyLogoURL is non-nil once enriched.
+	CounterpartyShortID *string `json:"counterparty_short_id,omitempty"`
+	CounterpartyLogoURL *string `json:"counterparty_logo_url,omitempty"`
 }
 
 type MerchantSummaryResult struct {

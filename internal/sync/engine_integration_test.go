@@ -262,6 +262,89 @@ func TestSync_BasicAddTransactions(t *testing.T) {
 	}
 }
 
+// TestSync_DiscoversNewAccountsMidSync proves the SimpleFIN aggregator case:
+// a connection that re-returns its account set on sync, where a NEW account has
+// appeared (the user linked another bank at their bridge after connecting). The
+// engine must create that account and link it to the connection so its
+// transactions resolve instead of being dropped on a missing-account lookup.
+func TestSync_DiscoversNewAccountsMidSync(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategories(t, queries)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_simplefin")
+	// Only one account exists at connect time.
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		reconcilesPending: true, // poll-based, like SimpleFIN
+		syncResult: provider.SyncResult{
+			Accounts: []provider.Account{
+				{ExternalID: "ext_acct_1", Name: "Checking", Type: "depository", ISOCurrencyCode: "USD"},
+				{ExternalID: "ext_acct_2", Name: "New Savings", Type: "depository", ISOCurrencyCode: "USD"},
+			},
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_on_new",
+					AccountExternalID: "ext_acct_2", // belongs to the just-discovered account
+					Amount:            decimal.NewFromFloat(20.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Coffee",
+					ISOCurrencyCode:   "USD",
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync() error: %v", err)
+	}
+
+	// The new account must now exist, linked to this connection.
+	var newAcctID, newAcctConn pgtype.UUID
+	var newAcctName string
+	if err := pool.QueryRow(ctx,
+		"SELECT id, connection_id, name FROM accounts WHERE external_account_id = $1",
+		"ext_acct_2").Scan(&newAcctID, &newAcctConn, &newAcctName); err != nil {
+		t.Fatalf("new account was not created during sync: %v", err)
+	}
+	if newAcctConn != conn.ID {
+		t.Errorf("new account linked to wrong connection: got %v want %v", newAcctConn, conn.ID)
+	}
+	if newAcctName != "New Savings" {
+		t.Errorf("new account name = %q, want %q", newAcctName, "New Savings")
+	}
+
+	// Its transaction must have resolved onto the new account rather than being dropped.
+	var txnCount int
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM transactions WHERE account_id = $1 AND deleted_at IS NULL",
+		newAcctID).Scan(&txnCount); err != nil {
+		t.Fatalf("count txns on new account: %v", err)
+	}
+	if txnCount != 1 {
+		t.Errorf("expected 1 transaction on the newly discovered account, got %d", txnCount)
+	}
+
+	// The pre-existing account must be left intact — discovery must skip accounts
+	// already linked to the connection, not duplicate or re-create them.
+	var existingCount int
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM accounts WHERE external_account_id = $1 AND connection_id = $2",
+		"ext_acct_1", conn.ID).Scan(&existingCount); err != nil {
+		t.Fatalf("count existing account rows: %v", err)
+	}
+	if existingCount != 1 {
+		t.Errorf("expected exactly 1 row for the pre-existing account, got %d (discovery duplicated it)", existingCount)
+	}
+}
+
 func TestSync_ModifyTransactions(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
@@ -1571,10 +1654,11 @@ func TestRule_Trigger_OnUpdate_SkipsOnCreate(t *testing.T) {
 	}
 }
 
-// TestRule_TypedActions_SetCategory_RespectsOverride verifies that a rule with a
-// typed set_category action does not overwrite a transaction whose
-// category_override flag is true.
-func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
+// TestRule_TypedActions_SetCategory_OverwritesOnChange verifies P3
+// last-writer-wins: when a CHANGED transaction (isChanged=true) is re-synced,
+// the rule's typed set_category action fires and overwrites whatever category
+// was previously set (there is no override lock anymore).
+func TestRule_TypedActions_SetCategory_OverwritesOnChange(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
@@ -1634,18 +1718,17 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 		t.Fatalf("expected initial category=%v, got %v", food.ID, initialCatID)
 	}
 
-	// Set a manual override pointing at the other category.
-	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE provider_transaction_id = 'txn_override'",
+	// Set a prior manual category pointing at the other category.
+	if _, err := pool.Exec(ctx,
+		"UPDATE transactions SET category_id = $1 WHERE provider_transaction_id = 'txn_override'",
 		other.ID,
-	)
-	if err != nil {
-		t.Fatalf("set override: %v", err)
+	); err != nil {
+		t.Fatalf("set prior category: %v", err)
 	}
 
 	// Second sync changes the transaction so the rule is re-evaluated. Because
 	// the rule trigger is "always" and the data changed (isChanged=true), the
-	// rule fires — but the override must be respected.
+	// rule fires — and last-writer-wins overwrites the prior category.
 	mock.syncResult = provider.SyncResult{
 		Modified: []provider.Transaction{
 			{
@@ -1672,8 +1755,8 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query transaction after second sync: %v", err)
 	}
-	if finalCatID != other.ID {
-		t.Errorf("rule overwrote category_override=true; expected %v, got %v", other.ID, finalCatID)
+	if finalCatID != food.ID {
+		t.Errorf("last-writer-wins: rule should overwrite prior category on a changed re-sync; expected %v, got %v", food.ID, finalCatID)
 	}
 }
 
@@ -1830,19 +1913,19 @@ func TestRule_DisabledRule_NotFired_DuringSync(t *testing.T) {
 	}
 }
 
-// TestRule_OverrideSuppressesSetCategoryButNotOthers verifies that when a
-// transaction has category_override=TRUE, a rule that set_category + add_tag
-// still applies the tag — override only suppresses the category write.
-func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
+// TestRule_SetCategoryAndAddTagOnChange verifies P3 last-writer-wins: when a
+// CHANGED transaction is re-synced, a rule that set_category + add_tag applies
+// BOTH — the category overwrites the prior value AND the tag is attached.
+func TestRule_SetCategoryAndAddTagOnChange(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
 	_, food := seedCategoriesWithFood(t, queries)
-	overrideCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+	priorCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
 		Slug: "user_pick", DisplayName: "User Pick",
 	})
 	if err != nil {
-		t.Fatalf("create override category: %v", err)
+		t.Fatalf("create prior category: %v", err)
 	}
 
 	rule := testutil.MustCreateTransactionRule(
@@ -1879,13 +1962,13 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 		t.Fatalf("first sync: %v", err)
 	}
 
-	// Pin a manual override on the row, swap the user's category, and remove
-	// the tag so the second sync has a clean slate to re-apply it.
+	// Set a prior manual category on the row and remove the tag so the second
+	// sync has a clean slate to re-apply it.
 	if _, err := pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = 'user' WHERE provider_transaction_id = 'txn_override_combo'",
-		overrideCat.ID,
+		"UPDATE transactions SET category_id = $1 WHERE provider_transaction_id = 'txn_override_combo'",
+		priorCat.ID,
 	); err != nil {
-		t.Fatalf("set override: %v", err)
+		t.Fatalf("set prior category: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`DELETE FROM transaction_tags WHERE transaction_id = (SELECT id FROM transactions WHERE provider_transaction_id = 'txn_override_combo')`,
@@ -1910,19 +1993,19 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 		t.Fatalf("second sync: %v", err)
 	}
 
-	// Category override should still be pointing at the user's choice, not
-	// the rule's food_and_drink.
+	// Last-writer-wins: the category should now be the rule's food_and_drink,
+	// overwriting the prior user_pick.
 	var finalCatID pgtype.UUID
 	if err := pool.QueryRow(ctx,
 		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_override_combo'",
 	).Scan(&finalCatID); err != nil {
 		t.Fatalf("query transaction: %v", err)
 	}
-	if finalCatID != overrideCat.ID {
-		t.Errorf("override suppressed failed; expected %v, got %v (food=%v)", overrideCat.ID, finalCatID, food.ID)
+	if finalCatID != food.ID {
+		t.Errorf("expected rule category to win on changed re-sync; expected %v, got %v (prior=%v)", food.ID, finalCatID, priorCat.ID)
 	}
 
-	// But the add_tag action should have still run — tag is attached.
+	// The add_tag action should also have run — tag is attached.
 	var tagAttached int
 	if err := pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM transaction_tags tt

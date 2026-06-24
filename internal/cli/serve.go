@@ -173,23 +173,18 @@ func runServe(_ context.Context, version string, noDashboardFlag bool) error {
 	agentOrch := service.NewOrchestrator(a.Service, agentSidecar, agentMaxConcurrent, cfg.EncryptionKey, logger)
 	agentSched := service.NewAgentScheduler(agentOrch, a.Service, logger)
 	agentOrch.AttachScheduler(agentSched)
-	// Wire the post-sync hook. Ordered: the deterministic recurring-series
-	// detector runs first (synchronous, bounded SQL over a trailing window) so
-	// fresh candidates exist before agents fire; then trigger_on_sync_complete
-	// agents dispatch asynchronously. Detection failures are logged, never fatal
-	// to the sync.
+	// Wire the post-sync hook: trigger_on_sync_complete agents dispatch
+	// asynchronously after each successful sync.
 	a.SyncEngine.OnSyncComplete = func(ctx context.Context, connID pgtype.UUID) {
-		if n, err := a.Service.DetectSeriesForConnection(ctx, connID); err != nil {
-			logger.Warn("recurring-series detection failed", "error", err)
-		} else if n > 0 {
-			logger.Info("recurring-series detection", "candidates", n)
-		}
 		agentOrch.FireSyncCompleteAgents(ctx)
 	}
 	// Materialize assign_series rule actions inside the sync transaction
 	// (resolve-or-mint + link). Function-pointer hook keeps the sync engine
 	// decoupled from the series service — same pattern as OnSyncComplete.
 	a.SyncEngine.AssignSeriesInTx = a.Service.AssignSeriesFromRuleTx
+	// Materialize assign_counterparty rule actions inside the sync transaction
+	// (resolve-or-create + link) — same decoupling pattern as AssignSeriesInTx.
+	a.SyncEngine.AssignCounterpartyInTx = a.Service.AssignCounterpartyFromRuleTx
 	agentSched.Start(ctx)
 	a.AgentOrchestrator = agentOrch
 	a.AgentScheduler = agentSched

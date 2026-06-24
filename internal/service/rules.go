@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -43,6 +44,22 @@ var validConditionFields = map[string]string{
 	"tags":                       "tags",
 	"series":                     "string", // recurring-series short_id the txn belongs to
 	"in_series":                  "bool",   // whether the txn belongs to any recurring series
+	"counterparty":               "string", // counterparty short_id the txn is bound to
+	"has_counterparty":           "bool",   // whether the txn is bound to any counterparty
+
+	// Date-part fields — numeric values derived from the tz-naive `date`
+	// column (no timezone math; provider-localized). day_of_week uses Go's
+	// time.Weekday numbering (0=Sunday … 6=Saturday).
+	"day_of_month": "numeric", // 1..31 (clamped/cyclic under approx, see evalDayOfMonth)
+	"month":        "numeric", // 1..12
+	"day_of_week":  "numeric", // 0=Sun .. 6=Sat
+	"day_of_year":  "numeric", // 1..366
+}
+
+// datePartFields is the set of derived date-part condition fields. They are
+// numeric but computed from TransactionContext.Date rather than a stored scalar.
+var datePartFields = map[string]bool{
+	"day_of_month": true, "month": true, "day_of_week": true, "day_of_year": true,
 }
 
 // stringOps are operators valid for string fields.
@@ -51,8 +68,13 @@ var stringOps = map[string]bool{
 }
 
 // numericOps are operators valid for numeric fields.
+//
+//   - approx: amount ≈ value ± tolerance (requires Tolerance ≥ 0). For
+//     day_of_month, the comparison is cyclic + clamped (see evalDayOfMonth).
+//   - between: min ≤ amount ≤ max (requires Min and Max, Min ≤ Max).
 var numericOps = map[string]bool{
 	"eq": true, "neq": true, "gt": true, "gte": true, "lt": true, "lte": true,
+	"approx": true, "between": true,
 }
 
 // boolOps are operators valid for boolean fields.
@@ -66,6 +88,44 @@ var boolOps = map[string]bool{
 //   - in: any element of c.Value ([]string) is present in tctx.Tags.
 var tagsOps = map[string]bool{
 	"contains": true, "not_contains": true, "in": true,
+}
+
+// metadataFieldPrefix marks a condition leaf that reads a key from the
+// transaction's free-form metadata blob. The substring after the prefix is the
+// metadata key, e.g. field "metadata.tax_deductible" reads metadata["tax_deductible"].
+const metadataFieldPrefix = "metadata."
+
+// metadataOps are operators valid for a metadata.<key> field. Metadata values
+// are arbitrary JSON, so the set is the union of string, numeric, and presence
+// operators; comparison semantics are resolved at eval time from the expected
+// value's type (see evalMetadata). exists / not_exists test key presence and
+// ignore the value.
+var metadataOps = map[string]bool{
+	"eq": true, "neq": true, "contains": true, "not_contains": true,
+	"matches": true, "in": true,
+	"gt": true, "gte": true, "lt": true, "lte": true,
+	"exists": true, "not_exists": true,
+}
+
+// metadataKeyFromField extracts the metadata key from a "metadata.<key>" field,
+// returning ("", false) when field is not a metadata field.
+func metadataKeyFromField(field string) (string, bool) {
+	if !strings.HasPrefix(field, metadataFieldPrefix) {
+		return "", false
+	}
+	return field[len(metadataFieldPrefix):], true
+}
+
+// conditionFieldType returns the value-type bucket for a condition field,
+// dispatching "metadata.<key>" dotted fields to the "metadata" bucket and
+// otherwise consulting validConditionFields. Returns ("", false) for unknown
+// fields.
+func conditionFieldType(field string) (string, bool) {
+	if _, ok := metadataKeyFromField(field); ok {
+		return "metadata", true
+	}
+	t, ok := validConditionFields[field]
+	return t, ok
 }
 
 // conditionIsEmpty reports whether a Condition is a zero-value match-all.
@@ -102,7 +162,7 @@ func validateConditionDepth(c Condition, depth int) error {
 	}
 
 	if isLeaf {
-		fieldType, ok := validConditionFields[c.Field]
+		fieldType, ok := conditionFieldType(c.Field)
 		if !ok {
 			return fmt.Errorf("%w: unknown field %q", ErrInvalidParameter, c.Field)
 		}
@@ -137,8 +197,28 @@ func validateConditionDepth(c Condition, depth int) error {
 			if !numericOps[c.Op] {
 				return fmt.Errorf("%w: operator %q not valid for numeric field %q", ErrInvalidParameter, c.Op, c.Field)
 			}
-			if _, ok := toFloat64(c.Value); !ok {
-				return fmt.Errorf("%w: numeric value required for field %q", ErrInvalidParameter, c.Field)
+			switch c.Op {
+			case "between":
+				if c.Min == nil || c.Max == nil {
+					return fmt.Errorf("%w: 'between' operator requires numeric 'min' and 'max' for field %q", ErrInvalidParameter, c.Field)
+				}
+				if *c.Min > *c.Max {
+					return fmt.Errorf("%w: 'between' requires min ≤ max for field %q", ErrInvalidParameter, c.Field)
+				}
+			case "approx":
+				if _, ok := toFloat64(c.Value); !ok {
+					return fmt.Errorf("%w: numeric value required for field %q", ErrInvalidParameter, c.Field)
+				}
+				if c.Tolerance == nil {
+					return fmt.Errorf("%w: 'approx' operator requires a numeric 'tolerance' for field %q", ErrInvalidParameter, c.Field)
+				}
+				if *c.Tolerance < 0 {
+					return fmt.Errorf("%w: 'tolerance' must be ≥ 0 for field %q", ErrInvalidParameter, c.Field)
+				}
+			default:
+				if _, ok := toFloat64(c.Value); !ok {
+					return fmt.Errorf("%w: numeric value required for field %q", ErrInvalidParameter, c.Field)
+				}
 			}
 		case "bool":
 			if !boolOps[c.Op] {
@@ -163,6 +243,44 @@ func validateConditionDepth(c Condition, depth int) error {
 				// contains/not_contains expect a single string value
 				if _, ok := c.Value.(string); !ok {
 					return fmt.Errorf("%w: %s on tags requires a string value", ErrInvalidParameter, c.Op)
+				}
+			}
+		case "metadata":
+			key, _ := metadataKeyFromField(c.Field)
+			if err := validateMetadataKey(key); err != nil {
+				return fmt.Errorf("%w (field %q)", err, c.Field)
+			}
+			if !metadataOps[c.Op] {
+				return fmt.Errorf("%w: operator %q not valid for metadata field %q", ErrInvalidParameter, c.Op, c.Field)
+			}
+			switch c.Op {
+			case "exists", "not_exists":
+				// Presence test — value is ignored, nothing to validate.
+			case "in":
+				vals, ok := toStringSlice(c.Value)
+				if !ok || len(vals) == 0 {
+					return fmt.Errorf("%w: 'in' operator requires a non-empty array for field %q", ErrInvalidParameter, c.Field)
+				}
+			case "matches":
+				s, ok := c.Value.(string)
+				if !ok {
+					return fmt.Errorf("%w: 'matches' operator requires a string value for field %q", ErrInvalidParameter, c.Field)
+				}
+				if _, err := regexp.Compile(s); err != nil {
+					return fmt.Errorf("%w: invalid regex pattern for field %q: %v", ErrInvalidParameter, c.Field, err)
+				}
+			case "gt", "gte", "lt", "lte":
+				if _, ok := toFloat64(c.Value); !ok {
+					return fmt.Errorf("%w: numeric value required for operator %q on field %q", ErrInvalidParameter, c.Op, c.Field)
+				}
+			default: // eq, neq, contains, not_contains
+				if c.Value == nil {
+					return fmt.Errorf("%w: operator %q requires a value for field %q", ErrInvalidParameter, c.Op, c.Field)
+				}
+				switch c.Value.(type) {
+				case string, float64, float32, int, int64, bool, json.Number:
+				default:
+					return fmt.Errorf("%w: operator %q on field %q requires a scalar value (string, number, or boolean)", ErrInvalidParameter, c.Op, c.Field)
 				}
 			}
 		}
@@ -194,6 +312,13 @@ type CompiledCondition struct {
 	Value interface{}
 	Regex *regexp.Regexp
 
+	// Tolerance / Min / Max carry the extra numeric-operator parameters
+	// (approx tolerance, between bounds) so evalNumeric / evalDayOfMonth can
+	// read them without re-parsing the source Condition.
+	Tolerance *float64
+	Min       *float64
+	Max       *float64
+
 	// Pre-lowercased expected value for case-insensitive string comparisons.
 	// Set at compile time so evalString avoids repeated ToLower on the expected side.
 	lowerValue string
@@ -215,9 +340,12 @@ func CompileCondition(c Condition) (*CompiledCondition, error) {
 		return nil, nil
 	}
 	cc := &CompiledCondition{
-		Field: c.Field,
-		Op:    c.Op,
-		Value: c.Value,
+		Field:     c.Field,
+		Op:        c.Op,
+		Value:     c.Value,
+		Tolerance: c.Tolerance,
+		Min:       c.Min,
+		Max:       c.Max,
 	}
 
 	fieldType := validConditionFields[c.Field]
@@ -353,8 +481,225 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 		return evalString(c, tctx.SeriesShortID)
 	case "in_series":
 		return evalBool(c, tctx.InSeries)
+	case "counterparty":
+		return evalString(c, tctx.CounterpartyShortID)
+	case "has_counterparty":
+		return evalBool(c, tctx.HasCounterparty)
+	case "day_of_month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalDayOfMonth(c, tctx.Date)
+	case "month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalNumeric(c, float64(int(tctx.Date.Month())))
+	case "day_of_week":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalNumeric(c, float64(int(tctx.Date.Weekday())))
+	case "day_of_year":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evalNumeric(c, float64(tctx.Date.YearDay()))
+	}
+	if key, ok := metadataKeyFromField(c.Field); ok {
+		return evalMetadata(c, key, tctx.Metadata)
 	}
 	return false
+}
+
+// evalDayOfMonth evaluates a day_of_month leaf. For the approx operator it uses
+// cyclic + clamped matching against the transaction's actual month length: the
+// target is clamped to [1, daysInMonth] (so "the 31st" matches Feb's last day)
+// and the distance wraps around the month (so the 1st and the last day are 1
+// apart). Every other operator falls back to the plain numeric comparison on
+// the literal day-of-month (1..31).
+func evalDayOfMonth(c *CompiledCondition, date time.Time) bool {
+	day := date.Day()
+	if c.Op != "approx" {
+		return evalNumeric(c, float64(day))
+	}
+	target, ok := toFloat64(c.Value)
+	if !ok || c.Tolerance == nil {
+		return false
+	}
+	monthLen := daysInMonth(date.Year(), date.Month())
+	return dayOfMonthApproxMatch(day, int(math.Round(target)), *c.Tolerance, monthLen)
+}
+
+// daysInMonth returns the number of days in the given year/month (handles leap
+// February via the day-0-of-next-month trick).
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
+// dayOfMonthApproxMatch reports whether actualDay is within tolerance of
+// targetDay on a cyclic month of monthLen days. targetDay is first clamped into
+// [1, monthLen]; the distance is the smaller of the direct and wrap-around gaps.
+func dayOfMonthApproxMatch(actualDay, targetDay int, tolerance float64, monthLen int) bool {
+	if monthLen <= 0 {
+		return false
+	}
+	if targetDay > monthLen {
+		targetDay = monthLen
+	}
+	if targetDay < 1 {
+		targetDay = 1
+	}
+	diff := actualDay - targetDay
+	if diff < 0 {
+		diff = -diff
+	}
+	if wrap := monthLen - diff; wrap < diff {
+		diff = wrap
+	}
+	return float64(diff) <= tolerance
+}
+
+// evalMetadata evaluates a metadata.<key> leaf against the transaction's
+// metadata blob. Presence operators (exists / not_exists) test key presence;
+// every other operator requires the key to be present (an absent key matches
+// only not_exists). Comparison semantics for eq / neq are driven by the
+// expected value's type — a numeric expected compares numerically, a bool
+// expected compares as bool, otherwise the stored value is stringified and
+// compared case-insensitively. contains / not_contains / matches / in always
+// operate on the stringified stored value.
+func evalMetadata(c *CompiledCondition, key string, meta map[string]any) bool {
+	raw, present := meta[key]
+	switch c.Op {
+	case "exists":
+		return present
+	case "not_exists":
+		return !present
+	}
+	if !present {
+		return false
+	}
+	switch c.Op {
+	case "eq":
+		return metadataEquals(raw, c.Value)
+	case "neq":
+		return !metadataEquals(raw, c.Value)
+	case "contains":
+		return strings.Contains(strings.ToLower(metadataString(raw)), strings.ToLower(metadataString(c.Value)))
+	case "not_contains":
+		return !strings.Contains(strings.ToLower(metadataString(raw)), strings.ToLower(metadataString(c.Value)))
+	case "matches":
+		if c.Regex != nil {
+			return c.Regex.MatchString(metadataString(raw))
+		}
+		return false
+	case "in":
+		actual := metadataString(raw)
+		if vals, ok := toStringSlice(c.Value); ok {
+			for _, v := range vals {
+				if strings.EqualFold(actual, v) {
+					return true
+				}
+			}
+		}
+		return false
+	case "gt", "gte", "lt", "lte":
+		actual, ok1 := metadataFloat(raw)
+		expected, ok2 := toFloat64(c.Value)
+		if !ok1 || !ok2 {
+			return false
+		}
+		switch c.Op {
+		case "gt":
+			return actual > expected
+		case "gte":
+			return actual >= expected
+		case "lt":
+			return actual < expected
+		case "lte":
+			return actual <= expected
+		}
+	}
+	return false
+}
+
+// metadataEquals compares a stored metadata value against an expected condition
+// value. The expected value's type selects the comparison: bool → bool,
+// number → numeric, otherwise case-insensitive string compare on the
+// stringified stored value.
+func metadataEquals(raw, expected any) bool {
+	switch exp := expected.(type) {
+	case bool:
+		b, ok := metadataBool(raw)
+		return ok && b == exp
+	case float64, float32, int, int64, json.Number:
+		ev, _ := toFloat64(expected)
+		av, ok := metadataFloat(raw)
+		return ok && av == ev
+	default:
+		return strings.EqualFold(metadataString(raw), metadataString(expected))
+	}
+}
+
+// metadataString renders a stored metadata value as a string for string
+// operators. Scalars render naturally; objects/arrays fall back to their JSON
+// encoding so a regex/contains can still match structured values.
+func metadataString(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case bool:
+		if val {
+			return "true"
+		}
+		return "false"
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case json.Number:
+		return val.String()
+	default:
+		if b, err := json.Marshal(val); err == nil {
+			return string(b)
+		}
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// metadataFloat coerces a stored metadata value to float64 for numeric
+// comparison. Returns false when the value is not numeric.
+func metadataFloat(v any) (float64, bool) {
+	switch val := v.(type) {
+	case float64:
+		return val, true
+	case float32:
+		return float64(val), true
+	case int:
+		return float64(val), true
+	case int64:
+		return float64(val), true
+	case json.Number:
+		f, err := val.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(val, 64)
+		return f, err == nil
+	}
+	return 0, false
+}
+
+// metadataBool coerces a stored metadata value to bool. Returns false (ok=false)
+// when the value isn't a recognizable boolean.
+func metadataBool(v any) (bool, bool) {
+	switch val := v.(type) {
+	case bool:
+		return val, true
+	case string:
+		b, err := strconv.ParseBool(val)
+		return b, err == nil
+	}
+	return false, false
 }
 
 // evalTags handles contains / not_contains / in for the tags slice field.
@@ -405,6 +750,12 @@ func evalString(c *CompiledCondition, actual string) bool {
 }
 
 func evalNumeric(c *CompiledCondition, actual float64) bool {
+	if c.Op == "between" {
+		if c.Min == nil || c.Max == nil {
+			return false
+		}
+		return actual >= *c.Min && actual <= *c.Max
+	}
 	expected, ok := toFloat64(c.Value)
 	if !ok {
 		return false
@@ -422,6 +773,11 @@ func evalNumeric(c *CompiledCondition, actual float64) bool {
 		return actual < expected
 	case "lte":
 		return actual <= expected
+	case "approx":
+		if c.Tolerance == nil {
+			return false
+		}
+		return math.Abs(actual-expected) <= *c.Tolerance
 	}
 	return false
 }
@@ -497,11 +853,16 @@ func toStringSlice(v interface{}) ([]string, bool) {
 // Unknown types are rejected by ValidateActions. Read-time tolerates unknown
 // types by skipping them with a logged warning (see sync/rule_resolver).
 var validActionTypes = map[string]bool{
-	"set_category":  true,
-	"add_tag":       true,
-	"remove_tag":    true,
-	"add_comment":   true,
-	"assign_series": true,
+	"set_category":        true,
+	"add_tag":             true,
+	"remove_tag":          true,
+	"add_comment":         true,
+	"assign_series":       true,
+	"assign_counterparty": true,
+	"set_metadata":        true,
+	"remove_metadata":     true,
+	"flag":                true,
+	"unflag":              true,
 }
 
 // tagSlugPattern enforces the tag slug format: lowercase alphanumerics with
@@ -520,7 +881,7 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 	seenCategory := false
 	for _, a := range actions {
 		if !validActionTypes[a.Type] {
-			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series)", ErrInvalidParameter, a.Type)
+			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment|assign_series|assign_counterparty|set_metadata|remove_metadata|flag|unflag)", ErrInvalidParameter, a.Type)
 		}
 		switch a.Type {
 		case "set_category":
@@ -547,18 +908,52 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 			}
 		case "assign_series":
 			hasSeries := strings.TrimSpace(a.SeriesShortID) != ""
-			hasKey := strings.TrimSpace(a.MerchantKey) != ""
-			if hasSeries == hasKey {
-				return fmt.Errorf("%w: assign_series requires exactly one of series_short_id or merchant_key", ErrInvalidParameter)
+			hasName := strings.TrimSpace(a.SeriesName) != ""
+			if hasSeries == hasName {
+				return fmt.Errorf("%w: assign_series requires exactly one of series_short_id or series_name", ErrInvalidParameter)
 			}
-			if hasKey && !a.CreateIfMissing {
-				return fmt.Errorf("%w: assign_series with merchant_key requires create_if_missing=true", ErrInvalidParameter)
+			if hasName && !a.CreateIfMissing {
+				return fmt.Errorf("%w: assign_series with series_name requires create_if_missing=true", ErrInvalidParameter)
 			}
 			if hasSeries {
 				if _, err := s.resolveSeriesID(ctx, a.SeriesShortID); err != nil {
 					return fmt.Errorf("%w: assign_series series_short_id %q not found", ErrInvalidParameter, a.SeriesShortID)
 				}
 			}
+		case "assign_counterparty":
+			hasCP := strings.TrimSpace(a.CounterpartyShortID) != ""
+			hasName := strings.TrimSpace(a.CounterpartyName) != ""
+			if hasCP == hasName {
+				return fmt.Errorf("%w: assign_counterparty requires exactly one of counterparty_short_id or counterparty_name", ErrInvalidParameter)
+			}
+			if hasName && !a.CreateIfMissing {
+				return fmt.Errorf("%w: assign_counterparty with counterparty_name requires create_if_missing=true", ErrInvalidParameter)
+			}
+			if hasCP {
+				if _, err := s.resolveCounterpartyID(ctx, a.CounterpartyShortID); err != nil {
+					return fmt.Errorf("%w: assign_counterparty counterparty_short_id %q not found", ErrInvalidParameter, a.CounterpartyShortID)
+				}
+			}
+		case "set_metadata":
+			if err := validateMetadataKey(a.MetadataKey); err != nil {
+				return fmt.Errorf("%w (set_metadata)", err)
+			}
+			valBytes, err := json.Marshal(a.MetadataValue)
+			if err != nil {
+				return fmt.Errorf("%w: set_metadata value is not JSON-serializable: %v", ErrInvalidParameter, err)
+			}
+			if len(valBytes) > maxMetadataValBytes {
+				return fmt.Errorf("%w: set_metadata value exceeds %d bytes", ErrInvalidParameter, maxMetadataValBytes)
+			}
+		case "remove_metadata":
+			if err := validateMetadataKey(a.MetadataKey); err != nil {
+				return fmt.Errorf("%w (remove_metadata)", err)
+			}
+		case "flag", "unflag":
+			// No parameters: flag sets transactions.flagged_at = NOW(),
+			// unflag clears it. Mirrors the flag_transaction MCP tool (sans the
+			// optional comment reason, which is a tool-only affordance). Last-
+			// writer-wins resolves a flag+unflag pair within one rule.
 		}
 	}
 	return nil
@@ -1216,17 +1611,15 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 // conditions work during retroactive apply. GROUP BY t.id is required because
 // of the LEFT JOIN onto the tag pivot.
 //
-// NOTE: `category_override=TRUE` rows are intentionally *not* filtered here.
-// Hit counts must reflect every condition match (sync-time parity, Q12), and
-// non-category actions (add_tag, remove_tag) legitimately fire on overridden
-// rows. The `set_category` UPDATE below enforces its own
-// `category_override = 'none'` guard so overridden rows keep their user-pinned
-// category.
+// Hit counts reflect every condition match (sync-time parity, Q12). Provenance
+// was removed in P3, so set_category writes category_id directly here — there is
+// no override guard to honor.
 const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
 	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[]),
-	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL)
+	COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata, t.date,
+	COALESCE(cp.short_id, ''), (t.counterparty_id IS NOT NULL)
 	FROM transactions t
 	JOIN accounts a ON t.account_id = a.id
 	JOIN bank_connections bc ON a.connection_id = bc.id
@@ -1234,16 +1627,24 @@ const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provid
 	LEFT JOIN transaction_tags tt ON tt.transaction_id = t.id
 	LEFT JOIN tags tag ON tag.id = tt.tag_id
 	LEFT JOIN recurring_series rs ON rs.id = t.series_id
+	LEFT JOIN counterparties cp ON cp.id = t.counterparty_id
 	WHERE t.deleted_at IS NULL
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
-const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id`
+const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name, rs.short_id, t.series_id, t.metadata, t.date, cp.short_id, t.counterparty_id`
+
+// transactionContextColumns is the number of columns selected by
+// transactionContextQuery (and bound by scanTransactionContextRow). Callers size
+// their scan-dest slice with this so adding a column is a single-line change.
+const transactionContextColumns = 18
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
-	id   pgtype.UUID
-	tctx TransactionContext
+	id          pgtype.UUID
+	tctx        TransactionContext
+	metadataRaw []byte      // raw JSONB; unmarshalled into tctx.Metadata by finalize
+	dateRaw     pgtype.Date // tz-naive posting date; copied into tctx.Date by finalize
 }
 
 func scanTransactionContextRow(dest []any) *transactionContextRow {
@@ -1262,14 +1663,178 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	dest[11] = &r.tctx.Tags
 	dest[12] = &r.tctx.SeriesShortID
 	dest[13] = &r.tctx.InSeries
+	dest[14] = &r.metadataRaw
+	dest[15] = &r.dateRaw
+	dest[16] = &r.tctx.CounterpartyShortID
+	dest[17] = &r.tctx.HasCounterparty
 	return r
 }
 
+// finalize unmarshals the raw metadata JSONB into tctx.Metadata. Call after
+// rows.Scan. A malformed blob leaves Metadata nil (metadata conditions simply
+// won't match) rather than failing the whole apply pass.
+func (r *transactionContextRow) finalize() {
+	if r.dateRaw.Valid {
+		r.tctx.Date = r.dateRaw.Time
+	}
+	if len(r.metadataRaw) == 0 {
+		return
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(r.metadataRaw, &meta); err == nil {
+		r.tctx.Metadata = meta
+	}
+}
+
+// retroTxnIntent is the net, resolved set of state-mutating rule actions to
+// materialize against ONE transaction during a retroactive apply. Both
+// retroactive paths — ApplyRuleRetroactively (a single rule) and
+// ApplyAllRulesRetroactively (the whole rule set) — reduce their matches to
+// this shape and hand it to applyRetroTxnIntent, so the two can never again
+// diverge on which actions they materialize. That asymmetry is exactly what
+// previously dropped assign_series from the bulk path.
+//
+// add_comment is deliberately NOT a field here: a comment is narration authored
+// at the moment a rule fires during sync, not durable transaction state.
+// Replaying it across a bulk historical backfill would manufacture thousands of
+// misleading "comment" annotations, so every retroactive path skips it. (The
+// sync-time resolver in internal/sync/rule_resolver.go still materializes
+// add_comment — retroactive apply is the one place it's intentionally dropped.)
+//
+// Adding a new state-mutating action (e.g. the P1 set_field family) means
+// teaching this one struct + applyRetroTxnIntent; both paths inherit it.
+type retroTxnIntent struct {
+	txnID pgtype.UUID
+
+	// set_category — last-writer-wins. catID.Valid gates the write; catRule is
+	// the winning rule (for the category_set annotation).
+	catID   pgtype.UUID
+	catSlug string
+	catRule ruleapply.Rule
+
+	// add_tag / remove_tag — net-diffed; value is the owning rule for audit.
+	tagAdds    map[string]ruleapply.Rule
+	tagRemoves map[string]ruleapply.Rule
+
+	// assign_series — last-writer-wins; nil means no assignment.
+	series     *RuleAction
+	seriesRule ruleapply.Rule
+
+	// assign_counterparty — last-writer-wins; nil means no assignment.
+	counterparty     *RuleAction
+	counterpartyRule ruleapply.Rule
+
+	// set_metadata / remove_metadata — net-diffed, disjoint by construction.
+	metadataSet    map[string]any
+	metadataRemove []string
+
+	// flag / unflag — last-writer-wins tri-state: "flag" sets flagged_at = NOW(),
+	// "unflag" clears it to NULL, "" leaves it untouched. Mirrors the
+	// flag_transaction MCP tool's flagged_at write (sans the optional comment).
+	flagIntent string
+
+	// ruleApplied drives the generic rule_applied audit annotations. Each path
+	// populates this with its own granularity (per-action for the single-rule
+	// path, per-matching-rule for the bulk path); the materializer just emits.
+	ruleApplied []retroRuleApplied
+}
+
+// retroRuleApplied is one rule_applied audit annotation to emit for a txn.
+type retroRuleApplied struct {
+	rule  ruleapply.Rule
+	field string // may be "" for a rule-level (action-less) audit
+	value string
+}
+
+// applyRetroTxnIntent materializes one transaction's net retroactive intent
+// within tx. It is THE shared writer for every state-mutating rule action
+// (set_category, add_tag, remove_tag, assign_series, set_metadata,
+// remove_metadata, flag, unflag), so coverage cannot drift between the
+// retroactive paths.
+//
+// All writes use ruleapply.AppliedByRetroactive — this function is the
+// retroactive lane by construction.
+func (s *Service) applyRetroTxnIntent(ctx context.Context, tx pgx.Tx, it *retroTxnIntent) error {
+	// set_category — provenance/precedence was removed in P3: retroactive apply
+	// writes category_id directly (last-writer-wins), matching the sync path.
+	if it.catID.Valid {
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET category_id = $1, updated_at = NOW()
+			WHERE id = $2 AND deleted_at IS NULL`,
+			it.catID, it.txnID); err != nil {
+			return fmt.Errorf("update transaction category: %w", err)
+		}
+		if err := ruleapply.WriteCategorySet(ctx, tx, it.txnID, it.catRule, it.catSlug, ruleapply.AppliedByRetroactive); err != nil {
+			return fmt.Errorf("annotate category_set: %w", err)
+		}
+	}
+
+	for slug, r := range it.tagAdds {
+		if _, err := s.materializeRuleTagAdd(ctx, tx, it.txnID, slug, r.ID, r.ShortID, r.Name); err != nil {
+			return err
+		}
+	}
+	for slug, r := range it.tagRemoves {
+		if _, err := s.materializeRuleTagRemove(ctx, tx, it.txnID, slug, r.ID, r.ShortID, r.Name); err != nil {
+			return err
+		}
+	}
+
+	// assign_series — same resolve-or-mint + back-link the sync path uses, so
+	// retroactive and sync-time behave identically.
+	if it.series != nil {
+		if err := s.AssignSeriesFromRuleTx(ctx, tx, it.txnID, it.series.SeriesShortID, it.series.SeriesName, it.series.CreateIfMissing); err != nil {
+			return fmt.Errorf("apply assign_series retroactively: %w", err)
+		}
+	}
+
+	// assign_counterparty — same resolve-or-create + link the sync path uses.
+	if it.counterparty != nil {
+		if err := s.AssignCounterpartyFromRuleTx(ctx, tx, it.txnID, it.counterparty.CounterpartyShortID, it.counterparty.CounterpartyName, it.counterparty.CreateIfMissing); err != nil {
+			return fmt.Errorf("apply assign_counterparty retroactively: %w", err)
+		}
+	}
+
+	// set_metadata / remove_metadata — one UPDATE merges the net intent.
+	if len(it.metadataSet) > 0 || len(it.metadataRemove) > 0 {
+		if err := applyMetadataToTxns(ctx, tx, []pgtype.UUID{it.txnID}, it.metadataSet, it.metadataRemove); err != nil {
+			return err
+		}
+	}
+
+	// flag / unflag — set or clear flagged_at, mirroring the flag_transaction
+	// tool's write (transaction_flag.go). Last-writer-wins is already resolved
+	// upstream into a single flagIntent.
+	switch it.flagIntent {
+	case "flag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+			it.txnID); err != nil {
+			return fmt.Errorf("flag transaction: %w", err)
+		}
+	case "unflag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NULL WHERE id = $1 AND deleted_at IS NULL`,
+			it.txnID); err != nil {
+			return fmt.Errorf("unflag transaction: %w", err)
+		}
+	}
+
+	for _, ra := range it.ruleApplied {
+		if err := ruleapply.WriteRuleApplied(ctx, tx, it.txnID, ra.rule, ra.field, ra.value, ruleapply.AppliedByRetroactive); err != nil {
+			return fmt.Errorf("annotate rule_applied: %w", err)
+		}
+	}
+	return nil
+}
+
 // ApplyRuleRetroactively applies a single rule to all existing non-deleted
-// transactions matching its condition. Materializes set_category (SQL UPDATE,
-// skipped on category_override=TRUE rows), add_tag (upsert transaction_tags),
-// and remove_tag (delete transaction_tags). add_comment stays sync-only by
-// design — retroactive apply is bulk historical data, not narration.
+// transactions matching its condition. Materialization flows through the shared
+// applyRetroTxnIntent, so it covers every state-mutating action — set_category,
+// add_tag, remove_tag,
+// assign_series, set_metadata, remove_metadata, flag, unflag. add_comment stays
+// sync-only by design — retroactive apply is bulk historical data, not
+// narration.
 //
 // Returns the number of transactions that matched the condition (hit count —
 // not the number of rows physically modified). This matches sync-time
@@ -1304,6 +1869,10 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 	var tagAdds []string
 	var tagRemoves []string
 	var seriesAssign *RuleAction
+	var counterpartyAssign *RuleAction
+	metadataSet := map[string]any{}
+	var metadataRemove []string
+	var flagIntent string
 	for _, a := range rule.Actions {
 		switch a.Type {
 		case "set_category":
@@ -1323,9 +1892,36 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		case "assign_series":
 			aCopy := a
 			seriesAssign = &aCopy
+		case "assign_counterparty":
+			aCopy := a
+			counterpartyAssign = &aCopy
+		case "set_metadata":
+			if a.MetadataKey == "" {
+				continue
+			}
+			if i := indexExactStr(metadataRemove, a.MetadataKey); i >= 0 {
+				metadataRemove = append(metadataRemove[:i], metadataRemove[i+1:]...)
+			}
+			metadataSet[a.MetadataKey] = a.MetadataValue
+		case "remove_metadata":
+			if a.MetadataKey == "" {
+				continue
+			}
+			// Last-writer-wins: a remove after a set of the same key must delete
+			// it. Drop any queued set and queue the delete; the SQL
+			// `metadata - keys` is a harmless no-op on rows lacking the key.
+			delete(metadataSet, a.MetadataKey)
+			if indexExactStr(metadataRemove, a.MetadataKey) < 0 {
+				metadataRemove = append(metadataRemove, a.MetadataKey)
+			}
+		case "flag":
+			flagIntent = "flag"
+		case "unflag":
+			flagIntent = "unflag"
 		}
 	}
-	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0 || seriesAssign != nil
+	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0 || seriesAssign != nil ||
+		counterpartyAssign != nil || len(metadataSet) > 0 || len(metadataRemove) > 0 || flagIntent != ""
 	if !hasWriteAction {
 		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
@@ -1358,12 +1954,13 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		rowCount := 0
 		for rows.Next() {
 			rowCount++
-			dest := make([]any, 14)
+			dest := make([]any, transactionContextColumns)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
 				return totalMatched, fmt.Errorf("scan transaction: %w", err)
 			}
+			r.finalize()
 			lastID = r.id
 			if EvaluateCondition(compiled, r.tctx) {
 				matchIDs = append(matchIDs, r.id)
@@ -1389,66 +1986,50 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 			return totalMatched, fmt.Errorf("begin retroactive apply tx: %w", err)
 		}
 
-		// set_category: bulk UPDATE for matching non-overridden rows.
-		if categorySetCatID.Valid {
-			_, err := tx.Exec(ctx,
-				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = 'none' AND deleted_at IS NULL`,
-				categorySetCatID, matchIDs)
-			if err != nil {
-				tx.Rollback(ctx)
-				return totalMatched, fmt.Errorf("update transactions: %w", err)
-			}
-			// Annotation per touched row.
-			rule := ruleapply.Rule{ID: ruleUUID, ShortID: ruleShortID, Name: ruleName}
-			for _, txnID := range matchIDs {
-				if err := ruleapply.WriteCategorySet(ctx, tx, txnID, rule, categorySetSlug, ruleapply.AppliedByRetroactive); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, fmt.Errorf("annotate category_set: %w", err)
-				}
-			}
-		}
-
-		// add_tag: materialize per tag per matching txn.
-		for _, txnID := range matchIDs {
-			for _, slug := range tagAdds {
-				if _, err := s.materializeRuleTagAdd(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, err
-				}
-			}
-			for _, slug := range tagRemoves {
-				if _, err := s.materializeRuleTagRemove(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, err
-				}
-			}
-		}
-
-		// assign_series: resolve-or-mint the series and link each matched txn
-		// (NULL-fill) within the batch tx — same materialization the sync path
-		// uses, so retroactive and sync-time behave identically.
-		if seriesAssign != nil {
-			for _, txnID := range matchIDs {
-				if err := s.AssignSeriesFromRuleTx(ctx, tx, txnID, seriesAssign.SeriesShortID, seriesAssign.MerchantKey, seriesAssign.CreateIfMissing); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, fmt.Errorf("apply assign_series retroactively: %w", err)
-				}
-			}
-		}
-
-		// rule_applied audit trail — one per action intent per matched txn.
+		// Materialize through the shared per-txn applier so this path covers the
+		// exact same action set as the bulk ApplyAllRulesRetroactively path. The
+		// rule's net intent (category/tags/series/metadata) is uniform across
+		// matched rows, so the per-txn intent differs only by txnID.
 		appliedRule := ruleapply.Rule{ID: ruleUUID, ShortID: ruleShortID, Name: ruleName}
+
+		// rule_applied audit shape is identical for every matched txn: one entry
+		// per non-comment action intent. add_comment is skipped retroactively
+		// (see retroTxnIntent).
+		var ruleApplied []retroRuleApplied
 		for _, action := range rule.Actions {
 			field, value := actionAuditFields(action)
 			if field == "" || field == "comment" {
 				continue
 			}
-			for _, txnID := range matchIDs {
-				if err := ruleapply.WriteRuleApplied(ctx, tx, txnID, appliedRule, field, value, ruleapply.AppliedByRetroactive); err != nil {
-					tx.Rollback(ctx)
-					return totalMatched, fmt.Errorf("annotate rule_applied: %w", err)
-				}
+			ruleApplied = append(ruleApplied, retroRuleApplied{rule: appliedRule, field: field, value: value})
+		}
+
+		for _, txnID := range matchIDs {
+			it := retroTxnIntent{
+				txnID:            txnID,
+				catID:            categorySetCatID,
+				catSlug:          categorySetSlug,
+				catRule:          appliedRule,
+				tagAdds:          make(map[string]ruleapply.Rule, len(tagAdds)),
+				tagRemoves:       make(map[string]ruleapply.Rule, len(tagRemoves)),
+				series:           seriesAssign,
+				seriesRule:       appliedRule,
+				counterparty:     counterpartyAssign,
+				counterpartyRule: appliedRule,
+				metadataSet:      metadataSet,
+				metadataRemove:   metadataRemove,
+				flagIntent:       flagIntent,
+				ruleApplied:      ruleApplied,
+			}
+			for _, slug := range tagAdds {
+				it.tagAdds[slug] = appliedRule
+			}
+			for _, slug := range tagRemoves {
+				it.tagRemoves[slug] = appliedRule
+			}
+			if err := s.applyRetroTxnIntent(ctx, tx, &it); err != nil {
+				tx.Rollback(ctx)
+				return totalMatched, err
 			}
 		}
 
@@ -1486,21 +2067,80 @@ func actionAuditFields(a RuleAction) (string, string) {
 		return "category", a.CategorySlug
 	case "add_tag":
 		return "tag", a.TagSlug
+	case "remove_tag":
+		// "tag_remove" mirrors the sync resolver's audit field for removals
+		// (internal/sync/rule_resolver.go), keeping retroactive and sync-time
+		// rule_applied annotations consistent.
+		return "tag_remove", a.TagSlug
 	case "add_comment":
 		return "comment", a.Content
 	case "assign_series":
 		if a.SeriesShortID != "" {
 			return "series", a.SeriesShortID
 		}
-		return "series", a.MerchantKey
+		return "series", a.SeriesName
+	case "assign_counterparty":
+		if a.CounterpartyShortID != "" {
+			return "counterparty", a.CounterpartyShortID
+		}
+		return "counterparty", a.CounterpartyName
+	case "set_metadata":
+		return "metadata", a.MetadataKey
+	case "remove_metadata":
+		return "metadata_remove", a.MetadataKey
+	case "flag":
+		return "flag", ""
+	case "unflag":
+		return "unflag", ""
 	}
 	return "", ""
 }
 
+// applyMetadataToTxns merges a rule's net metadata intent into every listed
+// transaction in one UPDATE, sharing the caller's tx. set keys overwrite,
+// remove keys delete; the two are disjoint by resolver/extraction construction
+// so `(metadata - removeKeys) || setObj` applies both unambiguously.
+func applyMetadataToTxns(ctx context.Context, tx pgx.Tx, txnIDs []pgtype.UUID, set map[string]any, remove []string) error {
+	setJSON := "{}"
+	if len(set) > 0 {
+		b, err := json.Marshal(set)
+		if err != nil {
+			return fmt.Errorf("marshal rule metadata set: %w", err)
+		}
+		setJSON = string(b)
+	}
+	removeKeys := remove
+	if removeKeys == nil {
+		removeKeys = []string{}
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE transactions
+		   SET metadata = (metadata - $1::text[]) || $2::jsonb, updated_at = NOW()
+		 WHERE id = ANY($3) AND deleted_at IS NULL`,
+		removeKeys, setJSON, txnIDs); err != nil {
+		return fmt.Errorf("apply rule metadata: %w", err)
+	}
+	return nil
+}
+
+// indexExactStr returns the index of target in slice using exact
+// (case-sensitive) comparison, or -1. Metadata keys are case-sensitive JSONB
+// keys, so they must not be folded.
+func indexExactStr(slice []string, target string) int {
+	for i, s := range slice {
+		if s == target {
+			return i
+		}
+	}
+	return -1
+}
+
 // ApplyAllRulesRetroactively applies all active rules to existing transactions
-// in pipeline-stage order (priority ASC, created_at ASC). Materializes
-// set_category (last-writer-wins), add_tag, and remove_tag. add_comment stays
-// sync-only.
+// in pipeline-stage order (priority ASC, created_at ASC). Per transaction it
+// folds the rule set to a net intent and materializes it through the shared
+// applyRetroTxnIntent, covering every state-mutating action — set_category
+// (last-writer-wins), add_tag, remove_tag, assign_series, set_metadata,
+// remove_metadata, flag, unflag. add_comment stays sync-only.
 //
 // Returns a map of rule_id → match_count. Hit counts include every condition
 // match, not just actions that caused a DB write (sync-time parity).
@@ -1568,25 +2208,34 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 
 		// Per transaction: fold rules to determine net action intents, mirroring
 		// the sync resolver. Category: last-writer-wins. Tags: net-diff.
+		// Metadata: last-writer-wins per key, net-diff set↔remove.
 		type txnIntent struct {
-			txnID         pgtype.UUID
-			catID         pgtype.UUID
-			catSlug       string
-			catRule       *compiledRule
-			tagAdds       map[string]*compiledRule // slug → first rule that added it
-			tagRemoves    map[string]*compiledRule
-			matchingRules []*compiledRule // every rule whose condition matched (for rule_applied)
+			txnID            pgtype.UUID
+			catID            pgtype.UUID
+			catSlug          string
+			catRule          *compiledRule
+			tagAdds          map[string]*compiledRule // slug → first rule that added it
+			tagRemoves       map[string]*compiledRule
+			series           *RuleAction     // net assign_series intent (last-writer-wins)
+			seriesRule       *compiledRule   // rule that owns the winning series assignment
+			counterparty     *RuleAction     // net assign_counterparty intent (last-writer-wins)
+			counterpartyRule *compiledRule   // rule that owns the winning counterparty assignment
+			metadataSet      map[string]any  // key → net value to write
+			metadataRemove   []string        // net keys to delete
+			flagIntent       string          // "flag" | "unflag" | "" (last-writer-wins)
+			matchingRules    []*compiledRule // every rule whose condition matched (for rule_applied)
 		}
 		var intents []txnIntent
 		rowCount := 0
 		for rows.Next() {
 			rowCount++
-			dest := make([]any, 14)
+			dest := make([]any, transactionContextColumns)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
 				return hitCounts, fmt.Errorf("scan transaction: %w", err)
 			}
+			r.finalize()
 			lastID = r.id
 			tctx := r.tctx
 			if len(tctx.Tags) > 0 {
@@ -1595,9 +2244,10 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 				tctx.Tags = cp
 			}
 			intent := txnIntent{
-				txnID:      r.id,
-				tagAdds:    make(map[string]*compiledRule),
-				tagRemoves: make(map[string]*compiledRule),
+				txnID:       r.id,
+				tagAdds:     make(map[string]*compiledRule),
+				tagRemoves:  make(map[string]*compiledRule),
+				metadataSet: make(map[string]any),
 			}
 			for i := range compiled {
 				cr := &compiled[i]
@@ -1641,10 +2291,63 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 							}
 						}
 						tctx.Tags = sliceutil.DropFold(tctx.Tags, a.TagSlug)
+					case "set_metadata":
+						if a.MetadataKey == "" {
+							continue
+						}
+						if i := indexExactStr(intent.metadataRemove, a.MetadataKey); i >= 0 {
+							intent.metadataRemove = append(intent.metadataRemove[:i], intent.metadataRemove[i+1:]...)
+						}
+						intent.metadataSet[a.MetadataKey] = a.MetadataValue
+						if tctx.Metadata == nil {
+							tctx.Metadata = make(map[string]any)
+						}
+						tctx.Metadata[a.MetadataKey] = a.MetadataValue
+					case "remove_metadata":
+						if a.MetadataKey == "" {
+							continue
+						}
+						// Last-writer-wins: a remove after a set of the same
+						// key must delete it. Drop any queued set and queue
+						// the delete; `metadata - keys` is a no-op on rows
+						// lacking the key.
+						delete(intent.metadataSet, a.MetadataKey)
+						if indexExactStr(intent.metadataRemove, a.MetadataKey) < 0 {
+							intent.metadataRemove = append(intent.metadataRemove, a.MetadataKey)
+						}
+						delete(tctx.Metadata, a.MetadataKey)
+					case "assign_series":
+						if a.SeriesShortID == "" && a.SeriesName == "" {
+							continue
+						}
+						// Last-writer-wins: a txn joins at most one series, so a
+						// later-stage rule overrides an earlier assignment.
+						aCopy := a
+						intent.series = &aCopy
+						intent.seriesRule = cr
+					case "assign_counterparty":
+						if a.CounterpartyShortID == "" && a.CounterpartyName == "" {
+							continue
+						}
+						// Last-writer-wins: a txn binds at most one counterparty.
+						aCopy := a
+						intent.counterparty = &aCopy
+						intent.counterpartyRule = cr
+					case "flag":
+						// Last-writer-wins: a later-stage rule's flag/unflag
+						// overrides an earlier one.
+						intent.flagIntent = "flag"
+					case "unflag":
+						intent.flagIntent = "unflag"
+					case "add_comment":
+						// Narration authored at sync time; intentionally never
+						// replayed on a historical backfill (see retroTxnIntent).
 					}
 				}
 			}
-			if intent.catRule != nil || len(intent.tagAdds) > 0 || len(intent.tagRemoves) > 0 {
+			if intent.catRule != nil || len(intent.tagAdds) > 0 || len(intent.tagRemoves) > 0 ||
+				intent.series != nil || intent.counterparty != nil || len(intent.metadataSet) > 0 ||
+				len(intent.metadataRemove) > 0 || intent.flagIntent != "" {
 				intents = append(intents, intent)
 			}
 		}
@@ -1664,79 +2367,55 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		if err != nil {
 			return hitCounts, fmt.Errorf("begin apply-all tx: %w", err)
 		}
-		aborted := false
 
-		// Group category updates by (catID) for batched UPDATEs.
-		catBatches := make(map[pgtype.UUID][]pgtype.UUID)
-		for _, it := range intents {
-			if it.catRule != nil {
-				catBatches[it.catID] = append(catBatches[it.catID], it.txnID)
+		// Materialize each txn's net intent through the shared per-txn applier so
+		// this path covers the exact same action set as ApplyRuleRetroactively —
+		// including assign_series, which this bulk path previously dropped.
+		//
+		// rule_applied audit: one annotation per matching rule per txn, without
+		// per-action specialization (action_field / action_value left empty) —
+		// callers get a rule-level audit. Shape still matches the canonical
+		// 5-key payload.
+		for i := range intents {
+			it := &intents[i]
+			ri := retroTxnIntent{
+				txnID:          it.txnID,
+				tagAdds:        make(map[string]ruleapply.Rule, len(it.tagAdds)),
+				tagRemoves:     make(map[string]ruleapply.Rule, len(it.tagRemoves)),
+				metadataSet:    it.metadataSet,
+				metadataRemove: it.metadataRemove,
+				flagIntent:     it.flagIntent,
 			}
-		}
-		for catID, txnIDs := range catBatches {
-			if _, err := tx.Exec(ctx,
-				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = 'none' AND deleted_at IS NULL`,
-				catID, txnIDs); err != nil {
-				tx.Rollback(ctx)
-				return hitCounts, fmt.Errorf("update transactions: %w", err)
-			}
-		}
-
-		for _, it := range intents {
-			// category_set annotation (one per touched row, owned by the winning rule).
 			if it.catRule != nil {
-				if err := ruleapply.WriteCategorySet(ctx, tx, it.txnID,
-					ruleapply.Rule{ID: it.catRule.uuid, ShortID: it.catRule.shortID, Name: it.catRule.name},
-					it.catSlug, ruleapply.AppliedByRetroactive,
-				); err != nil {
-					aborted = true
-					break
-				}
+				ri.catID = it.catID
+				ri.catSlug = it.catSlug
+				ri.catRule = ruleapply.Rule{ID: it.catRule.uuid, ShortID: it.catRule.shortID, Name: it.catRule.name}
 			}
 			for slug, cr := range it.tagAdds {
-				if _, err := s.materializeRuleTagAdd(ctx, tx, it.txnID, slug, cr.uuid, cr.shortID, cr.name); err != nil {
-					aborted = true
-					break
-				}
-			}
-			if aborted {
-				break
+				ri.tagAdds[slug] = ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name}
 			}
 			for slug, cr := range it.tagRemoves {
-				if _, err := s.materializeRuleTagRemove(ctx, tx, it.txnID, slug, cr.uuid, cr.shortID, cr.name); err != nil {
-					aborted = true
-					break
-				}
+				ri.tagRemoves[slug] = ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name}
 			}
-			if aborted {
-				break
+			if it.series != nil {
+				ri.series = it.series
+				ri.seriesRule = ruleapply.Rule{ID: it.seriesRule.uuid, ShortID: it.seriesRule.shortID, Name: it.seriesRule.name}
 			}
-
-			// rule_applied audit: one per matching rule per txn.
-			//
-			// Unlike ApplyRuleRetroactively, this path emits one annotation per
-			// (matching rule, txn) without per-action specialization — callers
-			// get a rule-level audit, so action_field / action_value are left
-			// empty. Shape still matches the canonical 5-key payload.
+			if it.counterparty != nil {
+				ri.counterparty = it.counterparty
+				ri.counterpartyRule = ruleapply.Rule{ID: it.counterpartyRule.uuid, ShortID: it.counterpartyRule.shortID, Name: it.counterpartyRule.name}
+			}
 			for _, cr := range it.matchingRules {
-				if err := ruleapply.WriteRuleApplied(ctx, tx, it.txnID,
-					ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name},
-					"", "", ruleapply.AppliedByRetroactive,
-				); err != nil {
-					aborted = true
-					break
-				}
+				ri.ruleApplied = append(ri.ruleApplied, retroRuleApplied{
+					rule: ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name},
+				})
 			}
-			if aborted {
-				break
+			if err := s.applyRetroTxnIntent(ctx, tx, &ri); err != nil {
+				tx.Rollback(ctx)
+				return hitCounts, fmt.Errorf("apply-all retroactive batch: %w", err)
 			}
 		}
 
-		if aborted {
-			tx.Rollback(ctx)
-			return hitCounts, fmt.Errorf("apply-all retroactive batch aborted")
-		}
 		if err := tx.Commit(ctx); err != nil {
 			return hitCounts, fmt.Errorf("commit apply-all batch: %w", err)
 		}
@@ -1922,11 +2601,12 @@ func (s *Service) loadTransactionContext(ctx context.Context, idOrShort string) 
 		}
 		return nil, fmt.Errorf("%w: transaction not found", ErrNotFound)
 	}
-	dest := make([]any, 14)
+	dest := make([]any, transactionContextColumns)
 	r := scanTransactionContextRow(dest)
 	if err := rows.Scan(dest...); err != nil {
 		return nil, fmt.Errorf("scan transaction context: %w", err)
 	}
+	r.finalize()
 	return &r.tctx, nil
 }
 
@@ -1952,19 +2632,22 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 
 	// Extended query to also get date and current category slug.
 	// Must match the same filters as transactionContextQuery (used by ApplyRuleRetroactively):
-	// - category_override = 'none' (rules don't overwrite manual overrides)
 	// - exclude matched dependent transactions (dedup'd via account links)
+	// Provenance was removed in P3, so there is no category_override filter — the
+	// preview reflects every row a rule would match (last-writer-wins).
 	baseQuery := `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
 		COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
-		t.date, COALESCE(c.slug, ''), COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL)
+		t.date, COALESCE(c.slug, ''), COALESCE(rs.short_id, ''), (t.series_id IS NOT NULL), t.metadata,
+		COALESCE(cp.short_id, ''), (t.counterparty_id IS NOT NULL)
 		FROM transactions t
 		JOIN accounts a ON t.account_id = a.id
 		JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories c ON t.category_id = c.id
 		LEFT JOIN recurring_series rs ON rs.id = t.series_id
-		WHERE t.deleted_at IS NULL AND t.category_override = 'none'
+		LEFT JOIN counterparties cp ON cp.id = t.counterparty_id
+		WHERE t.deleted_at IS NULL
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 	// When previewing for a specific rule's detail page, exclude transactions
@@ -2002,17 +2685,28 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		for rows.Next() {
 			rowCount++
 			var (
-				id      pgtype.UUID
-				tctx    TransactionContext
-				date    pgtype.Date
-				catSlug string
+				id          pgtype.UUID
+				tctx        TransactionContext
+				date        pgtype.Date
+				catSlug     string
+				metadataRaw []byte
 			)
 			if err := rows.Scan(&id, &tctx.Name, &tctx.MerchantName, &tctx.Amount,
 				&tctx.CategoryPrimary, &tctx.CategoryDetailed,
 				&tctx.Pending, &tctx.Provider, &tctx.AccountID, &tctx.UserID, &tctx.UserName,
-				&date, &catSlug, &tctx.SeriesShortID, &tctx.InSeries); err != nil {
+				&date, &catSlug, &tctx.SeriesShortID, &tctx.InSeries, &metadataRaw,
+				&tctx.CounterpartyShortID, &tctx.HasCounterparty); err != nil {
 				rows.Close()
 				return nil, fmt.Errorf("scan transaction: %w", err)
+			}
+			if len(metadataRaw) > 0 {
+				var meta map[string]any
+				if err := json.Unmarshal(metadataRaw, &meta); err == nil {
+					tctx.Metadata = meta
+				}
+			}
+			if date.Valid {
+				tctx.Date = date.Time
 			}
 			lastID = id
 			result.TotalScanned++
@@ -2456,6 +3150,22 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Add comment"
 	case "assign_series":
 		return "Assign to series"
+	case "assign_counterparty":
+		return "Assign counterparty"
+	case "flag":
+		return "Flag for attention"
+	case "unflag":
+		return "Clear flag"
+	case "set_metadata":
+		if a.MetadataKey != "" {
+			return "Set metadata: " + a.MetadataKey
+		}
+		return "Set metadata"
+	case "remove_metadata":
+		if a.MetadataKey != "" {
+			return "Remove metadata: " + a.MetadataKey
+		}
+		return "Remove metadata"
 	default:
 		return a.Type
 	}

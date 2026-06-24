@@ -170,11 +170,14 @@ type FeedTransactionRef struct {
 	ShortID      string
 	Name         string
 	MerchantName string
-	Amount       float64
-	Currency     string
-	Date         string
-	AccountName  string
-	Institution  string
+	// CounterpartyName is the assigned counterparty's name when present; the
+	// preferred display over MerchantName / provider name. Nil when unassigned.
+	CounterpartyName *string
+	Amount           float64
+	Currency         string
+	Date             string
+	AccountName      string
+	Institution      string
 	// Pending mirrors `transactions.pending`. When true the inline tx-ref
 	// row renders the same small clock-icon mark used on the per-tx page
 	// and the transactions list, signalling the row is still preliminary
