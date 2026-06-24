@@ -244,6 +244,8 @@ func workflowCategoryIcon(category string) string {
 		return "rocket"
 	case "Categorization & Review":
 		return "sparkles"
+	case "Enrichment":
+		return "gem"
 	case "Insights & Reports":
 		return "bar-chart-3"
 	case "Hygiene & Maintenance":

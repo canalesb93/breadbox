@@ -19,6 +19,7 @@ import (
 var f4ValidCategories = map[string]bool{
 	"Setup & Bulk":            true,
 	"Categorization & Review": true,
+	"Enrichment":              true,
 	"Insights & Reports":      true,
 	"Hygiene & Maintenance":   true,
 	"Alerts & Anomalies":      true,

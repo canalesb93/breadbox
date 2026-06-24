@@ -16,6 +16,7 @@ import (
 var knownPresetCategories = map[string]bool{
 	"Setup & Bulk":            true,
 	"Categorization & Review": true,
+	"Enrichment":              true,
 	"Insights & Reports":      true,
 	"Alerts & Anomalies":      true,
 }

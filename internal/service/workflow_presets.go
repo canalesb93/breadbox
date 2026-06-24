@@ -233,6 +233,43 @@ var workflowPresets = []WorkflowPreset{
 		EstCostPerRunUSD: 0.20, // hundreds–thousands of transactions on Haiku
 		Options:          []WorkflowPresetOption{applyModeOption},
 	},
+	{
+		Slug:        "series-foundation",
+		Name:        "Series Foundation",
+		Category:    "Setup & Bulk",
+		Icon:        "repeat",
+		Description: "A one-time pass over your history to detect recurring charges — subscriptions, bills, loans — and codify each as a rule, so future occurrences join their series automatically.",
+		PromptBlocks: []string{
+			"strategy-series-foundation",
+			"rules-curriculum",
+		},
+		ToolScope: "read_write", // creates series + assign_series rules (dry-run first)
+		Model:     "claude-sonnet-4-6",
+		OneOff:    true,
+		// Foundational one-off: a deep pass over 1000+ transactions that drafts and
+		// applies assign_series rules. Turns stay unlimited (budget-bound) so a large
+		// history isn't cut off mid-pass.
+		MaxBudgetUSD:     3.00,
+		EstCostPerRunUSD: 0.50, // analyzes 1000+ transactions on Sonnet + drafts rules
+		Options:          []WorkflowPresetOption{ruleApplyModeOption},
+	},
+	{
+		Slug:        "counterparty-foundation",
+		Name:        "Counterparty Foundation",
+		Category:    "Setup & Bulk",
+		Icon:        "store",
+		Description: "A one-time pass over your history to identify who's behind each charge — merchants, people, employers — collapse duplicate descriptors, and codify each as a rule that resolves future charges automatically.",
+		PromptBlocks: []string{
+			"strategy-counterparty-foundation",
+			"rules-curriculum",
+		},
+		ToolScope:        "read_write", // creates counterparties + assign_counterparty rules (dry-run first)
+		Model:            "claude-sonnet-4-6",
+		OneOff:           true,
+		MaxBudgetUSD:     3.00,
+		EstCostPerRunUSD: 0.50, // analyzes 1000+ transactions on Sonnet + drafts rules
+		Options:          []WorkflowPresetOption{ruleApplyModeOption},
+	},
 
 	{
 		Slug:        "routine-reviewer",
@@ -268,6 +305,43 @@ var workflowPresets = []WorkflowPreset{
 		EstCostPerRunUSD: 0.04,
 		Options:          []WorkflowPresetOption{applyModeOption},
 	},
+
+	// ── Enrichment ───────────────────────────────────────────────────────────
+	// Focused, single-dimension curators that keep the series and counterparty
+	// catalogs accurate and well-enriched as data arrives. They run after each
+	// sync by default — the doctrine's "improve the enrichment layer on every
+	// sync" — and are drawer-switchable to a weekly cadence. Narrower and deeper
+	// than the general Transaction Reviewer: each owns one entity type, promotes
+	// emerging patterns to rules, and tidies mistakes (split/unlink, enrich).
+	{
+		Slug:        "series-curator",
+		Name:        "Series Curator",
+		Category:    "Enrichment",
+		Icon:        "repeat",
+		Description: "Keeps recurring series accurate as transactions arrive — places new recurring charges, promotes emerging patterns to rules, and tidies types and mistakes.",
+		PromptBlocks: []string{
+			"strategy-series-curator",
+			"rules-curriculum",
+		},
+		ToolScope:             "read_write", // assigns series + authors assign_series rules
+		TriggerOnSyncComplete: true,
+		EstCostPerRunUSD:      0.03, // focused, single-dimension pass over new charges
+	},
+	{
+		Slug:        "counterparty-curator",
+		Name:        "Counterparty Curator",
+		Category:    "Enrichment",
+		Icon:        "store",
+		Description: "Keeps counterparty identities accurate and enriched as transactions arrive — binds new charges, mints entities for new recurring payees, collapses duplicates, and fills in brand details.",
+		PromptBlocks: []string{
+			"strategy-counterparty-curator",
+			"rules-curriculum",
+		},
+		ToolScope:             "read_write", // assigns counterparties + authors rules + enriches
+		TriggerOnSyncComplete: true,
+		EstCostPerRunUSD:      0.03, // focused, single-dimension pass over new charges
+	},
+
 	{
 		Slug:        "weekly-money-digest",
 		Name:        "Weekly Money Digest",
