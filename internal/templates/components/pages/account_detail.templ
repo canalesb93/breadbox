@@ -634,17 +634,17 @@ func acctOwnerSelectHTML(p AccountDetailProps) string {
 	if p.Account != nil && p.Account.OwnerUserID != nil {
 		current = *p.Account.OwnerUserID
 	}
-	inheritLabel := "Inherit from connection"
-	if p.Account != nil && p.Account.UserName != "" {
-		inheritLabel = "Inherit from connection (" + p.Account.UserName + ")"
-	}
+	// Keep the inherit label short. Appending the connection owner's name would
+	// overflow the narrow settings cell: daisy 5's appearance:base-select does
+	// not clip a long selected value (text-overflow is ignored on the select),
+	// so the value bleeds over the dropdown arrow and out of the card.
 	var b strings.Builder
 	fmt.Fprintf(&b, `<select onchange="updateOwner('%s', this.value)" class="select select-sm w-full">`, htmlAttrEscape(p.AccountID))
 	inheritSel := ""
 	if current == "" {
 		inheritSel = " selected"
 	}
-	fmt.Fprintf(&b, `<option value=""%s>%s</option>`, inheritSel, htmlAttrEscape(inheritLabel))
+	fmt.Fprintf(&b, `<option value=""%s>Inherit from connection</option>`, inheritSel)
 	for _, m := range p.Members {
 		sel := ""
 		if m.ShortID == current {
