@@ -129,36 +129,49 @@ templ CounterpartyDetail(p CounterpartyDetailProps) {
 				})
 			</div>
 		</div>
-		<!-- Enrichment — manual edit lane (no auto-fetch) -->
+		<!-- Enrichment — manual edit lane (no auto-fetch). Standard page-form
+		     vocabulary (bb-card + stacked fields), not the settings two-column
+		     gutter, which is reserved for /settings/*. -->
 		<div class="mt-5 max-w-3xl">
 			@entityPanelHeader("sparkles", "Enrichment", "Name, category, and brand details", nil)
-			<form method="POST" action={ templ.SafeURL("/counterparties/" + p.Counterparty.ShortID) }>
+			<form method="POST" action={ templ.SafeURL("/counterparties/" + p.Counterparty.ShortID) } class="bb-card p-0 overflow-hidden">
 				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-				@components.SettingsSection(components.SettingsSectionProps{
-					Icon:  "store",
-					Title: "Details",
-				}) {
-					@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "Display label for this counterparty"}) {
-						<input type="text" name="name" value={ p.Counterparty.Name } required class="input input-sm w-full sm:w-80" aria-label="Name"/>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Category", Caption: "Default category for its charges"}) {
-						<select name="category_id" class="select select-sm w-auto max-w-full" aria-label="Category">
-							<option value="" selected?={ p.CategoryID == "" }>— None —</option>
-							for _, opt := range p.CategoryOptions {
-								<option value={ opt.Value } selected?={ opt.Selected }>{ opt.Label }</option>
-							}
-						</select>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "MCC", Caption: "Merchant category code (4 digits)"}) {
-						<input type="text" name="mcc" value={ p.MCC } inputmode="numeric" maxlength="4" placeholder="e.g. 5411" class="input input-sm w-32" aria-label="MCC"/>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Website", Caption: "Its domain auto-fetches a brand logo via logo.dev when counterparty logos are enabled and a logo.dev token is set in Settings", Stack: true}) {
-						<input type="url" name="website_url" value={ p.WebsiteURL } placeholder="https://example.com" class="input input-sm w-full" aria-label="Website URL"/>
-					}
-					@components.SettingsRow(components.SettingsRowProps{Label: "Logo URL", Caption: "Overrides the auto-fetched logo. Hotlinked on counterparty rows.", Stack: true}) {
-						<input type="url" name="logo_url" value={ p.LogoURL } placeholder="https://logo.example.com/acme.png" class="input input-sm w-full" aria-label="Logo URL"/>
-					}
-				}
+				<div class="p-5 sm:p-6 space-y-4">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-name">
+								Name <span class="text-error">*</span>
+							</label>
+							<input type="text" id="cp-name" name="name" value={ p.Counterparty.Name } required class="bb-form-input" aria-label="Name"/>
+							<p class="text-xs text-base-content/40 mt-1.5">Display label for this counterparty.</p>
+						</div>
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-category">Category</label>
+							<select id="cp-category" name="category_id" class="bb-form-select" aria-label="Category">
+								<option value="" selected?={ p.CategoryID == "" }>— None —</option>
+								for _, opt := range p.CategoryOptions {
+									<option value={ opt.Value } selected?={ opt.Selected }>{ opt.Label }</option>
+								}
+							</select>
+							<p class="text-xs text-base-content/40 mt-1.5">Default category for its charges.</p>
+						</div>
+					</div>
+					<div class="max-w-[14rem]">
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-mcc">MCC</label>
+						<input type="text" id="cp-mcc" name="mcc" value={ p.MCC } inputmode="numeric" maxlength="4" placeholder="e.g. 5411" class="bb-form-input" aria-label="MCC"/>
+						<p class="text-xs text-base-content/40 mt-1.5">Merchant category code (4 digits).</p>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-website">Website</label>
+						<input type="url" id="cp-website" name="website_url" value={ p.WebsiteURL } placeholder="https://example.com" class="bb-form-input" aria-label="Website URL"/>
+						<p class="text-xs text-base-content/40 mt-1.5">Its domain auto-fetches a brand logo via logo.dev when counterparty logos are enabled and a token is set in Settings.</p>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-logo">Logo URL</label>
+						<input type="url" id="cp-logo" name="logo_url" value={ p.LogoURL } placeholder="https://logo.example.com/acme.png" class="bb-form-input" aria-label="Logo URL"/>
+						<p class="text-xs text-base-content/40 mt-1.5">Overrides the auto-fetched logo. Hotlinked on counterparty rows.</p>
+					</div>
+				</div>
 				<div class="bb-action-row">
 					<button type="submit" class="btn btn-primary btn-sm gap-1.5">
 						@components.LucideIcon("check", "w-4 h-4")
@@ -180,30 +193,33 @@ templ CounterpartyForm(p CounterpartyFormProps) {
 		Subtitle:             "Name a counterparty, then enrich it and author rules that assign charges to it. It starts empty.",
 		SubtitleHideOnMobile: true,
 	})
-	<form method="POST" action="/counterparties/new" class="max-w-2xl">
-		<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-		if p.Error != "" {
-			<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
-				@components.LucideIcon("alert-triangle", "w-4 h-4")
-				<span>{ p.Error }</span>
+	<div class="max-w-lg">
+		<form method="POST" action="/counterparties/new" class="bb-card p-0 overflow-hidden">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<div class="p-5 sm:p-6">
+				if p.Error != "" {
+					<div role="alert" class="alert alert-soft alert-error rounded-xl mb-4">
+						@components.LucideIcon("alert-triangle", "w-4 h-4")
+						<span>{ p.Error }</span>
+					</div>
+				}
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="cp-new-name">
+						Name <span class="text-error">*</span>
+					</label>
+					<input type="text" id="cp-new-name" name="name" value={ p.Name } required placeholder="e.g. Amazon" class="bb-form-input" aria-label="Name"/>
+					<p class="text-xs text-base-content/40 mt-1.5">What you call this counterparty. Enrich it (category, logo, website) after creating.</p>
+				</div>
 			</div>
-		}
-		@components.SettingsSection(components.SettingsSectionProps{
-			Icon:  "store",
-			Title: "Details",
-		}) {
-			@components.SettingsRow(components.SettingsRowProps{Label: "Name", Caption: "What you call this counterparty"}) {
-				<input type="text" name="name" value={ p.Name } required placeholder="e.g. Amazon" class="input input-sm w-full sm:w-80" aria-label="Name"/>
-			}
-		}
-		<div class="bb-action-row">
-			<a href="/counterparties" class="btn btn-ghost btn-sm">Cancel</a>
-			<button type="submit" class="btn btn-primary btn-sm gap-1.5">
-				@components.LucideIcon("plus", "w-4 h-4")
-				Create counterparty
-			</button>
-		</div>
-	</form>
+			<div class="bb-action-row">
+				<a href="/counterparties" class="btn btn-ghost btn-sm">Cancel</a>
+				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
+					@components.LucideIcon("plus", "w-4 h-4")
+					Create counterparty
+				</button>
+			</div>
+		</form>
+	</div>
 }
 
 // counterpartyHeaderIcon renders the EntityHeader leading tile content — the same
