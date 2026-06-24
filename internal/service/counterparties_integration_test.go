@@ -240,6 +240,65 @@ func TestApplyRuleRetroactively_AssignCounterpartyByShortID(t *testing.T) {
 	}
 }
 
+// TestApplyRuleRetroactively_AssignCounterparty_FeedSingleEvent is the
+// regression test for issue #1915: a retroactive assign_counterparty rule must
+// surface as ONE feed event (the rule_applied row), not two. Before the fix the
+// rule wrote both a rule_applied row (attributed to the rule) AND a
+// counterparty_assigned side-effect row (attributed to SystemActor "Breadbox"),
+// and the latter escaped the rule-source dedup — so the feed showed the same
+// retroactive application twice ("… ran a rule …" + "Breadbox assigned …").
+func TestApplyRuleRetroactively_AssignCounterparty_FeedSingleEvent(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+	// Three charges so the bucket clears the default bulk-action threshold.
+	testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX.COM 1", "Netflix", 1599, "2026-03-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX.COM 2", "Netflix", 1599, "2026-04-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "NETFLIX.COM 3", "Netflix", 1599, "2026-05-15")
+	actor := service.Actor{Type: "user", ID: "u1", Name: "Tester"}
+
+	cp, err := svc.AssignCounterparty(ctx, service.AssignCounterpartyInput{Name: "Netflix", CreateIfMissing: true}, actor)
+	if err != nil {
+		t.Fatalf("create counterparty: %v", err)
+	}
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Netflix Counterparty",
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "Netflix"},
+		Actions:    []service.RuleAction{{Type: "assign_counterparty", CounterpartyShortID: cp.ShortID}},
+		Actor:      actor,
+	})
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+	if _, err := svc.ApplyRuleRetroactively(ctx, rule.ID); err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+
+	events, err := svc.ListFeedEvents(ctx, service.FeedEventsParams{})
+	if err != nil {
+		t.Fatalf("ListFeedEvents: %v", err)
+	}
+
+	// Exactly one bulk_action event survives — the rule_applied bucket. The
+	// counterparty_assigned side-effect (system "Breadbox" actor) is deduped.
+	bulk := countEventsByType(events, "bulk_action")
+	if bulk != 1 {
+		for _, ev := range events {
+			if ev.Type == "bulk_action" {
+				t.Logf("bulk_action kind=%q actor=%q", ev.BulkAction.Kind, ev.BulkAction.ActorName)
+			}
+		}
+		t.Fatalf("bulk_action events = %d, want 1 (rule_applied only; membership side-effect deduped)", bulk)
+	}
+	ev := findEventByType(events, "bulk_action").BulkAction
+	if ev.Kind != "rule_applied" {
+		t.Errorf("surviving bulk_action kind = %q, want rule_applied", ev.Kind)
+	}
+	if ev.ActorName == "Breadbox" {
+		t.Errorf("surviving event attributed to %q — the system membership row should have been deduped", ev.ActorName)
+	}
+}
+
 // TestApplyRuleRetroactively_AssignCounterpartyByName covers resolve-or-create by
 // name on the single-rule retroactive path.
 func TestApplyRuleRetroactively_AssignCounterpartyByName(t *testing.T) {

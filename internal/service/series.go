@@ -135,7 +135,7 @@ func (s *Service) mintSeriesByName(ctx context.Context, in AssignSeriesInput, ac
 	}
 
 	if len(memberIDs) > 0 {
-		if err := backLinkMembers(ctx, tx, qtx, seriesID, memberIDs, actor); err != nil {
+		if err := backLinkMembers(ctx, tx, qtx, seriesID, memberIDs, actor, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -185,7 +185,7 @@ func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID p
 		return nil // nothing actionable
 	}
 
-	if err := backLinkMembers(ctx, tx, qtx, seriesID, []pgtype.UUID{txnID}, SystemActor()); err != nil {
+	if err := backLinkMembers(ctx, tx, qtx, seriesID, []pgtype.UUID{txnID}, SystemActor(), annotationSourceRule); err != nil {
 		return err
 	}
 	return nil
@@ -194,8 +194,10 @@ func (s *Service) AssignSeriesFromRuleTx(ctx context.Context, tx pgx.Tx, txnID p
 // backLinkMembers back-links members to a series (NULL-fill only) and emits a
 // series_assigned annotation for the charges this call actually linked. Shared
 // by the mint, link, and rule paths. The caller owns the surrounding
-// transaction.
-func backLinkMembers(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID pgtype.UUID, memberIDs []pgtype.UUID, actor Actor) error {
+// transaction. `source` flows to the annotation payload — the rule path passes
+// annotationSourceRule so the row is deduped against its parent rule_applied
+// row; imperative callers pass "".
+func backLinkMembers(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID pgtype.UUID, memberIDs []pgtype.UUID, actor Actor, source string) error {
 	if len(memberIDs) == 0 {
 		return nil
 	}
@@ -217,7 +219,7 @@ func backLinkMembers(ctx context.Context, tx pgx.Tx, qtx *db.Queries, seriesID p
 		if err != nil {
 			return fmt.Errorf("reload series for annotation: %w", err)
 		}
-		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, row.ShortID, row.Name, actor); err != nil {
+		if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesAssigned, newlyLinked, row.ShortID, row.Name, actor, source); err != nil {
 			return fmt.Errorf("emit series_assigned annotations: %w", err)
 		}
 	}
@@ -250,7 +252,7 @@ func (s *Service) linkSeriesMembers(ctx context.Context, idOrShort string, membe
 		}
 		return nil, fmt.Errorf("get series: %w", err)
 	}
-	if err := backLinkMembers(ctx, tx, qtx, row.ID, memberIDs, actor); err != nil {
+	if err := backLinkMembers(ctx, tx, qtx, row.ID, memberIDs, actor, ""); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -364,7 +366,7 @@ func (s *Service) UnlinkSeriesTransactions(ctx context.Context, idOrShort string
 			ErrInvalidParameter, len(memberIDs)-int(detached), len(memberIDs))
 	}
 
-	if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesUnlinked, memberIDs, row.ShortID, row.Name, actor); err != nil {
+	if err := emitSeriesMembershipAnnotations(ctx, qtx, annotationKindSeriesUnlinked, memberIDs, row.ShortID, row.Name, actor, ""); err != nil {
 		return nil, fmt.Errorf("emit series_unlinked annotations: %w", err)
 	}
 
@@ -602,7 +604,11 @@ func unlinkedMemberSubset(ctx context.Context, tx pgx.Tx, ids []pgtype.UUID) ([]
 // annotation per affected transaction, atomic with the surrounding tx (q is the
 // tx-scoped *db.Queries). The payload carries the series short_id + name so the
 // timeline can render and deep-link the sentence.
-func emitSeriesMembershipAnnotations(ctx context.Context, q *db.Queries, kind string, txnIDs []pgtype.UUID, seriesShortID, seriesName string, actor Actor) error {
+// When source is non-empty it is stamped into the payload (the rule path passes
+// annotationSourceRule so the row is deduped against the parent rule_applied row
+// by EnrichAnnotations; user- and agent-authored calls pass "" so their events
+// survive).
+func emitSeriesMembershipAnnotations(ctx context.Context, q *db.Queries, kind string, txnIDs []pgtype.UUID, seriesShortID, seriesName string, actor Actor, source string) error {
 	if len(txnIDs) == 0 {
 		return nil
 	}
@@ -612,6 +618,9 @@ func emitSeriesMembershipAnnotations(ctx context.Context, q *db.Queries, kind st
 	payload := map[string]interface{}{
 		"series_id":   seriesShortID,
 		"series_name": seriesName,
+	}
+	if source != "" {
+		payload["source"] = source
 	}
 	for _, txnID := range txnIDs {
 		if err := writeAnnotation(ctx, q, writeAnnotationParams{

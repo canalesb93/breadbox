@@ -110,15 +110,32 @@ func EnrichAnnotations(in []Annotation, opts EnrichOptions) []Annotation {
 // the raw slug round-trips unchanged.
 func identityDisplay(s string) string { return s }
 
+// annotationSourceRule marks a structural annotation (tag / category /
+// counterparty / series membership) written as a side-effect of a rule firing.
+// EnrichAnnotations drops these in favour of the parent rule_applied row, which
+// is the canonical audit record. Rule-write paths stamp it into the payload;
+// user- and agent-authored writes leave it absent so those events survive.
+const annotationSourceRule = "rule"
+
 // isRuleSourceDuplicate reports whether an annotation row was written as a
 // side-effect of a rule application and therefore duplicates a parent
-// rule_applied row. Only tag_added / tag_removed / category_set rows can
-// carry source="rule" today; comment and rule_applied are never deduped here.
+// rule_applied row. tag_added / tag_removed / category_set and the
+// counterparty / series membership kinds can carry source="rule"; comment and
+// rule_applied are never deduped here.
+//
+// The membership kinds were added after the original dedup (see the
+// *_annotations_series_kinds.sql / *_annotations_counterparty_kinds.sql
+// migrations) and were previously omitted — that gap is what surfaced a
+// rule-driven assignment as two adjacent feed events (the rule_applied row plus
+// a "Breadbox assigned …" membership row). Keeping the list in lock-step with
+// the rule-write paths is what collapses them back into one.
 func isRuleSourceDuplicate(a Annotation) bool {
 	switch a.Kind {
-	case "tag_added", "tag_removed", "category_set":
+	case "tag_added", "tag_removed", "category_set",
+		"counterparty_assigned", "counterparty_unlinked",
+		"series_assigned", "series_unlinked":
 		source, _ := a.Payload["source"].(string)
-		return source == "rule"
+		return source == annotationSourceRule
 	}
 	return false
 }
@@ -420,6 +437,13 @@ func formatRuleSummary(ruleName, field, value string, categoryDisplay func(strin
 		verb = "added tag " + value
 	case "comment":
 		verb = "added a comment"
+	case "counterparty":
+		// The membership row (which carries the counterparty name) is deduped
+		// away in favour of this rule_applied row, so phrase it generically —
+		// the rule name already names the counterparty in practice.
+		verb = "set the counterparty"
+	case "series":
+		verb = "linked a recurring series"
 	default:
 		verb = "applied"
 	}

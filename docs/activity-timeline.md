@@ -397,13 +397,21 @@ Enrichment is a pure transformation in `internal/service/annotations_enrich.go`
 that runs on every list of annotations before they reach the UI (or MCP). It
 does three things:
 
-1. **Drop rule-source structural rows.** When a rule fires during sync, the
-   sync engine writes a `rule_applied` annotation **and** a structural
-   side-effect row (`tag_added` / `category_set`) carrying
+1. **Drop rule-source structural rows.** When a rule fires (during sync or a
+   retroactive apply), the engine writes a `rule_applied` annotation **and** a
+   structural side-effect row — `tag_added` / `tag_removed` / `category_set`,
+   or a `counterparty_assigned` / `counterparty_unlinked` /
+   `series_assigned` / `series_unlinked` membership row — carrying
    `payload.source = "rule"`. The `rule_applied` row is the canonical audit
    record; its rule-source siblings are noise. `isRuleSourceDuplicate`
    filters them out. Comments and `rule_applied` itself are never deduped
-   here — only structural side-effects flagged with `source: "rule"`.
+   here — only structural side-effects flagged with `source: "rule"`. The
+   membership kinds were added after the original dedup and were initially
+   omitted, which surfaced a rule-driven counterparty/series assignment as
+   two adjacent feed rows (the `rule_applied` row plus a system-actor
+   "Breadbox assigned …" row) — issue #1915. When you add a new rule-write
+   path, stamp `source: "rule"` on its side-effect rows **and** add the kind
+   to `isRuleSourceDuplicate`.
 
 2. **Drop adjacent same-actor comment-vs-tag-note duplicates.** The MCP
    `update_transactions` tool can write a `tag_added` with `payload.note`
