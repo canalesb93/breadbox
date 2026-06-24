@@ -75,7 +75,7 @@ func (s *Service) createCounterpartyByName(ctx context.Context, in AssignCounter
 	}
 
 	if len(memberIDs) > 0 {
-		if err := linkCounterpartyAndAnnotate(ctx, tx, qtx, row, memberIDs, actor); err != nil {
+		if err := linkCounterpartyAndAnnotate(ctx, tx, qtx, row, memberIDs, actor, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -118,7 +118,7 @@ func (s *Service) AssignCounterpartyFromRuleTx(ctx context.Context, tx pgx.Tx, t
 		return nil // nothing actionable
 	}
 
-	return linkCounterpartyAndAnnotate(ctx, tx, qtx, row, []pgtype.UUID{txnID}, SystemActor())
+	return linkCounterpartyAndAnnotate(ctx, tx, qtx, row, []pgtype.UUID{txnID}, SystemActor(), annotationSourceRule)
 }
 
 // resolveOrCreateCounterpartyByName returns the oldest live counterparty with the
@@ -143,8 +143,10 @@ func resolveOrCreateCounterpartyByName(ctx context.Context, qtx *db.Queries, nam
 
 // linkCounterpartyAndAnnotate links members to a counterparty (NULL-fill only)
 // and emits a counterparty_assigned annotation for the charges this call actually
-// linked. The caller owns the surrounding transaction.
-func linkCounterpartyAndAnnotate(ctx context.Context, tx pgx.Tx, qtx *db.Queries, cp db.Counterparty, memberIDs []pgtype.UUID, actor Actor) error {
+// linked. The caller owns the surrounding transaction. `source` flows to the
+// annotation payload — the rule path passes annotationSourceRule so the row is
+// deduped against its parent rule_applied row; imperative callers pass "".
+func linkCounterpartyAndAnnotate(ctx context.Context, tx pgx.Tx, qtx *db.Queries, cp db.Counterparty, memberIDs []pgtype.UUID, actor Actor, source string) error {
 	if len(memberIDs) == 0 {
 		return nil
 	}
@@ -161,7 +163,7 @@ func linkCounterpartyAndAnnotate(ctx context.Context, tx pgx.Tx, qtx *db.Queries
 		return fmt.Errorf("link counterparty members: %w", err)
 	}
 	if len(newlyLinked) > 0 {
-		if err := emitCounterpartyMembershipAnnotations(ctx, qtx, annotationKindCounterpartyAssigned, newlyLinked, cp.ShortID, cp.Name, actor); err != nil {
+		if err := emitCounterpartyMembershipAnnotations(ctx, qtx, annotationKindCounterpartyAssigned, newlyLinked, cp.ShortID, cp.Name, actor, source); err != nil {
 			return fmt.Errorf("emit counterparty_assigned annotations: %w", err)
 		}
 	}
@@ -195,7 +197,7 @@ func (s *Service) linkCounterpartyMembers(ctx context.Context, idOrShort string,
 		}
 		return nil, fmt.Errorf("get counterparty: %w", err)
 	}
-	if err := linkCounterpartyAndAnnotate(ctx, tx, qtx, row, memberIDs, actor); err != nil {
+	if err := linkCounterpartyAndAnnotate(ctx, tx, qtx, row, memberIDs, actor, ""); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -253,7 +255,7 @@ func (s *Service) UnlinkCounterpartyTransactions(ctx context.Context, idOrShort 
 			ErrInvalidParameter, len(memberIDs)-int(detached), len(memberIDs))
 	}
 
-	if err := emitCounterpartyMembershipAnnotations(ctx, qtx, annotationKindCounterpartyUnlinked, memberIDs, row.ShortID, row.Name, actor); err != nil {
+	if err := emitCounterpartyMembershipAnnotations(ctx, qtx, annotationKindCounterpartyUnlinked, memberIDs, row.ShortID, row.Name, actor, ""); err != nil {
 		return nil, fmt.Errorf("emit counterparty_unlinked annotations: %w", err)
 	}
 
@@ -526,7 +528,11 @@ func unlinkedCounterpartySubset(ctx context.Context, tx pgx.Tx, ids []pgtype.UUI
 // counterparty_unlinked annotation per affected transaction, atomic with the
 // surrounding tx. The payload carries the counterparty short_id + name so the
 // timeline can render and deep-link the sentence.
-func emitCounterpartyMembershipAnnotations(ctx context.Context, q *db.Queries, kind string, txnIDs []pgtype.UUID, cpShortID, cpName string, actor Actor) error {
+// When source is non-empty it is stamped into the payload (the rule paths pass
+// annotationSourceRule so the row is recognised as a rule side-effect and
+// deduped against the parent rule_applied row by EnrichAnnotations; user- and
+// agent-authored calls pass "" so their events survive).
+func emitCounterpartyMembershipAnnotations(ctx context.Context, q *db.Queries, kind string, txnIDs []pgtype.UUID, cpShortID, cpName string, actor Actor, source string) error {
 	if len(txnIDs) == 0 {
 		return nil
 	}
@@ -536,6 +542,9 @@ func emitCounterpartyMembershipAnnotations(ctx context.Context, q *db.Queries, k
 	payload := map[string]interface{}{
 		"counterparty_id":   cpShortID,
 		"counterparty_name": cpName,
+	}
+	if source != "" {
+		payload["source"] = source
 	}
 	for _, txnID := range txnIDs {
 		if err := writeAnnotation(ctx, q, writeAnnotationParams{

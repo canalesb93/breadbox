@@ -593,6 +593,94 @@ func TestEnrichAnnotations_CounterpartyMembershipSummaries(t *testing.T) {
 	}
 }
 
+// A rule-driven counterparty/series assignment writes BOTH a rule_applied row
+// and a membership side-effect row stamped source="rule". Enrichment drops the
+// membership row in favour of the parent rule_applied row, so the feed and the
+// per-transaction timeline show one event instead of two (issue #1915). This is
+// the membership twin of TestEnrichAnnotations_DropsRuleSourcedTagAdded.
+func TestEnrichAnnotations_DropsRuleSourcedMembership(t *testing.T) {
+	ruleID := "rule-cp"
+	rows := []Annotation{
+		{
+			ID:        "cp-membership",
+			Kind:      "counterparty_assigned",
+			ActorName: "Breadbox", // SystemActor() — the mislabelled "Breadbox assigned …" row
+			ActorType: "system",
+			Payload: map[string]interface{}{
+				"counterparty_id":   "CPX12345",
+				"counterparty_name": "Netflix",
+				"source":            "rule",
+			},
+			CreatedAt: "2026-04-04T12:00:00Z",
+		},
+		{
+			ID:        "series-membership",
+			Kind:      "series_assigned",
+			ActorName: "Breadbox",
+			ActorType: "system",
+			Payload: map[string]interface{}{
+				"series_id":   "SER12345",
+				"series_name": "Netflix",
+				"source":      "rule",
+			},
+			CreatedAt: "2026-04-04T12:00:01Z",
+		},
+		{
+			ID:        "cp-rule",
+			Kind:      "rule_applied",
+			ActorName: "Netflix Counterparty",
+			ActorType: "system",
+			ActorID:   &ruleID,
+			RuleID:    &ruleID,
+			Payload: map[string]interface{}{
+				"rule_name":    "Netflix Counterparty",
+				"action_field": "counterparty",
+				"action_value": "CPX12345",
+				"applied_by":   "retroactive",
+			},
+			CreatedAt: "2026-04-04T12:00:02Z",
+		},
+	}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	if len(out) != 1 {
+		t.Fatalf("len = %d, want 1 (rule_applied only)", len(out))
+	}
+	if out[0].Kind != "rule_applied" {
+		t.Errorf("survivor kind = %q, want rule_applied", out[0].Kind)
+	}
+	// The surviving rule_applied sentence names the action without needing the
+	// deduped membership row.
+	wantSummary := `Rule "Netflix Counterparty" set the counterparty retroactively`
+	if out[0].Summary != wantSummary {
+		t.Errorf("Summary = %q, want %q", out[0].Summary, wantSummary)
+	}
+}
+
+// A user- or agent-authored counterparty/series assignment (no source="rule")
+// is a first-class event and must survive enrichment — only rule side-effects
+// are deduped.
+func TestEnrichAnnotations_KeepsUserAuthoredMembership(t *testing.T) {
+	actorID := "user-1"
+	rows := []Annotation{
+		{
+			ID:        "cp-user",
+			Kind:      "counterparty_assigned",
+			ActorName: "Alice",
+			ActorType: "user",
+			ActorID:   &actorID,
+			Payload:   map[string]interface{}{"counterparty_id": "CPX12345", "counterparty_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:00:00Z",
+		},
+	}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	if len(out) != 1 {
+		t.Fatalf("len = %d, want 1 (user membership survives)", len(out))
+	}
+	if out[0].Summary != "Alice set the counterparty to Netflix" {
+		t.Errorf("Summary = %q", out[0].Summary)
+	}
+}
+
 func TestEnrichAnnotations_PreservesOrder(t *testing.T) {
 	rows := []Annotation{
 		{ID: "a", Kind: "comment", ActorName: "alice", Payload: map[string]interface{}{"content": "1"}, CreatedAt: "2026-04-01T00:00:00Z"},
