@@ -2,111 +2,106 @@
 
 package pages
 
-import "testing"
+import (
+	"testing"
 
-// TestGroupSubscriptionsByStatus pins the ledger IA: rows bucket into
-// Active → Paused → Ended in that order, unknown statuses sink last in
-// first-seen order, row order is preserved within a group, and only the
-// Active group carries a monthly subtotal — single-currency only.
-func TestGroupSubscriptionsByStatus(t *testing.T) {
-	t.Run("orders groups active → paused → ended and preserves row order", func(t *testing.T) {
-		rows := []SubscriptionRow{
-			{ShortID: "p1", Status: "paused"},
-			{ShortID: "a1", Status: "active"},
-			{ShortID: "c1", Status: "cancelled"},
-			{ShortID: "a2", Status: "active"},
+	"breadbox/internal/service"
+)
+
+// TestBuildGoverningRule pins the flattening of a service rule response into the
+// pure-view components.GoverningRule the detail page's governing-rules panel
+// renders: identity carries over, and the condition/action summaries are derived
+// via the shared service helpers (so a series' rules read like the /rules list).
+func TestBuildGoverningRule(t *testing.T) {
+	t.Run("assign_series rule keyed by short_id", func(t *testing.T) {
+		resp := service.TransactionRuleResponse{
+			ShortID:       "r4Nkr7Sh",
+			Name:          "Netflix subscription",
+			Conditions:    service.Condition{Field: "merchant", Op: "contains", Value: "netflix"},
+			Actions:       []service.RuleAction{{Type: "assign_series", SeriesShortID: "DCSC3LaN"}},
+			Enabled:       true,
+			HitCount:      4,
+			CreatedByType: "user",
+			CreatedByName: "Ricardo",
 		}
-		groups := GroupSubscriptionsByStatus(rows)
-		if len(groups) != 3 {
-			t.Fatalf("want 3 groups, got %d", len(groups))
+		got := BuildGoverningRule(resp)
+		if got.ShortID != "r4Nkr7Sh" || got.Name != "Netflix subscription" {
+			t.Fatalf("identity not carried over: %+v", got)
 		}
-		wantOrder := []struct{ status, label string }{
-			{"active", "Active"},
-			{"paused", "Paused"},
-			{"cancelled", "Ended"},
+		if got.ConditionSummary == "" {
+			t.Errorf("ConditionSummary should be derived, got empty")
 		}
-		for i, w := range wantOrder {
-			if groups[i].Status != w.status || groups[i].Label != w.label {
-				t.Errorf("group %d = (%q,%q), want (%q,%q)", i, groups[i].Status, groups[i].Label, w.status, w.label)
-			}
+		if got.ActionSummary != "Assign to series" {
+			t.Errorf("ActionSummary = %q, want %q", got.ActionSummary, "Assign to series")
 		}
-		// Within the active group, incoming order (a1 before a2) is preserved.
-		active := groups[0]
-		if len(active.Rows) != 2 || active.Rows[0].ShortID != "a1" || active.Rows[1].ShortID != "a2" {
-			t.Errorf("active group rows = %+v, want [a1 a2]", active.Rows)
+		if !got.Enabled || got.HitCount != 4 || got.CreatedByType != "user" {
+			t.Errorf("scalar fields mismatch: %+v", got)
 		}
 	})
 
-	t.Run("empty input yields no groups", func(t *testing.T) {
-		if g := GroupSubscriptionsByStatus(nil); len(g) != 0 {
-			t.Errorf("want 0 groups for nil input, got %d", len(g))
+	t.Run("multi-action rule summarizes the count", func(t *testing.T) {
+		resp := service.TransactionRuleResponse{
+			ShortID: "PfBp54nN",
+			Name:    "Streaming round-up",
+			Actions: []service.RuleAction{
+				{Type: "assign_series", SeriesName: "Netflix"},
+				{Type: "add_tag", TagSlug: "streaming"},
+			},
+			CreatedByType: "agent",
+		}
+		got := BuildGoverningRule(resp)
+		if got.ActionSummary != "2 actions" {
+			t.Errorf("ActionSummary = %q, want %q", got.ActionSummary, "2 actions")
+		}
+		if got.CreatedByType != "agent" {
+			t.Errorf("CreatedByType = %q, want agent", got.CreatedByType)
 		}
 	})
+}
 
-	t.Run("unknown status sinks last with a title-cased label", func(t *testing.T) {
-		rows := []SubscriptionRow{
-			{Status: "weird"},
-			{Status: "active"},
+// TestSubscriptionMemberCount pins the row's "N charges" label pluralization.
+func TestSubscriptionMemberCount(t *testing.T) {
+	cases := map[int]string{0: "0 charges", 1: "1 charge", 4: "4 charges"}
+	for n, want := range cases {
+		if got := subscriptionMemberCount(n); got != want {
+			t.Errorf("subscriptionMemberCount(%d) = %q, want %q", n, got, want)
 		}
-		groups := GroupSubscriptionsByStatus(rows)
-		if len(groups) != 2 {
-			t.Fatalf("want 2 groups, got %d", len(groups))
-		}
-		if groups[0].Status != "active" {
-			t.Errorf("first group = %q, want active", groups[0].Status)
-		}
-		if groups[1].Status != "weird" || groups[1].Label != "Weird" {
-			t.Errorf("last group = (%q,%q), want (weird,Weird)", groups[1].Status, groups[1].Label)
-		}
-	})
+	}
+}
 
-	t.Run("active group sums monthly equivalent for one currency", func(t *testing.T) {
-		rows := []SubscriptionRow{
-			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 10},
-			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 5.5},
-			{Status: "active", HasAmount: false, Currency: "USD", MonthlyEquiv: 99}, // no amount, ignored
+// TestSubscriptionRowMeta pins the body-line composition: charges always show;
+// the rule count is appended only when at least one governing rule exists
+// (mirrors counterpartyRowMeta so the two surfaces read identically).
+func TestSubscriptionRowMeta(t *testing.T) {
+	cases := []struct {
+		members, rules int
+		want           string
+	}{
+		{0, 0, "0 charges"},
+		{1, 0, "1 charge"},
+		{4, 1, "4 charges · 1 rule"},
+		{4, 3, "4 charges · 3 rules"},
+	}
+	for _, c := range cases {
+		if got := subscriptionRowMeta(c.members, c.rules); got != c.want {
+			t.Errorf("subscriptionRowMeta(%d,%d) = %q, want %q", c.members, c.rules, got, c.want)
 		}
-		g := GroupSubscriptionsByStatus(rows)[0]
-		if !g.HasSubtotal {
-			t.Fatal("want HasSubtotal=true for single-currency active group")
-		}
-		if g.SubtotalCurrency != "USD" {
-			t.Errorf("subtotal currency = %q, want USD", g.SubtotalCurrency)
-		}
-		if g.Subtotal != 15.5 {
-			t.Errorf("subtotal = %v, want 15.5", g.Subtotal)
-		}
-	})
+	}
+}
 
-	t.Run("blank currency normalizes to USD for the single-currency check", func(t *testing.T) {
-		rows := []SubscriptionRow{
-			{Status: "active", HasAmount: true, Currency: "", MonthlyEquiv: 4},
-			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 6},
+// TestSubscriptionTypeTone pins the type→tone mapping to the vivid tones only
+// (so subscription never collapses to gray on the dark theme).
+func TestSubscriptionTypeTone(t *testing.T) {
+	cases := map[string]string{
+		"subscription": "success",
+		"bill":         "warning",
+		"loan":         "info",
+		"other":        "neutral",
+		"":             "neutral",
+	}
+	for typ, want := range cases {
+		if got := string(subscriptionTypeTone(typ)); got != want {
+			t.Errorf("subscriptionTypeTone(%q) = %q, want %q", typ, got, want)
 		}
-		g := GroupSubscriptionsByStatus(rows)[0]
-		if !g.HasSubtotal || g.SubtotalCurrency != "USD" || g.Subtotal != 10 {
-			t.Errorf("got (has=%v cur=%q sub=%v), want (true USD 10)", g.HasSubtotal, g.SubtotalCurrency, g.Subtotal)
-		}
-	})
-
-	t.Run("mixed currencies suppress the subtotal", func(t *testing.T) {
-		rows := []SubscriptionRow{
-			{Status: "active", HasAmount: true, Currency: "USD", MonthlyEquiv: 10},
-			{Status: "active", HasAmount: true, Currency: "EUR", MonthlyEquiv: 5},
-		}
-		g := GroupSubscriptionsByStatus(rows)[0]
-		if g.HasSubtotal {
-			t.Errorf("want no subtotal across currencies, got %v %q", g.Subtotal, g.SubtotalCurrency)
-		}
-	})
-
-	t.Run("non-active groups never carry a subtotal", func(t *testing.T) {
-		rows := []SubscriptionRow{
-			{Status: "paused", HasAmount: true, Currency: "USD", MonthlyEquiv: 12},
-		}
-		g := GroupSubscriptionsByStatus(rows)[0]
-		if g.HasSubtotal {
-			t.Errorf("paused group should have no subtotal, got %v", g.Subtotal)
-		}
-	})
+	}
 }

@@ -307,7 +307,7 @@ func (s *Service) DeleteCategory(ctx context.Context, id string) (int64, error) 
 	}
 
 	_, err = s.Pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1 WHERE category_id IS NULL AND deleted_at IS NULL AND category_override = 'none'",
+		"UPDATE transactions SET category_id = $1 WHERE category_id IS NULL AND deleted_at IS NULL",
 		uncategorized.ID)
 	if err != nil {
 		return count, fmt.Errorf("reassign transactions: %w", err)
@@ -403,7 +403,7 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 	return nil
 }
 
-// SetTransactionCategory sets a manual category override on a transaction and
+// SetTransactionCategory sets a transaction's category and
 // records a `category_set` annotation attributed to the supplied actor. The
 // UPDATE and the annotation write run in a single DB transaction so a failed
 // annotation rolls back the category change — keeping the activity timeline in
@@ -432,47 +432,26 @@ func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID 
 	defer tx.Rollback(ctx)
 	qtx := s.Queries.WithTx(tx)
 
-	// Precedence user > agent > rule. An agent write is guarded — it never
-	// overwrites a 'user' lock. The transaction was resolved above, so 0 rows
-	// from the agent write means "exists but user-locked": honor the lock and
-	// no-op (the agent's intent not to clobber a human decision is satisfied).
-	var landed bool
-	if actor.Type == "agent" {
-		rowsAffected, err := qtx.SetTransactionCategoryOverrideAgent(ctx, db.SetTransactionCategoryOverrideAgentParams{
-			ID:         txnUID,
-			CategoryID: catUID,
-		})
-		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-				return ErrCategoryNotFound
-			}
-			return fmt.Errorf("set category override (agent): %w", err)
+	// Provenance/precedence was removed in P3: rules, agents, and users all write
+	// category_id directly (last-writer-wins). The write always lands.
+	rowsAffected, err := qtx.SetTransactionCategory(ctx, db.SetTransactionCategoryParams{
+		ID:         txnUID,
+		CategoryID: catUID,
+	})
+	if err != nil {
+		// Check for FK violation on category_id (nonexistent category)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return ErrCategoryNotFound
 		}
-		landed = rowsAffected > 0
-	} else {
-		rowsAffected, err := qtx.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
-			ID:         txnUID,
-			CategoryID: catUID,
-		})
-		if err != nil {
-			// Check for FK violation on category_id (nonexistent category)
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-				return ErrCategoryNotFound
-			}
-			return fmt.Errorf("set category override: %w", err)
-		}
-		if rowsAffected == 0 {
-			return ErrNotFound
-		}
-		landed = true
+		return fmt.Errorf("set category: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
 	}
 
-	if landed {
-		if err := writeCategorySetAnnotation(ctx, qtx, txnUID, actor, cat.Slug, false); err != nil {
-			return err
-		}
+	if err := writeCategorySetAnnotation(ctx, qtx, txnUID, actor, cat.Slug, false); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -481,11 +460,10 @@ func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID 
 	return nil
 }
 
-// ResetTransactionCategory clears the manual override and sets the category to
-// uncategorized. Transaction rules will re-categorize it on the next sync if a
-// matching rule exists. Records a `category_set` annotation with
-// `action: "reset"` attributed to the supplied actor in the same DB transaction
-// as the writes.
+// ResetTransactionCategory sets the category to uncategorized. Transaction rules
+// will re-categorize it on the next sync if a matching rule exists. Records a
+// `category_set` annotation with `action: "reset"` attributed to the supplied
+// actor in the same DB transaction as the write.
 func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string, actor Actor) error {
 	txnUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
@@ -499,24 +477,21 @@ func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string, ac
 	defer tx.Rollback(ctx)
 	qtx := s.Queries.WithTx(tx)
 
-	// Clear the override flag — bail out early on a missing transaction so the
-	// uncategorized lookup below isn't reached for nonexistent rows.
-	rowsAffected, err := qtx.ClearTransactionCategoryOverride(ctx, txnUID)
-	if err != nil {
-		return fmt.Errorf("clear override: %w", err)
-	}
-	if rowsAffected == 0 {
-		return ErrNotFound
-	}
-
 	uncategorized, err := qtx.GetCategoryBySlug(ctx, "uncategorized")
 	if err != nil {
 		return fmt.Errorf("get uncategorized: %w", err)
 	}
 
 	// Set to uncategorized — rules will re-categorize on next sync.
-	if _, err := tx.Exec(ctx, "UPDATE transactions SET category_id = $1 WHERE id = $2", uncategorized.ID, txnUID); err != nil {
+	rowsAffected, err := qtx.ClearTransactionCategory(ctx, db.ClearTransactionCategoryParams{
+		ID:         txnUID,
+		CategoryID: uncategorized.ID,
+	})
+	if err != nil {
 		return fmt.Errorf("reset category: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
 	}
 
 	if err := writeCategorySetAnnotation(ctx, qtx, txnUID, actor, "uncategorized", true); err != nil {
@@ -525,34 +500,6 @@ func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string, ac
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit reset_transaction_category: %w", err)
-	}
-	return nil
-}
-
-// SetCategoryOverrideFlag flips the category_override flag on a transaction
-// without touching the category itself. Used by the detail-page lock toggle:
-// locking shields the row from transaction rules; unlocking lets rules
-// re-categorize on the next sync.
-func (s *Service) SetCategoryOverrideFlag(ctx context.Context, txnID string, override bool, actor Actor) error {
-	txnUID, err := s.resolveTransactionID(ctx, txnID)
-	if err != nil {
-		return ErrNotFound
-	}
-	// The lock toggle is binary: locking pins the row as a user override;
-	// unlocking returns it to 'none' so rules (and agents) can act on it.
-	level := CategoryOverrideNone
-	if override {
-		level = CategoryOverrideUser
-	}
-	rowsAffected, err := s.Queries.SetCategoryOverrideFlag(ctx, db.SetCategoryOverrideFlagParams{
-		ID:               txnUID,
-		CategoryOverride: level,
-	})
-	if err != nil {
-		return fmt.Errorf("set category override flag: %w", err)
-	}
-	if rowsAffected == 0 {
-		return ErrNotFound
 	}
 	return nil
 }
@@ -658,7 +605,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	// Note: In PostgreSQL UPDATE...FROM, the target table (t) cannot be referenced
 	// in FROM-clause JOINs. The categories JOIN is only needed for CategorySlug filter
 	// and is added conditionally below.
-	query := "UPDATE transactions t SET category_id = $1, category_override = 'user', updated_at = NOW()" +
+	query := "UPDATE transactions t SET category_id = $1, updated_at = NOW()" +
 		" FROM accounts a" +
 		" LEFT JOIN bank_connections bc ON a.connection_id = bc.id" +
 		" WHERE t.account_id = a.id AND t.deleted_at IS NULL" +

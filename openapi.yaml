@@ -95,6 +95,8 @@ tags:
     description: Scoped credentials for REST and MCP clients.
   - name: Settings
     description: Provider credentials and other app-config knobs.
+  - name: Counterparties
+    description: The canonical, cross-provider "other side" of a charge (merchants and non-merchants), with manual enrichment.
   - name: Workflows
     description: Scheduled Claude Agent SDK definitions, run history, transcripts, and prompt blocks.
   - name: Webhooks
@@ -371,7 +373,6 @@ paths:
         - { name: pending, in: query, schema: { type: boolean } }
         - { name: flagged, in: query, schema: { type: boolean }, description: Filter to flagged (true) or unflagged (false) transactions. }
         - { name: deleted, in: query, schema: { type: string, enum: [include, only] }, description: Whether to include or restrict to soft-deleted transactions. }
-        - { name: category_override, in: query, schema: { type: string, enum: [none, agent, user] }, description: Filter by category-override source (none/agent/user). }
       responses:
         "200":
           description: Paginated transaction list.
@@ -460,7 +461,7 @@ paths:
     patch:
       tags: [Transactions]
       summary: Set transaction category
-      description: Sets `category_id` and `category_override = 'user' (manual user override)`. **Requires `full_access` scope.**
+      description: Sets `category_id` (last-writer-wins; no provenance). **Requires `full_access` scope.**
       requestBody:
         required: true
         content:
@@ -1784,7 +1785,8 @@ paths:
       summary: Apply all rules retroactively
       description: |
         Replays every enabled rule against the historical transaction set
-        (skipping rows where `category_override <> 'none'`). **Requires `full_access` scope.**
+        (set_category writes `category_id` directly — last-writer-wins, no
+        provenance guard). **Requires `full_access` scope.**
       responses:
         "202":
           description: Application summary.
@@ -1925,11 +1927,7 @@ paths:
     get:
       tags: [Series]
       summary: List recurring series (subscriptions)
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema: { type: string, enum: [active, candidate, paused, cancelled] }
+      description: "Recurring series are thin, rule-maintained entities — surrogate id/short_id, name, type, tags. Membership comes from `assign_series` rules, not a shipped detector."
       responses:
         "200":
           description: Recurring series.
@@ -1943,8 +1941,8 @@ paths:
                     items: { $ref: "#/components/schemas/RecurringSeries" }
     post:
       tags: [Series]
-      summary: Create or assign a recurring series
-      description: "**Requires `full_access` scope.** Create a series detection missed, or assign transactions to one. Provide `series_id` to assign to an existing series, or `merchant_key` + `create_if_missing` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector). `transaction_ids` (max 50) are back-linked NULL-fill only. `confirm:true` activates the series in the same call."
+      summary: Assign or create a recurring series
+      description: "**Requires `full_access` scope.** Link transactions to a series, creating it if needed. Provide `series_id` to assign to an existing series, or `series_name` + `create_if_missing` to mint/resolve one by name (surrogate-first: the same name always resolves the same series). `transaction_ids` (max 50) are back-linked NULL-fill only."
       requestBody:
         required: true
         content:
@@ -1953,17 +1951,10 @@ paths:
               type: object
               properties:
                 series_id: { type: string, description: "Existing series short ID or UUID to assign to." }
-                merchant_key: { type: string, description: "Key to mint a new series under (requires create_if_missing)." }
+                series_name: { type: string, description: "Name to mint/resolve a series under (requires create_if_missing)." }
                 create_if_missing: { type: boolean }
-                name: { type: string }
-                cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual] }
-                type: { type: string, enum: [subscription, bill, loan, other], description: "Optional type for a minted series; inferred from category when omitted." }
-                expected_amount: { type: number }
-                currency: { type: string }
-                category_id: { type: string }
-                user_id: { type: string }
+                type: { type: string, enum: [subscription, bill, loan, other], description: "Optional type for a minted series (default subscription)." }
                 transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
-                confirm: { type: boolean }
       responses:
         "200":
           description: Created or updated series.
@@ -1971,22 +1962,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/explain:
-    get:
-      tags: [Series]
-      summary: Explain near-miss subscriptions
-      description: "Answer \"why isn't <merchant> a subscription?\". Reports every recurring-looking merchant group that is not already a series, with the detector's verdict — `qualifies:true` (eligible but untracked) or a specific gate it failed (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Read-only analysis over the trailing detection window."
-      responses:
-        "200":
-          description: Near-miss merchant groups with detector verdicts.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  near_misses:
-                    type: array
-                    items: { $ref: "#/components/schemas/SeriesNearMiss" }
   /api/v1/series/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }
@@ -2002,8 +1977,8 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Series]
-      summary: Edit and/or review a recurring series
-      description: "**Requires `full_access` scope.** Partial update. `verdict` (optional) adjudicates the lifecycle (confirm/reject/pause/cancel; a user's confirmation outranks a later agent write). The remaining fields edit the series' user-owned attributes — any subset may be present, omitted fields are unchanged. Edits apply first, then the verdict, so a caller can rename-and-confirm in one request. Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature). An empty body is rejected. Detector-owned fields (merchant_key, confidence, rollups) are not editable here — use `/rekey` and the detection funnel; the `type` axis has its own `/type` endpoint."
+      summary: Edit a recurring series
+      description: "**Requires `full_access` scope.** Partial update of a thin series' `name` and/or `type` — any subset may be present, omitted fields are unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key). An empty body is rejected."
       requestBody:
         required: true
         content:
@@ -2011,15 +1986,8 @@ paths:
             schema:
               type: object
               properties:
-                verdict: { type: string, enum: [confirm, reject, pause, cancel] }
                 name: { type: string }
-                expected_amount: { type: number }
-                amount_tolerance: { type: number }
-                currency: { type: string }
-                cadence: { type: string, enum: [weekly, biweekly, monthly, quarterly, semiannual, annual, irregular, unknown] }
-                expected_day: { type: integer, description: "Day-of-month / day-of-week anchor (1–31). Send 0 to clear the anchor; omit to leave unchanged." }
-                category_id: { type: string }
-                user_id: { type: string }
+                type: { type: string, enum: [subscription, bill, loan, other] }
       responses:
         "200":
           description: Updated series.
@@ -2033,7 +2001,7 @@ paths:
     post:
       tags: [Series]
       summary: Link transactions to a recurring series
-      description: "**Requires `full_access` scope.** Back-links transactions (max 50, NULL-fill only — never steals a charge already in another series) to the series and recomputes its rollups. `confirm:true` activates the series."
+      description: "**Requires `full_access` scope.** Back-links transactions (max 50, NULL-fill only — never steals a charge already in another series) to the series."
       requestBody:
         required: true
         content:
@@ -2043,7 +2011,6 @@ paths:
               required: [transaction_ids]
               properties:
                 transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
-                confirm: { type: boolean }
       responses:
         "200":
           description: Updated series.
@@ -2058,81 +2025,10 @@ paths:
     delete:
       tags: [Series]
       summary: Unlink a transaction from a recurring series
-      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`), strips the series' inherited tags from it (a user-added tag survives), and recomputes the series' rollups + next expected date. Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
+      description: "**Requires `full_access` scope.** Detaches the transaction (clears its `series_id`) and strips the series' inherited tags from it (a user-added tag survives). Errors (400) if the transaction isn't a current member of this series, so it can't touch another series."
       responses:
         "200":
           description: Updated series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/rekey:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Re-key a recurring series
-      description: "**Requires `full_access` scope.** Corrects a series' `merchant_key` and repoints its members' `merchant_key` to match. Errors (400) if a live series already exists at the new key or it is sticky-rejected — re-key never silently merges. Corrects historical grouping; future charges still key off the provider name."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [new_merchant_key]
-              properties:
-                new_merchant_key: { type: string }
-      responses:
-        "200":
-          description: Re-keyed series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/type:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Set a recurring series' type
-      description: "**Requires `full_access` scope.** Overrides the series type (`subscription`|`bill`|`loan`|`other`). Sticky correction — re-detection won't change it back."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [type]
-              properties:
-                type: { type: string, enum: [subscription, bill, loan, other] }
-      responses:
-        "200":
-          description: Updated series.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RecurringSeries" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/series/{id}/split:
-    parameters:
-      - { name: id, in: path, required: true, schema: { type: string } }
-    post:
-      tags: [Series]
-      summary: Split a recurring series
-      description: "**Requires `full_access` scope.** Moves the given `transaction_ids` (max 50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for an over-grouped series. Errors (400) if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series."
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [new_merchant_key, transaction_ids]
-              properties:
-                new_merchant_key: { type: string }
-                name: { type: string }
-                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
-      responses:
-        "200":
-          description: The new series the members were split into.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
@@ -2174,6 +2070,122 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RecurringSeries" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # -- Counterparties --
+  /api/v1/counterparties:
+    get:
+      tags: [Counterparties]
+      summary: List counterparties
+      description: "Counterparties are the canonical, cross-provider \"other side\" of a charge — merchants AND non-merchants (Venmo, people, employers). Each is a surrogate identity (id/short_id) + name + optional enrichment. Membership comes from `assign_counterparty` rules, not a normalizer."
+      responses:
+        "200":
+          description: Counterparties.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counterparties:
+                    type: array
+                    items: { $ref: "#/components/schemas/Counterparty" }
+    post:
+      tags: [Counterparties]
+      summary: Create a counterparty
+      description: "**Requires `full_access` scope.** Creates a counterparty by `name` with optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). A duplicate live name is rejected — edit the existing one instead. To bind charges, use the assign endpoint or author an `assign_counterparty` rule."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                website_url: { type: string }
+                logo_url: { type: string }
+                category_id: { type: string, description: "Category slug or short ID/UUID." }
+                mcc: { type: string }
+      responses:
+        "200":
+          description: Created counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "409": { $ref: "#/components/responses/NotFound" }
+  /api/v1/counterparties/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Counterparties]
+      summary: Get counterparty
+      responses:
+        "200":
+          description: Counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Counterparties]
+      summary: Enrich a counterparty
+      description: "**Requires `full_access` scope.** Partial enrichment update of `name`, `website_url`, `logo_url`, `category_id` (slug or short ID/UUID), and/or `mcc` — omitted fields are unchanged. An empty body, or an empty `name`, is rejected."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                website_url: { type: string }
+                logo_url: { type: string }
+                category_id: { type: string }
+                mcc: { type: string }
+      responses:
+        "200":
+          description: Updated counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/counterparties/{id}/transactions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Counterparties]
+      summary: Link transactions to a counterparty
+      description: "**Requires `full_access` scope.** Binds transactions (max 50, NULL-fill only — never steals a charge already bound to another counterparty) to the counterparty. This is a one-off; for durable patterns author an `assign_counterparty` rule."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transaction_ids]
+              properties:
+                transaction_ids: { type: array, items: { type: string }, maxItems: 50 }
+      responses:
+        "200":
+          description: Updated counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/counterparties/{id}/transactions/{txid}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: txid, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Counterparties]
+      summary: Unlink a transaction from a counterparty
+      description: "**Requires `full_access` scope.** Detaches the transaction (which must currently be bound to this counterparty) — the inverse of the link path."
+      responses:
+        "200":
+          description: Updated counterparty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Counterparty" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   # -- Users --
@@ -3389,8 +3401,10 @@ components:
         iso_currency_code: { type: string }
         name: { type: string }
         merchant_name: { type: string, nullable: true }
+        counterparty_short_id: { type: string, nullable: true, description: "short_id of the assigned counterparty (the other side of the transaction), null when unassigned." }
+        counterparty_name: { type: string, nullable: true, description: "Preferred display name when a counterparty is assigned; falls back to merchant_name then name." }
+        counterparty_logo_url: { type: string, nullable: true, description: "Counterparty logo URL; null until enrichment populates it." }
         category_id: { type: string, nullable: true }
-        category_override: { type: string, enum: [none, agent, user], description: "Source of the current category lock (precedence user > agent > rule)." }
         pending: { type: boolean }
         deleted_at: { type: string, format: date-time, nullable: true }
         tags:
@@ -3459,48 +3473,30 @@ components:
         color: { type: string }
     RecurringSeries:
       type: object
-      description: A detected recurring series (subscription).
+      description: "A thin, rule-maintained recurring series (subscription/bill/loan). Surrogate identity + name + type + tags; membership comes from `assign_series` rules, not a shipped detector."
       properties:
         id: { type: string }
         short_id: { type: string }
         name: { type: string }
-        merchant_key: { type: string }
-        cadence: { type: string, description: "`weekly`|`biweekly`|`monthly`|`quarterly`|`semiannual`|`annual`|`irregular`|`unknown`." }
-        expected_amount: { type: number, nullable: true }
-        iso_currency_code: { type: string, nullable: true }
-        status: { type: string, description: "`active`|`paused`|`cancelled`|`candidate`." }
-        type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`. Inferred from the members' dominant category at first detection; user/agent-overridable + sticky." }
-        confidence: { type: string, description: "`auto`|`confirmed`|`rejected` — the verdict axis." }
-        detection_source: { type: string, description: "`deterministic`|`agent`|`user`|`rule`." }
-        last_amount: { type: number, nullable: true }
-        last_seen_date: { type: string, format: date, nullable: true }
-        next_expected_date: { type: string, format: date, nullable: true }
-        renewal_health: { type: string, description: "Derived (active series only): `active`|`due_soon`|`overdue`|`stale`|`unknown`, from next_expected_date vs today." }
-        days_until_renewal: { type: integer, nullable: true, description: "Signed days to next_expected_date (negative = overdue). Omitted when no projection." }
-        occurrence_count: { type: integer }
-        detection_signals: { type: object, nullable: true, additionalProperties: true }
+        type: { type: string, description: "Recurring-charge type: `subscription`|`bill`|`loan`|`other`." }
         tags: { type: array, items: { type: string } }
         created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
       additionalProperties: true
-    SeriesNearMiss:
+    Counterparty:
       type: object
-      description: A recurring-looking merchant group that is not (yet) a series, with the detector's verdict.
+      description: "The canonical, cross-provider \"other side\" of a charge (a merchant or non-merchant). Surrogate identity + name + optional enrichment; membership comes from `assign_counterparty` rules, not a normalizer."
       properties:
-        merchant_key: { type: string }
+        id: { type: string }
+        short_id: { type: string }
         name: { type: string }
-        iso_currency_code: { type: string, nullable: true }
-        occurrence_count: { type: integer }
-        qualifies: { type: boolean, description: "True when the group passes every gate but isn't tracked yet." }
-        reason: { type: string, description: "Gate it failed; empty when qualifies. `too_few_occurrences`|`irregular_cadence`|`interval_too_variable`|`amount_unstable`|`same_day_duplicates`|`too_few_charges`." }
-        explanation: { type: string, description: "Human one-line explanation with the numbers folded in." }
-        nearest_cadence: { type: string }
-        median_gap_days: { type: number }
-        interval_cv: { type: number }
-        amount_min: { type: number, nullable: true }
-        amount_max: { type: number, nullable: true }
-        amount_spread_ratio: { type: number }
-        first_seen: { type: string, format: date, nullable: true }
-        last_seen: { type: string, format: date, nullable: true }
+        website_url: { type: string, nullable: true }
+        logo_url: { type: string, nullable: true }
+        category_id: { type: string, nullable: true }
+        mcc: { type: string, nullable: true }
+        canonical_counterparty_id: { type: string, nullable: true, description: "Self-reference for later rollups of duplicate counterparties." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
       additionalProperties: true
     Category:
       type: object

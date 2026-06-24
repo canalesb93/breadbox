@@ -7,13 +7,12 @@ INSERT INTO transactions (
   amount, iso_currency_code, date, authorized_date,
   datetime, authorized_datetime, provider_name, provider_merchant_name,
   provider_category_primary, provider_category_detailed, provider_category_confidence,
-  provider_payment_channel, pending, category_id, merchant_key
+  provider_payment_channel, pending, category_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 )
 ON CONFLICT (provider_transaction_id) DO UPDATE SET
   account_id = EXCLUDED.account_id,
-  merchant_key = EXCLUDED.merchant_key,
   provider_pending_transaction_id = EXCLUDED.provider_pending_transaction_id,
   amount = EXCLUDED.amount,
   iso_currency_code = EXCLUDED.iso_currency_code,
@@ -28,11 +27,12 @@ ON CONFLICT (provider_transaction_id) DO UPDATE SET
   provider_category_confidence = EXCLUDED.provider_category_confidence,
   provider_payment_channel = EXCLUDED.provider_payment_channel,
   pending = EXCLUDED.pending,
-  category_id = CASE
-    WHEN transactions.category_override <> 'none' THEN transactions.category_id
-    WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
-    ELSE transactions.category_id
-  END,
+  -- category_id is enrichment owned by rules/agents/users — never by raw sync.
+  -- The sync engine never populates EXCLUDED.category_id (the upsert params leave
+  -- it unset), so a raw re-sync of an existing row must PRESERVE the category it
+  -- already has. (P3 collapsed the old category_override CASE: with provenance
+  -- removed there is nothing to branch on, and re-sync must not touch category.)
+  category_id = transactions.category_id,
   deleted_at = NULL,
   updated_at = CASE
     WHEN transactions.amount IS DISTINCT FROM EXCLUDED.amount

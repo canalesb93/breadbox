@@ -6,142 +6,62 @@ import (
 	"breadbox/internal/templates/components"
 )
 
-// SubscriptionDetail renders /recurring/{short_id} — a detection-forward detail
-// page: a plain-language DETECTION summary + match-window viz on top, then a
-// two-column Rule (the tunable detector params) / Evidence (the charge
-// timeline), and a read-only fact strip. Lightweight fields (type, category,
-// tags) edit inline via the shared pickers; the heavier ones (name, cadence,
-// expected amount/tolerance/day) edit in a right-side drawer with Save. All
-// mutations run through the `seriesDetail` Alpine factory.
+// SubscriptionDetail renders /recurring/{short_id} under the rules-as-substrate
+// model: a series IS the rules that define it. The page pairs the LINKED CHARGES
+// (what's currently in the series) with the GOVERNING RULES (the assign_series
+// rules whose matches put them there), making the membership relationship
+// explicit. Name + type edit in a thin right-side drawer (one Save); tags edit
+// inline and are inherited by linked charges. All mutations run through the
+// `seriesDetail` Alpine factory.
 templ SubscriptionDetail(p SubscriptionDetailProps) {
-	<!-- Picker payloads must precede the factory's synchronous <script src> so
-	     seedGlobals() finds them (window.__bbCategories / __bbAllTags) on first
-	     render — same ordering contract as transaction_detail.templ. -->
-	@templ.JSONScript("series-detail-categories", p.CategoryTree)
+	<!-- Tag-picker payload must precede the factory's synchronous <script src> so
+	     seedGlobals() finds it (window.__bbAllTags) on first render. -->
 	@templ.JSONScript("series-detail-alltags", p.AllTags)
 	@templ.JSONScript("series-detail-current-tags", p.CurrentTagSlugs)
 	<script src="/static/js/admin/components/series_detail.js"></script>
-	@components.CategoryPickerScript()
-	@components.CategoryPickerStyles()
 	<div x-data="seriesDetail" data-series-id={ p.Series.ShortID }>
 		@components.EntityHeader(components.EntityHeaderProps{
 			Title:            p.Series.Name,
 			TitlePrivateKind: "merchant",
-			Icon:             seriesTypeIcon(p.Series.Type),
-			IconTone:         seriesStatusIconTone(p.Series.Status),
+			IconComponent:    seriesHeaderIcon(p.Series.Type),
+			IconTone:         components.IconToneDefault,
 			Badges:           seriesDetailBadges(p.Series),
-			Meta:             components.EntityHeaderMeta(p.Series.CadenceLabel, p.Series.MerchantKey),
-			Action:           seriesDetailActions(p.Series),
+			Meta:             seriesDetailMeta(p),
+			Action:           seriesDetailActions(),
 		})
-		@components.SeriesDetectionPanel(p.Detection)
-		<!-- Rule (edit) + Evidence (read) -->
+		<!-- Linked charges (what's in the series) + Governing rules (what defines it) -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-			@seriesRuleCard(p)
 			<div>
-				@seriesPanelHeader("layers", "Evidence", fmt.Sprintf("%d charges matched", evidenceMatchedCount(p.Evidence)), seriesLinkChargeBtn())
-				@components.SeriesEvidenceTimeline(p.Evidence)
-			</div>
-		</div>
-		<div class="mt-5">
-			@components.SeriesFactStrip(p.Facts)
-		</div>
-		<!-- The actual charges linked to this series, rendered with the shared
-		     TxRowCompact (same row used across the app — carries its own date,
-		     account + category) so you can see and click into exactly what's
-		     included before confirming. -->
-		if len(p.MemberRows) > 0 {
-			<div class="mt-5">
-				@seriesPanelHeader("receipt", "Charges in this series", fmt.Sprintf("%d linked", len(p.MemberRows)), nil)
-				<div class="bb-card p-2 sm:p-3">
-					for _, m := range p.MemberRows {
-						@seriesChargeRow(m)
-					}
-				</div>
-			</div>
-		}
-		@seriesEditDrawer(p)
-		@seriesLinkModal()
-	</div>
-}
-
-// seriesRuleCard is the editable detector-rule panel. Inline: type (select),
-// category (shared categoryPicker), tags (shared tag picker), and merchant-key
-// re-key. The heavier fields are read-only here and edited via the drawer.
-templ seriesRuleCard(p SubscriptionDetailProps) {
-	<div>
-		@seriesPanelHeader("repeat", "Rule", "Tune what the detector looks for", seriesRuleEditBtn())
-		<div class="bb-card p-5">
-			<div class="grid grid-cols-2 gap-x-5 gap-y-4">
-				<div>
-					@seriesFieldLabel("Type")
-					<select
-						@change={ fmt.Sprintf("setType(%q, $event.target.value)", p.Series.ShortID) }
-						class="select select-sm w-full"
-						aria-label="Type"
-					>
-						for _, opt := range seriesTypeOptions {
-							<option value={ opt.Value } selected?={ p.Series.Type == opt.Value }>{ opt.Label }</option>
+				@entityPanelHeader("receipt", "Linked charges", fmt.Sprintf("%d in this series", len(p.MemberRows)), seriesLinkChargeBtn())
+				if len(p.MemberRows) > 0 {
+					<div class="bb-card p-2 sm:p-3">
+						for _, m := range p.MemberRows {
+							@entityChargeRow(m)
 						}
-					</select>
-				</div>
-				<div>
-					@seriesFieldLabel("Cadence")
-					<div class="text-sm font-medium mt-1.5">{ p.Series.CadenceLabel }</div>
-				</div>
-				<div>
-					@seriesFieldLabel("Expected amount")
-					<div class="text-sm font-medium mt-1.5">{ subscriptionDetailField(p.ExpectedAmount) }</div>
-				</div>
-				<div>
-					@seriesFieldLabel("Tolerance")
-					<div class="text-sm font-medium mt-1.5">{ subscriptionToleranceSuffix(p.AmountTolerance) }</div>
-				</div>
-				<div>
-					@seriesFieldLabel("Expected day")
-					<div class="text-sm font-medium mt-1.5">{ subscriptionDetailField(p.ExpectedDay) }</div>
-				</div>
-				<div>
-					@seriesFieldLabel("Category")
-					<div
-						class="bb-cat-picker mt-1"
-						x-data="categoryPicker"
-						data-mode="assign"
-						data-source-id="series-cat"
-						data-placeholder="Uncategorized"
-						data-allow-empty="true"
-						data-empty-label="Uncategorized"
-						data-initial={ p.CurrentCategoryID }
-						@category-change="saveCategory($event.detail)"
-					>
-						<button type="button" class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
-							<template x-if="displayColor"><span class="w-2.5 h-2.5 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
-							<span x-text="displayLabel" class="text-sm font-medium flex-1 text-left truncate"></span>
-							@components.LucideIcon("chevron-down", "w-4 h-4 text-base-content opacity-30 shrink-0")
-						</button>
 					</div>
-				</div>
+				} else {
+					<div class="bb-card p-2 sm:p-3">
+						<div class="px-3 py-6 text-center text-sm text-base-content/55">
+							No charges are linked yet. A governing rule will fill this in on the next sync, or link one manually.
+						</div>
+					</div>
+				}
 			</div>
-			<!-- Merchant key — detection anchor -->
-			<div class="border-t border-base-200 mt-4 pt-4" x-data="{ rk: false }">
-				@seriesFieldLabel("Merchant key — detection anchor")
-				<div x-show="!rk" class="flex items-center justify-between gap-2 mt-1">
-					<code class="font-mono text-sm break-all">{ subscriptionDetailField(p.Series.MerchantKey) }</code>
-					<button type="button" class="btn btn-ghost btn-xs gap-1.5 text-base-content/60 shrink-0" @click="rk = true; $nextTick(() => $refs.rkInput.focus())">
-						@components.LucideIcon("pencil", "w-3.5 h-3.5")
-						Re-key
-					</button>
-				</div>
-				<div x-show="rk" x-cloak class="flex items-center gap-2 mt-1.5">
-					<input x-ref="rkInput" type="text" value={ p.Series.MerchantKey } class="input input-sm font-mono flex-1" aria-label="New merchant key"/>
-					<button type="button" class="btn btn-primary btn-sm" @click={ fmt.Sprintf("rekey(%q, $refs.rkInput.value)", p.Series.ShortID) }>Save</button>
-					<button type="button" class="btn btn-ghost btn-sm" @click="rk = false">Cancel</button>
-				</div>
+			<div>
+				@entityPanelHeader("filter", "Governing rules", seriesGoverningSubtitle(len(p.GoverningRules)), entityRulesBtn())
+				@components.GoverningRulesPanel(components.GoverningRulesPanelProps{
+					Rules:      p.GoverningRules,
+					EntityWord: "series",
+					ActionCode: "assign_series",
+				})
 			</div>
-			<!-- Tags — inherited by linked charges -->
-			<div class="border-t border-base-200 mt-4 pt-4">
-				@seriesFieldLabel("Tags — inherited by linked charges")
+		</div>
+		<!-- Tags — inherited by linked charges -->
+		<div class="mt-5">
+			@entityPanelHeader("tag", "Tags", "Inherited by every linked charge", nil)
+			<div class="bb-card p-5">
 				<div
-					class="flex flex-wrap items-center gap-2 mt-2"
+					class="flex flex-wrap items-center gap-2"
 					@tag-selection-commit.window="if ($event.detail.sourceId === 'series-tag') { applyTagDiff($event.detail.adds, $event.detail.removes) }"
 				>
 					for _, chip := range p.TagChips {
@@ -164,129 +84,42 @@ templ seriesRuleCard(p SubscriptionDetailProps) {
 				</div>
 			</div>
 		</div>
+		@seriesEditDrawer(p)
+		@seriesLinkModal()
 	</div>
 }
 
-// seriesEditDrawer is the right-side slide-over for the heavier rule fields,
-// committed with one explicit Save (mirrors the Workflows configure drawer).
+// seriesEditDrawer is the right-side slide-over for the two editable attributes
+// of a thin series — its name and type — committed with one explicit Save. Built
+// on the shared components.Drawer (store-driven open/close, scrim, transitions,
+// Escape-to-close), opened via $store.drawers.open('series-edit').
 templ seriesEditDrawer(p SubscriptionDetailProps) {
-	<div
-		x-show="editOpen"
-		x-cloak
-		x-transition:enter="transition-opacity ease-out duration-200"
-		x-transition:enter-start="opacity-0"
-		x-transition:enter-end="opacity-100"
-		x-transition:leave="transition-opacity ease-in duration-150"
-		x-transition:leave-start="opacity-100"
-		x-transition:leave-end="opacity-0"
-		class="fixed inset-0 bg-black/40 z-40"
-		@click="editOpen = false"
-	></div>
-	<div
-		x-show="editOpen"
-		x-cloak
-		x-transition:enter="transition ease-out duration-200"
-		x-transition:enter-start="translate-x-full"
-		x-transition:enter-end="translate-x-0"
-		x-transition:leave="transition ease-in duration-150"
-		x-transition:leave-start="translate-x-0"
-		x-transition:leave-end="translate-x-full"
-		class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-base-100 border-l border-base-300 shadow-xl flex flex-col"
-		@keydown.escape.window="editOpen = false"
-	>
+	@components.Drawer(components.DrawerProps{ID: "series-edit", Title: "Edit series"}) {
 		<form class="flex flex-col h-full" @submit.prevent="saveDrawer($event.target)">
-			<div class="flex items-center justify-between gap-3 p-5 border-b border-base-300">
-				<div class="font-semibold">Edit rule</div>
-				<button type="button" class="btn btn-ghost btn-sm btn-square" @click="editOpen = false" aria-label="Close">
-					@components.LucideIcon("x", "w-4 h-4")
-				</button>
-			</div>
+			@components.DrawerHeader(components.DrawerHeaderProps{Icon: "pencil", Title: "Edit series"})
 			<div class="flex-1 overflow-y-auto p-5 space-y-4">
 				<div>
 					<div class="text-sm font-medium mb-1.5">Name</div>
 					<input type="text" name="name" value={ p.Series.Name } required class="input input-sm w-full" aria-label="Name"/>
 				</div>
 				<div>
-					<div class="text-sm font-medium mb-1.5">Cadence</div>
-					<select name="cadence" class="select select-sm w-full" aria-label="Cadence">
-						for _, opt := range seriesCadenceOptions {
-							<option value={ opt.Value } selected?={ p.Series.Cadence == opt.Value }>{ opt.Label }</option>
+					<div class="text-sm font-medium mb-1.5">Type</div>
+					<select name="type" class="select select-sm w-full" aria-label="Type">
+						for _, opt := range seriesTypeOptions {
+							<option value={ opt.Value } selected?={ p.Series.Type == opt.Value }>{ opt.Label }</option>
 						}
 					</select>
 				</div>
-				<div class="grid grid-cols-2 gap-3">
-					<div>
-						<div class="text-sm font-medium mb-1.5">Expected amount</div>
-						<input
-							type="number"
-							step="0.01"
-							name="expected_amount"
-							if p.HasExpectedAmount {
-								value={ fmt.Sprintf("%.2f", p.ExpectedAmountValue) }
-							}
-							placeholder="0.00"
-							class="input input-sm w-full"
-							aria-label="Expected amount"
-						/>
-					</div>
-					<div>
-						<div class="text-sm font-medium mb-1.5">Currency</div>
-						<input type="text" name="currency" value={ p.Series.Currency } placeholder="USD" class="input input-sm w-full uppercase" aria-label="Currency"/>
-					</div>
-				</div>
-				<div class="grid grid-cols-2 gap-3">
-					<div>
-						<div class="text-sm font-medium mb-1.5">Tolerance</div>
-						<input type="number" step="0.01" name="amount_tolerance" value={ fmt.Sprintf("%.2f", p.AmountToleranceValue) } class="input input-sm w-full" aria-label="Tolerance"/>
-					</div>
-					<div>
-						<div class="text-sm font-medium mb-1.5">Expected day</div>
-						<input
-							type="number"
-							min="1"
-							max="31"
-							name="expected_day"
-							if p.ExpectedDayValue > 0 {
-								value={ fmt.Sprintf("%d", p.ExpectedDayValue) }
-							}
-							placeholder="—"
-							class="input input-sm w-full"
-							aria-label="Expected day"
-						/>
-					</div>
-				</div>
 			</div>
-			<div class="flex items-center justify-end gap-2 p-4 border-t border-base-300">
-				<button type="button" class="btn btn-ghost btn-sm" @click="editOpen = false">Cancel</button>
+			@components.DrawerFooter() {
+				<button type="button" class="btn btn-ghost btn-sm" @click="$store.drawers.close()">Cancel</button>
 				<button type="submit" class="btn btn-primary btn-sm gap-1.5">
 					@components.LucideIcon("check", "w-4 h-4")
 					Save
 				</button>
-			</div>
+			}
 		</form>
-	</div>
-}
-
-// seriesPanelHeader is the "icon · Title · subtitle" row above the Rule and
-// Evidence panels, with an optional trailing action.
-templ seriesPanelHeader(icon, title, subtitle string, action templ.Component) {
-	<div class="flex items-center justify-between gap-2 mb-3">
-		<div class="flex items-center gap-2 min-w-0">
-			@components.LucideIcon(icon, "w-4 h-4 text-base-content/50 shrink-0")
-			<h2 class="text-sm font-semibold text-base-content">{ title }</h2>
-			<span class="text-xs text-base-content/45 truncate hidden sm:inline">· { subtitle }</span>
-		</div>
-		if action != nil {
-			@action
-		}
-	</div>
-}
-
-templ seriesRuleEditBtn() {
-	<button type="button" class="btn btn-ghost btn-xs gap-1.5 shrink-0" @click="editOpen = true">
-		@components.LucideIcon("pencil", "w-3.5 h-3.5")
-		Edit
-	</button>
+	}
 }
 
 templ seriesLinkChargeBtn() {
@@ -296,46 +129,33 @@ templ seriesLinkChargeBtn() {
 	</button>
 }
 
-templ seriesFieldLabel(label string) {
-	<div class="text-[0.7rem] uppercase tracking-wider text-base-content/45">{ label }</div>
+// seriesHeaderIcon renders the EntityHeader leading tile content — the same
+// type-tinted EntityAvatar the ledger rows use, sized to fill the header tile
+// slot so the detail hero matches the list.
+templ seriesHeaderIcon(typ string) {
+	@components.EntityAvatar(components.EntityAvatarProps{
+		Icon:  subscriptionTypeIcon(typ),
+		Tone:  subscriptionTypeTone(typ),
+		Class: "w-full h-full",
+	})
 }
 
-// seriesDetailBadges is the EntityHeader badge row: status + type + (candidate) confidence.
+// seriesDetailBadges is the EntityHeader badge row: the structured type chip.
 templ seriesDetailBadges(s SubscriptionRow) {
-	<span class={ seriesStatusBadgeClass(s.StatusTone) }>{ s.StatusLabel }</span>
 	@components.SeriesTypeChip(s.TypeLabel, "sm")
-	if s.Status == "candidate" {
-		@components.SeriesConfidenceChip(s.ConfidenceBand, s.BandTone)
-	}
 }
 
-// seriesDetailActions is the EntityHeader trailing verdict cluster.
-templ seriesDetailActions(s SubscriptionRow) {
-	<div class="flex items-center gap-2">
-		switch s.Status {
-			case "candidate":
-				@seriesVerdictBtn(s, "reject", "Not recurring", "x", "btn-ghost")
-				@seriesVerdictBtn(s, "confirm", "Confirm", "check", "btn-primary")
-			case "active":
-				@seriesVerdictBtn(s, "pause", "Pause", "pause", "btn-ghost")
-				@seriesVerdictBtn(s, "cancel", "Cancel", "x-circle", "btn-ghost")
-			case "paused":
-				@seriesVerdictBtn(s, "confirm", "Resume", "play", "btn-primary")
-				@seriesVerdictBtn(s, "cancel", "Cancel", "x-circle", "btn-ghost")
-			case "cancelled":
-				@seriesVerdictBtn(s, "confirm", "Reactivate", "rotate-ccw", "btn-primary")
-		}
-	</div>
+// seriesDetailMeta is the quiet sub-title line — the linked-charge count.
+templ seriesDetailMeta(p SubscriptionDetailProps) {
+	<span class="text-sm text-base-content/55">{ subscriptionMemberCount(len(p.MemberRows)) }</span>
 }
 
-templ seriesVerdictBtn(s SubscriptionRow, verdict, label, icon, variant string) {
-	<button
-		type="button"
-		@click={ fmt.Sprintf("submitVerdict(%q, %q, %q)", s.ShortID, s.Name, verdict) }
-		class={ "btn btn-sm gap-1.5", variant }
-	>
-		@components.LucideIcon(icon, "w-4 h-4")
-		{ label }
+// seriesDetailActions is the EntityHeader trailing cluster — a single Edit
+// affordance that opens the name/type drawer.
+templ seriesDetailActions() {
+	<button type="button" class="btn btn-sm btn-ghost gap-1.5" @click="$store.drawers.open('series-edit')">
+		@components.LucideIcon("pencil", "w-4 h-4")
+		Edit
 	</button>
 }
 
@@ -375,7 +195,7 @@ templ seriesLinkModal() {
 	</div>
 }
 
-// seriesSelectOption is a (value,label) pair for the type/cadence selects.
+// seriesSelectOption is a (value,label) pair for the type select.
 type seriesSelectOption struct{ Value, Label string }
 
 var seriesTypeOptions = []seriesSelectOption{
@@ -385,62 +205,16 @@ var seriesTypeOptions = []seriesSelectOption{
 	{"other", "Other"},
 }
 
-var seriesCadenceOptions = []seriesSelectOption{
-	{"weekly", "Weekly"},
-	{"biweekly", "Every 2 weeks"},
-	{"monthly", "Monthly"},
-	{"quarterly", "Quarterly"},
-	{"semiannual", "Every 6 months"},
-	{"annual", "Annual"},
-	{"irregular", "Irregular"},
-	{"unknown", "Unknown"},
-}
-
-func seriesTypeIcon(t string) string {
-	switch t {
-	case "bill":
-		return "receipt"
-	case "loan":
-		return "landmark"
+// seriesGoverningSubtitle renders the governing-rules panel subtitle.
+func seriesGoverningSubtitle(n int) string {
+	switch n {
+	case 0:
+		return "Rules that assign charges here"
+	case 1:
+		return "1 rule defines membership"
 	default:
-		return "repeat"
+		return fmt.Sprintf("%d rules define membership", n)
 	}
-}
-
-// seriesStatusBadgeClass renders the header status chip. The neutral tone
-// (cancelled / unknown) maps to badge-ghost rather than badge-soft
-// badge-neutral — a soft neutral badge reads as invisible gray-on-gray on
-// the dark theme (per the vivid-only badge rule). Vivid tones stay soft.
-func seriesStatusBadgeClass(tone string) string {
-	if tone == "neutral" || tone == "" {
-		return "badge badge-ghost badge-sm"
-	}
-	return "badge badge-soft badge-sm badge-" + tone
-}
-
-func seriesStatusIconTone(status string) components.IconTone {
-	switch status {
-	case "active":
-		return components.IconToneSuccess
-	case "candidate":
-		return components.IconToneWarning
-	default:
-		return components.IconToneNeutral
-	}
-}
-
-func subscriptionDetailField(v string) string {
-	if v == "" {
-		return "—"
-	}
-	return v
-}
-
-func subscriptionToleranceSuffix(tol string) string {
-	if tol == "" {
-		return "—"
-	}
-	return "± " + tol
 }
 
 func seriesAddTagLabel(n int) string {
@@ -448,14 +222,4 @@ func seriesAddTagLabel(n int) string {
 		return "Add tag"
 	}
 	return "Edit tags"
-}
-
-func evidenceMatchedCount(ev components.SeriesEvidenceProps) int {
-	n := 0
-	for _, r := range ev.Rows {
-		if r.State != "projected" {
-			n++
-		}
-	}
-	return n
 }

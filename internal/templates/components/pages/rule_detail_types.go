@@ -4,6 +4,7 @@ package pages
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -26,8 +27,8 @@ type RuleDetailProps struct {
 	ActionCategoryName  string
 	Categories          []service.CategoryResponse
 	// LastActiveTime is the parsed last_hit_at; zero value means "never".
-	LastActiveTime time.Time
-	HasLastActive  bool
+	LastActiveTime   time.Time
+	HasLastActive    bool
 	ConditionSummary string
 	// ConditionRows is the pre-formatted list of ConditionRowProps the handler
 	// computes for non-match-all rules. Empty when the rule matches everything
@@ -78,12 +79,21 @@ func ruleConditionMatchAll(c service.Condition) bool {
 	return c.Field == "" && len(c.And) == 0 && len(c.Or) == 0 && c.Not == nil
 }
 
-// ruleHasRetroactiveAction mirrors the funcMap helper — true when the rule
-// has at least one set_category / add_tag / remove_tag action.
+// ruleHasRetroactiveAction reports whether a rule has at least one action that
+// the engine actually materializes against already-synced transactions. This
+// MUST stay aligned with Service.ApplyRuleRetroactively (internal/service/rules.go):
+// that path materializes set_category, add_tag, remove_tag, assign_series,
+// assign_counterparty, set_metadata, remove_metadata, flag, and unflag. Only
+// add_comment is sync-only (an explicit no-op retroactively). Treating a
+// membership/metadata/flag rule as non-retroactive here would wrongly hide the
+// "Apply now" affordance even though the engine would back-fill it.
 func ruleHasRetroactiveAction(actions []service.RuleAction) bool {
 	for _, a := range actions {
 		switch a.Type {
-		case "set_category", "add_tag", "remove_tag":
+		case "set_category", "add_tag", "remove_tag",
+			"assign_series", "assign_counterparty",
+			"set_metadata", "remove_metadata",
+			"flag", "unflag":
 			return true
 		}
 	}
@@ -244,4 +254,33 @@ func syncHistoryHitCount(h map[string]any) int {
 		return int(v)
 	}
 	return 0
+}
+
+// ruleActionEntityName returns the human display name for an assign_series /
+// assign_counterparty action — the by-name value when the rule mints/binds by
+// name, otherwise the short ID it targets, otherwise "". Used by the rule
+// detail "Then" card so surrogate-first actions read legibly.
+func ruleActionEntityName(a service.RuleAction) string {
+	switch a.Type {
+	case "assign_series":
+		if n := strings.TrimSpace(a.SeriesName); n != "" {
+			return n
+		}
+		return strings.TrimSpace(a.SeriesShortID)
+	case "assign_counterparty":
+		if n := strings.TrimSpace(a.CounterpartyName); n != "" {
+			return n
+		}
+		return strings.TrimSpace(a.CounterpartyShortID)
+	}
+	return ""
+}
+
+// ruleMetadataValueText renders a set_metadata action's value for display.
+// Returns "" when there is no value so the caller can omit the "= value" tail.
+func ruleMetadataValueText(a service.RuleAction) string {
+	if a.MetadataValue == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", a.MetadataValue)
 }

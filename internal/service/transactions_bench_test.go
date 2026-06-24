@@ -30,7 +30,7 @@ func benchBuildListTransactionsQuery(params benchListParams) (string, []any) {
 		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
 		"COALESCE(a.display_name, a.name) AS account_name, " +
 		"COALESCE(au.name, u.name) AS user_name, " +
-		"t.category_id, t.category_override, " +
+		"t.category_id, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
 		"t.attributed_user_id, au.name AS attributed_user_name, " +
@@ -297,7 +297,7 @@ func benchBuildAdminListQuery(params benchAdminListParams) (string, []any) {
 		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
-		"t.category_override, t.pending, " +
+		"t.pending, " +
 		"(SELECT COUNT(*) FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'comment' AND ann.deleted_at IS NULL) AS comment_count, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +

@@ -188,7 +188,7 @@ Each operation:
 | Field | Type | Description |
 |-------|------|-------------|
 | `transaction_id` | string | UUID or short ID. Required. |
-| `category_slug` | string | Optional category to set. Sets `category_override='user'`. |
+| `category_slug` | string | Optional category to set (writes `category_id`; last-writer-wins, no provenance). |
 | `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates tags if the slug is new. |
 | `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional — if provided, lands on the `tag_removed` annotation. |
 | `comment` | string | Optional comment annotation. |
@@ -246,43 +246,23 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ### list_series (Read)
 
-List detected recurring series. Optional `status` filter (`active` | `candidate` | `paused` | `cancelled`). **Lean by default** (`fields` omitted → `overview` projection): each row carries `type` (`subscription` | `bill` | `loan` | `other` — inferred from category, set via `set_series_type`), `cadence`, `expected_amount` + `iso_currency_code` (never sum across currencies), `next_expected_date`, `occurrence_count`, and `confidence` (`auto` | `confirmed` | `rejected`). Active series also carry a derived `renewal_health` (`active` | `due_soon` | `overdue` | `stale` | `unknown`) and signed `days_until_renewal` (negative = overdue) so you can answer "what renews soon" and "what looks cancelled" without re-deriving cadence math — `stale` means a full cadence cycle elapsed past the expected charge. The verbose `detection_signals` evidence is **omitted** from the lean list — pass `fields=all`, or use `get_series` for one series' full detail. Read `status=candidate` to find series awaiting a verdict.
+List recurring series — thin, rule-maintained entities: each is a surrogate identity (`id`/`short_id`), a `name`, and a `type` (`subscription` | `bill` | `loan` | `other`), plus its `tags`. Membership comes from `assign_series` rules, not a shipped detector. **Lean by default** (`fields` omitted → `overview` projection: `name`, `type`, `tags`); pass `fields=all` for timestamps. Get a series' charges via `query_transactions(series_id=...)`.
 
 ### get_series (Read)
 
-Get one series by short ID or UUID, including its full `detection_signals` (`occurrence_count`, `interval_cv`, `cadence_snap_error`, `amount_branch`, `merchant_key_is_fallback`). Inspect before reviewing a candidate.
-
-### explain_series_candidates (Read)
-
-Answer "why isn't *merchant* a subscription?". Returns `near_misses` — every recurring-looking merchant group that is **not** already a series, each annotated with the detector's verdict: `qualifies:true` (passes every gate but isn't tracked yet — confirm it with `assign_series`) or a specific `reason` it fell short (`too_few_occurrences`, `irregular_cadence`, `interval_too_variable`, `amount_unstable`, `same_day_duplicates`). Each row carries a human `explanation` plus the raw numbers (`occurrence_count`, `nearest_cadence`, `median_gap_days`, `interval_cv`, `amount_min`/`amount_max`, `first_seen`/`last_seen`). Read-only analysis over the trailing detection window — the precision-first detector deliberately stays quiet on these, so this surfaces what it skipped (ordered most-charges-first, capped at 50).
-
-### review_series (Write)
-
-Apply a verdict: `confirm` (it is a subscription → `active`), `reject` (NOT a subscription → sticky at that amount band, never re-proposed), `pause`, or `cancel`. A user's prior confirmation outranks a later agent write. This is how an agent adjudicates candidates from `list_series(status=candidate)`.
+Get one series by short ID or UUID: its `name`, `type`, and `tags`. A series' linked charges come from `query_transactions(series_id=...)`; its governing rules (the `assign_series` rules that define its membership) are visible on the admin Recurring detail page.
 
 ### assign_series (Write)
 
-Create a recurring series detection missed, or link transactions to an existing one — the agent's path to fix gaps. Provide `series_id` to assign to an existing series, **or** `merchant_key` + `create_if_missing:true` to mint one (funnels through the same dedup + sticky-reject arbitration as the detector, so re-creating a user-rejected series at the same signature is a no-op). Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series). `confirm:true` flips it straight to `active`; omit to leave a reviewable `candidate`. Use after `list_series(status=candidate)` shows nothing for a subscription the user says exists.
+Link transactions to a recurring series, creating it if needed — the agent's path for a **one-off** assignment (encode a durable pattern as an `assign_series` **rule** instead when you want future charges to resolve automatically). Provide `series_id` to assign to an existing series, **or** `series_name` + `create_if_missing:true` to mint/resolve one by name (surrogate-first: the same name always resolves the same series). Optional `type` (`subscription`|`bill`|`loan`|`other`) for a minted series. Pass `transaction_ids` (≤50) to back-link members (NULL-fill only — never steals a charge already in another series).
 
 ### update_series (Write)
 
-Edit a recurring series' user-owned attributes: `name`, `expected_amount` (+ `currency`, `amount_tolerance`), `cadence`, `expected_day`, `category_id`, `user_id` (owner). Every field is optional — omit to leave unchanged. This is a deliberate override, **not** a detection proposal: it bypasses the source-precedence ladder and protects the edited values from being reverted by the next sync's re-detect. Editing `cadence` re-derives `next_expected_date`; changing `currency` or `user_id` is collision-guarded (they're part of the dedup signature, so an edit can't silently merge two series). Use `review_series` for `confirm`/`pause`/`cancel`, `set_series_type` for the type axis, and `rekey_series` for the `merchant_key` — those have their own semantics and are not editable here.
-
-### set_series_type (Write)
-
-Set a recurring series' `type`: `subscription` (streaming/SaaS/memberships), `bill` (rent/utilities/insurance/telecom), `loan` (mortgage/auto/student/personal), or `other`. The detector infers the type from the linked charges' dominant category at first detection; this is the correction handle. The override is **sticky** — re-detection won't revert it. (`assign_series` also accepts an optional `type` when minting.)
-
-### rekey_series (Write)
-
-Correct a series' `merchant_key` when detection grouped it under a wrong or fallback key (e.g. `payment` → `spotify`). Repoints the series and its linked transactions to `new_merchant_key`. Refuses to silently merge: errors if a live series already exists at the new key, or that key is sticky-rejected. Corrects *historical* grouping — incoming charges still key off the provider name at sync time (a merchant-key alias table is future work).
-
-### split_series (Write)
-
-Break an over-grouped series in two: move `transaction_ids` (≤50, each a current member of the source series) into a brand-new series under `new_merchant_key`. The fix for the detector sweeping a stray charge into a real subscription (e.g. a $4.99 add-on bundled with a $139/yr renewal). The new series inherits the source's currency / user / category; rollups recompute on both sides. Errors if `new_merchant_key` equals the source key, already has a series, or any listed transaction isn't a current member. Returns the new series.
+Edit a recurring series' `name` and/or `type` (`subscription` | `bill` | `loan` | `other`). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).
 
 ### unlink_series_transactions (Write)
 
-Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id`, strips the series' inherited tags from them (a tag the user added directly survives), and recomputes the series' rollups + `next_expected_date`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series. Use to remove a charge the detector wrongly swept in; use `split_series` instead when the stray charges form their own series.
+Detach `transaction_ids` (≤50, each a current member) from a recurring series — the inverse of `assign_series`' link path. Clears each charge's `series_id` and strips the series' inherited tags from them (a tag the user added directly survives). Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another series.
 
 ### add_series_tag (Write)
 
@@ -291,6 +271,36 @@ Attach an existing tag to a recurring series. The tag is materialized onto every
 ### remove_series_tag (Write)
 
 Detach a tag from a recurring series and strip the series-inherited copies from its linked transactions. Provenance-scoped: a tag a user added directly to a transaction survives.
+
+---
+
+## Counterparties Tools
+
+A counterparty is the canonical, cross-provider "other side" of a charge — merchants **and** non-merchants (Venmo, people, employers). It is a thin, rule-maintained entity: a surrogate identity (`id`/`short_id`) + `name` + optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). Membership comes from `assign_counterparty` rules, not a normalizer.
+
+### list_counterparties (Read)
+
+List every live counterparty with its `name` and enrichment fields. Get a counterparty's charges via `query_transactions`; get one counterparty via `get_counterparty`.
+
+### get_counterparty (Read)
+
+Get one counterparty by short ID or UUID: its `name` and enrichment fields. Its governing rules (the `assign_counterparty` rules that define its membership) are visible on the admin Counterparties detail page; its linked charges come from `query_transactions`. Also exposed as the `breadbox://counterparty/{short_id}` resource (detail + governing rules).
+
+### create_counterparty (Write)
+
+Create a new counterparty with a `name` and optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use `assign_counterparty` (one-off) or author an `assign_counterparty` **rule** (durable).
+
+### update_counterparty (Write)
+
+Enrich a counterparty: edit its `name`, `website_url`, `logo_url`, `category_id` (slug or short ID), and/or `mcc`. Every field optional — omit to leave unchanged; an empty `name` is rejected. This is the enrichment lane (no auto-fetch).
+
+### assign_counterparty (Write)
+
+Bind transactions to a counterparty, creating it if needed — a **one-off** assignment. For durable patterns, author an `assign_counterparty` **rule** so every future matching charge resolves automatically. Provide `counterparty_id` to bind to an existing counterparty, **or** `name` + `create_if_missing:true` to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass `transaction_ids` (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).
+
+### unlink_counterparty_transaction (Write)
+
+Detach `transaction_ids` (≤50, each a current member) from a counterparty — the inverse of `assign_counterparty`' link path. Clears each charge's `counterparty_id`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.
 
 ---
 
@@ -307,15 +317,15 @@ Create a rule that fires during sync. Actions compose (`set_category` + `add_tag
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `name` | string | Human-readable rule name |
-| `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. Leaf fields include `metadata.<key>` to read a key from the free-form metadata blob (ops: `eq`/`neq`/`contains`/`not_contains`/`matches`/`in`/`gt`/`gte`/`lt`/`lte`/`exists`/`not_exists`; an absent key matches only `not_exists`). |
-| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`, `set_metadata` (`metadata_key` + `metadata_value`, any JSON), `remove_metadata` (`metadata_key`), `assign_series`. Either this or `category_slug` is required. |
+| `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. Numeric fields (incl. `amount`) add `approx` (`value` + sibling `tolerance`) and `between` (sibling `min`/`max`). Date-part fields derived from the tz-naive `date` — `day_of_month`, `month`, `day_of_week` (`0`=Sun), `day_of_year` — are numeric; `day_of_month approx` is cyclic + clamped (31 matches Feb's last day). Encode annual cadence as `month` + `day_of_month` (leap-robust), not `day_of_year`. Leaf fields also include `metadata.<key>` to read a key from the free-form metadata blob (ops: `eq`/`neq`/`contains`/`not_contains`/`matches`/`in`/`gt`/`gte`/`lt`/`lte`/`exists`/`not_exists`; an absent key matches only `not_exists`). Full grammar: `docs/rule-dsl.md`. |
+| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`, `set_metadata` (`metadata_key` + `metadata_value`, any JSON), `remove_metadata` (`metadata_key`), `assign_series`, `flag` (no params — sets `flagged_at`, surfacing the txn for attention), `unflag` (no params — clears `flagged_at`). Either this or `category_slug` is required. |
 | `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
 | `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
 | `stage` | string | **Preferred.** Semantic pipeline stage: `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
 | `priority` | int | Raw pipeline-stage integer, 0–1000. Use for fine-grained slotting within a stage. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard) if neither is provided. |
 | `enabled` | bool | Default true |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
-| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series`; `add_comment` is sync-only) |
+| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series` / `flag` / `unflag`; `add_comment` is sync-only) |
 
 ### list_transaction_rules (Read)
 
@@ -360,7 +370,7 @@ Delete a rule by ID. System-seeded rules can't be deleted — disable them via u
 
 ### apply_rules (Write)
 
-Retroactive apply. Pass `rule_id` for a single rule (no chaining — that rule evaluates in isolation), or omit to run the full active-rule pipeline in priority-ASC order with the same chaining semantics as sync. Materializes `set_category` / `add_tag` / `remove_tag`; skips `add_comment`. Ignores `rule.trigger` (retroactive is a bulk op).
+Retroactive apply. Pass `rule_id` for a single rule (no chaining — that rule evaluates in isolation), or omit to run the full active-rule pipeline in priority-ASC order with the same chaining semantics as sync. Materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series` / `flag` / `unflag`; skips `add_comment`. Ignores `rule.trigger` (retroactive is a bulk op).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|

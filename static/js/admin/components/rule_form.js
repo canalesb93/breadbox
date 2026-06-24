@@ -15,13 +15,16 @@
 document.addEventListener('alpine:init', function () {
   Alpine.data('ruleForm', function () {
     var fieldTypes = {
-      name: 'string', merchant_name: 'string', amount: 'numeric',
-      category_primary: 'string', category_detailed: 'string',
+      provider_name: 'string', provider_merchant_name: 'string', amount: 'numeric',
+      provider_category_primary: 'string', provider_category_detailed: 'string',
       category: 'string',
       pending: 'bool', provider: 'string',
       account_id: 'string', account_name: 'string',
       user_id: 'string', user_name: 'string',
       tags: 'tags',
+      // Date-part fields are numeric, derived server-side from the tz-naive date.
+      day_of_month: 'numeric', month: 'numeric',
+      day_of_week: 'numeric', day_of_year: 'numeric',
       // "metadata" is the visual-builder field for a metadata.<key> leaf. The
       // dotted field is assembled at submit time from cond.field + cond.key.
       metadata: 'metadata',
@@ -45,12 +48,14 @@ document.addEventListener('alpine:init', function () {
         { value: 'in',           label: 'in list' },
       ],
       numeric: [
-        { value: 'gte', label: '≥' },
-        { value: 'lte', label: '≤' },
-        { value: 'eq',  label: '=' },
-        { value: 'gt',  label: '>' },
-        { value: 'lt',  label: '<' },
-        { value: 'neq', label: '≠' },
+        { value: 'gte',     label: '≥' },
+        { value: 'lte',     label: '≤' },
+        { value: 'eq',      label: '=' },
+        { value: 'gt',      label: '>' },
+        { value: 'lt',      label: '<' },
+        { value: 'neq',     label: '≠' },
+        { value: 'approx',  label: '≈ ±' },
+        { value: 'between', label: 'between' },
       ],
       bool: [
         { value: 'eq',  label: 'is' },
@@ -81,11 +86,17 @@ document.addEventListener('alpine:init', function () {
     // via onFieldChange().
     // `key` carries the metadata key for a metadata.<key> leaf (unused by every
     // other field type).
-    function emptyCondition() { return { field: '', op: '', value: '', key: '' }; }
+    // `tolerance` is the ± window for the numeric `approx` operator; `min`/`max`
+    // bound the `between` operator. Unused by every other field/operator.
+    function emptyCondition() { return { field: '', op: '', value: '', key: '', tolerance: '', min: '', max: '' }; }
     // New action rows start as unpicked drafts so "Action..." is the default
     // and the value input stays disabled until a type is chosen. `key` /
     // `valueType` are only used by the metadata actions.
-    function emptyAction() { return { field: '', value: '', key: '', valueType: 'text', error: '' }; }
+    // `createName` is the membership-defining create-by-name affordance for the
+    // assign_series / assign_counterparty actions: when non-empty it serializes
+    // as *_name + create_if_missing:true; otherwise `value` carries the existing
+    // entity's short_id. The two modes are mutually exclusive in the UI.
+    function emptyAction() { return { field: '', value: '', createName: '', key: '', valueType: 'text', error: '' }; }
 
     // Action type registry — first-class typed actions match the API's
     // supported action.type values (set_category | add_tag | remove_tag |
@@ -96,8 +107,12 @@ document.addEventListener('alpine:init', function () {
       { value: 'tag',             label: 'Add tag' },
       { value: 'tag_remove',      label: 'Remove tag' },
       { value: 'comment',         label: 'Add comment' },
+      { value: 'series',          label: 'Assign to series' },
+      { value: 'counterparty',    label: 'Assign to counterparty' },
       { value: 'metadata_set',    label: 'Set metadata' },
       { value: 'metadata_remove', label: 'Remove metadata' },
+      { value: 'flag',            label: 'Flag for attention' },
+      { value: 'unflag',          label: 'Clear flag' },
     ];
 
     // Tag slug regex must match the server-side validator in
@@ -118,6 +133,20 @@ document.addEventListener('alpine:init', function () {
       if (a.type === 'add_comment') {
         return { field: 'comment', value: a.content || '', error: '' };
       }
+      if (a.type === 'assign_series') {
+        // Existing-series mode binds series_short_id; create-by-name mode carries
+        // series_name (+ create_if_missing). Recover whichever was stored.
+        if (a.series_name) {
+          return { field: 'series', value: '', createName: a.series_name, key: '', valueType: 'text', error: '' };
+        }
+        return { field: 'series', value: a.series_short_id || '', createName: '', key: '', valueType: 'text', error: '' };
+      }
+      if (a.type === 'assign_counterparty') {
+        if (a.counterparty_name) {
+          return { field: 'counterparty', value: '', createName: a.counterparty_name, key: '', valueType: 'text', error: '' };
+        }
+        return { field: 'counterparty', value: a.counterparty_short_id || '', createName: '', key: '', valueType: 'text', error: '' };
+      }
       if (a.type === 'set_metadata') {
         // Recover the value's type so the editor renders the right control and
         // re-submits the same JSON type.
@@ -130,6 +159,10 @@ document.addEventListener('alpine:init', function () {
       }
       if (a.type === 'remove_metadata') {
         return { field: 'metadata_remove', key: a.metadata_key || '', value: '', valueType: 'text', error: '' };
+      }
+      if (a.type === 'flag' || a.type === 'unflag') {
+        // No parameters — the action type alone carries the intent.
+        return { field: a.type, value: '', key: '', valueType: 'text', error: '' };
       }
       // Tolerate unknown types so the form still loads — validation happens at submit.
       return { field: a.type || a.field || '', value: a.category_slug || a.tag_slug || a.content || a.value || '', error: '' };
@@ -147,7 +180,16 @@ document.addEventListener('alpine:init', function () {
       }
       var value = sub.value;
       if (Array.isArray(value)) value = value.join(', ');
-      return { field: field, op: sub.op || 'contains', value: String(value == null ? '' : value), key: key };
+      return {
+        field: field,
+        op: sub.op || 'contains',
+        value: String(value == null ? '' : value),
+        key: key,
+        // Recover the approx ± window and between bounds so an edit round-trips.
+        tolerance: sub.tolerance == null ? '' : String(sub.tolerance),
+        min: sub.min == null ? '' : String(sub.min),
+        max: sub.max == null ? '' : String(sub.max),
+      };
     }
 
     // Initialize form from existing rule or defaults
@@ -285,6 +327,9 @@ document.addEventListener('alpine:init', function () {
         else cond.op = defaultOps[this.fieldType(cond.field)] || 'contains';
         if (this.fieldType(cond.field) === 'bool') cond.value = 'true';
         else cond.value = '';
+        // Reset the approx/between params so a stale tolerance/bound doesn't ride
+        // along after switching fields.
+        cond.tolerance = ''; cond.min = ''; cond.max = '';
         // Reset the metadata key when leaving/entering the metadata field so a
         // stale key doesn't ride along on a non-metadata leaf.
         if (cond.field !== 'metadata') cond.key = '';
@@ -303,7 +348,13 @@ document.addEventListener('alpine:init', function () {
       // Action helpers. Only set_category is singleton (backend enforces one
       // per rule); add_tag / remove_tag / add_comment may repeat.
       isActionUsed: function (field) {
-        if (field !== 'category') return false;
+        // set_category is backend-singleton; flag/unflag are singleton in the UI
+        // (a rule either flags or it doesn't — last-writer-wins makes a second
+        // row meaningless). assign_series / assign_counterparty are likewise
+        // singleton: a transaction belongs to one series / one counterparty, so a
+        // second assignment row in the same rule would just be last-writer-wins.
+        if (field !== 'category' && field !== 'flag' && field !== 'unflag' &&
+            field !== 'series' && field !== 'counterparty') return false;
         return this.form.actions.some(function (a) { return a.field === field; });
       },
       // Block "Add action" only while there's an unpicked draft row.
@@ -326,6 +377,7 @@ document.addEventListener('alpine:init', function () {
       onActionTypeChange: function (idx) {
         var a = this.form.actions[idx];
         a.value = '';
+        a.createName = '';
         a.error = '';
         a.key = '';
         a.valueType = 'text';
@@ -369,6 +421,11 @@ document.addEventListener('alpine:init', function () {
             }
           }
         }
+        var hasFlag = this.form.actions.some(function (a) { return a.field === 'flag'; });
+        var hasUnflag = this.form.actions.some(function (a) { return a.field === 'unflag'; });
+        if (hasFlag && hasUnflag) {
+          warnings.push('This rule both flags and clears the flag — last action wins, so one of them has no effect.');
+        }
         return warnings;
       },
 
@@ -406,6 +463,12 @@ document.addEventListener('alpine:init', function () {
             if (metadataPresenceOps[c.op]) return true;
             return c.value !== '';
           }
+          if (self.fieldType(c.field) === 'numeric') {
+            // `between` carries min+max instead of a single value; `approx`
+            // needs both a center value and a ± tolerance.
+            if (c.op === 'between') return c.min !== '' && c.max !== '';
+            if (c.op === 'approx') return c.value !== '' && c.tolerance !== '';
+          }
           return c.value !== '';
         });
         if (conds.length === 0) return null;
@@ -423,7 +486,15 @@ document.addEventListener('alpine:init', function () {
             if (c.op === 'in') mval = String(val).split(',').map(function (s) { return s.trim(); }).filter(Boolean);
             return { field: field, op: c.op, value: mval };
           }
-          if (type === 'numeric') val = parseFloat(val) || 0;
+          if (type === 'numeric') {
+            if (c.op === 'between') {
+              return { field: c.field, op: 'between', min: parseFloat(c.min) || 0, max: parseFloat(c.max) || 0 };
+            }
+            if (c.op === 'approx') {
+              return { field: c.field, op: 'approx', value: parseFloat(val) || 0, tolerance: parseFloat(c.tolerance) || 0 };
+            }
+            val = parseFloat(val) || 0;
+          }
           else if (type === 'bool') val = val === 'true';
           else if (type === 'tags' && c.op === 'in') {
             // Tags `in` takes an array; UI collects a comma-separated string.
@@ -487,7 +558,14 @@ document.addEventListener('alpine:init', function () {
         var actions = this.form.actions
           .filter(function (a) {
             if (!a.field) return false;
+            // flag / unflag carry no value — keep them on the field alone.
+            if (a.field === 'flag' || a.field === 'unflag') return true;
             if (a.field === 'metadata_set' || a.field === 'metadata_remove') return !!(a.key && a.key.trim());
+            // assign_series / assign_counterparty need EITHER an existing entity
+            // (value = short_id) OR a create-by-name (createName).
+            if (a.field === 'series' || a.field === 'counterparty') {
+              return (a.value && a.value !== '') || !!(a.createName && a.createName.trim());
+            }
             return a.value !== undefined && a.value !== '';
           })
           .map(function (a) {
@@ -495,6 +573,23 @@ document.addEventListener('alpine:init', function () {
             if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
             if (a.field === 'tag_remove') return { type: 'remove_tag', tag_slug: a.value };
             if (a.field === 'comment') return { type: 'add_comment', content: a.value };
+            if (a.field === 'flag') return { type: 'flag' };
+            if (a.field === 'unflag') return { type: 'unflag' };
+            if (a.field === 'series') {
+              // create-by-name wins when filled; the two modes are mutually
+              // exclusive in the UI, so this yields exactly one identifier — what
+              // ValidateActions requires.
+              if (a.createName && a.createName.trim()) {
+                return { type: 'assign_series', series_name: a.createName.trim(), create_if_missing: true };
+              }
+              return { type: 'assign_series', series_short_id: a.value };
+            }
+            if (a.field === 'counterparty') {
+              if (a.createName && a.createName.trim()) {
+                return { type: 'assign_counterparty', counterparty_name: a.createName.trim(), create_if_missing: true };
+              }
+              return { type: 'assign_counterparty', counterparty_short_id: a.value };
+            }
             if (a.field === 'metadata_set') {
               // Coerce the value to its declared JSON type so the stored blob is
               // typed (boolean true, number 100) rather than always a string.

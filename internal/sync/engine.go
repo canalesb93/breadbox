@@ -73,7 +73,14 @@ type Engine struct {
 	// the transaction. Wired by the app layer in serve.go (function pointer, no
 	// import cycle — the same pattern as OnSyncComplete). Nil-safe: when unset
 	// (series subsystem not wired) the action is a no-op.
-	AssignSeriesInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, merchantKey string, createIfMissing bool) error
+	AssignSeriesInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, seriesShortID, seriesName string, createIfMissing bool) error
+
+	// AssignCounterpartyInTx materializes an `assign_counterparty` rule action
+	// INSIDE the sync transaction — resolving/creating a counterparty and binding
+	// the transaction. Wired by the app layer in serve.go (function pointer, same
+	// decoupling pattern as AssignSeriesInTx). Nil-safe: when unset (counterparty
+	// subsystem not wired) the action is a no-op.
+	AssignCounterpartyInTx func(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, counterpartyShortID, counterpartyName string, createIfMissing bool) error
 }
 
 // NewEngine creates a new sync engine.
@@ -621,11 +628,6 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
 	}
 
-	merchantName := ""
-	if txn.MerchantName != nil {
-		merchantName = *txn.MerchantName
-	}
-
 	params := db.UpsertTransactionParams{
 		AccountID:                    accountID,
 		ProviderTransactionID:        txn.ExternalID,
@@ -643,10 +645,6 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderCategoryConfidence:   pgconv.TextPtrIfNotEmpty(txn.CategoryConfidence),
 		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
-		// merchant_key: the normalized recurring-series detection anchor, set at
-		// sync time so going-forward rows are immediately groupable. NULL when no
-		// usable merchant signal (excluded from auto-detection). See merchantkey.go.
-		MerchantKey: pgconv.TextIfNotEmpty(MerchantKey(merchantName, txn.Name)),
 	}
 
 	row, err := q.UpsertTransaction(ctx, params)
@@ -691,6 +689,9 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		AccountName: accountName,
 		UserID:      pgconv.FormatUUID(userID),
 		UserName:    userName,
+		// txn.Date is tz-naive (provider-localized); no timezone math. Powers
+		// the day_of_month / month / day_of_week / day_of_year condition fields.
+		Date: txn.Date,
 	}
 	if txn.MerchantName != nil {
 		tctx.MerchantName = *txn.MerchantName
@@ -716,6 +717,14 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	if dbTxn.SeriesID.Valid {
 		tctx.InSeries = true
 		tctx.SeriesShortID = resolver.SeriesShortID(dbTxn.SeriesID)
+	}
+	// Seed counterparty binding so rules can condition on it via
+	// field="counterparty" / field="has_counterparty". counterparty_id is NULL on
+	// freshly-synced rows (assign_counterparty rules resolve it post-upsert), so
+	// this is populated mainly on changed / re-synced rows already bound.
+	if dbTxn.CounterpartyID.Valid {
+		tctx.HasCounterparty = true
+		tctx.CounterpartyShortID = resolver.CounterpartyShortID(dbTxn.CounterpartyID)
 	}
 	// Seed the metadata blob so conditions on field="metadata.<key>" can read
 	// the transaction's current enrichment values, and so chaining rules see
@@ -775,10 +784,11 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		}
 	}
 
-	// set_category: write category_id when a rule matched and the transaction
-	// is not locked by an agent or user. Rules are the lowest priority
-	// (user > agent > rule), so they only write rows still at 'none'.
-	if result.CategorySlug != "" && dbTxn.CategoryOverride == "none" {
+	// set_category: write category_id when a rule matched. Provenance/precedence
+	// was removed in P3 — rules write category_id directly (last-writer-wins).
+	// Rules only run on isNew||isChanged transactions, so a user's manual edit on
+	// an unchanged row is not continuously re-clobbered.
+	if result.CategorySlug != "" {
 		catID := resolver.CategoryIDForSlug(result.CategorySlug)
 		if !catID.Valid {
 			// Unknown slug — most commonly a category was deleted after the
@@ -789,7 +799,7 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 				"rule_id", src.ruleShortID, "rule_name", src.ruleName, "slug", result.CategorySlug)
 		} else {
 			_, err := tx.Exec(ctx,
-				`UPDATE transactions SET category_id = $1 WHERE id = $2 AND category_override = 'none'`,
+				`UPDATE transactions SET category_id = $1 WHERE id = $2`,
 				catID, dbTxn.ID)
 			if err != nil {
 				return result.Sources, fmt.Errorf("apply rule category: %w", err)
@@ -840,8 +850,18 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	// stays decoupled from the series service. No-op when the hook is unset.
 	if result.SeriesAssign != nil && e.AssignSeriesInTx != nil {
 		if err := e.AssignSeriesInTx(ctx, tx, dbTxn.ID,
-			result.SeriesAssign.SeriesShortID, result.SeriesAssign.MerchantKey, result.SeriesAssign.CreateIfMissing); err != nil {
+			result.SeriesAssign.SeriesShortID, result.SeriesAssign.SeriesName, result.SeriesAssign.CreateIfMissing); err != nil {
 			return result.Sources, fmt.Errorf("apply assign_series: %w", err)
+		}
+	}
+
+	// assign_counterparty: bind the transaction to a counterparty within the sync
+	// tx (resolve-or-create + link), via the app-wired hook so the sync package
+	// stays decoupled from the counterparty service. No-op when the hook is unset.
+	if result.CounterpartyAssign != nil && e.AssignCounterpartyInTx != nil {
+		if err := e.AssignCounterpartyInTx(ctx, tx, dbTxn.ID,
+			result.CounterpartyAssign.CounterpartyShortID, result.CounterpartyAssign.CounterpartyName, result.CounterpartyAssign.CreateIfMissing); err != nil {
+			return result.Sources, fmt.Errorf("apply assign_counterparty: %w", err)
 		}
 	}
 
@@ -853,6 +873,26 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	if len(result.MetadataSet) > 0 || len(result.MetadataRemove) > 0 {
 		if err := e.applyMetadataFromRule(ctx, tx, dbTxn.ID, result.MetadataSet, result.MetadataRemove); err != nil {
 			return result.Sources, err
+		}
+	}
+
+	// flag / unflag: set or clear flagged_at within the sync tx, mirroring the
+	// flag_transaction MCP tool's write (transaction_flag.go). The net decision
+	// is already resolved last-writer-wins. Like assign_series / metadata, no
+	// dedicated timeline annotation is emitted — the rule_applied source records
+	// the firing.
+	switch result.FlagIntent {
+	case "flag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+			dbTxn.ID); err != nil {
+			return result.Sources, fmt.Errorf("apply rule flag: %w", err)
+		}
+	case "unflag":
+		if _, err := tx.Exec(ctx,
+			`UPDATE transactions SET flagged_at = NULL WHERE id = $1 AND deleted_at IS NULL`,
+			dbTxn.ID); err != nil {
+			return result.Sources, fmt.Errorf("apply rule unflag: %w", err)
 		}
 	}
 

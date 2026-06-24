@@ -764,6 +764,19 @@ func projectFeedBulkAction(b *service.FeedBulkActionEvent, tagDisplayFn func(str
 			if cd.Icon != nil {
 				display.Icon = *cd.Icon
 			}
+		case "series_assigned", "series_unlinked":
+			// Membership subjects carry their human name in sub.Name (the
+			// enriched Annotation.Subject) and their short_id in sub.Slug —
+			// there's no slug→display lookup to perform. Stamp the canonical
+			// app icon so the subject reads consistently with the rest of the
+			// product (series → "repeat", counterparty → "store").
+			if display.Icon == "" {
+				display.Icon = "repeat"
+			}
+		case "counterparty_assigned", "counterparty_unlinked":
+			if display.Icon == "" {
+				display.Icon = "store"
+			}
 		}
 		if display.Name == "" {
 			display.Name = sub.Slug
@@ -782,6 +795,7 @@ func projectSampleTx(tx service.FeedSampleTx) pages.FeedTransactionRef {
 		ShortID:             tx.ShortID,
 		Name:                tx.Name,
 		MerchantName:        tx.MerchantName,
+		CounterpartyName:    tx.CounterpartyName,
 		Amount:              tx.Amount,
 		Currency:            tx.Currency,
 		Date:                tx.Date,

@@ -58,8 +58,11 @@ templ TxRow(tx service.AdminTransactionRow) {
 			})
 			<!-- Description + meta line -->
 			<div class="flex-1 min-w-0">
-				<div class="flex items-center gap-2">
-					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop data-private="merchant" class="font-medium text-sm hover:text-primary transition-colors truncate">{ tx.Name }</a>
+				<div class="flex items-center gap-2 min-w-0">
+					if tx.CounterpartyLogoURL != nil && *tx.CounterpartyLogoURL != "" {
+						<img src={ deref(tx.CounterpartyLogoURL) } alt="" loading="lazy" class="w-4 h-4 rounded-sm object-contain shrink-0"/>
+					}
+					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop data-private="merchant" class="font-medium text-sm hover:text-primary transition-colors truncate">{ txPrimaryName(tx) }</a>
 				</div>
 				<!-- Meta line (sm+). Canonical order across every breakpoint:
 				     [Lead] · {Merchant | Category} · Tags · Comments.
@@ -294,6 +297,17 @@ templ TxRow(tx service.AdminTransactionRow) {
 			</div>
 		</div>
 	</div>
+}
+
+// txPrimaryName is the preferred display name for a transaction row: the
+// assigned counterparty's name when present, otherwise the raw provider
+// description. Mirrors the COALESCE(counterparty_name, provider_name) display
+// convention used across the read model.
+func txPrimaryName(tx service.AdminTransactionRow) string {
+	if tx.CounterpartyName != nil && *tx.CounterpartyName != "" {
+		return *tx.CounterpartyName
+	}
+	return tx.Name
 }
 
 // txMerchantAttr lowercases merchant for the data-tx-merchant filter attr;

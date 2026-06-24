@@ -28,10 +28,13 @@ type FeedActivityRow struct {
 	TransactionShortID string
 	TransactionName    string
 	MerchantName       string
-	Amount             float64
-	IsoCurrencyCode    string
-	TransactionDate    string
-	Pending            bool
+	// CounterpartyName is the assigned counterparty's name when present; the
+	// preferred display over MerchantName / provider name. Nil when unassigned.
+	CounterpartyName *string
+	Amount           float64
+	IsoCurrencyCode  string
+	TransactionDate  string
+	Pending          bool
 
 	AccountName     string
 	InstitutionName string
@@ -70,6 +73,7 @@ SELECT
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
     ac.name, bc.institution_name,
     cat.display_name, COALESCE(cat.color, pcat.color) AS cat_color, cat.icon, cat.slug,
+    cp.name AS counterparty_name,
     (SELECT COUNT(*)::int FROM transaction_tags tt WHERE tt.transaction_id = t.id) AS tag_count
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
@@ -77,6 +81,7 @@ LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
 LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN categories pcat ON cat.parent_id = pcat.id
+LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -266,11 +271,14 @@ type FeedSampleTx struct {
 	ShortID      string
 	Name         string
 	MerchantName string
-	Amount       float64
-	Currency     string
-	Date         string
-	AccountName  string
-	Institution  string
+	// CounterpartyName is the assigned counterparty's name when present; the
+	// preferred display over MerchantName / provider name. Nil when unassigned.
+	CounterpartyName *string
+	Amount           float64
+	Currency         string
+	Date             string
+	AccountName      string
+	Institution      string
 	// Pending mirrors `transactions.pending` so the feed card can render
 	// the same clock-icon pending mark used on `/transactions/{id}` and
 	// the transactions list — preliminary rows often re-show as posted
@@ -550,6 +558,7 @@ SELECT
     t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date, t.pending,
     ac.name, bc.institution_name,
     cat.display_name, COALESCE(cat.color, pcat.color) AS cat_color, cat.icon, cat.slug,
+    cp.name AS counterparty_name,
     (SELECT COUNT(*)::int FROM transaction_tags tt WHERE tt.transaction_id = t.id) AS tag_count
 FROM annotations a
 JOIN transactions t ON a.transaction_id = t.id
@@ -557,6 +566,7 @@ LEFT JOIN accounts ac ON t.account_id = ac.id
 LEFT JOIN bank_connections bc ON ac.connection_id = bc.id
 LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN categories pcat ON cat.parent_id = pcat.id
+LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
    AND aa.id::text = a.actor_id
@@ -621,6 +631,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		accountName, institutionName        pgtype.Text
 		catDisplay, catColor                pgtype.Text
 		catIcon, catSlug                    pgtype.Text
+		counterpartyName                    pgtype.Text
 		tagCount                            int
 	)
 
@@ -631,6 +642,7 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 		&txShort, &txName, &merchantName, &amount, &isoCcy, &txDate, &pending,
 		&accountName, &institutionName,
 		&catDisplay, &catColor, &catIcon, &catSlug,
+		&counterpartyName,
 		&tagCount,
 	); err != nil {
 		return FeedActivityRow{}, fmt.Errorf("scan feed activity row: %w", err)
@@ -715,6 +727,10 @@ func scanFeedActivityRow(s scanner) (FeedActivityRow, error) {
 	if catSlug.Valid {
 		v := catSlug.String
 		row.CategorySlug = &v
+	}
+	if counterpartyName.Valid && counterpartyName.String != "" {
+		v := counterpartyName.String
+		row.CounterpartyName = &v
 	}
 	return row, nil
 }
@@ -912,12 +928,14 @@ func (s *Service) fetchSyncSampleTransactions(ctx context.Context, raws []syncRo
 SELECT t.short_id, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, t.date,
        t.created_at, t.pending, ac.name, bc.id::text, bc.institution_name,
        cat.display_name, COALESCE(cat.color, pcat.color) AS cat_color, cat.icon, cat.slug,
+       cp.name AS counterparty_name,
        (SELECT COUNT(*)::int FROM transaction_tags tt WHERE tt.transaction_id = t.id) AS tag_count
 FROM transactions t
 JOIN accounts ac ON ac.id = t.account_id
 JOIN bank_connections bc ON ac.connection_id = bc.id
 LEFT JOIN categories cat ON t.category_id = cat.id
 LEFT JOIN categories pcat ON cat.parent_id = pcat.id
+LEFT JOIN counterparties cp ON t.counterparty_id = cp.id
 WHERE t.created_at >= $1
   AND t.deleted_at IS NULL
   AND bc.id::text = ANY($2::text[])
@@ -950,21 +968,28 @@ ORDER BY t.created_at DESC
 			institutionName      pgtype.Text
 			catDisplay, catColor pgtype.Text
 			catIcon, catSlug     pgtype.Text
+			counterpartyName     pgtype.Text
 			tagCount             int
 		)
-		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName, &catDisplay, &catColor, &catIcon, &catSlug, &tagCount); err != nil {
+		if err := rows.Scan(&shortID, &provName, &merchantName, &amount, &isoCcy, &txDate, &createdAt, &pending, &accountName, &connID, &institutionName, &catDisplay, &catColor, &catIcon, &catSlug, &counterpartyName, &tagCount); err != nil {
 			return nil, err
+		}
+		var counterpartyPtr *string
+		if counterpartyName.Valid && counterpartyName.String != "" {
+			v := counterpartyName.String
+			counterpartyPtr = &v
 		}
 		t := txRow{
 			FeedSampleTx: FeedSampleTx{
-				ShortID:      shortID,
-				Name:         provName,
-				MerchantName: pgconv.TextOr(merchantName, ""),
-				Currency:     pgconv.TextOr(isoCcy, "USD"),
-				AccountName:  pgconv.TextOr(accountName, ""),
-				Institution:  pgconv.TextOr(institutionName, ""),
-				Pending:      pending,
-				TagCount:     tagCount,
+				ShortID:          shortID,
+				Name:             provName,
+				MerchantName:     pgconv.TextOr(merchantName, ""),
+				CounterpartyName: counterpartyPtr,
+				Currency:         pgconv.TextOr(isoCcy, "USD"),
+				AccountName:      pgconv.TextOr(accountName, ""),
+				Institution:      pgconv.TextOr(institutionName, ""),
+				Pending:          pending,
+				TagCount:         tagCount,
 			},
 			ConnectionID: connID,
 			CreatedAt:    createdAt.Time.UTC(),
@@ -1444,6 +1469,10 @@ func bulkSubjectKey(a Annotation) string {
 		return "category:" + a.CategorySlug
 	case "rule_applied":
 		return "rule:" + a.RuleShortID
+	case "series_assigned", "series_unlinked":
+		return "series:" + annotationPayloadString(a, "series_id")
+	case "counterparty_assigned", "counterparty_unlinked":
+		return "counterparty:" + annotationPayloadString(a, "counterparty_id")
 	}
 	return ""
 }
@@ -1456,8 +1485,26 @@ func bulkSubjectSlug(a Annotation) string {
 		return a.CategorySlug
 	case "rule_applied":
 		return a.RuleShortID
+	case "series_assigned", "series_unlinked":
+		return annotationPayloadString(a, "series_id")
+	case "counterparty_assigned", "counterparty_unlinked":
+		return annotationPayloadString(a, "counterparty_id")
 	}
 	return ""
+}
+
+// annotationPayloadString reads a string field from an annotation's untyped
+// payload, returning "" when absent or not a string. The bulk-action subject
+// helpers use it to key membership events (series / counterparty) on their
+// short_id — the payload carries series_id / counterparty_id without a typed
+// field threaded through every call site. The subject *name* still comes from
+// the enriched Annotation.Subject.
+func annotationPayloadString(a Annotation, key string) string {
+	if a.Payload == nil {
+		return ""
+	}
+	s, _ := a.Payload[key].(string)
+	return s
 }
 
 // sampleTxFromRow projects a feed-activity row into the small FeedSampleTx
@@ -1471,6 +1518,7 @@ func sampleTxFromRow(r FeedActivityRow) FeedSampleTx {
 		ShortID:             r.TransactionShortID,
 		Name:                r.TransactionName,
 		MerchantName:        merchant,
+		CounterpartyName:    r.CounterpartyName,
 		Amount:              r.Amount,
 		Currency:            r.IsoCurrencyCode,
 		Date:                r.TransactionDate,

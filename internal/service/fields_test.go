@@ -193,7 +193,7 @@ func strPtr(s string) *string { return &s }
 
 func TestFilterTransactionFields_AllFields(t *testing.T) {
 	// Build a fieldSet with all valid fields
-	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,provider_name,provider_merchant_name,category,category_override,provider_category_primary,provider_category_detailed,provider_category_confidence,provider_payment_channel,pending,created_at,updated_at,metadata,flagged_at")
+	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,provider_name,provider_merchant_name,counterparty_short_id,counterparty_name,category,provider_category_primary,provider_category_detailed,provider_category_confidence,provider_payment_channel,pending,created_at,updated_at,metadata,flagged_at")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

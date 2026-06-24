@@ -504,6 +504,95 @@ func TestEnrichAnnotations_UnknownKindRoundTrips(t *testing.T) {
 	}
 }
 
+// Series membership rows render the prebuilt Summary differentiating
+// linked/unlinked, mirroring the counterparty twin below.
+func TestEnrichAnnotations_SeriesMembershipSummaries(t *testing.T) {
+	rows := []Annotation{
+		{
+			ID:        "s-assigned",
+			Kind:      "series_assigned",
+			ActorName: "Alice",
+			Payload:   map[string]interface{}{"series_id": "SER12345", "series_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:00:00Z",
+		},
+		{
+			ID:        "s-unlinked",
+			Kind:      "series_unlinked",
+			ActorName: "", // system-attributed
+			Payload:   map[string]interface{}{"series_id": "SER12345", "series_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:01:00Z",
+		},
+	}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	if len(out) != 2 {
+		t.Fatalf("len = %d, want 2", len(out))
+	}
+	if out[0].Action != "linked" || out[0].Subject != "Netflix" {
+		t.Errorf("assigned: Action=%q Subject=%q", out[0].Action, out[0].Subject)
+	}
+	if out[0].Summary != "Alice linked this to Netflix" {
+		t.Errorf("assigned Summary = %q", out[0].Summary)
+	}
+	if out[1].Summary != "Unlinked from Netflix" {
+		t.Errorf("unlinked Summary = %q", out[1].Summary)
+	}
+}
+
+// Counterparty membership rows mirror series exactly: a prebuilt Summary
+// differentiating set/remove, surfaced via the same Summary-fallback render
+// path. (rules-substrate doctrine: counterparty events read like series.)
+func TestEnrichAnnotations_CounterpartyMembershipSummaries(t *testing.T) {
+	rows := []Annotation{
+		{
+			ID:        "cp-assigned-actor",
+			Kind:      "counterparty_assigned",
+			ActorName: "Alice",
+			Payload:   map[string]interface{}{"counterparty_id": "CPX12345", "counterparty_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:00:00Z",
+		},
+		{
+			ID:        "cp-assigned-system",
+			Kind:      "counterparty_assigned",
+			ActorName: "", // system-attributed (rule / detection)
+			Payload:   map[string]interface{}{"counterparty_id": "CPX12345", "counterparty_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:01:00Z",
+		},
+		{
+			ID:        "cp-unlinked-actor",
+			Kind:      "counterparty_unlinked",
+			ActorName: "Bob",
+			Payload:   map[string]interface{}{"counterparty_id": "CPX12345", "counterparty_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:02:00Z",
+		},
+		{
+			ID:        "cp-unlinked-system",
+			Kind:      "counterparty_unlinked",
+			ActorName: "",
+			Payload:   map[string]interface{}{"counterparty_id": "CPX12345", "counterparty_name": "Netflix"},
+			CreatedAt: "2026-04-04T12:03:00Z",
+		},
+	}
+	out := EnrichAnnotations(rows, EnrichOptions{})
+	if len(out) != 4 {
+		t.Fatalf("len = %d, want 4", len(out))
+	}
+	if out[0].Action != "set" || out[0].Subject != "Netflix" {
+		t.Errorf("assigned-actor: Action=%q Subject=%q", out[0].Action, out[0].Subject)
+	}
+	if out[0].Summary != "Alice set the counterparty to Netflix" {
+		t.Errorf("assigned-actor Summary = %q", out[0].Summary)
+	}
+	if out[1].Summary != "Counterparty set to Netflix" {
+		t.Errorf("assigned-system Summary = %q", out[1].Summary)
+	}
+	if out[2].Action != "removed" || out[2].Summary != "Bob removed the counterparty" {
+		t.Errorf("unlinked-actor: Action=%q Summary=%q", out[2].Action, out[2].Summary)
+	}
+	if out[3].Summary != "Counterparty removed" {
+		t.Errorf("unlinked-system Summary = %q", out[3].Summary)
+	}
+}
+
 func TestEnrichAnnotations_PreservesOrder(t *testing.T) {
 	rows := []Annotation{
 		{ID: "a", Kind: "comment", ActorName: "alice", Payload: map[string]interface{}{"content": "1"}, CreatedAt: "2026-04-01T00:00:00Z"},

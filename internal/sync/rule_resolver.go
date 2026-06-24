@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"breadbox/internal/pgconv"
 	"breadbox/internal/sliceutil"
@@ -23,9 +25,16 @@ type Condition struct {
 	Field string      `json:"field,omitempty"`
 	Op    string      `json:"op,omitempty"`
 	Value interface{} `json:"value,omitempty"`
-	And   []Condition `json:"and,omitempty"`
-	Or    []Condition `json:"or,omitempty"`
-	Not   *Condition  `json:"not,omitempty"`
+	// Tolerance is the ± window for the numeric `approx` operator; Min/Max
+	// bound the `between` operator. Mirrors service.Condition so a rule's JSONB
+	// round-trips identically between the write-time validator and this
+	// sync-time evaluator.
+	Tolerance *float64    `json:"tolerance,omitempty"`
+	Min       *float64    `json:"min,omitempty"`
+	Max       *float64    `json:"max,omitempty"`
+	And       []Condition `json:"and,omitempty"`
+	Or        []Condition `json:"or,omitempty"`
+	Not       *Condition  `json:"not,omitempty"`
 }
 
 // TransactionContext holds the fields available for rule evaluation during sync.
@@ -59,12 +68,26 @@ type TransactionContext struct {
 	// InSeries reports whether the transaction is linked to any recurring
 	// series (field: "in_series"). Same timing caveat as SeriesShortID.
 	InSeries bool
+	// CounterpartyShortID is the short_id of the counterparty this transaction is
+	// bound to (field: "counterparty"), empty when unassigned. Resolved from the
+	// resolver's counterparty cache at sync time. Like series_id, counterparty_id
+	// is NULL on freshly-synced rows (resolved post-upsert by assign_counterparty
+	// rules), so this matters mostly for changed / re-synced rows + retroactive.
+	CounterpartyShortID string
+	// HasCounterparty reports whether the transaction is bound to any counterparty
+	// (field: "has_counterparty"). Same timing caveat as CounterpartyShortID.
+	HasCounterparty bool
 	// Metadata holds the transaction's free-form metadata blob (the JSONB
 	// `metadata` column) so conditions on dotted fields (field:
 	// "metadata.<key>") can read arbitrary enrichment values. Updated
 	// mid-resolver as earlier-stage set_metadata / remove_metadata actions
 	// apply, so later-stage rules observe the running blob.
 	Metadata map[string]any
+	// Date is the transaction's tz-naive posting date (the `date` column, no
+	// time component). The derived date-part condition fields (day_of_month /
+	// month / day_of_week / day_of_year) are computed from it; a zero Date makes
+	// those conditions evaluate to false.
+	Date time.Time
 }
 
 // RuleActionSource tracks which rule contributed which action for audit.
@@ -111,6 +134,10 @@ type RuleActions struct {
 	// Last-writer-wins: the highest-priority matching rule owns the assignment
 	// (a transaction belongs to at most one series).
 	SeriesAssign *SeriesAssignIntent
+	// CounterpartyAssign, when non-nil, binds the transaction to a counterparty.
+	// Last-writer-wins: the highest-priority matching rule owns the binding
+	// (a transaction binds at most one counterparty).
+	CounterpartyAssign *CounterpartyAssignIntent
 	// MetadataSet maps metadata keys to the value the net-surviving set_metadata
 	// action wrote. Last-writer-wins per key across the pipeline. A later-stage
 	// remove_metadata for the same key cancels the set (the key won't appear
@@ -120,6 +147,12 @@ type RuleActions struct {
 	// earlier-stage rule then removed by a later one cancels (appears in
 	// neither map); a key removed then re-set ends up only in MetadataSet.
 	MetadataRemove []string
+	// FlagIntent is the net flag/unflag decision for the transaction:
+	// "flag" sets flagged_at = NOW(), "unflag" clears it, "" leaves it
+	// untouched. Last-writer-wins across the pipeline (a higher-priority rule's
+	// flag/unflag overrides a lower one), mirroring the flag_transaction MCP
+	// tool's flagged_at write.
+	FlagIntent string
 	// Sources records per-action provenance for the audit trail. For
 	// set_category, only the winning (last) rule's source is retained.
 	// For tag actions, only net-surviving adds/removes have sources.
@@ -130,25 +163,37 @@ type RuleActions struct {
 // Kept local so the sync package doesn't import service (preserves the
 // one-way service → sync dependency direction).
 type typedAction struct {
-	Type            string
-	CategorySlug    string
-	TagSlug         string
-	Content         string
-	SeriesShortID   string
-	MerchantKey     string
-	CreateIfMissing bool
-	MetadataKey     string
-	MetadataValue   any
+	Type                string
+	CategorySlug        string
+	TagSlug             string
+	Content             string
+	SeriesShortID       string
+	SeriesName          string
+	CounterpartyShortID string
+	CounterpartyName    string
+	CreateIfMissing     bool
+	MetadataKey         string
+	MetadataValue       any
 }
 
 // SeriesAssignIntent is the resolved assign_series action: link the
-// transaction to an existing series (SeriesShortID) or mint one keyed on
-// MerchantKey (CreateIfMissing). A transaction joins at most one series, so
+// transaction to an existing series (SeriesShortID) or mint one by name
+// (SeriesName + CreateIfMissing). A transaction joins at most one series, so
 // this is last-writer-wins across matching rules.
 type SeriesAssignIntent struct {
 	SeriesShortID   string
-	MerchantKey     string
+	SeriesName      string
 	CreateIfMissing bool
+}
+
+// CounterpartyAssignIntent is the resolved assign_counterparty action: bind the
+// transaction to an existing counterparty (CounterpartyShortID) or resolve-or-
+// create one by name (CounterpartyName + CreateIfMissing). A transaction binds at
+// most one counterparty, so this is last-writer-wins across matching rules.
+type CounterpartyAssignIntent struct {
+	CounterpartyShortID string
+	CounterpartyName    string
+	CreateIfMissing     bool
 }
 
 // RuleResolver loads transaction rules and evaluates them during sync.
@@ -158,6 +203,7 @@ type RuleResolver struct {
 	slugCache       map[[16]byte]string    // category UUID bytes -> slug
 	slugToID        map[string]pgtype.UUID // category slug -> UUID (reverse cache)
 	seriesShortID   map[[16]byte]string    // recurring_series UUID bytes -> short_id
+	cpShortID       map[[16]byte]string    // counterparties UUID bytes -> short_id
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
@@ -176,9 +222,13 @@ type compiledCondition struct {
 	op    string
 	value interface{}
 	regex *regexp.Regexp // pre-compiled for "matches" operator
-	and   []*compiledCondition
-	or    []*compiledCondition
-	not   *compiledCondition
+	// tolerance / min / max carry the approx / between numeric-operator params.
+	tolerance *float64
+	min       *float64
+	max       *float64
+	and       []*compiledCondition
+	or        []*compiledCondition
+	not       *compiledCondition
 }
 
 // ruleRow holds the raw data from the transaction_rules table query.
@@ -198,6 +248,7 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 		slugCache:     make(map[[16]byte]string),
 		slugToID:      make(map[string]pgtype.UUID),
 		seriesShortID: make(map[[16]byte]string),
+		cpShortID:     make(map[[16]byte]string),
 		hitCounts:     make(map[[16]byte]int),
 	}
 
@@ -248,6 +299,26 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 				return nil, fmt.Errorf("scan recurring series short_id: %w", err)
 			}
 			r.seriesShortID[id.Bytes] = shortID
+		}
+	}
+
+	// Load the counterparty id→short_id cache so the `counterparty` condition
+	// field can resolve a transaction's counterparty_id to its short_id without a
+	// per-row query. Tolerate a missing table (older deployments / lite / before
+	// the P4 migration) the same way the series cache does — counterparty
+	// conditions simply won't match.
+	cpRows, err := pool.Query(ctx, "SELECT id, short_id FROM counterparties")
+	if err != nil {
+		logger.Warn("failed to load counterparties cache; counterparty conditions will not match", "error", err)
+	} else {
+		defer cpRows.Close()
+		for cpRows.Next() {
+			var id pgtype.UUID
+			var shortID string
+			if err := cpRows.Scan(&id, &shortID); err != nil {
+				return nil, fmt.Errorf("scan counterparty short_id: %w", err)
+			}
+			r.cpShortID[id.Bytes] = shortID
 		}
 	}
 
@@ -363,15 +434,30 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 			out = append(out, typedAction{Type: t, Content: content})
 		case "assign_series":
 			seriesShortID, _ := m["series_short_id"].(string)
-			merchantKey, _ := m["merchant_key"].(string)
+			seriesName, _ := m["series_name"].(string)
+			// Backward-compat: a rule authored before the surrogate-first rebuild
+			// (P2) stored the mint target under `merchant_key`. Map it onto
+			// SeriesName so existing rules keep firing. An explicit series_name wins.
+			// TODO: remove after existing assign_series rules are migrated off merchant_key
+			if seriesName == "" {
+				seriesName, _ = m["merchant_key"].(string)
+			}
 			createIfMissing, _ := m["create_if_missing"].(bool)
-			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, MerchantKey: merchantKey, CreateIfMissing: createIfMissing})
+			out = append(out, typedAction{Type: t, SeriesShortID: seriesShortID, SeriesName: seriesName, CreateIfMissing: createIfMissing})
+		case "assign_counterparty":
+			cpShortID, _ := m["counterparty_short_id"].(string)
+			cpName, _ := m["counterparty_name"].(string)
+			createIfMissing, _ := m["create_if_missing"].(bool)
+			out = append(out, typedAction{Type: t, CounterpartyShortID: cpShortID, CounterpartyName: cpName, CreateIfMissing: createIfMissing})
 		case "set_metadata":
 			key, _ := m["metadata_key"].(string)
 			out = append(out, typedAction{Type: t, MetadataKey: key, MetadataValue: m["metadata_value"]})
 		case "remove_metadata":
 			key, _ := m["metadata_key"].(string)
 			out = append(out, typedAction{Type: t, MetadataKey: key})
+		case "flag", "unflag":
+			// No parameters — surfaces / clears the transaction's flag.
+			out = append(out, typedAction{Type: t})
 		default:
 			logger.Warn("skipping unknown rule action type",
 				"rule_id", pgconv.FormatUUID(ruleID), "type", t)
@@ -437,6 +523,9 @@ func compileCondition(c *Condition) (*compiledCondition, error) {
 	cc.field = c.Field
 	cc.op = c.Op
 	cc.value = c.Value
+	cc.tolerance = c.Tolerance
+	cc.min = c.Min
+	cc.max = c.Max
 
 	// Pre-compile regex for "matches" operator.
 	if c.Op == "matches" {
@@ -481,6 +570,16 @@ func (r *RuleResolver) SeriesShortID(id pgtype.UUID) string {
 	return r.seriesShortID[id.Bytes]
 }
 
+// CounterpartyShortID returns the short_id for a counterparty UUID, or empty
+// string if the counterparty is unknown to the resolver's cache (e.g. created
+// after resolver construction, or the table was unavailable at load time).
+func (r *RuleResolver) CounterpartyShortID(id pgtype.UUID) string {
+	if !id.Valid {
+		return ""
+	}
+	return r.cpShortID[id.Bytes]
+}
+
 // ResolveWithContext evaluates all transaction rules in pipeline-stage order
 // (priority ASC, created_at ASC) and returns the merged actions. Rules whose
 // trigger doesn't match isNew are skipped.
@@ -494,9 +593,9 @@ func (r *RuleResolver) SeriesShortID(id pgtype.UUID) string {
 // As earlier-stage rules apply their add_tag / set_category actions, the
 // local context updates so later-stage rules' conditions can observe them.
 // This enables composition ("rule A tags 'coffee'; rule B reacts to the tag
-// and picks a category"). `category_override=true` on the transaction
-// suppresses set_category both in the local context mutation and downstream
-// in the engine's DB write.
+// and picks a category"). Provenance/precedence was removed in P3 — rules
+// write category_id directly (last-writer-wins), so there is no override that
+// suppresses set_category.
 //
 // Action merging:
 //   - set_category: last-writer-wins. The highest-priority matching rule
@@ -630,7 +729,7 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					ActionValue: a.Content,
 				})
 			case "assign_series":
-				if a.SeriesShortID == "" && a.MerchantKey == "" {
+				if a.SeriesShortID == "" && a.SeriesName == "" {
 					continue
 				}
 				// Last-writer-wins: a transaction joins at most one series, so a
@@ -638,7 +737,7 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				// its audit source.
 				result.SeriesAssign = &SeriesAssignIntent{
 					SeriesShortID:   a.SeriesShortID,
-					MerchantKey:     a.MerchantKey,
+					SeriesName:      a.SeriesName,
 					CreateIfMissing: a.CreateIfMissing,
 				}
 				result.Sources = dropSeriesSource(result.Sources)
@@ -648,6 +747,26 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					RuleName:    rule.name,
 					ActionField: "series",
 					ActionValue: seriesActionValue(a),
+				})
+			case "assign_counterparty":
+				if a.CounterpartyShortID == "" && a.CounterpartyName == "" {
+					continue
+				}
+				// Last-writer-wins: a transaction binds at most one counterparty,
+				// so a later-stage rule overrides an earlier binding and supersedes
+				// its audit source.
+				result.CounterpartyAssign = &CounterpartyAssignIntent{
+					CounterpartyShortID: a.CounterpartyShortID,
+					CounterpartyName:    a.CounterpartyName,
+					CreateIfMissing:     a.CreateIfMissing,
+				}
+				result.Sources = dropCounterpartySource(result.Sources)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: "counterparty",
+					ActionValue: counterpartyActionValue(a),
 				})
 			case "set_metadata":
 				if a.MetadataKey == "" {
@@ -708,10 +827,41 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 						ActionValue: a.MetadataKey,
 					})
 				}
+			case "flag", "unflag":
+				// Last-writer-wins: a later-stage rule's flag/unflag supersedes
+				// an earlier one (a transaction is flagged or it isn't). Drop the
+				// superseded source so the rule_applied audit credits the winning
+				// rule only. ActionField is the action type so the dedup key and
+				// audit annotation distinguish flag from unflag.
+				result.FlagIntent = a.Type
+				result.Sources = dropFlagSource(result.Sources)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: a.Type,
+				})
 			}
 		}
 	}
 	return result
+}
+
+// dropFlagSource removes any prior flag/unflag source so the final
+// RuleActionSource slice records only the winning (last) rule's provenance for
+// the flag decision. Non-flag sources are preserved.
+func dropFlagSource(src []RuleActionSource) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == "flag" || s.ActionField == "unflag" {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
 }
 
 // dropCategorySource removes any prior category source so the final
@@ -732,13 +882,13 @@ func dropCategorySource(src []RuleActionSource) []RuleActionSource {
 }
 
 // seriesActionValue is the audit value for an assign_series action: the
-// series short_id when assigning to an existing series, else the merchant_key
+// series short_id when assigning to an existing series, else the series name
 // the series is minted under.
 func seriesActionValue(a typedAction) string {
 	if a.SeriesShortID != "" {
 		return a.SeriesShortID
 	}
-	return a.MerchantKey
+	return a.SeriesName
 }
 
 // dropSeriesSource removes any prior series source so the final source slice
@@ -750,6 +900,32 @@ func dropSeriesSource(src []RuleActionSource) []RuleActionSource {
 	kept := src[:0]
 	for _, s := range src {
 		if s.ActionField == "series" {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
+}
+
+// counterpartyActionValue is the audit value for an assign_counterparty action:
+// the counterparty short_id when binding to an existing counterparty, else the
+// name it resolves-or-creates under.
+func counterpartyActionValue(a typedAction) string {
+	if a.CounterpartyShortID != "" {
+		return a.CounterpartyShortID
+	}
+	return a.CounterpartyName
+}
+
+// dropCounterpartySource removes any prior counterparty source so the final
+// source slice records only the winning (last) rule's provenance for the binding.
+func dropCounterpartySource(src []RuleActionSource) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == "counterparty" {
 			continue
 		}
 		kept = append(kept, s)
@@ -930,12 +1106,80 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.SeriesShortID)
 	case "in_series":
 		return evaluateBool(c, tctx.InSeries)
+	case "counterparty":
+		return evaluateString(c, tctx.CounterpartyShortID)
+	case "has_counterparty":
+		return evaluateBool(c, tctx.HasCounterparty)
+	case "day_of_month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateDayOfMonth(c, tctx.Date)
+	case "month":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateNumeric(c, float64(int(tctx.Date.Month())))
+	case "day_of_week":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateNumeric(c, float64(int(tctx.Date.Weekday())))
+	case "day_of_year":
+		if tctx.Date.IsZero() {
+			return false
+		}
+		return evaluateNumeric(c, float64(tctx.Date.YearDay()))
 	default:
 		if key, ok := metadataKeyFromField(c.field); ok {
 			return evaluateMetadata(c, key, tctx.Metadata)
 		}
 		return false // unknown field
 	}
+}
+
+// evaluateDayOfMonth mirrors service.evalDayOfMonth: approx uses cyclic +
+// clamped matching against the transaction's actual month length; every other
+// operator falls back to a plain numeric comparison on the literal day (1..31).
+func evaluateDayOfMonth(c *compiledCondition, date time.Time) bool {
+	day := date.Day()
+	if c.op != "approx" {
+		return evaluateNumeric(c, float64(day))
+	}
+	if c.tolerance == nil {
+		return false
+	}
+	target := toFloat64(c.value)
+	monthLen := daysInMonth(date.Year(), date.Month())
+	return dayOfMonthApproxMatch(day, int(math.Round(target)), *c.tolerance, monthLen)
+}
+
+// daysInMonth returns the number of days in the given year/month.
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
+// dayOfMonthApproxMatch reports whether actualDay is within tolerance of
+// targetDay on a cyclic month of monthLen days. targetDay clamps into
+// [1, monthLen]; distance is the smaller of the direct and wrap-around gaps.
+func dayOfMonthApproxMatch(actualDay, targetDay int, tolerance float64, monthLen int) bool {
+	if monthLen <= 0 {
+		return false
+	}
+	if targetDay > monthLen {
+		targetDay = monthLen
+	}
+	if targetDay < 1 {
+		targetDay = 1
+	}
+	diff := actualDay - targetDay
+	if diff < 0 {
+		diff = -diff
+	}
+	if wrap := monthLen - diff; wrap < diff {
+		diff = wrap
+	}
+	return float64(diff) <= tolerance
 }
 
 // metadataFieldPrefix marks a condition leaf that reads a key from the
@@ -1109,6 +1353,12 @@ func evaluateString(c *compiledCondition, fieldVal string) bool {
 
 // evaluateNumeric applies numeric operators.
 func evaluateNumeric(c *compiledCondition, fieldVal float64) bool {
+	if c.op == "between" {
+		if c.min == nil || c.max == nil {
+			return false
+		}
+		return fieldVal >= *c.min && fieldVal <= *c.max
+	}
 	v := toFloat64(c.value)
 
 	switch c.op {
@@ -1124,6 +1374,11 @@ func evaluateNumeric(c *compiledCondition, fieldVal float64) bool {
 		return fieldVal < v
 	case "lte":
 		return fieldVal <= v
+	case "approx":
+		if c.tolerance == nil {
+			return false
+		}
+		return math.Abs(fieldVal-v) <= *c.tolerance
 	default:
 		return false
 	}

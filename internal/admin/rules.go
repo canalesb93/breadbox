@@ -167,11 +167,18 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		// Tags feed the add_tag autocomplete in the form. Best-effort — empty
 		// list just means no datalist suggestions.
 		tags, _ := svc.ListTags(ctx)
+		// Series + counterparties populate the assign_series / assign_counterparty
+		// action dropdowns. Best-effort — an empty list still lets the user
+		// create-by-name.
+		series, _ := svc.ListSeries(ctx, nil)
+		counterparties, _ := svc.ListCounterparties(ctx)
 
 		props := pages.RuleFormProps{
 			IsEdit:         false,
 			FlatCategories: flattenCategories(categories),
 			Tags:           tags,
+			Series:         series,
+			Counterparties: counterparties,
 		}
 
 		data := BaseTemplateData(r, sm, "rules", "New Rule")
