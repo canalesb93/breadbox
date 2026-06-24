@@ -65,7 +65,7 @@ templ Nav(p NavProps) {
 		}
 		if p.IsAdmin {
 			@navLink("/rules", "zap", "Rules", navActive(p.CurrentPage, "rules"))
-			@navLink("/categories", "folder", "Categories", navActive(p.CurrentPage, "categories"))
+			@navLink("/categories", "shapes", "Categories", navActive(p.CurrentPage, "categories"))
 		}
 		if p.IsEditor {
 			@navLink("/counterparties", "store", "Counterparties", navActive(p.CurrentPage, "counterparties"))

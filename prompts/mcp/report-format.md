@@ -81,9 +81,6 @@ When referencing specific transactions, always use markdown links: [Transaction 
 This makes transactions clickable in the dashboard for quick access.
 
 SESSION MANAGEMENT:
-- Before performing write operations, call create_session with a purpose describing your task.
-- Include the returned session_id and a brief reason on ALL write tool calls.
-- Optionally include session_id on read calls to associate them with your session.
-- One session per logical task (e.g. "weekly review", "rule cleanup for dining").
-- The reason should be informal and specific (e.g. "approving clearly valid grocery charge", "creating rule for recurring uber charges").
+- Audit sessions are automatic — there is no create_session tool. Every tool call is logged under a session keyed off your transport connection, lazy-created on your first call.
+- To label a specific call, pass an optional `reason` string in `tools/call._meta` (the spec's per-request metadata slot) — informal and specific (e.g. "approving clearly valid grocery charge", "creating rule for recurring uber charges").
 - Sessions and their tool calls are visible on the family's dashboard for transparency.

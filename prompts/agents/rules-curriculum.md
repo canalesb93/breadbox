@@ -18,7 +18,7 @@ series, tags, flags, and metadata are all just rule actions. Learn this one
 mechanism and you can automate the whole review loop.
 
 > The grammar — every field, operator, and action shape — lives in
-> `breadbox://rule-dsl`. Read it whenever you author a rule. This block
+> `get_reference(kind=rule-dsl)`. Read it whenever you author a rule. This block
 > teaches the **decision framework**: *when* to write a rule and *which
 > fields* to write it on. It does not repeat the grammar.
 
@@ -52,8 +52,8 @@ Never create a rule blind. Always:
    transactions would match and surfaces a sample. Reject anything that
    over-matches, fights a category a human already set, or matches zero rows
    (a typo in the condition).
-3. **`create_transaction_rule`** (one) or **`batch_create_rules`** (several
-   related rules in one call, max 100). Only create what previewed clean.
+3. **`create_transaction_rule`** — pass a `rules` array (one element, or
+   several related rules in one call, max 100). Only create what previewed clean.
 
 ## Stable-field doctrine
 
@@ -129,8 +129,10 @@ fear of stomping a human's correction on settled history.
 
 ## Action catalog (summary)
 
-Every action you might put on a rule — the same verbs you can also call as
-one-off MCP tools. See `breadbox://rule-dsl` for exact shapes.
+Every action you might put on a rule — the same effects you can also apply
+one-off via `update_transactions` (category, tags, comment, metadata, flag),
+`assign_series`, and `assign_counterparty`. See `get_reference(kind=rule-dsl)`
+for exact shapes.
 
 | Action | What it does |
 |---|---|
@@ -143,7 +145,7 @@ one-off MCP tools. See `breadbox://rule-dsl` for exact shapes.
 | `assign_counterparty` | Bind the transaction to a counterparty — the entity on the other side (the counterparties idiom below). |
 
 A transaction joins at most one series; a higher-priority `assign_series`
-overrides a lower one. Pick priority bands per `breadbox://rule-dsl` so
+overrides a lower one. Pick priority bands per `get_reference(kind=rule-dsl)` so
 specific rules outrank broad ones.
 
 ## The counterparties idiom — name the entity behind the charge
