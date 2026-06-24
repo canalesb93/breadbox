@@ -59,6 +59,16 @@ type RuleApplicationMeta struct {
 	AppliedBy           string
 }
 
+// ruleAppliedByTitle returns the tooltip text for the inline meta badge that
+// marks how a Recent-Applications row was touched. Retroactive is the common
+// case; any other non-sync origin falls back to a generic phrasing.
+func ruleAppliedByTitle(appliedBy string) string {
+	if appliedBy == "retroactive" {
+		return "Applied retroactively from this rule's detail page"
+	}
+	return "Applied via " + appliedBy
+}
+
 // ruleID safely returns the rule's ID, or empty string when the rule
 // pointer is nil. Used to build the data-apply-url / data-toggle-url
 // attributes without crashing the template render on a transient nil.
