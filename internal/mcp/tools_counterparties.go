@@ -18,14 +18,6 @@ type getCounterpartyInput struct {
 	ID string `json:"id" jsonschema:"required,Counterparty short ID or UUID."`
 }
 
-type createCounterpartyInput struct {
-	Name       string `json:"name" jsonschema:"required,Display name for the counterparty (the canonical, cross-provider 'other side' of a charge — a merchant, person, or employer). De-duped on the live name, but not unique."`
-	WebsiteURL string `json:"website_url,omitempty" jsonschema:"Optional canonical website URL."`
-	LogoURL    string `json:"logo_url,omitempty" jsonschema:"Optional logo image URL."`
-	CategoryID string `json:"category_id,omitempty" jsonschema:"Optional default category (slug or short ID/UUID) for this counterparty's charges."`
-	MCC        string `json:"mcc,omitempty" jsonschema:"Optional 4-digit merchant category code."`
-}
-
 type updateCounterpartyInput struct {
 	ID         string  `json:"id" jsonschema:"required,Counterparty short ID or UUID to enrich."`
 	Name       *string `json:"name,omitempty" jsonschema:"New display name. Omit to leave unchanged; empty string is rejected."`
@@ -37,9 +29,14 @@ type updateCounterpartyInput struct {
 
 type assignCounterpartyInput struct {
 	CounterpartyID  string   `json:"counterparty_id,omitempty" jsonschema:"Existing counterparty short ID or UUID to bind transactions to. Provide this OR (name + create_if_missing)."`
-	Name            string   `json:"name,omitempty" jsonschema:"Name to resolve-or-create a counterparty under (requires create_if_missing). Surrogate-first: pick a clean canonical label — e.g. 'Amazon'."`
+	Name            string   `json:"name,omitempty" jsonschema:"Name to resolve-or-create a counterparty under (requires create_if_missing). Surrogate-first: pick a clean canonical label — e.g. 'Amazon'. To mint a bare counterparty (no transactions), pass name + create_if_missing with no transaction_ids."`
 	CreateIfMissing bool     `json:"create_if_missing,omitempty" jsonschema:"Resolve (or create) a counterparty by name when no counterparty_id is given."`
+	FailIfExists    bool     `json:"fail_if_exists,omitempty" jsonschema:"With create_if_missing, error instead of resolving when a counterparty already exists at this name — use for a strict 'make a brand-new counterparty' intent."`
 	TransactionIDs  []string `json:"transaction_ids,omitempty" jsonschema:"Transactions (short ID or UUID) to link to the counterparty. Max 50 per call. NULL-fill only — never steals a charge already bound elsewhere."`
+	WebsiteURL      string   `json:"website_url,omitempty" jsonschema:"Optional enrichment applied to the resolved/minted counterparty: canonical website URL."`
+	LogoURL         string   `json:"logo_url,omitempty" jsonschema:"Optional enrichment: logo image URL."`
+	CategoryID      string   `json:"category_id,omitempty" jsonschema:"Optional enrichment: default category (slug or short ID/UUID) for this counterparty's charges."`
+	MCC             string   `json:"mcc,omitempty" jsonschema:"Optional enrichment: 4-digit merchant category code."`
 }
 
 type unlinkCounterpartyTransactionInput struct {
@@ -65,48 +62,6 @@ func (s *MCPServer) handleGetCounterparty(_ context.Context, _ *mcpsdk.CallToolR
 			return errorResult(fmt.Errorf("counterparty not found")), nil, nil
 		}
 		return errorResult(err), nil, nil
-	}
-	return jsonResult(cp)
-}
-
-func (s *MCPServer) handleCreateCounterparty(ctx context.Context, _ *mcpsdk.CallToolRequest, input createCounterpartyInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.Name == "" {
-		return errorResult(fmt.Errorf("name is required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-	// Strict create (FailIfExists) — an explicit "make a new counterparty" intent
-	// should surface a conflict rather than silently resolve an existing row.
-	cp, err := s.svc.AssignCounterparty(context.Background(), service.AssignCounterpartyInput{
-		Name:            input.Name,
-		CreateIfMissing: true,
-		FailIfExists:    true,
-	}, actor)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	// Apply any enrichment fields supplied at create time.
-	if input.WebsiteURL != "" || input.LogoURL != "" || input.CategoryID != "" || input.MCC != "" {
-		edit := service.EditCounterpartyInput{}
-		if input.WebsiteURL != "" {
-			edit.WebsiteURL = &input.WebsiteURL
-		}
-		if input.LogoURL != "" {
-			edit.LogoURL = &input.LogoURL
-		}
-		if input.CategoryID != "" {
-			edit.CategoryID = &input.CategoryID
-		}
-		if input.MCC != "" {
-			edit.MCC = &input.MCC
-		}
-		enriched, err := s.svc.UpdateCounterparty(context.Background(), cp.ShortID, edit, actor)
-		if err != nil {
-			return errorResult(err), nil, nil
-		}
-		cp = enriched
 	}
 	return jsonResult(cp)
 }
@@ -145,6 +100,7 @@ func (s *MCPServer) handleAssignCounterparty(ctx context.Context, _ *mcpsdk.Call
 		CounterpartyShortID: optStr(input.CounterpartyID),
 		Name:                input.Name,
 		CreateIfMissing:     input.CreateIfMissing,
+		FailIfExists:        input.FailIfExists,
 		TransactionIDs:      input.TransactionIDs,
 	}, actor)
 	if err != nil {
@@ -152,6 +108,27 @@ func (s *MCPServer) handleAssignCounterparty(ctx context.Context, _ *mcpsdk.Call
 			return errorResult(fmt.Errorf("counterparty not found")), nil, nil
 		}
 		return errorResult(err), nil, nil
+	}
+	// Apply any enrichment fields in the same call (folds the former create_counterparty).
+	if input.WebsiteURL != "" || input.LogoURL != "" || input.CategoryID != "" || input.MCC != "" {
+		edit := service.EditCounterpartyInput{}
+		if input.WebsiteURL != "" {
+			edit.WebsiteURL = &input.WebsiteURL
+		}
+		if input.LogoURL != "" {
+			edit.LogoURL = &input.LogoURL
+		}
+		if input.CategoryID != "" {
+			edit.CategoryID = &input.CategoryID
+		}
+		if input.MCC != "" {
+			edit.MCC = &input.MCC
+		}
+		enriched, err := s.svc.UpdateCounterparty(context.Background(), cp.ShortID, edit, actor)
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+		cp = enriched
 	}
 	return jsonResult(cp)
 }

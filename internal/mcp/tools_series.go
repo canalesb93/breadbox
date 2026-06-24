@@ -43,7 +43,7 @@ type unlinkSeriesInput struct {
 func (s *MCPServer) handleListSeries(_ context.Context, _ *mcpsdk.CallToolRequest, input listSeriesInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	// Lean-by-default: list_series returns the overview projection (identity +
-	// type + tags) unless the caller asks for more.
+	// type) unless the caller asks for more.
 	fieldsRaw := input.Fields
 	switch fieldsRaw {
 	case "":

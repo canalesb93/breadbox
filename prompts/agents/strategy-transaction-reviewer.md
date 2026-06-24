@@ -50,8 +50,9 @@ For each resolved transaction, apply the curriculum's core heuristic:
   expected again) → promote it to a rule. Follow the 3-step author flow every
   time: `find_matching_rules` (don't duplicate existing coverage) →
   `preview_rule` (verify the match count and sample) →
-  `create_transaction_rule` / `batch_create_rules`. Author conditions only on
-  the stable raw fields the curriculum names — never on mutable display fields.
+  `create_transaction_rule` (pass a `rules` array to author several at once).
+  Author conditions only on the stable raw fields the curriculum names — never
+  on mutable display fields.
 
 Rules you create here apply to **future** syncs. Do not run `apply_rules` or
 `apply_retroactively` during a routine review — just create the rule and let

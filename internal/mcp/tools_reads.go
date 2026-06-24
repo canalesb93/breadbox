@@ -4,20 +4,21 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
 	"breadbox/internal/service"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// Tools in this file mirror the bounded reference resources registered in
-// resources.go (breadbox://accounts, ://categories, ://tags, ://users,
-// ://sync-status, ://rules, ://overview). Resources are the preferred surface
-// for application-driven hosts (Claude.ai's paperclip menu, Inspector), but
-// not every MCP client implements the resources/* methods — clients without
-// resource support need tool fallbacks for the same reads. Each handler here
-// calls into the same service path the matching resource handler uses, with
-// a tool-shaped envelope.
+// Tools in this file back the bounded reference reads, surfaced to agents
+// through get_reference(kind=…). They're the canonical (and for most kinds,
+// only) way to read this data: accounts, categories, tags, users, sync status,
+// and the rule roster. A subset (overview, sync-status) is ALSO exposed as a
+// breadbox:// resource for hosts with an attach UI (Claude.ai's paperclip menu,
+// Inspector); those resource handlers in resources.go call the same service
+// path, so the two surfaces never drift. Each handler here returns a
+// tool-shaped envelope.
 
 // --- Input types ---
 
@@ -70,6 +71,57 @@ type queryTransactionRulesInput struct {
 	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result. Only valid with the default priority sort; an explicit sort_by returns a single top-N page with no next_cursor."`
 	Fields       string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include, to cut response size. Alias: summary (name,enabled,priority,trigger,category,hit_count,last_hit_at; the default — omits the conditions and actions trees). Default when omitted: summary. Pass fields=all for every field including the full conditions/actions. id is always included."`
+}
+
+// getReferenceInput selects which operating-guidance doc to read. These are the
+// near-static markdown docs that teach an agent how to drive the server — the
+// content that used to live in `breadbox://` markdown resources before resources
+// were retired. Serving them as a tool means clients that can't read MCP
+// resources (e.g. Claude.ai) can still pull the guidance on demand.
+type getReferenceInput struct {
+	Kind string `json:"kind" jsonschema:"required,Which guidance doc to read: 'instructions' (how the server is organized + conventions) | 'rule-dsl' (the full transaction-rule condition grammar, action types, and pipeline-stage semantics — read before authoring rules) | 'review-guidelines' (principles for reviewing transactions and creating rules — read before working the review queue) | 'report-format' (structure + formatting for submit_report)."`
+}
+
+// handleGetReference returns the requested guidance doc as markdown. The
+// instructions / review-guidelines / report-format docs honor the operator's
+// app_config overrides (falling back to the embedded defaults); rule-dsl is the
+// fixed embedded grammar.
+func (s *MCPServer) handleGetReference(_ context.Context, _ *mcpsdk.CallToolRequest, input getReferenceInput) (*mcpsdk.CallToolResult, any, error) {
+	cfg, err := s.svc.GetMCPConfig(context.Background())
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	var content string
+	switch input.Kind {
+	case "instructions":
+		content = orDefault(cfg.Instructions, DefaultInstructions)
+	case "review-guidelines":
+		content = orDefault(cfg.ReviewGuidelines, DefaultReviewGuidelines)
+	case "report-format":
+		content = orDefault(cfg.ReportFormat, DefaultReportFormat)
+	case "rule-dsl":
+		content = DefaultRuleDSL
+	default:
+		return errorResult(fmt.Errorf("unknown kind %q: must be one of instructions, rule-dsl, review-guidelines, report-format", input.Kind)), nil, nil
+	}
+	return markdownResult(content), nil, nil
+}
+
+// orDefault returns v, or def when v is empty.
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+// markdownResult wraps a guidance doc as a single markdown text content block.
+// Unlike jsonResult it does not JSON-encode or ID-compact — the payload is
+// human-readable markdown, not a data record.
+func markdownResult(md string) *mcpsdk.CallToolResult {
+	return &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: md}},
+	}
 }
 
 // --- Handlers ---

@@ -2,23 +2,20 @@
 
 package mcp
 
-// Regression harness for the flag_transaction / unflag_transaction MCP tool
-// response shapes (T18).
+// Regression harness for flagging through update_transactions (T18).
 //
-// The goals mirror response_shapes_integration_test.go: lock the JSON envelope
-// every caller / SDK generator relies on. The asserts are intentionally loose on
-// values but strict on shape — if someone renames `flagged` → `is_flagged`, or
-// drops `transaction_id` from the envelope, the test breaks in the same PR.
+// flag_transaction / unflag_transaction were folded into update_transactions
+// as the per-op `flagged` field. These tests lock that the folded path still
+// has the same observable behavior: flagged_at is set/cleared in the DB, an
+// accompanying comment lands as the flag reason, and query_transactions
+// (flagged=…) filters on it.
 //
 // Coverage:
-//   - flag_transaction: required keys present (transaction_id, flagged=true)
-//   - flag_transaction with reason: reason recorded as a comment annotation
-//   - unflag_transaction: required keys present (transaction_id, flagged=false)
-//   - flag_transaction -> GetTransaction: flagged_at reflected in side-effect
-//   - unflag_transaction side-effect: flagged_at cleared (nil)
-//   - Missing transaction_id: error envelope returned
-//   - Missing transaction row: error envelope returned
-//   - StructuredContent / TextContent parity (via decodeToolResult)
+//   - flagged:true sets flagged_at (side-effect)
+//   - flagged:true + comment records the reason as a comment annotation
+//   - flagged:false clears flagged_at
+//   - flagged:false on an already-unflagged row is a no-op success
+//   - an op with a nonexistent transaction_id fails that op (not a panic)
 //   - query_transactions(flagged=true) surfaces only the flagged row
 
 import (
@@ -29,13 +26,9 @@ import (
 )
 
 // T18FlagFreshTxn creates a fresh transaction on the seeded primary account
-// and returns its UUID string. Keeps the test bodies from duplicating fixture
-// plumbing and avoids naming collisions with the shared seedFixtures txn used
-// by other parallel suites.
+// and returns its UUID string.
 func T18FlagFreshTxn(t *testing.T, f *fixtures) string {
 	t.Helper()
-	// Reuse the queries handle from the fixture server to stay within the same
-	// truncated DB state seedFixtures created.
 	q := f.svc.svc.Queries
 	accts, err := f.svc.svc.ListAccounts(f.ctx, nil)
 	if err != nil || len(accts) == 0 {
@@ -59,77 +52,59 @@ func T18FlagFreshTxn(t *testing.T, f *fixtures) string {
 	return formatUUIDTest(t, txn.ID)
 }
 
-// TestT18FlagTransactionResponseShape pins the flag_transaction tool's JSON
-// envelope: required keys transaction_id and flagged=true must both be present
-// for every successful call. Also locks the StructuredContent / TextContent
-// parity contract (enforced by decodeToolResult).
-func TestT18FlagTransactionResponseShape(t *testing.T) {
-	f := seedFixtures(t)
-	txnID := T18FlagFreshTxn(t, f)
-
-	res, _, err := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: txnID,
+// t18Flag drives a single flag/unflag op through update_transactions and
+// returns the decoded response envelope.
+func t18Flag(t *testing.T, f *fixtures, txnID string, flagged bool, comment string) map[string]any {
+	t.Helper()
+	op := transactionOperationInput{TransactionID: txnID, Flagged: &flagged}
+	if comment != "" {
+		op.Comment = &comment
+	}
+	res, _, err := f.svc.handleUpdateTransactions(f.ctx, nil, updateTransactionsInput{
+		Operations: []transactionOperationInput{op},
 	})
-	out := decodeToolResult[map[string]any](t, "T18:flag_transaction", res, err)
-
-	requireKeys(t, "T18:flag_transaction", out, "transaction_id", "flagged")
-
-	if flagged, _ := out["flagged"].(bool); !flagged {
-		t.Errorf("T18:flag_transaction: flagged=%v, want true", out["flagged"])
-	}
-	if tid, _ := out["transaction_id"].(string); tid == "" {
-		t.Errorf("T18:flag_transaction: transaction_id is empty")
-	}
+	return decodeToolResult[map[string]any](t, "T18:update_transactions flag", res, err)
 }
 
-// TestT18FlagTransactionSideEffect asserts that flagging a transaction actually
-// sets flagged_at in the DB. A MCP wrapper that returned the success envelope
-// without calling the service would look correct in the tool response but fail
-// here when we read back the transaction.
-func TestT18FlagTransactionSideEffect(t *testing.T) {
+// TestT18FlagSetsFlaggedAt asserts that flagged:true via update_transactions
+// actually sets flagged_at in the DB.
+func TestT18FlagSetsFlaggedAt(t *testing.T) {
 	f := seedFixtures(t)
 	txnID := T18FlagFreshTxn(t, f)
 
-	// Confirm baseline: fresh transaction is unflagged.
 	before, err := f.svc.svc.GetTransaction(f.ctx, txnID)
 	if err != nil {
-		t.Fatalf("T18:side-effect: GetTransaction before: %v", err)
+		t.Fatalf("T18:flag: GetTransaction before: %v", err)
 	}
 	if before.FlaggedAt != nil {
-		t.Fatalf("T18:side-effect: fresh transaction FlaggedAt=%v, want nil", *before.FlaggedAt)
+		t.Fatalf("T18:flag: fresh transaction FlaggedAt=%v, want nil", *before.FlaggedAt)
 	}
 
-	flagRes, _, flagErr := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: txnID,
-	})
-	decodeToolResult[map[string]any](t, "T18:flag_transaction side-effect", flagRes, flagErr)
+	out := t18Flag(t, f, txnID, true, "")
+	requireKeys(t, "T18:flag", out, "results", "succeeded", "failed")
+	if succeeded, _ := out["succeeded"].(float64); succeeded != 1 {
+		t.Errorf("T18:flag: succeeded=%v, want 1", out["succeeded"])
+	}
 
 	after, err := f.svc.svc.GetTransaction(f.ctx, txnID)
 	if err != nil {
-		t.Fatalf("T18:side-effect: GetTransaction after: %v", err)
+		t.Fatalf("T18:flag: GetTransaction after: %v", err)
 	}
 	if after.FlaggedAt == nil {
-		t.Fatalf("T18:side-effect: FlaggedAt is nil after flag_transaction — wrapper likely dropped the service call")
+		t.Fatalf("T18:flag: FlaggedAt is nil after flagged:true — fold dropped the flag write")
 	}
 }
 
-// TestT18FlagTransactionWithReason ensures that passing a non-empty reason
-// persists it as a comment annotation on the transaction timeline. The flag
-// tool doc says "recorded as a comment annotation"; this test locks that the
-// MCP wrapper actually forwards the reason string to the service.
-func TestT18FlagTransactionWithReason(t *testing.T) {
+// TestT18FlagWithReason ensures a comment paired with flagged:true persists as
+// a comment annotation on the timeline (the fold's replacement for the old
+// flag `reason` field).
+func TestT18FlagWithReason(t *testing.T) {
 	f := seedFixtures(t)
 	txnID := T18FlagFreshTxn(t, f)
 
 	const reason = "T18: amount looks high for this merchant"
+	t18Flag(t, f, txnID, true, reason)
 
-	flagRes, _, flagErr := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: txnID,
-		Reason:        reason,
-	})
-	decodeToolResult[map[string]any](t, "T18:flag_with_reason", flagRes, flagErr)
-
-	// The reason should surface as a comment annotation on the timeline.
 	anns, err := f.svc.svc.ListAnnotations(f.ctx, txnID, service.ListAnnotationsParams{})
 	if err != nil {
 		t.Fatalf("T18:flag_with_reason: ListAnnotations: %v", err)
@@ -146,147 +121,67 @@ func TestT18FlagTransactionWithReason(t *testing.T) {
 	}
 }
 
-// TestT18UnflagTransactionResponseShape pins the unflag_transaction tool's JSON
-// envelope: required keys transaction_id and flagged=false must both be present.
-// Also locks the StructuredContent / TextContent parity contract.
-func TestT18UnflagTransactionResponseShape(t *testing.T) {
+// TestT18UnflagClearsFlaggedAt asserts flagged:false clears flagged_at.
+func TestT18UnflagClearsFlaggedAt(t *testing.T) {
 	f := seedFixtures(t)
 	txnID := T18FlagFreshTxn(t, f)
 
-	// Flag first so there is something to unflag.
-	flagRes, _, flagErr := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: txnID,
-	})
-	decodeToolResult[map[string]any](t, "T18:unflag setup flag", flagRes, flagErr)
-
-	res, _, err := f.svc.handleUnflagTransaction(f.ctx, nil, unflagTransactionInput{
-		TransactionID: txnID,
-	})
-	out := decodeToolResult[map[string]any](t, "T18:unflag_transaction", res, err)
-
-	requireKeys(t, "T18:unflag_transaction", out, "transaction_id", "flagged")
-
-	if flagged, _ := out["flagged"].(bool); flagged {
-		t.Errorf("T18:unflag_transaction: flagged=%v, want false", out["flagged"])
-	}
-	if tid, _ := out["transaction_id"].(string); tid == "" {
-		t.Errorf("T18:unflag_transaction: transaction_id is empty")
-	}
-}
-
-// TestT18UnflagTransactionSideEffect asserts that unflag_transaction actually
-// clears flagged_at in the DB. A wrapper that returned flagged=false without
-// calling the service would be silently broken.
-func TestT18UnflagTransactionSideEffect(t *testing.T) {
-	f := seedFixtures(t)
-	txnID := T18FlagFreshTxn(t, f)
-
-	// Seed a flag first via the tool handler.
-	flagRes, _, flagErr := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: txnID,
-	})
-	decodeToolResult[map[string]any](t, "T18:unflag side-effect: flag setup", flagRes, flagErr)
-
-	// Confirm it is now flagged in the DB.
+	t18Flag(t, f, txnID, true, "")
 	mid, err := f.svc.svc.GetTransaction(f.ctx, txnID)
 	if err != nil {
-		t.Fatalf("T18:unflag side-effect: GetTransaction mid: %v", err)
+		t.Fatalf("T18:unflag: GetTransaction mid: %v", err)
 	}
 	if mid.FlaggedAt == nil {
-		t.Fatalf("T18:unflag side-effect: FlaggedAt is nil after flag — seeding failed")
+		t.Fatalf("T18:unflag: FlaggedAt is nil after flag — seeding failed")
 	}
 
-	// Now unflag via the MCP tool handler.
-	unflagRes, _, unflagErr := f.svc.handleUnflagTransaction(f.ctx, nil, unflagTransactionInput{
-		TransactionID: txnID,
-	})
-	decodeToolResult[map[string]any](t, "T18:unflag side-effect", unflagRes, unflagErr)
-
+	t18Flag(t, f, txnID, false, "")
 	after, err := f.svc.svc.GetTransaction(f.ctx, txnID)
 	if err != nil {
-		t.Fatalf("T18:unflag side-effect: GetTransaction after: %v", err)
+		t.Fatalf("T18:unflag: GetTransaction after: %v", err)
 	}
 	if after.FlaggedAt != nil {
-		t.Errorf("T18:unflag side-effect: FlaggedAt=%v after unflag, want nil — wrapper likely dropped the service call", *after.FlaggedAt)
+		t.Errorf("T18:unflag: FlaggedAt=%v after flagged:false, want nil", *after.FlaggedAt)
 	}
 }
 
-// TestT18UnflagIdempotent asserts that unflagging an already-unflagged
-// transaction succeeds without error (the tool doc says "No-op if it isn't
-// flagged"). The response shape contract still holds.
+// TestT18UnflagIdempotent asserts flagged:false on a never-flagged row
+// succeeds without error.
 func TestT18UnflagIdempotent(t *testing.T) {
 	f := seedFixtures(t)
 	txnID := T18FlagFreshTxn(t, f)
 
-	// txnID is already unflagged — calling unflag must succeed.
-	res, _, err := f.svc.handleUnflagTransaction(f.ctx, nil, unflagTransactionInput{
-		TransactionID: txnID,
-	})
-	out := decodeToolResult[map[string]any](t, "T18:unflag_idempotent", res, err)
-	requireKeys(t, "T18:unflag_idempotent", out, "transaction_id", "flagged")
-}
-
-// TestT18FlagMissingTransactionID asserts that omitting transaction_id returns
-// the error envelope (IsError=true) rather than a 500 or a nil crash.
-func TestT18FlagMissingTransactionID(t *testing.T) {
-	f := seedFixtures(t)
-
-	res, _, _ := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: "",
-	})
-	if res == nil || !res.IsError {
-		t.Fatalf("T18:flag_missing_id: expected error envelope for empty transaction_id, got %+v", res)
+	out := t18Flag(t, f, txnID, false, "")
+	if succeeded, _ := out["succeeded"].(float64); succeeded != 1 {
+		t.Errorf("T18:unflag_idempotent: succeeded=%v, want 1", out["succeeded"])
 	}
 }
 
-// TestT18UnflagMissingTransactionID mirrors the same contract for the unflag
-// tool.
-func TestT18UnflagMissingTransactionID(t *testing.T) {
-	f := seedFixtures(t)
-
-	res, _, _ := f.svc.handleUnflagTransaction(f.ctx, nil, unflagTransactionInput{
-		TransactionID: "",
-	})
-	if res == nil || !res.IsError {
-		t.Fatalf("T18:unflag_missing_id: expected error envelope for empty transaction_id, got %+v", res)
-	}
-}
-
-// TestT18FlagNonexistentTransaction asserts that a syntactically valid but
-// non-existent ID returns the error envelope instead of a nil result or panic.
+// TestT18FlagNonexistentTransaction asserts that flagging an unknown id fails
+// that op (failed=1) rather than panicking or silently succeeding.
 func TestT18FlagNonexistentTransaction(t *testing.T) {
 	f := seedFixtures(t)
 
-	res, _, _ := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: "zzzzzzzz",
-	})
-	if res == nil || !res.IsError {
-		t.Fatalf("T18:flag_nonexistent: expected error envelope for unknown transaction, got %+v", res)
+	out := t18Flag(t, f, "zzzzzzzz", true, "")
+	if failed, _ := out["failed"].(float64); failed != 1 {
+		t.Errorf("T18:flag_nonexistent: failed=%v, want 1", out["failed"])
 	}
 }
 
 // TestT18QueryTransactionsFlaggedFilter exercises query_transactions with
-// flagged=true after seeding a flagged and an unflagged transaction. The
-// filter must return only the flagged row — locking that the flagged_at field
-// is actually populated and filterable by agents using the MCP tool.
+// flagged=true/false after flagging a fresh transaction via update_transactions.
 func TestT18QueryTransactionsFlaggedFilter(t *testing.T) {
 	f := seedFixtures(t)
 	txnID := T18FlagFreshTxn(t, f)
 
-	// Flag the fresh txn via the tool handler.
-	flagRes, _, flagErr := f.svc.handleFlagTransaction(f.ctx, nil, flagTransactionInput{
-		TransactionID: txnID,
-	})
-	decodeToolResult[map[string]any](t, "T18:query_flagged: flag setup", flagRes, flagErr)
+	t18Flag(t, f, txnID, true, "")
 
-	// Resolve the short_id so we can look for it in both result sets.
 	flaggedRecord, err := f.svc.svc.GetTransaction(f.ctx, txnID)
 	if err != nil {
 		t.Fatalf("T18:query_flagged: GetTransaction: %v", err)
 	}
 	flaggedShort := flaggedRecord.ShortID
 
-	// query_transactions(flagged=true) — must include our flagged txn.
 	tru := true
 	flaggedQRes, _, flaggedQErr := f.svc.handleQueryTransactions(f.ctx, nil, queryTransactionsInput{
 		Flagged: &tru,
@@ -311,7 +206,6 @@ func TestT18QueryTransactionsFlaggedFilter(t *testing.T) {
 		t.Errorf("T18:query_flagged: short_id %q not found in flagged=true result set", flaggedShort)
 	}
 
-	// query_transactions(flagged=false) — the flagged txn must NOT appear.
 	fls := false
 	unflaggedQRes, _, unflaggedQErr := f.svc.handleQueryTransactions(f.ctx, nil, queryTransactionsInput{
 		Flagged: &fls,

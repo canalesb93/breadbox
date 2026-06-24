@@ -123,6 +123,20 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			return
 		}
 
+		// Opening a report marks it as read — the same affordance as a
+		// message thread. Idempotent (MarkAgentReportRead no-ops once read),
+		// so a re-open never resets the timestamp. A failure here is
+		// non-fatal: the report still renders, just unread. Reflect the new
+		// state below so the header badge/toggle render as read on this load.
+		if report.ReadAt == nil {
+			if err := svc.MarkAgentReportRead(ctx, reportID); err != nil {
+				a.Logger.Error("mark agent report read on open", "id", reportID, "error", err)
+			} else {
+				now := time.Now().Format(time.RFC3339)
+				report.ReadAt = &now
+			}
+		}
+
 		t, _ := time.Parse(time.RFC3339, report.CreatedAt)
 		// Render the absolute created-at clock in the viewer's timezone
 		// (bb_tz cookie) rather than the server's — see UserLocation.

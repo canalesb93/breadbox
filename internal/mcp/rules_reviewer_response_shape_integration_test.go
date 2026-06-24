@@ -56,26 +56,38 @@ func TestReviewerCreateRuleAssignSeriesResponseShape(t *testing.T) {
 	reviewerFreshTxn(t, f, "txn_reviewer_nflx_2", "2026-02-16", 1499)
 
 	res, _, err := f.svc.handleCreateTransactionRule(f.ctx, nil, createTransactionRuleInput{
-		Name: "Netflix → series",
-		Conditions: map[string]any{
-			"field": "provider_name",
-			"op":    "contains",
-			"value": "netflix",
-		},
-		Actions: []map[string]any{{
-			"type":              "assign_series",
-			"series_name":       "Netflix",
-			"create_if_missing": true,
+		Rules: []ruleSpecInput{{
+			Name: "Netflix → series",
+			Conditions: map[string]any{
+				"field": "provider_name",
+				"op":    "contains",
+				"value": "netflix",
+			},
+			Actions: []map[string]any{{
+				"type":              "assign_series",
+				"series_name":       "Netflix",
+				"create_if_missing": true,
+			}},
+			ApplyRetroactively: true,
 		}},
-		ApplyRetroactively: true,
 	})
 	out := decodeToolResult[map[string]any](t, "reviewer:create_transaction_rule", res, err)
 
-	requireKeys(t, "reviewer:create_transaction_rule", out, "rule", "retroactive_matches")
-
-	rule, ok := out["rule"].(map[string]any)
+	// create_transaction_rule returns a batch envelope: {created, failed, rules:[{rule, retroactive_matches}], errors}.
+	requireKeys(t, "reviewer:create_transaction_rule", out, "created", "rules")
+	rulesArr, ok := out["rules"].([]any)
+	if !ok || len(rulesArr) == 0 {
+		t.Fatalf("reviewer:create_transaction_rule: rules is %T (len %d), want non-empty array", out["rules"], len(rulesArr))
+	}
+	entry, ok := rulesArr[0].(map[string]any)
 	if !ok {
-		t.Fatalf("reviewer:create_transaction_rule: rule is %T, want object", out["rule"])
+		t.Fatalf("reviewer:create_transaction_rule: rules[0] is %T, want object", rulesArr[0])
+	}
+	requireKeys(t, "reviewer:create_transaction_rule.rules[0]", entry, "rule", "retroactive_matches")
+
+	rule, ok := entry["rule"].(map[string]any)
+	if !ok {
+		t.Fatalf("reviewer:create_transaction_rule: rule is %T, want object", entry["rule"])
 	}
 	requireKeys(t, "reviewer:create_transaction_rule.rule", rule, "actions", "created_by_type")
 
@@ -94,7 +106,7 @@ func TestReviewerCreateRuleAssignSeriesResponseShape(t *testing.T) {
 	if found == nil {
 		t.Fatal("reviewer loop via MCP did not mint a Netflix series")
 	}
-	if matches, _ := out["retroactive_matches"].(float64); matches < 2 {
-		t.Errorf("retroactive_matches = %v, want >= 2", out["retroactive_matches"])
+	if matches, _ := entry["retroactive_matches"].(float64); matches < 2 {
+		t.Errorf("retroactive_matches = %v, want >= 2", entry["retroactive_matches"])
 	}
 }

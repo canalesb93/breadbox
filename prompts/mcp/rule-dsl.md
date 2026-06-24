@@ -127,7 +127,7 @@ Rules replace the old recurring-charge detector. Express a subscription/recurrin
 - `add_tag` / `remove_tag` — tag auto-created on add; slug must match `^[a-z0-9][a-z0-9\-:]*[a-z0-9]$`. Same-slug add+remove in one pass cancels (net-diff).
 - `add_comment` — sync-only; retroactive apply does not materialize comments.
 - `set_metadata` / `remove_metadata` — write/clear a key on the transaction's metadata blob. `metadata_value` is any JSON value.
-- `flag` / `unflag` — set/clear the transaction's flag (mirrors the `flag_transaction` tool, sans reason).
+- `flag` / `unflag` — set/clear the transaction's flag (the same flag `update_transactions` writes via `flagged: true|false`, sans reason).
 - `assign_series` — **surrogate-first**: provide **exactly one** of `series_short_id` (existing series) OR `series_name` + `create_if_missing: true` (resolve-or-mint a thin series by name). There is **no `merchant_key`** — the legacy key is accepted only as a back-compat alias for `series_name`. Link-and-rollup only; never steals a charge already in another series; honors sticky-reject.
 - `assign_counterparty` — bind matching transactions to a **counterparty** (the other side of the transaction — merchants AND non-merchants: Venmo recipients, people, employers, landlords). Provide **exactly one** of `counterparty_short_id` (an existing counterparty) OR `counterparty_name` + `create_if_missing: true`. Default is **assign-to-existing**: a counterparty is **never** auto-created unless `create_if_missing` is set. By-name is a **resolve-or-create** that de-dupes on the live name (unlike series there is no UNIQUE on name) — so **reuse an existing counterparty across providers** (look one up first) rather than minting a duplicate. Link-only (NULL-fill).
 
@@ -164,10 +164,9 @@ Rules evaluate in `priority ASC, created_at ASC` — **lower stage runs first**.
 
 ## Authoring checklist
 
-1. Read `breadbox://rules` to avoid duplicates.
-2. `preview_rule` your conditions to verify match count and a sample.
+1. Read `list_transaction_rules` to avoid duplicates.
+2. `preview_rule` your conditions to verify match count and review a sample of matched transactions.
 3. Condition on immutable fields (raw provider fields, date-parts, `amount`).
 4. Pick the right `stage` so rules compose predictably.
 5. Use `category_slug` (never `category_id`); prefer `contains` / `approx` over exact match — feeds format names and amounts inconsistently.
-6. Use `batch_create_rules` (max 100) to land related rules in one call.
-</content>
+6. Use `create_transaction_rule` with a `rules` array (max 100) to land related rules in one call.

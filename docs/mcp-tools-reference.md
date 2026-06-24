@@ -50,10 +50,7 @@ Query transactions with composable filters and cursor pagination.
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps`. Omitted → `core,category` (lean default); `all` → every field. `id` always included. |
 | `cursor` | string | Pagination cursor |
 | `limit` | int | Results per page (default 50, max 500) |
-
-### count_transactions (Read)
-
-Count transactions matching filters. Same filter parameters as `query_transactions`. Returns count only — use before paginating large result sets.
+| `count_only` | bool | When true, return just `{ "count": N }` for the same filters — no rows, no pagination. `cursor`/`limit`/`sort_*`/`fields` ignored. Use before paginating large result sets, or to compare counts across ranges. |
 
 ### transaction_summary (Read)
 
@@ -70,27 +67,52 @@ Aggregated spending totals. Default date range: 30 days.
 
 ---
 
-## Account & Status Tools
+## Reference Data Tools
+
+> MCP resources were retired — these are plain tools (the only way to read this data).
+
+### get_overview (Read)
+
+Household snapshot: scope (users, accounts, currencies), freshness (latest sync, errored connections, recent transactions), pending-review backlog. Read once at the top of a session to ground later filters.
 
 ### list_accounts (Read)
 
-List all bank accounts across all connections. Returns account name, type, balances, connection info.
-
-### list_users (Read)
-
-List all family members in the household.
-
-### get_sync_status (Read)
-
-Get sync status for all connections — last sync time, status, errors.
+Bank accounts with name, type, balances, currency, and connection. Optional `user_id` filter scopes to one household member.
 
 ### list_categories (Read)
 
-List all categories in the 2-level hierarchy. Returns slug, display name, parent, icon, color.
+The 2-level category taxonomy (slug, display name, parent, icon, color). Use the slugs as the canonical `category_slug` handle on filters and writes.
 
-### export_categories (Read)
+### list_users (Read)
 
-Export the full category tree as TSV. Useful for backup or transfer.
+Household members with role and `short_id` (the `short_id` is the `user_id` on filters).
+
+### list_tags (Read)
+
+The registered tag vocabulary (slugs). New slugs auto-register when `update_transactions` adds them.
+
+### get_sync_status (Read)
+
+Per-connection sync status (provider, `active`|`error`|`pending_reauth`|`disconnected`), last-sync time, last error. Check before trusting freshness.
+
+### list_transaction_rules (Read)
+
+The transaction-rule roster. Filter by `category_slug`, `enabled`, or name `search`. Lean `summary` projection by default (no conditions/actions trees); `fields=all` for full definitions. For trigger/creator/hit-count filters or sorting, use `query_transaction_rules`.
+
+### get_reference (Read)
+
+Read an operating-guidance doc by `kind` — the near-static markdown that explains how to drive the server (formerly `breadbox://` markdown resources). Returns markdown.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `kind` | string | **Required.** One of `instructions`, `rule-dsl`, `review-guidelines`, `report-format`. |
+
+- `instructions` — data model + conventions overview.
+- `rule-dsl` — the transaction-rule condition grammar, action types, pipeline-stage ordering, sync-vs-retroactive semantics. Read before authoring rules.
+- `review-guidelines` — principles for reviewing transactions and creating rules. Read before working the needs-review queue.
+- `report-format` — structure + formatting conventions for `submit_report`.
+
+`instructions` / `review-guidelines` / `report-format` reflect operator customization (`app_config`); `rule-dsl` is the fixed grammar.
 
 ### list_workflows (Read)
 
@@ -152,7 +174,7 @@ Import categories from TSV format. Creates or updates categories.
 
 ### list_tags (Read)
 
-List all registered tags.
+The tag vocabulary — see **Reference Data Tools → `list_tags`** above.
 
 ### add_transaction_tag (Write)
 
@@ -176,7 +198,7 @@ Remove a tag from a transaction. An optional `note` lands on the `tag_removed` a
 
 ### update_transactions (Write)
 
-Compound batch write — set category, add tags, remove tags, and attach a comment per transaction in a single atomic call. Max 50 operations per request.
+Compound batch write — set category, add tags, remove tags, attach a comment, and flag/unflag per transaction in a single atomic call. Max 50 operations per request.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -191,7 +213,8 @@ Each operation:
 | `category_slug` | string | Optional category to set (writes `category_id`; last-writer-wins, no provenance). |
 | `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates tags if the slug is new. |
 | `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional — if provided, lands on the `tag_removed` annotation. |
-| `comment` | string | Optional comment annotation. |
+| `comment` | string | Optional comment annotation. When flagging, put the flag reason here. |
+| `flagged` | bool | Optional. `true` flags the transaction for human attention (sets `flagged_at`); `false` clears the flag. Omit to leave it untouched. Retrieve flagged rows with `query_transactions(flagged=true)`. Folds the former `flag_transaction` / `unflag_transaction` tools. |
 
 Use this to close a review entry: `set category + remove needs-review (with note) + comment` in one call.
 
@@ -258,7 +281,7 @@ Link transactions to a recurring series, creating it if needed — the agent's p
 
 ### update_series (Write)
 
-Edit a recurring series' `name` and/or `type` (`subscription` | `bill` | `loan` | `other`). Both optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key).
+Edit a recurring series in one call: its `name`, `type` (`subscription` | `bill` | `loan` | `other`), and tag membership (`tags_to_add` / `tags_to_remove`). Every field optional — omit to leave unchanged. Renaming onto an existing live series name is rejected (the name is the series' unique mint key). Tags must already exist (`create_tag`); an added tag is materialized onto every linked charge and applied to future members, a removed tag strips the series-inherited copies (a tag a user added directly to a charge survives).
 
 ### unlink_series_transactions (Write)
 
@@ -276,11 +299,7 @@ List every live counterparty with its `name` and enrichment fields. Get a counte
 
 ### get_counterparty (Read)
 
-Get one counterparty by short ID or UUID: its `name` and enrichment fields. Its governing rules (the `assign_counterparty` rules that define its membership) are visible on the admin Counterparties detail page; its linked charges come from `query_transactions`. Also exposed as the `breadbox://counterparty/{short_id}` resource (detail + governing rules).
-
-### create_counterparty (Write)
-
-Create a new counterparty with a `name` and optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`). Creating onto an existing live name is rejected — edit that one instead. To bind charges, use `assign_counterparty` (one-off) or author an `assign_counterparty` **rule** (durable).
+Get one counterparty by short ID or UUID: its `name` and enrichment fields. Its governing rules (the `assign_counterparty` rules that define its membership) are visible on the admin Counterparties detail page; its linked charges come from `query_transactions`.
 
 ### update_counterparty (Write)
 
@@ -288,11 +307,13 @@ Enrich a counterparty: edit its `name`, `website_url`, `logo_url`, `category_id`
 
 ### assign_counterparty (Write)
 
-Bind transactions to a counterparty, creating it if needed — a **one-off** assignment. For durable patterns, author an `assign_counterparty` **rule** so every future matching charge resolves automatically. Provide `counterparty_id` to bind to an existing counterparty, **or** `name` + `create_if_missing:true` to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Pass `transaction_ids` (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).
+Bind transactions to a counterparty, minting it if needed — a **one-off** assignment. For durable patterns, author an `assign_counterparty` **rule** so every future matching charge resolves automatically. Provide `counterparty_id` to bind to an existing counterparty, **or** `name` + `create_if_missing:true` to resolve-or-create one by name (surrogate-first; de-dupes on the live name). Mint a **bare** counterparty by passing `name` + `create_if_missing` with no `transaction_ids`; pass `fail_if_exists:true` for a strict "make a brand-new one" intent. Optional enrichment (`website_url`, `logo_url`, `category_id`, `mcc`) is applied to the resolved/minted counterparty in the same call. Pass `transaction_ids` (≤50) to link members (NULL-fill only — never steals a charge already bound elsewhere).
 
-### unlink_counterparty_transaction (Write)
+### unlink_counterparty_transactions (Write)
 
 Detach `transaction_ids` (≤50, each a current member) from a counterparty — the inverse of `assign_counterparty`' link path. Clears each charge's `counterparty_id`. Errors if any listed transaction isn't a current member, so it can't silently no-op or touch another counterparty.
+
+> Counterparty **creation** folds into `assign_counterparty` (`name` + `create_if_missing`, optional `fail_if_exists` + enrichment) — there is no standalone `create_counterparty` tool.
 
 ---
 
@@ -304,33 +325,31 @@ The tools below are thin API skins over the DSL — the DSL doc is the source of
 
 ### create_transaction_rule (Write)
 
-Create a rule that fires during sync. Actions compose (`set_category` + `add_tag` + `set_metadata` in a single rule are all valid).
+Create one or more rules that fire during sync. Pass `rules`: an array of 1..100 rule specs (a single rule is a one-element array). Authoring a chained pipeline in one call orders rules by stage so earlier-stage tag/category writes feed later-stage conditions. Actions compose within a rule (`set_category` + `add_tag` + `set_metadata` + `add_comment` are all valid). (Folds the former `batch_create_rules`.)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
+| `rules` | array | **Required.** 1..100 rule specs (fields below). |
+
+Each rule spec:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `name` | string | Human-readable rule name |
 | `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. Numeric fields (incl. `amount`) add `approx` (`value` + sibling `tolerance`) and `between` (sibling `min`/`max`). Date-part fields derived from the tz-naive `date` — `day_of_month`, `month`, `day_of_week` (`0`=Sun), `day_of_year` — are numeric; `day_of_month approx` is cyclic + clamped (31 matches Feb's last day). Encode annual cadence as `month` + `day_of_month` (leap-robust), not `day_of_year`. Leaf fields also include `metadata.<key>` to read a key from the free-form metadata blob (ops: `eq`/`neq`/`contains`/`not_contains`/`matches`/`in`/`gt`/`gte`/`lt`/`lte`/`exists`/`not_exists`; an absent key matches only `not_exists`). Full grammar: `docs/rule-dsl.md`. |
 | `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`, `set_metadata` (`metadata_key` + `metadata_value`, any JSON), `remove_metadata` (`metadata_key`), `assign_series`, `flag` (no params — sets `flagged_at`, surfacing the txn for attention), `unflag` (no params — clears `flagged_at`). Either this or `category_slug` is required. |
 | `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
 | `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
 | `stage` | string | **Preferred.** Semantic pipeline stage: `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
-| `priority` | int | Raw pipeline-stage integer, 0–1000. Use for fine-grained slotting within a stage. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard) if neither is provided. |
-| `enabled` | bool | Default true |
+| `priority` | int | Raw pipeline-stage integer, 0–1000. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard). |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
 | `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag` / `set_metadata` / `remove_metadata` / `assign_series` / `flag` / `unflag`; `add_comment` is sync-only) |
 
+Returns `{ created, failed, rules: [{rule, retroactive_matches?}], errors }` so a partial batch is recoverable.
+
 ### list_transaction_rules (Read)
 
-List rules with optional filters and cursor pagination. **Lean by default** (`fields` omitted → `summary` projection): each row carries `name`, `enabled`, `priority`, `trigger`, `category_slug` / `category_display_name`, `hit_count`, `last_hit_at`, `created_by_type` — the roster view, **without** the `conditions` / `actions` trees. Pass `fields=all` to inspect or audit full rule definitions. Mirror of `breadbox://rules` (which always returns full).
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `search` | string | Substring / words / fuzzy search on rule name |
-| `category_slug` | string | Filter by target category |
-| `enabled` | bool | Filter by enabled status |
-| `fields` | string | Field selection. Alias: `summary` (default). `all` → full definition incl. `conditions`/`actions`. |
-| `cursor` | string | Pagination cursor |
-| `limit` | int | Results per page (default 50, max 500) |
+The rule roster — see **Reference Data Tools → `list_transaction_rules`** above. For filtered/sorted analysis use `query_transaction_rules` below.
 
 ### query_transaction_rules (Read)
 
@@ -388,9 +407,9 @@ The **inverse of `preview_rule`**: evaluates the full active rule set against a 
 
 Response: `{ matched_count, rules: [{ short_id, name, sets_category, trigger, priority, hit_count, match_all }] }`. A rule with `sets_category` already handling the merchant means **don't** create a duplicate. `match_all=true` flags conditionless rules (e.g. the seeded `needs-review` tagger) that match everything — not merchant coverage.
 
-### batch_create_rules (Write)
+### create_transaction_rule — chained pipeline example
 
-Create multiple rules in one call. Ideal for composable pipelines — use `stage` (preferred) or raw `priority` on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` resolves to priority `0 / 10 / 50 / 100`; if both `stage` and `priority` are supplied on an item, `priority` wins. Returns per-item success + errors.
+`create_transaction_rule` takes a `rules` array, so a composable pipeline lands in one call — use `stage` (preferred) or raw `priority` on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. Returns per-item success + errors.
 
 Example pipeline (3 rules that chain):
 
@@ -511,12 +530,7 @@ Trigger a manual sync for all active connections.
 
 ## Resources
 
-In addition to tools, Breadbox exposes three MCP resources that provide passive context:
+Breadbox exposes **no MCP resources** — they were retired entirely (invisible on clients that can't `resources/list`). Everything is a tool:
 
-| URI | Description |
-|-----|-------------|
-| `breadbox://overview` | Live dataset summary (users, accounts, spending, pending transactions) |
-| `breadbox://review-guidelines` | Guidelines for reviewing transactions and creating rules |
-| `breadbox://report-format` | Report structure templates and formatting guidelines |
-
-Agents should read `breadbox://overview` at the start of a session for ambient context about the household's financial data.
+- Ambient context: call `get_overview` at the start of a session.
+- Operating-guidance docs (formerly `breadbox://` markdown resources): `get_reference(kind=instructions|rule-dsl|review-guidelines|report-format)`.

@@ -68,9 +68,9 @@ const dependentExclusionWhere = `
 	))
 `
 
-// GetOverviewStats returns the lightweight dataset overview served via
-// `breadbox://overview`. Detail consumers (per-connection sync, per-account
-// balances, full user/tag/category lists) read the dedicated resources.
+// GetOverviewStats returns the lightweight dataset overview served by the
+// get_overview MCP tool. Detail consumers (per-connection sync, per-account
+// balances, full user/tag/category lists) call the dedicated read tools.
 func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) {
 	stats := &OverviewStats{}
 

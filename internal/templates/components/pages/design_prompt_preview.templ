@@ -91,8 +91,8 @@ func designPromptPreviewSample() string {
 		"## Objective\n\n" +
 		"Shrink the `needs-review` queue as much as possible in one pass. Confidently categorize the clear-cut transactions and clear their `needs-review` tag; leave only the genuinely ambiguous ones tagged for a human.\n\n" +
 		"## Step by step\n\n" +
-		"1. Read `breadbox://overview` for context (accounts, users, currency).\n" +
-		"2. `count_transactions{tags:[\"needs-review\"]}` to size the backlog up front.\n" +
+		"1. Call `get_overview` for context (accounts, users, currency).\n" +
+		"2. `query_transactions{tags:[\"needs-review\"], count_only:true}` to size the backlog up front.\n" +
 		"3. Work in batches. `query_transactions` the largest raw-category groups together.\n" +
 		"4. For each transaction, decide the category from its name, merchant, amount, and raw category fields.\n" +
 		"5. Apply decisions in large compound writes — `update_transactions` (max 50 per call).\n\n" +

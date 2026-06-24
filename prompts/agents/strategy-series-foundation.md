@@ -16,13 +16,13 @@ A series is a charge that repeats on a cadence: a streaming subscription, a util
 
 ## Steps
 
-1. Read `breadbox://overview` for context. `list_series` to see what already exists — improve coverage and fill gaps, never duplicate a series or its rule. `list_transaction_rules` (or `query_transaction_rules`) to see existing `assign_series` rules.
+1. Read `get_overview` for context. `list_series` to see what already exists — improve coverage and fill gaps, never duplicate a series or its rule. `list_transaction_rules` (or `query_transaction_rules`) to see existing `assign_series` rules.
 2. **Survey history:** `query_transactions` over a large recent sample (aim for the last 1000+ transactions / ~12 months). Look for clusters of same-payee charges at a near-constant amount on a regular day. `transaction_summary` and sorting by merchant help the repeats surface.
 3. **Identify series candidates.** A good candidate has STRONG, REPEATED evidence — the same payee at a stable amount on a regular cadence across **3+ occurrences**. Note its typical amount, its tolerance (how much it varies), and its day-of-month (or month + day for annual charges).
 4. **Author each as an `assign_series` rule on raw fields** — the recurrence idiom from the rules curriculum: `amount approx <value> ± <tolerance>` ANDed with `day_of_month approx <day> ± <tolerance>` (use `month` + `day_of_month` for annual charges, never `day_of_year`). Anchor on the payee (`provider_merchant_name contains "…"`) when the amount alone is ambiguous. Target `assign_series` with `create_if_missing: true` so the series is minted on first match.
 5. **Dry-run EVERY candidate before creating it:** `preview_rule` reports how many transactions it would match and surfaces a sample. `find_matching_rules` confirms no existing rule already covers it. Only proceed with rules whose preview is clean and precise — discard anything that over-matches (catches one-off purchases), duplicates an existing rule, or matches zero rows.
-6. **Create the vetted rules** (`create_transaction_rule`, or `batch_create_rules` for several at once).
-7. **Set each series' type** with `set_series_type` — `subscription`, `bill`, `loan`, or `other` — so the Recurring page reads cleanly.
+6. **Create the vetted rules** with `create_transaction_rule` — pass a `rules` array to author several at once.
+7. **Give each series a type** (`subscription`, `bill`, `loan`, or `other`) with `update_series` so the Recurring page reads cleanly. (You can also pass `type` when minting via the `assign_series` tool.)
 8. **Backfill carefully:** for rules you are confident in, use `apply_rules` to link the matching history into its series. A clean dry run is the prerequisite.
 9. **Submit a report** listing each series created (its rule's conditions, typical amount + cadence, type, and match count) and what was backfilled.
 

@@ -16,12 +16,12 @@ The **other side** of a transaction — and not just merchants. A counterparty c
 
 ## Steps
 
-1. Read `breadbox://overview` for context. `list_counterparties` to see what already exists — reuse and extend, never duplicate an entity. `list_categories` for the enrichment taxonomy.
+1. Read `get_overview` for context. `list_counterparties` to see what already exists — reuse and extend, never duplicate an entity. `list_categories` for the enrichment taxonomy.
 2. **Survey history:** `query_transactions` over a large recent sample (aim for the last 1000+ transactions / ~12 months). Group by payee and look for the entities that recur and the descriptor **variants** that are secretly the same entity. `transaction_summary` helps the high-volume payees surface.
 3. **Identify counterparty candidates.** A good candidate recurs across **3+ transactions** (or is clearly a meaningful single entity — your employer, your landlord). For each, collect every raw-descriptor variant that maps to it.
 4. **Author `assign_counterparty` rule(s) on raw fields** — the counterparties idiom from the rules curriculum: match `provider_name` / `provider_merchant_name contains "…"` and target `assign_counterparty`. **Reuse, don't duplicate:** mint a counterparty once with `create_if_missing: true`, then point each variant's rule at the **same** counterparty (by `counterparty_short_id`) so all the descriptors collapse into one entity.
 5. **Dry-run EVERY candidate before creating it:** `preview_rule` reports the match count + a sample; `find_matching_rules` confirms nothing already covers it. Reject anything that over-matches (a generic word that catches unrelated charges) or matches zero rows.
-6. **Create the vetted rules** (`create_transaction_rule`, or `batch_create_rules`).
+6. **Create the vetted rules** with `create_transaction_rule` — pass a `rules` array to author several at once.
 7. **Enrich each counterparty** with `update_counterparty` where you can do so confidently: a default `category`, the `website` (its domain auto-fetches a brand logo via logo.dev when logos are enabled), and the `mcc` if known. Enrich only what you're sure of — leave fields blank rather than guess.
 8. **Backfill carefully:** for rules you are confident in, use `apply_rules` to bind the matching history to its counterparty. A clean dry run is the prerequisite.
 9. **Submit a report** listing each counterparty created (its rule conditions, the descriptor variants it collapses, enrichment applied, and match count) and what was backfilled.

@@ -12,7 +12,7 @@ Help the family understand where their money went, how spending changed, and whe
 
 ## Steps
 
-1. Read `breadbox://overview` for context (accounts, users, date range, data freshness).
+1. Call `get_overview` for context (accounts, users, date range, data freshness).
 2. Use `transaction_summary` with `group_by=category` for the target period (default: last 30 days).
 3. Use `transaction_summary` with `group_by=category_month` to compare against the prior period.
 4. Query notable individual transactions if anything stands out (`query_transactions` with `fields=core,category`); scan that sample for merchants that recur or for unusually large charges.

@@ -25,7 +25,7 @@ RULE CREATION:
 - Fields: provider_name, provider_merchant_name, amount, provider_category_primary (raw provider category), provider_category_detailed, pending, provider, account_id, user_id, user_name
 
 BEFORE CREATING A RULE:
-1. Read breadbox://rules to avoid duplicates
+1. Read list_transaction_rules to avoid duplicates
 2. Use preview_rule to test your conditions — verify match count and review sample transactions
 3. Query some transactions with fields=core,category to see what provider_category_primary values exist
 
@@ -49,9 +49,9 @@ RULE PIPELINE STAGES & CONFLICTS:
 - Rules fire in priority-ASC order during sync (lower priority runs first; later stages observe earlier-stage tag/category mutations).
 - Pass `stage` (not raw `priority`) when authoring rules — `baseline` (broad defaults) → `standard` (default) → `refinement` (reacts to earlier stages) → `override` (last word). Stage resolves to priority 0/10/50/100. If both are supplied, raw priority wins.
 - Recommended mapping by pattern: `provider_category_primary` rules → `baseline` or `standard`; name-pattern rules (`contains` on `provider_name`) → `standard`; per-merchant rules → `refinement` or `override`.
-- Check breadbox://rules before creating. If two rules can match the same transaction, the higher-stage one wins under last-writer semantics.
+- Check list_transaction_rules before creating. If two rules can match the same transaction, the higher-stage one wins under last-writer semantics.
 
-Use batch_create_rules (max 100) to create multiple rules efficiently.
+Use `create_transaction_rule` with a `rules` array (max 100) to create multiple rules in one call.
 Prefer contains over exact match — bank feeds format merchant names inconsistently.
 Always use category_slug (not category_id) when creating rules.
 

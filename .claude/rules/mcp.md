@@ -67,9 +67,9 @@ Good descriptions are load-bearing — they're the only documentation agents see
 
 `MCPServerConfig.Instructions` is domain-rich onboarding: data model overview, amount conventions, category system, recommended query patterns. Templates in `internal/mcp/templates.go` (`spend_review`, `monthly_analysis`, `reporting`) are presets users can load and edit. User-edited text stored as `mcp_custom_instructions` in `app_config`.
 
-## Resource
+## No MCP resources
 
-`breadbox://overview` returns live stats: users, accounts by type, connections with counts, 30-day spending summary with top 5 categories, pending transaction count.
+The `resources/*` surface (and resource templates) was retired entirely — it was invisible on clients that can't `resources/list` (e.g. Claude.ai), so everything is a tool. Don't re-add `AddResource` / `AddResourceTemplate`; add a read tool instead. See "Reference data" and "Guidance docs" below.
 
 ## Permissions admin page
 
@@ -81,25 +81,35 @@ The "review queue" is just transactions tagged `needs-review`. A seeded system r
 
 Agents follow a uniform loop: `query_transactions(tags=["needs-review"])` to find work, `update_transactions(operations=[…])` to set category + remove the tag (and pair the change with a `comment` for the audit trail) atomically per transaction. Max 50 ops per call.
 
-`update_transactions` is the universal per-row write — tag adds, tag removes, category sets, category resets (`reset_category: true`), and comments all flow through it. The bare-row and bulk variants (`add_transaction_tag`, `remove_transaction_tag`, `categorize_transaction`, `reset_transaction_category`, `add_transaction_comment`, `bulk_recategorize`, `batch_categorize_transactions`) were collapsed into it during the MCP overhaul.
+`update_transactions` is the universal per-row write — tag adds, tag removes, category sets, category resets (`reset_category: true`), comments, and flag/unflag (`flagged: true|false`) all flow through it. The bare-row and bulk variants (`add_transaction_tag`, `remove_transaction_tag`, `categorize_transaction`, `reset_transaction_category`, `add_transaction_comment`, `bulk_recategorize`, `batch_categorize_transactions`, and the standalone `flag_transaction` / `unflag_transaction`) were collapsed into it.
 
 Annotations are read via `list_annotations`. Tag *vocabulary* admin (introducing, renaming, deleting tag definitions) goes through `create_tag`, `update_tag`, `delete_tag`.
 
-## Reference data: dual surface (resources + tool mirrors)
+## Consolidated write tools
 
-Bounded reference data is exposed two ways:
+Several writes are deliberately compound so the registry stays small and an agent reaches for one obvious tool per entity:
 
-- **Resources (preferred)** — `breadbox://overview`, `://accounts`, `://categories`, `://tags`, `://users`, `://rules`, `://sync-status`. Surfaced in Claude.ai's paperclip menu and the Inspector resource picker. Application-driven, user-controlled.
-- **Tool mirrors (compat)** — `get_overview`, `list_accounts`, `list_categories`, `list_tags`, `list_users`, `list_transaction_rules`, `get_sync_status`. Same payload, called as tools. Kept because not every MCP client implements the resources/* methods — without these, those clients can't read this data at all.
+- `update_transactions` — see above (category, tags, comment, flag).
+- `set_transaction_metadata` — the single op over the free-form metadata JSONB column: `set` (merge keys), `unset` (delete keys), `replace:true` (swap/clear the whole blob). Absorbed `remove_`/`replace_`/`clear_transaction_metadata`.
+- `create_transaction_rule` — takes a `rules` array of 1..N specs (absorbed `batch_create_rules`); each spec may carry `apply_retroactively`.
+- `update_series` — edits a recurring series' `name`, `type`, and tag membership via `tags_to_add` / `tags_to_remove` (absorbed `add_series_tag` / `remove_series_tag`). Each tag sub-change still calls the same service method, so inheritance/provenance is unchanged.
+- `assign_counterparty` — mints-or-resolves a counterparty by name and links transactions; absorbed `create_counterparty` via `create_if_missing` (+ optional `fail_if_exists` for strict create) plus inline enrichment (`website_url` / `logo_url` / `category_id` / `mcc`). Mint a bare counterparty by passing `name` + `create_if_missing` with no `transaction_ids`.
 
-Both surfaces share the same service-layer call path (no logic duplication), so payload shape stays in sync. When adding a new bounded reference resource, register both: a resource handler in `resources.go` and a tool mirror in `tools_reads.go`.
+The series + counterparty subsystems (rules-as-substrate) otherwise mirror each other: `list_*` / `get_*` reads, `assign_*` (mints + links), `update_*` (edits), `unlink_*_transactions`. Membership for both comes from rules, not a shipped detector — don't add per-attribute write tools; fold into `update_*` or `assign_*`.
 
-## Resource templates (drill-downs)
+When folding a tool, prefer reusing the existing service methods from the compound handler over re-implementing the write — the MCP layer is where the consolidation lives.
 
-Per-entity detail views are exposed as MCP resource templates registered with `Server.AddResourceTemplate`:
+## Reference data: one tool per dataset
 
-- `breadbox://transaction/{short_id}` — `{transaction, annotations}`
-- `breadbox://account/{short_id}` — `{account, recent_transactions}` (capped at 25)
-- `breadbox://user/{short_id}` — `{user, accounts}`
+Bounded reference data is read through dedicated tools, handlers in `tools_reads.go`:
 
-Template handlers parse the trailing `{short_id}` via `extractTemplateParam`, resolve through the standard service `Get*` methods (which accept either UUID or short_id), and return `mcpsdk.ResourceNotFoundError(uri)` on miss. URIs come back to chat as clickable items via `resource_link` content blocks emitted by tools (planned in a follow-up PR).
+- `get_overview` (`handleGetOverview`)
+- `list_accounts` (`handleListAccounts`; optional `user_id`)
+- `list_categories`, `list_tags`, `list_users`, `get_sync_status`
+- `list_transaction_rules` (`handleListTransactionRules`; lean `summary` by default, `fields=all` for full). Filtered/sorted rule analysis lives in `query_transaction_rules`.
+
+To add a new reference dataset, register a new read tool here — there's no resource counterpart to keep in sync anymore.
+
+## Guidance docs: `get_reference(kind=…)`
+
+The near-static markdown that teaches an agent how to drive the server — formerly `breadbox://` markdown resources — is served by the `get_reference` tool (`handleGetReference` in `tools_reads.go`). `kind` ∈ `instructions` | `rule-dsl` | `review-guidelines` | `report-format`; it returns a markdown text block. `instructions` / `review-guidelines` / `report-format` honor the operator's `app_config` overrides (falling back to the embedded `prompts/mcp/*.md` defaults via the `Default*` vars in `server.go`); `rule-dsl` is the fixed grammar. Per-entity drilldowns (transaction + annotations, account + recent txns, user + accounts) are no longer a single call — reconstruct them from `query_transactions` + `list_annotations` / `list_accounts`.
