@@ -59,32 +59,43 @@ SELECT a.*,
   bc.short_id AS connection_short_id,
   bc.institution_name,
   u.short_id AS user_short_id,
-  bc.status as connection_status
+  bc.status as connection_status,
+  ow.short_id AS owner_user_short_id,
+  ow.name AS owner_user_name
 FROM accounts a
 LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 LEFT JOIN users u ON u.id = bc.user_id
+LEFT JOIN users ow ON ow.id = a.owner_user_id
 ORDER BY bc.institution_name, a.name;
 
 -- name: ListAccountsByUser :many
+-- Effective-owner filter: an account belongs to a user when its per-account
+-- owner override (if set) or, failing that, the connection owner matches.
 SELECT a.*,
   bc.short_id AS connection_short_id,
   bc.institution_name,
   u.short_id AS user_short_id,
-  bc.status as connection_status
+  bc.status as connection_status,
+  ow.short_id AS owner_user_short_id,
+  ow.name AS owner_user_name
 FROM accounts a
-JOIN bank_connections bc ON a.connection_id = bc.id
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 LEFT JOIN users u ON u.id = bc.user_id
-WHERE bc.user_id = $1 ORDER BY bc.institution_name, a.name;
+LEFT JOIN users ow ON ow.id = a.owner_user_id
+WHERE COALESCE(a.owner_user_id, bc.user_id) = $1 ORDER BY bc.institution_name, a.name;
 
 -- name: GetAccount :one
 SELECT a.*,
   bc.short_id AS connection_short_id,
   bc.institution_name,
   u.short_id AS user_short_id,
-  bc.status as connection_status
+  bc.status as connection_status,
+  ow.short_id AS owner_user_short_id,
+  ow.name AS owner_user_name
 FROM accounts a
 LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 LEFT JOIN users u ON u.id = bc.user_id
+LEFT JOIN users ow ON ow.id = a.owner_user_id
 WHERE a.id = $1;
 
 -- name: UpdateAccountDisplayName :one
@@ -93,6 +104,12 @@ WHERE id = $1 RETURNING *;
 
 -- name: UpdateAccountExcluded :one
 UPDATE accounts SET excluded = $2, updated_at = NOW()
+WHERE id = $1 RETURNING *;
+
+-- name: UpdateAccountOwner :one
+-- Sets (or clears, when $2 IS NULL) the per-account owner override. NULL means
+-- the account inherits its bank connection's owner.
+UPDATE accounts SET owner_user_id = $2, updated_at = NOW()
 WHERE id = $1 RETURNING *;
 
 -- name: ListExcludedAccountIDsByConnection :many

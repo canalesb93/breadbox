@@ -362,6 +362,7 @@ The `(provider, external_id)` unique constraint prevents duplicate connections f
 | `display_name` | `TEXT` | Yes | `NULL` | Optional user-assigned display name. Templates use `COALESCE(display_name, name)` for rendering. Added in Phase 10. |
 | `excluded` | `BOOLEAN` | No | `FALSE` | When `TRUE`, transaction upsert is skipped during sync (balances still refresh). Useful for accounts the user wants to track balances on but not import transactions from. Added in Phase 10. |
 | `last_balance_update` | `TIMESTAMPTZ` | Yes | `NULL` | When the balance columns were last refreshed from the provider. Set after each successful `/accounts/get` call. |
+| `owner_user_id` | `UUID` | Yes | `NULL` | Per-account owner override. FK to `users.id`, SET NULL on delete. `NULL` means the account inherits its connection's owner (`bank_connections.user_id`). When set, it is the effective owner for attribution — needed when one connection (e.g. a SimpleFIN bridge) spans accounts belonging to different household members. Resolved at read time via `COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id)`. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
 
@@ -374,7 +375,8 @@ PRIMARY KEY (id)
 #### Foreign Keys
 
 ```sql
-FOREIGN KEY (connection_id) REFERENCES bank_connections (id) ON DELETE SET NULL
+FOREIGN KEY (connection_id)  REFERENCES bank_connections (id) ON DELETE SET NULL
+FOREIGN KEY (owner_user_id)  REFERENCES users (id)            ON DELETE SET NULL
 ```
 
 #### Unique Constraints
@@ -392,6 +394,7 @@ Plaid `account_id` values are globally unique across all items and institutions.
 | `accounts_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
 | `accounts_connection_id_idx` | `connection_id` | B-tree | List all accounts for a connection. Used when syncing and when populating the dashboard. Supports SET NULL foreign key enforcement. |
 | `accounts_external_account_id_idx` | `external_account_id` | B-tree | Upsert lookup during sync and webhook processing. Enforces unique constraint. |
+| `accounts_owner_user_idx` | `owner_user_id` | B-tree (partial, `WHERE owner_user_id IS NOT NULL`) | Resolve accounts explicitly owned by a user (effective-owner filtering). |
 
 ---
 

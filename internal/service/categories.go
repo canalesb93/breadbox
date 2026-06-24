@@ -619,7 +619,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
 		argN++
 	}

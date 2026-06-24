@@ -588,6 +588,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm, svc))
 			r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
 			r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))
+			r.Post("/accounts/{id}/owner", UpdateAccountOwnerHandler(a, sm, svc))
 			r.Post("/test-provider/{provider}", ProvidersTestHandler(a))
 			r.Post("/users", CreateUserHandler(a, sm))
 			r.Put("/users/{id}", UpdateUserHandler(a, sm))

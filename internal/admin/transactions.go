@@ -480,6 +480,16 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			a.Logger.Error("list categories for account detail", "error", err)
 		}
 
+		// Household roster for the owner-override select. Editors only; viewers
+		// see the owner as a read-only label.
+		var members []service.UserResponse
+		if IsEditor(sm, r) {
+			members, err = svc.ListUsers(ctx)
+			if err != nil {
+				a.Logger.Error("list users for account detail", "error", err)
+			}
+		}
+
 		// Build export URL for this account's transactions.
 		acctExportURL := "/-/transactions/export-csv?account_id=" + idStr
 		if sd := q.Get("start_date"); sd != "" {
@@ -585,6 +595,7 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			CSRFToken:             GetCSRFToken(r),
 			AccountID:             idStr,
 			Account:               detail,
+			Members:               members,
 			IsLiability:           isLiability,
 			HasCreditUtil:         hasCreditUtil,
 			CreditUtilization:     creditUtilization,

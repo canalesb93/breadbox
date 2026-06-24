@@ -30,6 +30,8 @@ type Account struct {
 	UpdatedAt         string   `json:"updated_at"`
 	ConnectionStatus  *string  `json:"connection_status,omitempty"`
 	IsDependentLinked bool     `json:"is_dependent_linked"`
+	OwnerUserID       *string  `json:"owner_user_id,omitempty"`
+	OwnerUserName     *string  `json:"owner_user_name,omitempty"`
 }
 
 // AccountBalance is a single-currency balance block.
@@ -59,6 +61,7 @@ type AccountPatch struct {
 	DisplayName       *string `json:"display_name,omitempty"`
 	IsExcluded        *bool   `json:"is_excluded,omitempty"`
 	IsDependentLinked *bool   `json:"is_dependent_linked,omitempty"`
+	OwnerUserID       *string `json:"owner_user_id,omitempty"`
 }
 
 // AccountLink mirrors service.AccountLinkResponse — the

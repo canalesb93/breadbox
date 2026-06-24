@@ -105,7 +105,10 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 						}
 					}
 
-					connStatus := string(acct.ConnectionStatus)
+					var connStatus string
+					if acct.ConnectionStatus.Valid {
+						connStatus = string(acct.ConnectionStatus.ConnectionStatus)
+					}
 					eu.Accounts = append(eu.Accounts, UserAccountSummary{
 						ID:               pgconv.FormatUUID(acct.ID),
 						Name:             displayName,
