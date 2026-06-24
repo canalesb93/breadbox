@@ -62,15 +62,28 @@ window each sync, the engine soft-deletes stale pending rows via the
 
 One access URL spans every bank at the bridge, and the user can link more banks
 there *after* connecting Breadbox. So `SyncTransactions` also returns the
-connection's **full current account set** in `SyncResult.Accounts` (captured once
-per sync — the bridge lists the full set on every window, so there's no need to
-re-collect per window). Before processing transactions, the sync engine upserts
-that set with `UpsertAccountMetadata` — **metadata only, never balances** (those
-are owned by the balance-refresh path) and `connection_id` is set only on INSERT,
-so an existing account keeps its connection. A bank added at the bridge after
-connect therefore appears in Breadbox on the next sync automatically — no
-reconnect, no new token. Providers whose account set is fixed at connect time
-(Plaid, CSV) leave `SyncResult.Accounts` nil and the engine skips the upsert.
+connection's **full current account set** in `SyncResult.Accounts`, deduped by
+external ID across every fetch window (a single window can omit accounts, so the
+set is unioned rather than captured from one window). Before processing
+transactions, the sync engine upserts that set with `UpsertAccountMetadata` —
+**metadata only, never balances** (those are owned by the balance-refresh path)
+and `connection_id` is set only on INSERT, so an existing account keeps its
+connection. A bank added at the bridge after connect therefore appears in
+Breadbox on the next sync automatically — no reconnect, no new token. Providers
+whose account set is fixed at connect time (Plaid, CSV) leave
+`SyncResult.Accounts` nil and the engine skips the upsert.
+
+### Mixed-owner bridges
+
+A single SimpleFIN token can span accounts belonging to **different household
+members** (e.g. one person links both their and their partner's banks at the
+bridge). The connection has a single owner (`bank_connections.user_id`), but
+individual accounts can be reassigned to another member via the per-account
+owner override (`accounts.owner_user_id`) — editable from the account-detail
+Settings page or `PATCH /api/v1/accounts/{id}`. Attribution resolves at read
+time through `COALESCE(t.attributed_user_id, a.owner_user_id, bc.user_id)`, so
+reassigning an account re-routes its existing transactions across per-user
+totals with no backfill. See `docs/data-model.md` § `accounts`.
 
 ### Rate limits
 

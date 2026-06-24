@@ -17,6 +17,11 @@ type AccountDetailProps struct {
 	AccountID string
 	Account   *service.AdminAccountDetail
 
+	// Members is the household roster powering the owner-override select in
+	// Account Settings. Populated only for editors; empty for viewers, who
+	// see the owner as a read-only label.
+	Members []service.UserResponse
+
 	// Liability / credit utilization.
 	IsLiability       bool
 	HasCreditUtil     bool

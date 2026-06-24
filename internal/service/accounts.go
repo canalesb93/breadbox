@@ -70,6 +70,10 @@ type UpdateAccountParams struct {
 	// IsDependentLinked controls the dependent-linked flag (normally driven
 	// by account_links lifecycle but exposed here for parity with admin).
 	IsDependentLinked *bool
+	// OwnerUserID sets the per-account owner override: nil = no change,
+	// non-nil "" = clear (inherit the connection owner), non-nil short_id/uuid
+	// = set to that household member.
+	OwnerUserID *string
 }
 
 // UpdateAccount partially updates a single account. Returns the refreshed
@@ -86,7 +90,7 @@ func (s *Service) UpdateAccount(ctx context.Context, id string, params UpdateAcc
 		return nil, fmt.Errorf("get account: %w", err)
 	}
 
-	if params.DisplayName == nil && params.IsExcluded == nil && params.IsDependentLinked == nil {
+	if params.DisplayName == nil && params.IsExcluded == nil && params.IsDependentLinked == nil && params.OwnerUserID == nil {
 		// Nothing to do — return the current state.
 		return s.GetAccount(ctx, id)
 	}
@@ -99,6 +103,7 @@ func (s *Service) UpdateAccount(ctx context.Context, id string, params UpdateAcc
 		  display_name        = CASE WHEN $2::bool THEN $3::text ELSE display_name        END,
 		  excluded            = CASE WHEN $4::bool THEN $5::bool ELSE excluded            END,
 		  is_dependent_linked = CASE WHEN $6::bool THEN $7::bool ELSE is_dependent_linked END,
+		  owner_user_id       = CASE WHEN $8::bool THEN $9::uuid ELSE owner_user_id       END,
 		  updated_at = NOW()
 		WHERE id = $1`
 
@@ -129,7 +134,23 @@ func (s *Service) UpdateAccount(ctx context.Context, id string, params UpdateAcc
 		dlVal = false
 	}
 
-	if _, err := s.Pool.Exec(ctx, q, uid, dnSet, dnVal, exSet, exVal, dlSet, dlVal); err != nil {
+	// Owner override: nil = no change; "" = clear (inherit connection owner);
+	// otherwise resolve the short_id/uuid to the canonical user UUID.
+	ownSet := params.OwnerUserID != nil
+	var ownVal any
+	if ownSet {
+		if *params.OwnerUserID == "" {
+			ownVal = nil
+		} else {
+			ouid, err := s.resolveUserID(ctx, *params.OwnerUserID)
+			if err != nil {
+				return nil, fmt.Errorf("invalid owner user id: %w", err)
+			}
+			ownVal = ouid
+		}
+	}
+
+	if _, err := s.Pool.Exec(ctx, q, uid, dnSet, dnVal, exSet, exVal, dlSet, dlVal, ownSet, ownVal); err != nil {
 		return nil, fmt.Errorf("update account: %w", err)
 	}
 
@@ -243,15 +264,16 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 		UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
 		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 		IsDependentLinked: r.IsDependentLinked,
+		OwnerUserID:       textPtr(r.OwnerUserShortID),
+		OwnerUserName:     textPtr(r.OwnerUserName),
 	}
 }
 
 func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
-	connShort := r.ConnectionShortID
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
 		ShortID:           r.ShortID,
-		ConnectionID:      &connShort,
+		ConnectionID:      textPtr(r.ConnectionShortID),
 		UserID:            textPtr(r.UserShortID),
 		InstitutionName:   textPtr(r.InstitutionName),
 		Name:              r.Name,
@@ -266,8 +288,10 @@ func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
 		CreatedAt:         pgconv.TimestampStr(r.CreatedAt),
 		UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
-		ConnectionStatus:  connStatusPtr(r.ConnectionStatus),
+		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 		IsDependentLinked: r.IsDependentLinked,
+		OwnerUserID:       textPtr(r.OwnerUserShortID),
+		OwnerUserName:     textPtr(r.OwnerUserName),
 	}
 }
 
@@ -292,6 +316,8 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 		UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
 		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 		IsDependentLinked: r.IsDependentLinked,
+		OwnerUserID:       textPtr(r.OwnerUserShortID),
+		OwnerUserName:     textPtr(r.OwnerUserName),
 	}
 }
 

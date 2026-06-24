@@ -248,11 +248,13 @@ func accountRowFromListByUser(r db.ListAccountsByUserRow, userNameByShort, avata
 		MaskValid:         r.Mask.Valid,
 		Mask:              r.Mask.String,
 		InstitutionName:   r.InstitutionName.String,
-		ConnectionShortID: r.ConnectionShortID,
-		ConnectionStatus:  string(r.ConnectionStatus),
+		ConnectionShortID: r.ConnectionShortID.String,
 		IsDependentLinked: r.IsDependentLinked,
 		Excluded:          r.Excluded,
 		IsLiability:       IsLiabilityAccount(r.Type),
+	}
+	if r.ConnectionStatus.Valid {
+		row.ConnectionStatus = string(r.ConnectionStatus.ConnectionStatus)
 	}
 	if r.UserShortID.Valid {
 		row.UserID = r.UserShortID.String

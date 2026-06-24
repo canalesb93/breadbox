@@ -63,12 +63,14 @@ Body: every field is optional. Omit a key to leave the corresponding column unch
 | `display_name` | string | User-supplied label. Empty string clears the override. |
 | `is_excluded` | bool | Hide the account from totals and skip it during sync. |
 | `is_dependent_linked` | bool | Whether the account participates in dependent-link attribution. Normally driven by `account_links` lifecycle; exposed here for parity with the admin UI. |
+| `owner_user_id` | string | short_id of a household member to own this account, overriding the connection owner. Empty string clears the override so the account inherits its connection owner. The effective owner drives per-user transaction attribution. |
 
 ```json
 {
   "display_name": "Joint Checking",
   "is_excluded": false,
-  "is_dependent_linked": true
+  "is_dependent_linked": true,
+  "owner_user_id": "u8Xk2p9q"
 }
 ```
 

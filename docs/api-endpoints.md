@@ -30,7 +30,7 @@ Unauthenticated device-code dance the CLI uses to mint API keys on a remote host
 | GET | `/accounts` | R | List all household accounts |
 | GET | `/accounts/{id}` | R | Single account summary |
 | GET | `/accounts/{id}/detail` | R | Detail incl. last 25 transactions and per-currency balances |
-| PATCH | `/accounts/{id}` | W | Update `display_name`, `is_excluded`, `is_dependent_linked` |
+| PATCH | `/accounts/{id}` | W | Update `display_name`, `is_excluded`, `is_dependent_linked`, `owner_user_id` |
 
 ## Transactions
 

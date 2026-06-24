@@ -27,6 +27,12 @@ type AccountResponse struct {
 	UpdatedAt         string   `json:"updated_at"`
 	ConnectionStatus  *string  `json:"connection_status,omitempty"`
 	IsDependentLinked bool     `json:"is_dependent_linked"`
+	// OwnerUserID / OwnerUserName carry the per-account owner override
+	// (accounts.owner_user_id). nil means the account inherits its bank
+	// connection's owner (UserID above). When set, the override is the
+	// effective owner for attribution.
+	OwnerUserID   *string `json:"owner_user_id"`
+	OwnerUserName *string `json:"owner_user_name,omitempty"`
 }
 
 type TransactionCategoryInfo struct {

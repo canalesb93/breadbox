@@ -110,10 +110,35 @@ function toggleExcluded(accountId, checked) {
     });
 }
 
+// Account-settings: the Owner <select> fires onchange; POST the new owner and
+// reload so the effective-owner label and any per-user totals refresh. An
+// empty value clears the override so the account inherits its connection owner.
+function updateOwner(accountId, ownerId) {
+  fetch('/-/accounts/' + accountId + '/owner', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner_user_id: ownerId }),
+  })
+    .then(function (res) {
+      if (res.ok) {
+        showToast(ownerId === '' ? 'Owner reset to connection.' : 'Account owner updated.', 'success');
+        setTimeout(function () { window.location.reload(); }, 600);
+      } else {
+        return res.json().then(function (data) {
+          showToast(data.error || 'Failed to update owner.');
+        });
+      }
+    })
+    .catch(function () {
+      showToast('Network error. Please try again.');
+    });
+}
+
 window.showToast = showToast;
 window.quickSetCategory = quickSetCategory;
 window.updateDisplayName = updateDisplayName;
 window.toggleExcluded = toggleExcluded;
+window.updateOwner = updateOwner;
 
 // Seed window.__bbCategories as early as possible so inline x-data
 // initializers (the filter row's categoryPicker, plus tx_row's inline

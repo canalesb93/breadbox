@@ -3358,6 +3358,14 @@ components:
         is_excluded: { type: boolean }
         is_dependent_linked: { type: boolean }
         connection_id: { type: string, nullable: true }
+        user_id: { type: string, nullable: true, description: short_id of the connection owner. }
+        owner_user_id:
+          {
+            type: string,
+            nullable: true,
+            description: short_id of the per-account owner override; null means the account inherits its connection owner.,
+          }
+        owner_user_name: { type: string, nullable: true }
         provider: { type: string, enum: [plaid, teller, csv] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -3368,6 +3376,11 @@ components:
         display_name: { type: string, description: Empty string clears the override. }
         is_excluded: { type: boolean }
         is_dependent_linked: { type: boolean }
+        owner_user_id:
+          {
+            type: string,
+            description: short_id of a household member to own this account; empty string clears the override so it inherits the connection owner.,
+          }
     AccountDetail:
       allOf:
         - $ref: "#/components/schemas/Account"

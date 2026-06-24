@@ -1345,6 +1345,42 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 	}
 }
 
+// UpdateAccountOwnerHandler serves POST /admin/api/accounts/{id}/owner. Sets
+// (or clears) the per-account owner override. Routed through the service so a
+// member short_id is resolved and validated; an empty owner_user_id clears the
+// override so the account inherits its connection owner.
+func UpdateAccountOwnerHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid account ID"); !ok {
+			return
+		}
+		idStr := chi.URLParam(r, "id")
+
+		var req struct {
+			OwnerUserID *string `json:"owner_user_id"`
+		}
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		// Default a missing key to "" so the call is always a deliberate set/clear.
+		owner := ""
+		if req.OwnerUserID != nil {
+			owner = *req.OwnerUserID
+		}
+
+		account, err := svc.UpdateAccount(r.Context(), idStr, service.UpdateAccountParams{
+			OwnerUserID: &owner,
+		})
+		if err != nil {
+			a.Logger.Error("update account owner", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update account owner"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, account)
+	}
+}
+
 // UpdateConnectionPausedHandler serves POST /admin/api/connections/{id}/paused.
 func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
