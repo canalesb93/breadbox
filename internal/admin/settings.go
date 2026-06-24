@@ -83,10 +83,6 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 	}
 	agentAvatarStyle := appconfig.String(ctx, a.Queries, appconfig.KeyAvatarAgentStyle, avatar.DefaultAgentStyle)
 
-	// Counterparty logo hotlinking (env → app_config → default) for the
-	// Appearance section's toggle + optional logo.dev publishable token.
-	counterpartyLogos, logoDevToken := a.Service.CounterpartyLogoSettings(ctx)
-
 	nextSyncTime := ""
 	if a.Scheduler != nil {
 		nextSyncTime = formatNextSync(a.Scheduler.NextRun())
@@ -117,8 +113,6 @@ func buildSettingsProps(a *app.App, r *http.Request) (pages.SettingsProps, map[s
 		AvatarUserStyle:      userAvatarStyle,
 		AvatarAgentStyle:     agentAvatarStyle,
 		AvatarStyles:         avatar.AvailableStyles,
-		CounterpartyLogos:    counterpartyLogos,
-		LogoDevToken:         logoDevToken,
 	}
 	if a.VersionChecker != nil {
 		if updateAvailable, latest, err := a.VersionChecker.CheckForUpdate(ctx); err == nil && updateAvailable != nil && *updateAvailable && latest != nil {

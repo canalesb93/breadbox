@@ -42,4 +42,11 @@ type ProvidersProps struct {
 	// Per-provider health summaries (always populated for "plaid",
 	// "teller", "csv" — handler ensures stub entries exist).
 	ProviderHealth map[string]*service.ProviderHealthSummary
+
+	// logo.dev integration (the "API integrations" section) — the
+	// counterparty brand-logo toggle and its publishable token, relocated
+	// from the General → Counterparties section so all pluggable APIs live on
+	// the Providers directory.
+	CounterpartyLogos bool
+	LogoDevToken      string
 }

@@ -82,11 +82,4 @@ type SettingsProps struct {
 	AvatarUserStyle  string
 	AvatarAgentStyle string
 	AvatarStyles     []avatar.StyleOption
-
-	// CounterpartyLogos toggles hotlinking real brand logos from logo.dev on
-	// counterparty rows/headers (default on). LogoDevToken is the optional
-	// logo.dev publishable key (pk_…) for higher rate limits — public by design,
-	// so it's shown in the clear.
-	CounterpartyLogos bool
-	LogoDevToken      string
 }
