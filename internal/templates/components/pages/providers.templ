@@ -125,9 +125,7 @@ templ logoDevRow(p ProvidersProps) {
 // and the publishable token, relocated from the General → Counterparties section
 // so every pluggable API lives on the Providers directory. Both controls
 // auto-save on change (settings.js's settingsAutoSave → the 204 endpoints), so
-// the drawer has only a Close footer. The referrer note heads off the common
-// domain-restriction 401 (a restricted key needs this instance's domain in its
-// allowed referrers).
+// the drawer has only a Close footer.
 templ providersLogoDevDrawer(p ProvidersProps) {
 	@components.Drawer(components.DrawerProps{
 		ID:    "provider-logodev",
@@ -167,10 +165,6 @@ templ providersLogoDevDrawer(p ProvidersProps) {
 						<input type="text" name="logo_dev_token" value={ p.LogoDevToken } placeholder="pk_… (paste to enable logos)" autocomplete="off" spellcheck="false" class="input input-sm w-full font-mono" aria-label="logo.dev publishable token"/>
 					}
 					<p class="text-xs text-base-content/55 mt-1.5">Publishable key (<code>pk_…</code>) — required for logos to appear. Get a free one at <a href="https://logo.dev" target="_blank" rel="noopener" class="link link-hover">logo.dev</a>. Public by design (it rides in the image URL).</p>
-				</div>
-				<div role="note" class="alert alert-soft alert-info rounded-xl text-xs items-start">
-					@components.LucideIcon("info", "w-4 h-4 shrink-0 mt-0.5")
-					<span>If your logo.dev key is <strong>domain-restricted</strong>, add this Breadbox instance's domain to its allowed referrers (a wildcard like <code>*.example.com</code> covers subdomains). Otherwise logo.dev answers <code>401</code> and logos quietly fall back to monograms.</span>
 				</div>
 			</div>
 			@providerDrawerCloseFooter(false)
