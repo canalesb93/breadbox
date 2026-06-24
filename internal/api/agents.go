@@ -762,20 +762,3 @@ func ListRecentErroredAgentRunsHandler(svc *service.Service) http.HandlerFunc {
 		writeData(w, out)
 	}
 }
-
-// ListPromptBlocksHandler exposes the parsed agent prompt blocks under
-// prompts/agents/*.md to the admin UI. Backs the assembly-bench prompt
-// builder. The blocks themselves are embedded into the binary at build
-// time, so this is a read-only, side-effect-free endpoint — no scope
-// upgrade required.
-func ListPromptBlocksHandler(svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		out, err := svc.ListPromptBlocks(r.Context())
-		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR",
-				"Failed to list prompt blocks")
-			return
-		}
-		writeData(w, out)
-	}
-}
