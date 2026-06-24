@@ -47,6 +47,49 @@ func TestRuleHasRetroactiveActionExcludesCommentOnly(t *testing.T) {
 	}
 }
 
+func TestRuleActionEntityNamePrefersInlineName(t *testing.T) {
+	// An action that carries an inline name renders it verbatim, regardless of
+	// any resolved-name map.
+	p := RuleDetailProps{ActionEntityNames: map[string]string{"wvmXi45D": "Resolved"}}
+	cp := service.RuleAction{Type: "assign_counterparty", CounterpartyName: "Netflix", CounterpartyShortID: "wvmXi45D"}
+	if got := ruleActionEntityName(p, cp); got != "Netflix" {
+		t.Errorf("ruleActionEntityName(counterparty inline) = %q, want Netflix", got)
+	}
+	sr := service.RuleAction{Type: "assign_series", SeriesName: "Hulu", SeriesShortID: "abcd1234"}
+	if got := ruleActionEntityName(p, sr); got != "Hulu" {
+		t.Errorf("ruleActionEntityName(series inline) = %q, want Hulu", got)
+	}
+}
+
+func TestRuleActionEntityNameResolvesShortID(t *testing.T) {
+	// The bug from #1916: a rule that binds an existing counterparty by short_id
+	// stores no inline name, so the card used to render the opaque surrogate.
+	// With the handler-hydrated ActionEntityNames map, the short_id resolves to
+	// the entity's display name.
+	p := RuleDetailProps{ActionEntityNames: map[string]string{
+		"wvmXi45D": "Netflix",
+		"abcd1234": "Spotify",
+	}}
+	cp := service.RuleAction{Type: "assign_counterparty", CounterpartyShortID: "wvmXi45D"}
+	if got := ruleActionEntityName(p, cp); got != "Netflix" {
+		t.Errorf("ruleActionEntityName(counterparty short_id) = %q, want Netflix", got)
+	}
+	sr := service.RuleAction{Type: "assign_series", SeriesShortID: "abcd1234"}
+	if got := ruleActionEntityName(p, sr); got != "Spotify" {
+		t.Errorf("ruleActionEntityName(series short_id) = %q, want Spotify", got)
+	}
+}
+
+func TestRuleActionEntityNameFallsBackToShortID(t *testing.T) {
+	// When the lookup misses (entity deleted, resolution failed), the short_id
+	// is the last-resort display value rather than an empty label.
+	p := RuleDetailProps{ActionEntityNames: map[string]string{}}
+	cp := service.RuleAction{Type: "assign_counterparty", CounterpartyShortID: "wvmXi45D"}
+	if got := ruleActionEntityName(p, cp); got != "wvmXi45D" {
+		t.Errorf("ruleActionEntityName(unresolved counterparty) = %q, want wvmXi45D", got)
+	}
+}
+
 func TestRuleHasRetroactiveActionMixedRetroWins(t *testing.T) {
 	// A rule that mixes a sync-only action with a materializing one is still
 	// retroactive — the materializing action gets backfilled.
