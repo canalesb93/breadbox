@@ -103,13 +103,20 @@ The starter catalog (order = gallery display order):
 |---|---|---|---|---|
 | `rule-foundation` | Setup & Bulk | On demand (one-off) | `read_write` | $0.50 |
 | `bulk-catchup` | Setup & Bulk | On demand (one-off) | `read_write` | $0.20 |
+| `series-foundation` | Setup & Bulk | On demand (one-off) | `read_write` | $0.50 |
+| `counterparty-foundation` | Setup & Bulk | On demand (one-off) | `read_write` | $0.50 |
 | `routine-reviewer` | Categorization & Review | After each sync | `read_write` | $0.02 |
+| `transaction-reviewer` | Categorization & Review | After each sync | `read_write` | $0.04 |
+| `series-curator` | Enrichment | After each sync | `read_write` | $0.03 |
+| `counterparty-curator` | Enrichment | After each sync | `read_write` | $0.03 |
 | `weekly-money-digest` | Insights & Reports | Weekly (Mon 07:00) | `read_only` | $0.05 |
 | `backlog-closer` | Categorization & Review | Weekly (Mon 07:00) | `read_write` | $0.08 |
 | `monthly-close` | Insights & Reports | Monthly (1st, 08:00) | `read_only` | $0.07 |
 | `large-charge-sentinel` | Alerts & Anomalies | After each sync | `read_write` | $0.03 |
 
-**On-demand (one-off) workflows** (`OneOff: true`) have no recurring trigger: the scheduler and post-sync hook both skip them, and they run only when a human clicks **Run now**. The gallery renders them with copy/run/settings icon buttons instead of a run toggle. The first Run (or an explicit Settings → save) instantiates a manual-only `agent_definition` (enabled, no cron, no `trigger_on_sync_complete`); `POST /-/workflow-presets/{slug}/run` does the instantiate-on-first-use + dispatch in one call (admin-only, consent-gated). `rule-foundation` defaults to Sonnet, `bulk-catchup` to Haiku.
+The **Enrichment** category holds focused, single-dimension curators that keep the series and counterparty catalogs accurate and enriched as data arrives — narrower and deeper than the general `transaction-reviewer`. They default to after-each-sync (the doctrine's "improve the enrichment layer on every sync") and are drawer-switchable to a weekly cadence. The two **Foundation** one-offs (`series-foundation`, `counterparty-foundation`) are the recurring-series / counterparty counterparts to `rule-foundation`: a single deep pass that authors `assign_series` / `assign_counterparty` rules from history.
+
+**On-demand (one-off) workflows** (`OneOff: true`) have no recurring trigger: the scheduler and post-sync hook both skip them, and they run only when a human clicks **Run now**. The gallery renders them with copy/run/settings icon buttons instead of a run toggle. The first Run (or an explicit Settings → save) instantiates a manual-only `agent_definition` (enabled, no cron, no `trigger_on_sync_complete`); `POST /-/workflow-presets/{slug}/run` does the instantiate-on-first-use + dispatch in one call (admin-only, consent-gated). `rule-foundation`, `series-foundation`, and `counterparty-foundation` default to Sonnet; `bulk-catchup` to Haiku.
 
 ### Preset options
 
