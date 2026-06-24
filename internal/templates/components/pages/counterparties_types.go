@@ -82,6 +82,34 @@ type CounterpartyCategoryOption struct {
 	Selected bool
 }
 
+// counterpartyCategoryLabel resolves the counterparty's default-category display
+// name for the header chip. Prefers the resolved Counterparty.Category (set on
+// the list), falling back to the selected enrichment option's label so the detail
+// page shows the chip even when the handler only populated CategoryID.
+func counterpartyCategoryLabel(p CounterpartyDetailProps) string {
+	if p.Counterparty.Category != "" {
+		return p.Counterparty.Category
+	}
+	for _, opt := range p.CategoryOptions {
+		if opt.Selected && opt.Value != "" {
+			return opt.Label
+		}
+	}
+	return ""
+}
+
+// counterpartyWebsiteHost reduces a website URL to a bare host for the quiet
+// facts line — strips scheme, leading "www.", and a trailing slash. Display
+// only; the raw URL is still what the link points at.
+func counterpartyWebsiteHost(raw string) string {
+	s := strings.TrimSpace(raw)
+	s = strings.TrimPrefix(s, "https://")
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "www.")
+	s = strings.TrimSuffix(s, "/")
+	return s
+}
+
 // counterpartyMemberCount renders the dimmed "N charges" suffix on a row.
 func counterpartyMemberCount(n int) string {
 	if n == 1 {
