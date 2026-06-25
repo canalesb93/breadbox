@@ -51,6 +51,11 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			"Flash":       GetFlash(r.Context(), sm),
 		}
 
+		// logo.dev integration (the "API integrations" section): the
+		// counterparty brand-logo toggle + its publishable token (env →
+		// app_config → default).
+		counterpartyLogos, logoDevToken := svc.CounterpartyLogoSettings(ctx)
+
 		props := pages.ProvidersProps{
 			CSRFToken:     GetCSRFToken(r),
 			ConfigSources: a.Config.ConfigSources,
@@ -75,6 +80,9 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			HasEncryptionKey:    len(a.Config.EncryptionKey) > 0,
 			SyncIntervalMinutes: a.Config.SyncIntervalMinutes,
 			ProviderHealth:      providerHealth,
+
+			CounterpartyLogos: counterpartyLogos,
+			LogoDevToken:      logoDevToken,
 		}
 		renderProviders(w, r, sm, tr, data, props)
 	}

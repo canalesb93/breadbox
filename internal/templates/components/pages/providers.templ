@@ -20,10 +20,13 @@ import (
 // drawer scopes it via `x-data="providerCard" data-provider="..."`.
 templ Providers(p ProvidersProps) {
 	<script src="/static/js/admin/components/providers.js"></script>
+	<!-- settings.js registers the `settingsAutoSave` Alpine factory the logo.dev
+	     drawer's toggle + token use (each saves on change with a toast). -->
+	<script src="/static/js/admin/components/settings.js"></script>
 	<div>
 		@settingsTabHeader(settingsTabHeaderProps{
 			Title:    "Providers",
-			Subtitle: "Connect bank-data providers to sync accounts and transactions",
+			Subtitle: "Connect bank-data providers and API integrations to your Breadbox",
 		})
 		@components.SettingsSection(components.SettingsSectionProps{
 			Icon:    "plug",
@@ -69,14 +72,104 @@ templ Providers(p ProvidersProps) {
 				Health:     p.ProviderHealth["csv"],
 			})
 		}
-		// Per-provider drawers. Position-independent (fixed), so rendering
-		// them after the section is fine; only the one matching the open id
-		// (plus its scrim) shows.
+		@components.SettingsSection(components.SettingsSectionProps{
+			Icon:    "puzzle",
+			Title:   "API integrations",
+			Caption: "Non-bank APIs you can plug in to enrich your data",
+		}) {
+			@logoDevRow(p)
+		}
+		// Per-provider + integration drawers. Position-independent (fixed), so
+		// rendering them after the section is fine; only the one matching the open
+		// id (plus its scrim) shows.
 		@providersPlaidDrawer(p, p.ProviderHealth["plaid"])
 		@providersTellerDrawer(p, p.ProviderHealth["teller"])
 		@providersSimplefinDrawer(p, p.ProviderHealth["simplefin"])
 		@providersCSVDrawer(p.ProviderHealth["csv"])
+		@providersLogoDevDrawer(p)
 	</div>
+}
+
+// logoDevRow is the directory row for the logo.dev brand-logo integration. It
+// mirrors providerRow's shape (icon · name · desc · status · chevron, opening a
+// drawer) but carries a plain on/off status rather than a bank-provider health
+// dot — logo.dev has no connection to health-check.
+templ logoDevRow(p ProvidersProps) {
+	<button
+		type="button"
+		class="bb-settings-row bb-settings-row--link w-full text-left"
+		@click="$store.drawers.open('provider-logodev')"
+	>
+		@components.LucideIcon("image", "w-5 h-5 text-base-content opacity-60 shrink-0")
+		<div class="bb-settings-row__main">
+			<div class="bb-settings-row__label">logo.dev</div>
+			<p class="bb-settings-row__caption">Brand logos for counterparties — merchants, people, employers</p>
+		</div>
+		<div class="bb-settings-row__control">
+			<div class="flex items-center gap-2.5">
+				if p.CounterpartyLogos && p.LogoDevToken != "" {
+					<span class="inline-flex items-center gap-1.5 text-xs text-base-content/60 whitespace-nowrap">
+						<span class="status status-sm status-success"></span>
+						On
+					</span>
+				} else {
+					<span class="text-xs text-base-content/40 whitespace-nowrap">Off</span>
+				}
+				@components.LucideIcon("chevron-right", "w-4 h-4 text-base-content opacity-40 shrink-0")
+			</div>
+		</div>
+	</button>
+}
+
+// providersLogoDevDrawer configures the logo.dev integration — the enable toggle
+// and the publishable token, relocated from the General → Counterparties section
+// so every pluggable API lives on the Providers directory. Both controls
+// auto-save on change (settings.js's settingsAutoSave → the 204 endpoints), so
+// the drawer has only a Close footer.
+templ providersLogoDevDrawer(p ProvidersProps) {
+	@components.Drawer(components.DrawerProps{
+		ID:    "provider-logodev",
+		Title: "logo.dev",
+		Size:  "md",
+	}) {
+		<div class="flex flex-col h-full">
+			@components.DrawerHeader(components.DrawerHeaderProps{
+				Icon:     "image",
+				Title:    "logo.dev",
+				Subtitle: "Brand logos for counterparties",
+			})
+			<div class="flex-1 overflow-y-auto p-5 space-y-5">
+				<p class="text-sm text-base-content/70 leading-relaxed">
+					Hotlink real brand logos onto counterparty rows and headers. Each counterparty with a website (and no manual logo) shows its brand logo from logo.dev; otherwise it falls back to a gradient monogram.
+				</p>
+				<div class="flex items-center justify-between gap-3">
+					<div class="min-w-0">
+						<div class="text-sm font-medium">Counterparty logos</div>
+						<p class="text-xs text-base-content/55 mt-0.5">The counterparty's domain is sent to logo.dev on each render.</p>
+					</div>
+					@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+						Action:    "/settings/counterparty-logos",
+						CSRFToken: p.CSRFToken,
+						Label:     "Counterparty logos saved",
+					}) {
+						<input type="checkbox" name="counterparty_logos" value="true" class="toggle toggle-sm toggle-primary" checked?={ p.CounterpartyLogos } aria-label="Enable counterparty brand logos"/>
+					}
+				</div>
+				<div>
+					<div class="text-sm font-medium mb-1.5">Publishable token</div>
+					@components.SettingsAutoSaveForm(components.SettingsAutoSaveFormProps{
+						Action:    "/settings/logo-dev-token",
+						CSRFToken: p.CSRFToken,
+						Label:     "logo.dev token saved",
+					}) {
+						<input type="text" name="logo_dev_token" value={ p.LogoDevToken } placeholder="pk_… (paste to enable logos)" autocomplete="off" spellcheck="false" class="input input-sm w-full font-mono" aria-label="logo.dev publishable token"/>
+					}
+					<p class="text-xs text-base-content/55 mt-1.5">Publishable key (<code>pk_…</code>) — required for logos to appear. Get a free one at <a href="https://logo.dev" target="_blank" rel="noopener" class="link link-hover">logo.dev</a>. Public by design (it rides in the image URL).</p>
+				</div>
+			</div>
+			@providerDrawerCloseFooter(false)
+		</div>
+	}
 }
 
 // providersSimplefinDrawer holds the SimpleFIN opt-in. SimpleFIN has no
