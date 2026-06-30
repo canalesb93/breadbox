@@ -214,7 +214,7 @@ func TestOrchestratorRunNow_RunnerErrorPersisted(t *testing.T) {
 }
 
 func TestOrchestratorRunNow_MintRevokeRoundTrip(t *testing.T) {
-	svc, _, _ := newService(t)
+	svc, _, pool := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)
 	def := mustCreateAgentDefinition(t, svc, "orch-mintrevoke", true)
 
@@ -236,16 +236,23 @@ func TestOrchestratorRunNow_MintRevokeRoundTrip(t *testing.T) {
 		t.Error("expected BREADBOX_API_KEY to be set in JobSpec MCP env")
 	}
 
-	// Confirm the minted key was revoked after the run.
-	keys, err := svc.ListAPIKeys(context.Background())
-	if err != nil {
-		t.Fatalf("ListAPIKeys: %v", err)
-	}
+	// Confirm the minted key was both created and revoked after the run.
+	// Agent keys are deliberately filtered out of ListAPIKeys (they're
+	// machinery, not user-managed credentials), so assert against api_keys
+	// directly by the run-key name — scanning ListAPIKeys here would pass
+	// vacuously because the row never appears in it.
 	wantName := "agent:" + def.Slug + ":" + runResp.ShortID
-	for _, k := range keys {
-		if k.Name == wantName && k.RevokedAt == nil {
-			t.Errorf("minted key %q should be revoked, but RevokedAt is nil", wantName)
-		}
+	var total, unrevoked int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT COUNT(*), COUNT(*) FILTER (WHERE revoked_at IS NULL) FROM api_keys WHERE name = $1`,
+		wantName).Scan(&total, &unrevoked); err != nil {
+		t.Fatalf("query minted key: %v", err)
+	}
+	if total == 0 {
+		t.Errorf("expected a minted key named %q, found none", wantName)
+	}
+	if unrevoked != 0 {
+		t.Errorf("minted key %q should be revoked, but %d unrevoked row(s) remain", wantName, unrevoked)
 	}
 	// Touch the unused appconfig reader to keep the import live in case
 	// the test file evolves to read settings directly.
@@ -419,7 +426,7 @@ func TestOrchestratorRunNow_CleanSuccess_LeavesHitCapNil(t *testing.T) {
 // contention. The 4th concurrent attempt should still lock — the cap is
 // a real ceiling, not a no-op.
 func TestOrchestratorRunNow_TripleConcurrency(t *testing.T) {
-	svc, _, _ := newService(t)
+	svc, _, pool := newService(t)
 	encKey := seedSubscriptionAuth(t, svc)
 	def := mustCreateAgentDefinition(t, svc, "orch-3x", true)
 
@@ -480,16 +487,20 @@ func TestOrchestratorRunNow_TripleConcurrency(t *testing.T) {
 		t.Errorf("max concurrent runs observed = %d, want 3 (cap=3 should NOT serialize)", got)
 	}
 
-	// Every successful run minted an api_key and revoked it. After all three
-	// complete, no `agent:orch-3x:*` key should remain unrevoked.
-	keys, err := svc.ListAPIKeys(context.Background())
-	if err != nil {
-		t.Fatalf("ListAPIKeys: %v", err)
+	// Every successful run minted an api_key and revoked it. Agent keys are
+	// filtered out of ListAPIKeys, so query api_keys directly: the runs' keys
+	// must exist and none may remain unrevoked after all three complete.
+	var total, unrevoked int
+	if err := pool.QueryRow(context.Background(),
+		`SELECT COUNT(*), COUNT(*) FILTER (WHERE revoked_at IS NULL) FROM api_keys WHERE name LIKE 'agent:orch-3x:%'`,
+	).Scan(&total, &unrevoked); err != nil {
+		t.Fatalf("query minted keys: %v", err)
 	}
-	for _, k := range keys {
-		if strings.HasPrefix(k.Name, "agent:orch-3x:") && k.RevokedAt == nil {
-			t.Errorf("unrevoked minted key after concurrent runs: %s", k.Name)
-		}
+	if total == 0 {
+		t.Error("expected minted keys for the concurrent runs, found none")
+	}
+	if unrevoked != 0 {
+		t.Errorf("expected all minted keys revoked after concurrent runs, but %d remain unrevoked", unrevoked)
 	}
 }
 
